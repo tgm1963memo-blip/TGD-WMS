@@ -27,8 +27,9 @@ function LanguageToggle() {
         color: brandConfig.colors.black,
         display: 'inline-flex',
         gap: 8,
-        minHeight: 40,
-        padding: '6px 8px 6px 12px',
+        minHeight: 32,
+        padding: '4px 8px',
+        fontSize: 13,
       }}
     >
       <span>
