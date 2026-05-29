@@ -66,47 +66,49 @@ export function DocumentBrandingForm({
   }
 
   return (
-    <section className="document-branding-form" aria-label="Document branding settings">
-      <div className="document-section">
+    <section className="form-page" aria-label="Document branding settings">
+      <div className="form-section">
         <h2>{language === 'en' ? 'Edit Document Branding' : 'แก้ไขการตั้งค่าเอกสาร'}</h2>
-        <p className="sprint-status">
+        <div className="form-warning">
           Preview only / not saved to database. Logo upload is not enabled.
-        </p>
+        </div>
       </div>
-
-      <div className="document-section">
-        <h3>ข้อมูลบริษัท (Company Information)</h3>
-        {DOCUMENT_BRANDING_EDITABLE_FIELDS.map((field) => (
-          <label className="form-field" key={field}>
-            <span>{FIELD_LABELS_TH[field] || field}</span>
-            <input
-              type={getInputType(field)}
-              value={draft[field] || ''}
-              onChange={(event) => handleChange(field, event.target.value)}
-              aria-label={FIELD_LABELS_TH[field] || field}
-            />
-          </label>
-        ))}
+      <div className="form-section">
+        <h3 className="form-section-header">ข้อมูลบริษัท (Company Information)</h3>
+        <div className="form-grid">
+          {DOCUMENT_BRANDING_EDITABLE_FIELDS.map((field) => (
+            <label className="form-field" key={field}>
+              <span className="form-label">{FIELD_LABELS_TH[field] || field}</span>
+              <input
+                className="form-input"
+                type={getInputType(field)}
+                value={draft[field] || ''}
+                onChange={(e) => handleChange(field, e.target.value)}
+                aria-label={FIELD_LABELS_TH[field] || field}
+              />
+            </label>
+          ))}
+        </div>
       </div>
-
-      <div className="document-section">
-        <h3>Branding Validation Warning</h3>
+      <div className="form-section">
+        <h3 className="form-section-header">Branding Validation Warning</h3>
         {warnings.length > 0 ? (
-          <ul>
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
+          <div className="form-warning">
+            <ul>
+              {warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
         ) : (
-          <p>พร้อมแสดงตัวอย่าง (Ready for preview)</p>
+          <p className="form-label">พร้อมแสดงตัวอย่าง (Ready for preview)</p>
         )}
       </div>
-
-      <div className="document-toolbar">
-        <button type="button" onClick={handlePreview}>
+      <div className="form-actions document-toolbar">
+        <button className="form-button" type="button" onClick={handlePreview}>
           Update preview
         </button>
-        <button type="button" onClick={handleReset}>
+        <button className="form-button secondary" type="button" onClick={handleReset}>
           Reset draft
         </button>
       </div>
