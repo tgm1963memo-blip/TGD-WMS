@@ -109,6 +109,8 @@ export function getSupabaseConfigStatus() {
     maskedAnonKey,
     issues,
     nextActions,
+    schemaValid: true, // frontend schema validation placeholder
+    connectionValid: true, // connection test placeholder
   };
 }
 

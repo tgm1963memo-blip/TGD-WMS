@@ -11,7 +11,7 @@ export function checkSupabaseConfigReadiness() {
 
 /**
  * Summarizes readiness for UI consumption.
- * Returns a simplified object with masked values and a readable status.
+ * Returns a simplified object without exposing any secret values.
  */
 export function summarizeSupabaseReadiness() {
   const status = getSupabaseConfigStatus();
@@ -21,8 +21,10 @@ export function summarizeSupabaseReadiness() {
     urlConfigured: status.urlConfigured,
     anonKeyConfigured: status.anonKeyConfigured,
     serviceRoleExposed: status.serviceRoleExposed,
-    maskedUrl: status.maskedUrl,
-    maskedAnonKey: status.maskedAnonKey,
+    clientInitialized: status.isConfigured, // true only when config is valid
+    schemaValid: status.schemaValid,
+    connectionValid: status.connectionValid,
+    // No maskedUrl or maskedAnonKey are exposed to UI
     issues: status.issues,
     nextActions: status.nextActions,
   };

@@ -58,40 +58,29 @@ export function AuthReadinessPage() {
       {/* Supabase Connection Readiness panel */}
       <details open className="supabase-readiness-details" style={{ marginTop: 24 }}>
         <summary style={{ cursor: 'pointer', fontSize: 18, fontWeight: 'bold' }}>
-          {getTranslation('supabase_readiness.title', 'th')} / {getTranslation('supabase_readiness.title', 'en')}
+          Supabase Frontend Readiness
         </summary>
         <SectionCard
-          title={getTranslation('supabase_readiness.description', 'th')}
-          description={''}
+          title="Frontend connection readiness"
+          description={supabaseStatus.ready ? 'Ready' : 'Not ready'}
           tone={supabaseStatus.ready ? 'default' : 'warning'}
           actions={<ThaiStatusBadge summary={supabaseStatus} />}
         >
           <div className="summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             <div>
-              <strong>{getTranslation('supabase_readiness.url_configured', 'th')}:</strong>{' '}
-              {supabaseStatus.urlConfigured ? '✅' : '❌'}
+              <strong>Secret display:</strong> Hidden
             </div>
             <div>
-              <strong>{getTranslation('supabase_readiness.anon_key_configured', 'th')}:</strong>{' '}
-              {supabaseStatus.anonKeyConfigured ? '✅' : '❌'}
+              <strong>Production readiness:</strong> Not ready
             </div>
             <div>
-              <strong>{getTranslation('supabase_readiness.service_role_not_exposed', 'th')}:</strong>{' '}
-              {supabaseStatus.serviceRoleExposed ? '❌' : '✅'}
+              <strong>Live write:</strong> Disabled
             </div>
             <div>
-              <strong>{getTranslation('supabase_readiness.environment_ready', 'th')}:</strong>{' '}
-              {supabaseStatus.ready ? '✅ Ready' : '⚠️ Not Ready'}
+              <strong>Transaction write:</strong> Disabled
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <strong>{getTranslation('supabase_readiness.next_action', 'th')}:</strong>{' '}
-              {supabaseStatus.nextActions.length ? supabaseStatus.nextActions.join(', ') : 'None'}
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <strong>{getTranslation('supabase_readiness.masked_url', 'th')}:</strong> {supabaseStatus.maskedUrl}
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <strong>{getTranslation('supabase_readiness.masked_anon_key', 'th')}:</strong> {supabaseStatus.maskedAnonKey}
+            <div>
+              <strong>service_role exposed:</strong> {supabaseStatus.serviceRoleExposed ? 'Yes' : 'No'}
             </div>
           </div>
         </SectionCard>
