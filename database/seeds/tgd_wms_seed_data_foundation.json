@@ -1,0 +1,100 @@
+{
+  "users": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "auth_user_id": "auth-admin-uuid",
+      "email": "admin.demo@tgd-wms.local",
+      "role": "admin",
+      "customer_id": null,
+      "is_active": true
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "auth_user_id": "auth-manager-uuid",
+      "email": "manager.demo@tgd-wms.local",
+      "role": "warehouse_manager",
+      "customer_id": null,
+      "is_active": true
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "auth_user_id": "auth-staff-uuid",
+      "email": "staff.demo@tgd-wms.local",
+      "role": "warehouse_staff",
+      "customer_id": null,
+      "is_active": true
+    },
+    {
+      "id": "44444444-4444-4444-4444-444444444444",
+      "auth_user_id": "auth-accounting-uuid",
+      "email": "accounting.demo@tgd-wms.local",
+      "role": "accounting",
+      "customer_id": null,
+      "is_active": true
+    },
+    {
+      "id": "55555555-5555-5555-5555-555555555555",
+      "auth_user_id": "auth-viewer-uuid",
+      "email": "viewer.demo@tgd-wms.local",
+      "role": "viewer",
+      "customer_id": null,
+      "is_active": true
+    }
+  ],
+  "customers": [
+    {"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "name": "Demo Customer Alpha", "contact_email": "alpha@example.com"},
+    {"id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "name": "Demo Customer Beta",  "contact_email": "beta@example.com"},
+    {"id": "cccccccc-cccc-cccc-cccc-cccccccccccc", "name": "Demo Customer Gamma", "contact_email": "gamma@example.com"}
+  ],
+  "products": [
+    {"id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "name": "Frozen Shrimp", "sku": "FS-001", "unit": "kg"},
+    {"id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "name": "Frozen Fish",   "sku": "FF-001", "unit": "kg"},
+    {"id": "ffffffffff-ffff-ffff-ffff-ffffffffffff", "name": "Frozen Chicken","sku": "FC-001","unit": "kg"},
+    {"id": "11111111-2222-3333-4444-555555555555", "name": "Chilled Sausage","sku": "CS-001","unit": "kg"},
+    {"id": "66666666-7777-8888-9999-aaaaaaaaaaaa", "name": "Frozen Processed Food","sku": "FPF-001","unit": "kg"}
+  ],
+  "warehouses": [
+    {"id": "77777777-7777-7777-7777-777777777777", "code": "WH-COLD-01", "name": "Cold Storage Warehouse 01"}
+  ],
+  "zones": [
+    {"id": "88888888-8888-8888-8888-888888888888", "warehouse_id": "77777777-7777-7777-7777-777777777777", "code": "FROZEN-ZONE", "temperature": -18},
+    {"id": "99999999-9999-9999-9999-999999999999", "warehouse_id": "77777777-7777-7777-7777-777777777777", "code": "CHILLED-ZONE", "temperature": 4}
+  ],
+  "locations": [
+    {"id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "88888888-8888-8888-8888-888888888888", "code": "FZ-A-01-01", "description": "Frozen Zone A Shelf 1"},
+    {"id": "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "88888888-8888-8888-8888-888888888888", "code": "FZ-A-01-02", "description": "Frozen Zone A Shelf 2"},
+    {"id": "cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "88888888-8888-8888-8888-888888888888", "code": "FZ-B-01-01", "description": "Frozen Zone B Shelf 1"},
+    {"id": "dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "99999999-9999-9999-9999-999999999999", "code": "CH-A-01-01", "description": "Chilled Zone A Shelf 1"},
+    {"id": "eeeeeeee-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "99999999-9999-9999-9999-999999999999", "code": "CH-A-01-02", "description": "Chilled Zone A Shelf 2"},
+    {"id": "ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee", "zone_id": "99999999-9999-9999-9999-999999999999", "code": "QC-HOLD-01", "description": "Quality Control Hold Area"}
+  ],
+  "lots": [
+    {"id": "11111111-1111-2222-3333-444444444444", "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_number": "LOT-SHRIMP-001", "expiry_date": "2025-12-31"},
+    {"id": "22222222-1111-2222-3333-444444444444", "product_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "customer_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "lot_number": "LOT-FISH-001",   "expiry_date": "2025-11-30"}
+  ],
+  "pallets": [
+    {"id": "33333333-1111-2222-3333-444444444444", "lot_id": "11111111-1111-2222-3333-444444444444", "location_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "quantity": 1000},
+    {"id": "44444444-1111-2222-3333-444444444444", "lot_id": "22222222-1111-2222-3333-444444444444", "location_id": "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee", "quantity": 800}
+  ],
+  "stockBalances": [
+    {"id": "55555555-1111-2222-3333-444444444444", "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "quantity": 1500},
+    {"id": "66666666-1111-2222-3333-444444444444", "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "quantity": 500},
+    {"id": "77777777-1111-2222-3333-444444444444", "product_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "quantity": 1200},
+    {"id": "88888888-1111-2222-3333-444444444444", "product_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc", "quantity": 800}
+  ],
+  "stockMovements": [
+    {"id": "99999999-1111-2222-3333-444444444444", "movement_type": "RECEIVE_CONFIRM",  "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_id": "11111111-1111-2222-3333-444444444444", "pallet_id": null, "quantity": 1000, "occurred_at": "now"},
+    {"id": "aaaaaaaa-1111-2222-3333-444444444444", "movement_type": "PUTAWAY_CONFIRM",  "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_id": "11111111-1111-2222-3333-444444444444", "pallet_id": "33333333-1111-2222-3333-444444444444", "quantity": 1000, "occurred_at": "now"},
+    {"id": "bbbbbbbb-1111-2222-3333-444444444444", "movement_type": "TRANSFER_CONFIRM",  "product_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "customer_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "lot_id": "22222222-1111-2222-3333-444444444444", "pallet_id": null, "quantity": 800, "occurred_at": "now"},
+    {"id": "cccccccc-1111-2222-3333-444444444444", "movement_type": "ADJUSTMENT_CONFIRM","product_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "customer_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "lot_id": null, "pallet_id": null, "quantity": -100, "occurred_at": "now"},
+    {"id": "dddddddd-1111-2222-3333-444444444444", "movement_type": "PICK_ALLOCATE",    "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_id": null, "pallet_id": null, "quantity": 200, "occurred_at": "now"},
+    {"id": "eeeeeeee-1111-2222-3333-444444444444", "movement_type": "PICK_CONFIRM",    "product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_id": null, "pallet_id": null, "quantity": 200, "occurred_at": "now"},
+    {"id": "ffffffff-1111-2222-3333-444444444444", "movement_type": "DISPATCH_CONFIRM","product_id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "lot_id": null, "pallet_id": null, "quantity": 200, "occurred_at": "now"}
+  ],
+  "operationCharges": [
+    {"id": "33333333-bbbb-cccc-dddd-eeeeeeeeeeee", "description": "Cold storage fee Jan", "amount": 1500, "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "created_at": "now"}
+  ],
+  "accountingChargeStaging": [
+    {"id": "55555555-bbbb-cccc-dddd-eeeeeeeeeeee", "month": "2025-02", "projected_charge": 1600, "customer_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+  ]
+}

@@ -1,0 +1,83 @@
+import { supabase } from './supabaseClient.js';
+
+function missingSupabaseClientResult() {
+  return {
+    data: null,
+    error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
+  };
+}
+
+export async function postInventoryMovement(input) {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  return supabase.rpc('tgd_post_inventory_movement', { input });
+}
+
+export async function getInventoryMovements(filters = {}) {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  let query = supabase
+    .from('tgd_inventory_movements')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (filters.customerId) {
+    query = query.eq('customer_id', filters.customerId);
+  }
+
+  if (filters.productId) {
+    query = query.eq('product_id', filters.productId);
+  }
+
+  if (filters.movementType) {
+    query = query.eq('movement_type', filters.movementType);
+  }
+
+  if (filters.referenceType) {
+    query = query.eq('reference_type', filters.referenceType);
+  }
+
+  if (filters.referenceNo) {
+    query = query.eq('reference_no', filters.referenceNo);
+  }
+
+  return query;
+}
+
+export async function getStockBalances(filters = {}) {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  let query = supabase
+    .from('tgd_stock_balances')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (filters.customerId) {
+    query = query.eq('customer_id', filters.customerId);
+  }
+
+  if (filters.productId) {
+    query = query.eq('product_id', filters.productId);
+  }
+
+  if (filters.lotId) {
+    query = query.eq('lot_id', filters.lotId);
+  }
+
+  if (filters.locationId) {
+    query = query.eq('location_id', filters.locationId);
+  }
+
+  if (filters.palletId) {
+    query = query.eq('pallet_id', filters.palletId);
+  }
+
+  return query;
+}
+
