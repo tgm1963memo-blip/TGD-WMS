@@ -57,22 +57,14 @@ export function Sidebar() {
         background: brandConfig.colors.black,
         borderRight: '1px solid rgba(214, 161, 31, 0.35)',
         color: brandConfig.colors.white,
-        padding: 18,
+        paddingTop: 12,
+        paddingBottom: 18,
+        paddingLeft: 18,
+        paddingRight: 18,
       }}
     >
-      <div className="tgm-sidebar-brand">
-        <img
-          alt="TGM logo"
-          className="tgm-sidebar-logo"
-          src={brandConfig.logoPath}
-        />
-        <div>
-          <p className="eyebrow" style={{ color: brandConfig.colors.gold, margin: 0 }}>
-            {brandConfig.companyNameEn}
-          </p>
-          <strong>{brandConfig.brandName}</strong>
-        </div>
-      </div>
+        <img alt="TGM logo" src={brandConfig.logoPath} className="sr-only" />
+
       <nav className="nav-list" aria-label="TGM WMS sections" style={{ display: 'grid', gap: 18 }}>
         {navSections.map((group) => (
           <section key={group.key}>
