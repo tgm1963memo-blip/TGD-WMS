@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ControlledFrontendWriteDryRunPanel } from '../../components/dashboard/ControlledFrontendWriteDryRunPanel.jsx';
+import { ControlledReceivingRpcDryRunPanel } from '../../components/dashboard/ControlledReceivingRpcDryRunPanel.jsx';
 import { DashboardCard } from '../../components/dashboard/DashboardCard.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
@@ -160,7 +160,24 @@ export function DashboardPage() {
         </section>
       ) : null}
 
-      <ControlledFrontendWriteDryRunPanel session={session} />
+      <section
+        className="controlled-receive-movement-dry-run-locked"
+        role="status"
+        style={{
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 8,
+          color: '#991b1b',
+          marginBottom: 18,
+          padding: 16,
+        }}
+      >
+        <strong>Controlled RECEIVE movement dry run locked</strong>
+        <p style={{ margin: '6px 0 0' }}>
+          Controlled RECEIVE movement dry run is locked after 13J-M to prevent unintended stock mutation.
+        </p>
+      </section>
+      <ControlledReceivingRpcDryRunPanel session={session} />
 
       <DashboardSection title="สรุปข้อมูล Staging แบบอ่านอย่างเดียว">
         <div className="summary-grid">
