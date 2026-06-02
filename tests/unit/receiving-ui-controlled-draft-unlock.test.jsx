@@ -34,6 +34,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
   addReceivingLine: (...args) => addReceivingLine(...args),
   postReceivingDocument: (...args) => postReceivingDocument(...args),
   getReceivingDocumentById: (...args) => getReceivingDocumentById(...args),
+  getReceivingStockMovements: vi.fn(async () => ({ data: [], error: null })),
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 

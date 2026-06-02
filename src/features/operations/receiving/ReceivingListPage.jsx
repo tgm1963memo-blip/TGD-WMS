@@ -11,7 +11,7 @@ const columns = [
   {
     key: 'receiving_no',
     header: 'Receiving No',
-    render: (row) => <Link to={`/operations/receiving/${row.id}`}>{row.receiving_no}</Link>,
+    render: (row) => <Link to={`/operations/receiving/${row.id}`}>{row.receiving_no || row.document_no}</Link>,
   },
   { key: 'customer_id', header: 'Customer' },
   { key: 'warehouse_id', header: 'Warehouse' },
@@ -19,6 +19,11 @@ const columns = [
   { key: 'receiving_type', header: 'Type' },
   { key: 'expected_receive_date', header: 'Date' },
   { key: 'created_at', header: 'Created At' },
+  {
+    key: 'actions',
+    header: 'Actions',
+    render: (row) => <Link to={`/operations/receiving/${row.id}`}>View detail</Link>,
+  },
 ];
 
 export function ReceivingListPage() {

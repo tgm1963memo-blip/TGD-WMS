@@ -40,6 +40,30 @@ export async function getReceivingDocumentById(id) {
     .maybeSingle();
 }
 
+export async function getReceivingStockMovements(documentId) {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  return supabase
+    .from('tgd_stock_movements')
+    .select(`
+      id,
+      movement_type,
+      quantity,
+      weight,
+      from_location_id,
+      to_location_id,
+      source_document_id,
+      source_line_id,
+      created_at,
+      updated_at
+    `)
+    .eq('source_module', 'RECEIVING')
+    .eq('source_document_id', documentId)
+    .order('created_at', { ascending: true });
+}
+
 export async function createReceivingDocument(input) {
   if (!supabase) {
     return missingSupabaseClientResult();
