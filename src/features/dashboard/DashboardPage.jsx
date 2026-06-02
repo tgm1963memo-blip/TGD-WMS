@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ControlledFrontendWriteDryRunPanel } from '../../components/dashboard/ControlledFrontendWriteDryRunPanel.jsx';
 import { DashboardCard } from '../../components/dashboard/DashboardCard.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
@@ -158,6 +159,8 @@ export function DashboardPage() {
           อ่านข้อมูลจาก Supabase ไม่สำเร็จ: {state.error.message ?? String(state.error)}
         </section>
       ) : null}
+
+      <ControlledFrontendWriteDryRunPanel session={session} />
 
       <DashboardSection title="สรุปข้อมูล Staging แบบอ่านอย่างเดียว">
         <div className="summary-grid">
