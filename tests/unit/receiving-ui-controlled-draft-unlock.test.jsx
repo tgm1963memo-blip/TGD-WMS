@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppRoutes } from '../../src/app/routes.jsx';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
 
-const { createReceivingDocument, addReceivingLine } = vi.hoisted(() => ({
+const { createReceivingDocument, addReceivingLine, getReceivingDocumentById } = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
     data: 'draft-123',
     error: null,
@@ -13,11 +14,21 @@ const { createReceivingDocument, addReceivingLine } = vi.hoisted(() => ({
     data: 'line-456',
     error: null,
   })),
+  getReceivingDocumentById: vi.fn(async () => ({
+    data: {
+      id: '00000000-0000-4000-8000-000000000123',
+      receiving_no: 'RCV-DETAIL-001',
+      status: 'DRAFT',
+      tgd_receiving_lines: [],
+    },
+    error: null,
+  })),
 }));
 
 vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDocument: (...args) => createReceivingDocument(...args),
   addReceivingLine: (...args) => addReceivingLine(...args),
+  getReceivingDocumentById: (...args) => getReceivingDocumentById(...args),
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
@@ -30,6 +41,10 @@ function renderPage() {
 }
 
 describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows controlled draft mode and no longer uses the locked page title', () => {
     renderPage();
 
@@ -138,5 +153,49 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(source).not.toMatch(/\.update\s*\(/);
     expect(source).not.toMatch(/\.delete\s*\(/);
     expect(source).not.toMatch(/\.upsert\s*\(/);
+  });
+
+  it('defines the static receiving create route before the dynamic id route', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const routesPath = path.resolve(process.cwd(), 'src/app/routes.jsx');
+    const source = fs.readFileSync(routesPath, 'utf8');
+
+    expect(source).toContain('path="/operations/receiving/create"');
+    expect(source.indexOf('path="/operations/receiving/create"')).toBeLessThan(
+      source.indexOf('path="/operations/receiving/:id"'),
+    );
+  });
+
+  it('/operations/receiving/create renders controlled draft UI instead of detail', () => {
+    render(
+      <MemoryRouter initialEntries={['/operations/receiving/create']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Controlled receiving draft mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add Line section' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Receiving Detail' })).not.toBeInTheDocument();
+    expect(getReceivingDocumentById).not.toHaveBeenCalledWith('create');
+    expect(screen.getAllByText('Confirm/Post is still locked').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^Confirm$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
+  });
+
+  it('/operations/receiving/:id still renders detail for a uuid-like id', async () => {
+    const documentId = '00000000-0000-4000-8000-000000000123';
+
+    render(
+      <MemoryRouter initialEntries={[`/operations/receiving/${documentId}`]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(getReceivingDocumentById).toHaveBeenCalledWith(documentId);
+    });
+    expect(await screen.findByRole('heading', { name: 'Receiving Detail' })).toBeInTheDocument();
   });
 });

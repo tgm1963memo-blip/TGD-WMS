@@ -69,6 +69,7 @@ export function AppRoutes() {
         <Route path="/master/warehouses" element={<WarehousesPage />} />
         <Route path="/master/locations" element={<LocationsPage />} />
         <Route path="/operations/receiving" element={<ReceivingPage />} />
+        <Route path="/operations/receiving/create" element={<ReceivingCreatePage />} />
         <Route path="/operations/receiving/new" element={<ReceivingCreatePage />} />
         <Route path="/operations/receiving/:id" element={<ReceivingDetailPage />} />
         <Route path="/operations/putaway" element={<PutawayPage />} />
