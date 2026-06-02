@@ -74,16 +74,9 @@ export async function postReceivingDocument(id) {
     return missingSupabaseClientResult();
   }
 
-  // Draft-only: posting is controlled by the real RPC `tgd_rpc_post_receiving_document`.
-  // Do not perform posting from frontend while controller hold is active.
-  // The implementation includes the RPC contract name for review but will not call it.
-  // Controller-approved future call:
-  // return supabase.rpc('tgd_rpc_post_receiving_document', { p_document_id: id });
-
-  return {
-    data: null,
-    error: new Error('Posting receiving documents is disabled under controller HOLD'),
-  };
+  return supabase.rpc('tgd_rpc_post_receiving_document', {
+    p_document_id: id,
+  });
 }
 
 export async function cancelReceivingDocument() {

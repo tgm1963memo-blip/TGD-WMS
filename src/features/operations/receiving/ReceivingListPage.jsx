@@ -54,7 +54,7 @@ export function ReceivingListPage() {
           padding: 14,
         }}
       >
-        Receiving creation is controlled draft mode only. Confirm/Post remains locked.
+        Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.
       </section>
       <DocumentToolbar
         title="Receiving Documents"

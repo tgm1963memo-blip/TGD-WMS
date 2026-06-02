@@ -72,7 +72,7 @@ describe('Sprint 5E operational UI polish', () => {
       const source = readProjectFile(path);
       if (path.includes('/receiving/')) {
         expect(source).toContain('Controlled receiving draft mode');
-        expect(source).toContain('Confirm/Post is still locked');
+        expect(source).toContain('Confirm/Post Receiving');
         expect(source).not.toContain('DraftLineEditor');
         return;
       }

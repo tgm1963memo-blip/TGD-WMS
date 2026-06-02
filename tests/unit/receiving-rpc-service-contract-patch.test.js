@@ -120,20 +120,24 @@ describe('Sprint 13J-AE receiving RPC service contract patch', () => {
     expect(service).toContain('p_location_id: input.location_id');
   });
 
-  it('postReceivingDocument contract name is present but controller-held', () => {
+  it('postReceivingDocument calls the approved post RPC wrapper', () => {
     const service = readProjectFile(receivingServicePath);
     expect(service).toMatch(/tgd_rpc_post_receiving_document/);
-    expect(service).toContain('controller HOLD');
+    expect(service).toContain('p_document_id: id');
   });
 
-  it('ReceivingCreatePage allows controlled draft only and no Confirm/Post', () => {
+  it('ReceivingCreatePage allows controlled draft and service-wrapper Confirm/Post only', () => {
     const page = readProjectFile(receivingCreatePath);
 
     expect(page).toContain('Controlled receiving draft mode');
     expect(page).toContain('Save Draft');
     expect(page).toContain('addReceivingLine');
-    expect(page).toContain('Confirm/Post is still locked');
-    expect(page).not.toContain('postReceivingDocument');
+    expect(page).toContain('Confirm/Post Receiving');
+    expect(page).toContain('postReceivingDocument');
     expect(page).not.toContain('tgd_rpc_post_receiving_document');
+    expect(page).not.toMatch(/\.insert\s*\(/);
+    expect(page).not.toMatch(/\.update\s*\(/);
+    expect(page).not.toMatch(/\.delete\s*\(/);
+    expect(page).not.toMatch(/\.upsert\s*\(/);
   });
 });

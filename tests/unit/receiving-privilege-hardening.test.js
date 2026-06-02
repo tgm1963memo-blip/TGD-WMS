@@ -63,10 +63,12 @@ describe('Sprint 13J-L receiving privilege hardening migration', () => {
     expect(receivingCreate).toContain('Controlled receiving draft mode');
     expect(receivingCreate).toContain('createReceivingDocument');
     expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post is still locked');
-    expect(receivingCreate).not.toContain('postReceivingDocument');
+    expect(receivingCreate).toContain('Confirm/Post Receiving');
+    expect(receivingCreate).toContain('postReceivingDocument');
+    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
     expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('tgd_rpc_post_receiving_document');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);

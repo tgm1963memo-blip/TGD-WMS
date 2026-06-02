@@ -5,13 +5,17 @@ import { AppRoutes } from '../../src/app/routes.jsx';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
 
-const { createReceivingDocument, addReceivingLine, getReceivingDocumentById } = vi.hoisted(() => ({
+const { createReceivingDocument, addReceivingLine, postReceivingDocument, getReceivingDocumentById } = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
     data: 'draft-123',
     error: null,
   })),
   addReceivingLine: vi.fn(async () => ({
     data: 'line-456',
+    error: null,
+  })),
+  postReceivingDocument: vi.fn(async () => ({
+    data: { status: 'CONFIRMED' },
     error: null,
   })),
   getReceivingDocumentById: vi.fn(async () => ({
@@ -28,6 +32,7 @@ const { createReceivingDocument, addReceivingLine, getReceivingDocumentById } = 
 vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDocument: (...args) => createReceivingDocument(...args),
   addReceivingLine: (...args) => addReceivingLine(...args),
+  postReceivingDocument: (...args) => postReceivingDocument(...args),
   getReceivingDocumentById: (...args) => getReceivingDocumentById(...args),
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
@@ -43,6 +48,27 @@ function renderPage() {
 describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createReceivingDocument.mockResolvedValue({
+      data: 'draft-123',
+      error: null,
+    });
+    addReceivingLine.mockResolvedValue({
+      data: 'line-456',
+      error: null,
+    });
+    postReceivingDocument.mockResolvedValue({
+      data: { status: 'CONFIRMED' },
+      error: null,
+    });
+    getReceivingDocumentById.mockResolvedValue({
+      data: {
+        id: '00000000-0000-4000-8000-000000000123',
+        receiving_no: 'RCV-DETAIL-001',
+        status: 'DRAFT',
+        tgd_receiving_lines: [],
+      },
+      error: null,
+    });
   });
 
   it('shows controlled draft mode and no longer uses the locked page title', () => {
@@ -53,7 +79,8 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(screen.getByLabelText('Customer ID')).toBeInTheDocument();
     expect(screen.getByLabelText('Document No')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
-    expect(screen.getAllByText('Confirm/Post is still locked').length).toBeGreaterThan(0);
+    expect(screen.getByText('Controlled Confirm/Post')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm/Post Receiving' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Confirm$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
   });
@@ -111,14 +138,81 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(await screen.findByText(/line-456/)).toBeInTheDocument();
   });
 
-  it('source does not import postReceivingDocument or use direct Supabase writes', async () => {
+  it('shows Confirm/Post after draft creation and posts through the service wrapper', async () => {
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: 'Confirm/Post Receiving' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await screen.findByText('draft-123');
+    const postButton = screen.getByRole('button', { name: 'Confirm/Post Receiving' });
+    expect(postButton).toBeEnabled();
+
+    fireEvent.click(postButton);
+
+    await waitFor(() => {
+      expect(postReceivingDocument).toHaveBeenCalledWith('draft-123');
+    });
+    expect(await screen.findByText('Receiving document Confirm/Post completed.')).toBeInTheDocument();
+    expect(screen.getByText('CONFIRMED')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm/Post Receiving' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm/Post Receiving' }));
+    expect(postReceivingDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Confirm/Post while posting', async () => {
+    let resolvePost;
+    postReceivingDocument.mockImplementationOnce(() => new Promise((resolve) => {
+      resolvePost = resolve;
+    }));
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-002' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await screen.findByText('draft-123');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm/Post Receiving' }));
+
+    expect(screen.getByRole('button', { name: 'Posting receiving...' })).toBeDisabled();
+    resolvePost({ data: { status: 'CONFIRMED' }, error: null });
+    expect(await screen.findByText('Receiving document Confirm/Post completed.')).toBeInTheDocument();
+  });
+
+  it('shows post error returned by the receiving RPC wrapper', async () => {
+    postReceivingDocument.mockResolvedValueOnce({
+      data: null,
+      error: new Error('Document already confirmed'),
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-003' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await screen.findByText('draft-123');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm/Post Receiving' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Document already confirmed');
+    expect(screen.getByRole('button', { name: 'Confirm/Post Receiving' })).toBeEnabled();
+  });
+
+  it('source uses the post service wrapper and avoids direct writes or stock table references', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const pagePath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
     const source = fs.readFileSync(pagePath, 'utf8');
 
-    expect(source).not.toContain('postReceivingDocument');
+    expect(source).toContain('postReceivingDocument');
     expect(source).not.toContain('tgd_rpc_post_receiving_document');
+    expect(source).not.toContain('tgd_stock_movements');
+    expect(source).not.toContain('tgd_stock_balances');
     expect(source).not.toContain('supabase.from');
     expect(source).not.toMatch(/\.insert\s*\(/);
     expect(source).not.toMatch(/\.update\s*\(/);
@@ -133,7 +227,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post remains locked.')).toBeInTheDocument();
+    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
       'href',
       '/operations/receiving/create',
@@ -179,7 +273,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(screen.getByRole('heading', { name: 'Add Line section' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Receiving Detail' })).not.toBeInTheDocument();
     expect(getReceivingDocumentById).not.toHaveBeenCalledWith('create');
-    expect(screen.getAllByText('Confirm/Post is still locked').length).toBeGreaterThan(0);
+    expect(screen.getByText('Controlled Confirm/Post')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Confirm$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
   });

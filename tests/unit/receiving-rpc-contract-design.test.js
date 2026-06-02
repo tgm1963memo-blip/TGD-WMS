@@ -75,11 +75,12 @@ describe('Sprint 13J-J receiving RPC contract design', () => {
     const gateTest = readProjectFile(receivingGateTestPath);
     const receivingCreate = readProjectFile(receivingCreatePath);
 
-    expect(gateTest).toContain('Sprint 13J-I receiving operational write gate');
+    expect(gateTest).toContain('Sprint 13J-AI receiving operational write gate');
     expect(receivingCreate).toContain('Controlled receiving draft mode');
     expect(receivingCreate).toContain('createReceivingDocument');
     expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post is still locked');
-    expect(receivingCreate).not.toContain('postReceivingDocument');
+    expect(receivingCreate).toContain('Confirm/Post Receiving');
+    expect(receivingCreate).toContain('postReceivingDocument');
+    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
   });
 });

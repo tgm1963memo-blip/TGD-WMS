@@ -10,6 +10,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
   createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
   addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
+  postReceivingDocument: vi.fn(async () => ({ data: { status: 'CONFIRMED' }, error: null })),
 }));
 
 const projectRoot = resolve(__dirname, '../..');
@@ -21,31 +22,33 @@ function readSource(path) {
   return readFileSync(path, 'utf8');
 }
 
-describe('Sprint 13J-I receiving operational write gate', () => {
-  it('Receiving list does not expose active createHref to the receiving create route', () => {
+describe('Sprint 13J-AI receiving operational write gate', () => {
+  it('Receiving list links to controlled draft page with updated status message', () => {
     const source = readSource(listPagePath);
 
     expect(source).not.toContain('createHref="/operations/receiving/new"');
     expect(source).toContain('createHref="/operations/receiving/create"');
     expect(source).toContain('createLabel="Create Receiving Draft"');
-    expect(source).toContain('Receiving creation is controlled draft mode only. Confirm/Post remains locked.');
+    // Confirm/Post is no longer locked – message must reflect RPC availability
+    expect(source).toContain('Confirm/Post is available on draft page via RPC');
+    expect(source).not.toContain('Confirm/Post remains locked');
   });
 
-  it('Receiving list renders controlled draft navigation with post locked warning', async () => {
+  it('Receiving list renders controlled draft navigation with RPC status', async () => {
     render(
       <MemoryRouter>
         <ReceivingListPage />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post remains locked.')).toBeInTheDocument();
+    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
       'href',
       '/operations/receiving/create',
     );
   });
 
-  it('Receiving create page is controlled draft only with Confirm/Post locked', () => {
+  it('Receiving create page keeps Confirm/Post hidden until draft exists', () => {
     render(
       <MemoryRouter>
         <ReceivingCreatePage />
@@ -56,26 +59,56 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     expect(screen.getByLabelText('Customer ID')).toBeInTheDocument();
     expect(screen.getByLabelText('Document No')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
-    expect(screen.getAllByText('Confirm/Post is still locked').length).toBeGreaterThan(0);
+    expect(screen.getByText('Controlled Confirm/Post')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm/Post Receiving' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to receiving' })).toHaveAttribute('href', '/operations/receiving');
     expect(screen.queryByRole('button', { name: /^Confirm$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
   });
 
-  it('Receiving create page imports only controlled draft/add-line functions and no post/direct writes', () => {
+  it('Receiving create page uses postReceivingDocument wrapper and no direct RPC or DML', () => {
     const source = readSource(createPagePath);
 
+    // Allowed: import postReceivingDocument from service wrapper
     expect(source).toContain('createReceivingDocument');
     expect(source).toContain('addReceivingLine');
-    expect(source).not.toContain('updateReceivingDocument');
-    expect(source).not.toContain('postReceivingDocument');
+    expect(source).toContain('postReceivingDocument');
+    // Forbidden: direct RPC string in UI component
     expect(source).not.toContain('tgd_rpc_post_receiving_document');
+    // Forbidden: supabase.from in UI
+    expect(source).not.toContain('supabase.from');
+    // Forbidden: direct DML
     expect(source).not.toMatch(/\.insert\s*\(/);
     expect(source).not.toMatch(/\.update\s*\(/);
+    expect(source).not.toMatch(/\.delete\s*\(/);
+    expect(source).not.toMatch(/\.upsert\s*\(/);
+    // Forbidden: direct .rpc call in UI
     expect(source).not.toMatch(/\.rpc\s*\(/);
+    // Forbidden: stock table references
+    expect(source).not.toContain('tgd_stock_movements');
+    expect(source).not.toContain('tgd_stock_balances');
+    // Forbidden: updateReceivingDocument (still locked)
+    expect(source).not.toContain('updateReceivingDocument');
   });
 
-  it('Receiving service write wrappers are RPC-only and direct table writes are removed', () => {
+  it('receivingService.postReceivingDocument uses tgd_rpc_post_receiving_document with p_document_id', () => {
+    const source = readSource(receivingServicePath);
+
+    expect(source).toContain('postReceivingDocument');
+    expect(source).toContain('tgd_rpc_post_receiving_document');
+    expect(source).toContain('p_document_id: id');
+  });
+
+  it('receivingService has no direct DML', () => {
+    const source = readSource(receivingServicePath);
+
+    expect(source).not.toMatch(/\.insert\s*\(/);
+    expect(source).not.toMatch(/\.update\s*\(/);
+    expect(source).not.toMatch(/\.delete\s*\(/);
+    expect(source).not.toMatch(/\.upsert\s*\(/);
+  });
+
+  it('receivingService write wrappers are RPC-only', () => {
     const source = readSource(receivingServicePath);
 
     expect(source).toContain('createReceivingDocument');
@@ -83,15 +116,8 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     expect(source).toContain('p_document_no: input.document_no');
     expect(source).not.toContain('p_reference');
     expect(source).toContain('updateReceivingDocument');
-    expect(source).toContain('postReceivingDocument');
-    expect(source).toContain('tgd_rpc_post_receiving_document');
-    expect(source).toContain('Posting receiving documents is disabled under controller HOLD');
     expect(source).toContain('tgd_rpc_add_receiving_line');
     expect(source).toContain('p_location_id: input.location_id');
-    expect(source).not.toMatch(/\.insert\s*\(/);
-    expect(source).not.toMatch(/\.update\s*\(/);
-    expect(source).not.toMatch(/\.delete\s*\(/);
-    expect(source).not.toMatch(/\.upsert\s*\(/);
   });
 
   it('Receiving gate source has no private key or production env references', () => {

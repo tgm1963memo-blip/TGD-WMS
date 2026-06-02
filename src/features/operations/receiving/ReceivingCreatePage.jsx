@@ -4,6 +4,7 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import {
   addReceivingLine,
   createReceivingDocument,
+  postReceivingDocument,
 } from '../../../services/receivingService.js';
 
 const fieldStyle = {
@@ -56,6 +57,8 @@ export function ReceivingCreatePage() {
   const [error, setError] = useState('');
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isAddingLine, setIsAddingLine] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  const [postSucceeded, setPostSucceeded] = useState(false);
 
   const updateDraftField = (field, value) => {
     setDraftForm((current) => ({ ...current, [field]: value }));
@@ -89,6 +92,7 @@ export function ReceivingCreatePage() {
       document_no: draftForm.document_no,
       status: 'DRAFT',
     });
+    setPostSucceeded(false);
     setMessage('Receiving draft created.');
   };
 
@@ -122,6 +126,31 @@ export function ReceivingCreatePage() {
     setMessage('Receiving line added.');
   };
 
+  const handleConfirmPost = async () => {
+    setError('');
+    setMessage('');
+
+    if (!draft?.id || postSucceeded) {
+      return;
+    }
+
+    setIsPosting(true);
+    const result = await postReceivingDocument(draft.id);
+    setIsPosting(false);
+
+    if (result?.error) {
+      setError(result.error.message || 'Unable to Confirm/Post receiving document.');
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      status: 'CONFIRMED',
+    }));
+    setPostSucceeded(true);
+    setMessage('Receiving document Confirm/Post completed.');
+  };
+
   return (
     <section className="page-shell">
       <PageHeader
@@ -146,7 +175,7 @@ export function ReceivingCreatePage() {
           <li>Staging controlled unlock only</li>
           <li>Save Draft uses receiving RPC only</li>
           <li>Add Line uses receiving RPC only</li>
-          <li>Confirm/Post is still locked</li>
+          <li>Confirm/Post uses receiving RPC only after draft creation</li>
           <li>No stock movement or stock balance update is triggered from this page</li>
         </ul>
       </section>
@@ -317,11 +346,31 @@ export function ReceivingCreatePage() {
         {lastLineId ? <p>Last receiving line id: {lastLineId}</p> : null}
       </form>
 
-      <section style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
-        <strong>Confirm/Post is still locked</strong>
+      <section style={{ ...cardStyle, borderColor: '#fed7aa', color: '#9a3412' }}>
+        <strong>Controlled Confirm/Post</strong>
         <p style={{ marginBottom: 0 }}>
-          This page does not provide Confirm or Post actions and does not create stock movements.
+          Confirm/Post is available only after a draft exists. The action uses the receiving post RPC only and
+          does not perform direct table writes from this page.
         </p>
+        {draft ? (
+          <button
+            type="button"
+            disabled={!draft?.id || isPosting || postSucceeded}
+            onClick={handleConfirmPost}
+            style={{
+              background: postSucceeded ? '#94a3b8' : '#b45309',
+              border: 0,
+              borderRadius: 8,
+              color: '#ffffff',
+              cursor: !draft?.id || isPosting || postSucceeded ? 'not-allowed' : 'pointer',
+              marginTop: 16,
+              minHeight: 42,
+              padding: '10px 16px',
+            }}
+          >
+            {isPosting ? 'Posting receiving...' : 'Confirm/Post Receiving'}
+          </button>
+        ) : null}
       </section>
 
       <Link className="action-link" to="/operations/receiving">

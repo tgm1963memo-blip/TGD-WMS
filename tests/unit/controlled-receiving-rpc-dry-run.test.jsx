@@ -111,15 +111,15 @@ describe('controlled receiving RPC dry run', () => {
     expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
   });
 
-  it('ReceivingCreatePage is controlled draft only and does not import postReceivingDocument', () => {
+  it('ReceivingCreatePage uses controlled post wrapper only and no direct writes', () => {
     const receivingCreate = readSource(receivingCreatePath);
 
     expect(receivingCreate).toContain('Controlled receiving draft mode');
     expect(receivingCreate).toContain('createReceivingDocument');
     expect(receivingCreate).toContain('addReceivingLine');
     expect(receivingCreate).toContain('Save Draft');
-    expect(receivingCreate).toContain('Confirm/Post is still locked');
-    expect(receivingCreate).not.toContain('postReceivingDocument');
+    expect(receivingCreate).toContain('Confirm/Post Receiving');
+    expect(receivingCreate).toContain('postReceivingDocument');
     expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
     expect(receivingCreate).not.toMatch(/>\s*Confirm\s*</i);
     expect(receivingCreate).not.toMatch(/>\s*Post\s*</i);
@@ -138,7 +138,8 @@ describe('controlled receiving RPC dry run', () => {
     expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).toContain('postReceivingDocument');
-    expect(receivingService).toContain('Posting receiving documents is disabled under controller HOLD');
+    expect(receivingService).toContain('tgd_rpc_post_receiving_document');
+    expect(receivingService).toContain('p_document_id: id');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);

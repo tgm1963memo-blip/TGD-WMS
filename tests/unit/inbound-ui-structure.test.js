@@ -82,7 +82,7 @@ describe('Sprint 5B inbound UI structure', () => {
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
   });
 
-  it('uses services for data access without importing post helpers into pages', () => {
+  it('uses services for data access and keeps direct post RPC out of pages', () => {
     const receivingCreate = readProjectFile('src/features/operations/receiving/ReceivingCreatePage.jsx');
     const putawayCreate = readProjectFile('src/features/operations/putaway/PutawayCreatePage.jsx');
     const receivingList = readProjectFile('src/features/operations/receiving/ReceivingListPage.jsx');
@@ -91,8 +91,9 @@ describe('Sprint 5B inbound UI structure', () => {
     expect(receivingCreate).toContain('Controlled receiving draft mode');
     expect(receivingCreate).toContain('createReceivingDocument');
     expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post is still locked');
-    expect(receivingCreate).not.toContain('postReceivingDocument');
+    expect(receivingCreate).toContain('Confirm/Post Receiving');
+    expect(receivingCreate).toContain('postReceivingDocument');
+    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
     expect(putawayCreate).toContain('createPutawayDocument');
     expect(receivingList).toContain('getReceivingDocuments');
     expect(putawayList).toContain('getPutawayDocuments');
