@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { hasRoleAccess } from '../../../security/permissionGuard.js';
 import {
   addReceivingLine,
   createReceivingDocument,
@@ -104,6 +106,9 @@ export function ReceivingCreatePage() {
   const [isAddingLine, setIsAddingLine] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [postSucceeded, setPostSucceeded] = useState(false);
+
+  const userRole = getCurrentUserRole();
+  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
 
   useEffect(() => {
     let isMounted = true;
@@ -308,12 +313,21 @@ export function ReceivingCreatePage() {
     setMessage('Receiving document Confirm/Post completed.');
   };
 
+  if (!canWrite) {
+    return (
+      <div className="page-shell">
+        <PageHeader title="Create Receiving Draft" description="Controlled receiving draft creation." />
+        <section role="alert" style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
+          Authentication required. Permission denied.
+        </section>
+        <Link className="action-link" to="/operations/receiving">Back to receiving list</Link>
+      </div>
+    );
+  }
+
   return (
-    <section className="page-shell">
-      <PageHeader
-        title="Controlled Receiving Draft"
-        description="สร้างเอกสารรับเข้าแบบ Draft เท่านั้น โดยยังไม่เปิด Confirm/Post หรือการตัดสต็อก"
-      />
+    <div className="page-shell">
+      <PageHeader title="Create Receiving Draft" description="Controlled receiving draft creation." />
 
       <section
         className="warning-panel"
@@ -608,6 +622,6 @@ export function ReceivingCreatePage() {
       <Link className="action-link" to="/operations/receiving">
         Back to receiving
       </Link>
-    </section>
+    </div>
   );
 }

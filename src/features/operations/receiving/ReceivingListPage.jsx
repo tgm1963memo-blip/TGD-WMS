@@ -5,6 +5,8 @@ import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
+import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { hasRoleAccess } from '../../../security/permissionGuard.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 
 const columns = [
@@ -28,6 +30,8 @@ const columns = [
 
 export function ReceivingListPage() {
   const [state, setState] = useState({ data: [], loading: true, error: null });
+  const userRole = getCurrentUserRole();
+  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
 
   useEffect(() => {
     let isMounted = true;
@@ -63,8 +67,8 @@ export function ReceivingListPage() {
       </section>
       <DocumentToolbar
         title="Receiving Documents"
-        createHref="/operations/receiving/create"
-        createLabel="Create Receiving Draft"
+        createHref={canWrite ? "/operations/receiving/create" : null}
+        createLabel={canWrite ? "Create Receiving Draft" : null}
         onRefresh={() => window.location.reload()}
       />
       <DocumentFilterBar onChange={() => {}} />

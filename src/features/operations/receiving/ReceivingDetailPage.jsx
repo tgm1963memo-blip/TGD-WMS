@@ -9,6 +9,8 @@ import { ErrorState } from '../../../components/ui/ErrorState.jsx';
 import { LoadingState } from '../../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
+import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { hasRoleAccess } from '../../../security/permissionGuard.js';
 import {
   getReceivingDocumentById,
   getReceivingStockMovements,
@@ -95,8 +97,12 @@ export function ReceivingDetailPage() {
   const isDraft = status === 'DRAFT';
   const isConfirmed = status === 'CONFIRMED';
   const lineCount = document?.tgd_receiving_lines?.length ?? 0;
-  const showPostButton = isDraft && !postSucceeded;
-  const postButtonDisabled = !document?.id || isPosting || !isDraft;
+
+  const userRole = getCurrentUserRole();
+  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+
+  const showPostButton = isDraft && !postSucceeded && canWrite;
+  const postButtonDisabled = !document?.id || isPosting || !isDraft || !canWrite;
 
   const handleConfirmPost = async () => {
     if (!document?.id || !isDraft || isPosting) return;
@@ -174,8 +180,11 @@ export function ReceivingDetailPage() {
       <section style={{ ...cardStyle, borderColor: '#fed7aa', color: '#9a3412' }}>
         <strong>Controlled Confirm/Post</strong>
         <p style={{ marginBottom: 0 }}>
-          {isDraft
+          {isDraft && canWrite
             ? 'This document is DRAFT. You may Confirm/Post using the receiving post service wrapper.'
+            : null}
+          {isDraft && !canWrite
+            ? 'Confirm/Post is restricted.'
             : null}
           {isConfirmed ? 'Confirm/Post completed. Stock movement display is read-only.' : null}
           {!isDraft && !isConfirmed ? 'Confirm/Post is not available for this document status.' : null}

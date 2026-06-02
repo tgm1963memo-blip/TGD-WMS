@@ -32,8 +32,8 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     const source = readSource(listPagePath);
 
     expect(source).not.toContain('createHref="/operations/receiving/new"');
-    expect(source).toContain('createHref="/operations/receiving/create"');
-    expect(source).toContain('createLabel="Create Receiving Draft"');
+    expect(source).toContain('createHref={canWrite ? "/operations/receiving/create" : null}');
+    expect(source).toContain('createLabel={canWrite ? "Create Receiving Draft" : null}');
     // Confirm/Post is no longer locked – message must reflect RPC availability
     expect(source).toContain('Confirm/Post is available on draft page via RPC');
     expect(source).not.toContain('Confirm/Post remains locked');
