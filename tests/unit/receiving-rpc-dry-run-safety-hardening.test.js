@@ -22,7 +22,7 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     expect(dashboard).not.toContain('ControlledFrontendWriteDryRunPanel');
     expect(dashboard).not.toContain('Run controlled RECEIVE dry run');
     expect(dashboard).toContain(
-      'Controlled RECEIVE movement dry run is locked after 13J-M to prevent unintended stock mutation.',
+      'Controlled Receiving RPC dry-run panel is hidden after 13J-Y validation.',
     );
   });
 
@@ -30,8 +30,8 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     const dashboard = readProjectFile(dashboardPath);
     const panel = readProjectFile(newReceivingPanelPath);
 
-    expect(dashboard).toContain('ControlledReceivingRpcDryRunPanel');
-    expect(dashboard).toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
+    expect(dashboard).not.toContain('ControlledReceivingRpcDryRunPanel');
+    expect(dashboard).not.toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
     expect(panel).toContain('Controlled Receiving RPC Dry Run');
     expect(panel).toContain('Run Receiving RPC Dry Run');
   });

@@ -68,9 +68,11 @@ describe('controlled receiving RPC dry run', () => {
 
   it('dashboard mounts the controlled receiving dry-run panel outside Receiving pages', () => {
     const dashboard = readSource(dashboardPath);
+    const panel = readSource(panelPath);
 
-    expect(dashboard).toContain('ControlledReceivingRpcDryRunPanel');
-    expect(dashboard).toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
+    expect(dashboard).not.toContain('ControlledReceivingRpcDryRunPanel');
+    expect(dashboard).not.toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
+    expect(panel).toContain('Controlled Receiving RPC Dry Run');
   });
 
   it('service calls only the fixed dry-run RPC and not the full post RPC', () => {

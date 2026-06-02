@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ControlledReceivingRpcDryRunPanel } from '../../components/dashboard/ControlledReceivingRpcDryRunPanel.jsx';
 import { DashboardCard } from '../../components/dashboard/DashboardCard.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
@@ -174,10 +173,9 @@ export function DashboardPage() {
       >
         <strong>Controlled RECEIVE movement dry run locked</strong>
         <p style={{ margin: '6px 0 0' }}>
-          Controlled RECEIVE movement dry run is locked after 13J-M to prevent unintended stock mutation.
+          Controlled Receiving RPC dry-run panel is hidden after 13J-Y validation.
         </p>
       </section>
-      <ControlledReceivingRpcDryRunPanel session={session} />
 
       <DashboardSection title="สรุปข้อมูล Staging แบบอ่านอย่างเดียว">
         <div className="summary-grid">
