@@ -125,9 +125,11 @@ describe('Sprint 13J-K receiving RPC migration draft', () => {
     const receivingService = readProjectFile(receivingServicePath);
 
     expect(migration).toContain('Receiving UI remains locked');
-    expect(receivingCreate).toContain('Receiving Create Locked');
-    expect(receivingCreate).not.toContain('createReceivingDocument');
-    expect(receivingCreate).not.toMatch(/Save draft/i);
+    expect(receivingCreate).toContain('Controlled receiving draft mode');
+    expect(receivingCreate).toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('addReceivingLine');
+    expect(receivingCreate).toContain('Confirm/Post is still locked');
+    expect(receivingCreate).not.toContain('postReceivingDocument');
     expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');

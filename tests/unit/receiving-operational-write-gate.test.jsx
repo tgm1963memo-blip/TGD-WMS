@@ -8,6 +8,8 @@ import { ReceivingListPage } from '../../src/features/operations/receiving/Recei
 
 vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
+  createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
+  addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
 }));
 
 const projectRoot = resolve(__dirname, '../..');
@@ -38,27 +40,31 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     expect(screen.queryByRole('link', { name: /create draft/i })).not.toBeInTheDocument();
   });
 
-  it('Receiving create page is a locked gate page', () => {
+  it('Receiving create page is controlled draft only with Confirm/Post locked', () => {
     render(
       <MemoryRouter>
         <ReceivingCreatePage />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Receiving Create Locked' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Operational write is locked' })).toBeInTheDocument();
-    expect(screen.getByText('Controlled write passed in 13J-H')).toBeInTheDocument();
-    expect(screen.getByText('Next approval required before enabling real receiving')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Controlled receiving draft mode' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Customer ID')).toBeInTheDocument();
+    expect(screen.getByLabelText('Document No')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    expect(screen.getAllByText('Confirm/Post is still locked').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'Back to receiving' })).toHaveAttribute('href', '/operations/receiving');
-    expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Confirm$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
   });
 
-  it('Receiving create page does not import or call receiving write functions', () => {
+  it('Receiving create page imports only controlled draft/add-line functions and no post/direct writes', () => {
     const source = readSource(createPagePath);
 
-    expect(source).not.toContain('createReceivingDocument');
+    expect(source).toContain('createReceivingDocument');
+    expect(source).toContain('addReceivingLine');
     expect(source).not.toContain('updateReceivingDocument');
     expect(source).not.toContain('postReceivingDocument');
+    expect(source).not.toContain('tgd_rpc_post_receiving_document');
     expect(source).not.toMatch(/\.insert\s*\(/);
     expect(source).not.toMatch(/\.update\s*\(/);
     expect(source).not.toMatch(/\.rpc\s*\(/);
@@ -76,7 +82,7 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     expect(source).toContain('tgd_rpc_post_receiving_document');
     expect(source).toContain('Posting receiving documents is disabled under controller HOLD');
     expect(source).toContain('tgd_rpc_add_receiving_line');
-    expect(source).toContain('p_location_id: locationId');
+    expect(source).toContain('p_location_id: input.location_id');
     expect(source).not.toMatch(/\.insert\s*\(/);
     expect(source).not.toMatch(/\.update\s*\(/);
     expect(source).not.toMatch(/\.delete\s*\(/);

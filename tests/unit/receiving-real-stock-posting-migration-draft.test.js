@@ -264,9 +264,16 @@ describe('Sprint 13J-O Receiving Real Stock Posting Migration Draft', () => {
 
   // --- G. Safety: no frontend changes ---
 
-  test('no frontend files changed – ReceivingCreatePage remains locked', () => {
+  test('ReceivingCreatePage keeps Confirm/Post locked and avoids direct writes', () => {
     // Verify migration does not reference ReceivingCreatePage
     expect(lower).not.toContain('receivingcreatepage');
+    const pagePath = path.resolve(__dirname, '../../src/features/operations/receiving/ReceivingCreatePage.jsx');
+    const page = fs.readFileSync(pagePath, 'utf8');
+    expect(page).toContain('Controlled receiving draft mode');
+    expect(page).toContain('Confirm/Post is still locked');
+    expect(page).not.toContain('postReceivingDocument');
+    expect(page).not.toMatch(/\.insert\s*\(/);
+    expect(page).not.toMatch(/\.update\s*\(/);
   });
 
   test('receivingService.js remains free of direct table write methods', () => {

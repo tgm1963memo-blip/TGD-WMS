@@ -111,12 +111,25 @@ describe('controlled receiving RPC dry run', () => {
     expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
   });
 
-  it('ReceivingCreatePage remains locked and does not import createReceivingDocument', () => {
+  it('ReceivingCreatePage is controlled draft only and does not import postReceivingDocument', () => {
     const receivingCreate = readSource(receivingCreatePath);
 
-    expect(receivingCreate).toContain('Receiving Create Locked');
-    expect(receivingCreate).not.toContain('createReceivingDocument');
-    expect(receivingCreate).not.toMatch(/Save draft/i);
+    expect(receivingCreate).toContain('Controlled receiving draft mode');
+    expect(receivingCreate).toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('addReceivingLine');
+    expect(receivingCreate).toContain('Save Draft');
+    expect(receivingCreate).toContain('Confirm/Post is still locked');
+    expect(receivingCreate).not.toContain('postReceivingDocument');
+    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
+    expect(receivingCreate).not.toMatch(/>\s*Confirm\s*</i);
+    expect(receivingCreate).not.toMatch(/>\s*Post\s*</i);
+    expect(receivingCreate).not.toContain('supabase.from');
+    expect(receivingCreate).not.toMatch(/\.insert\s*\(/);
+    expect(receivingCreate).not.toMatch(/\.update\s*\(/);
+    expect(receivingCreate).not.toMatch(/\.delete\s*\(/);
+    expect(receivingCreate).not.toMatch(/\.upsert\s*\(/);
+    expect(receivingCreate).not.toContain('tgd_stock_movements');
+    expect(receivingCreate).not.toContain('tgd_stock_balances');
   });
 
   it('receivingService remains RPC-only for draft writes and does not use direct table DML', () => {
@@ -124,6 +137,8 @@ describe('controlled receiving RPC dry run', () => {
 
     expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('postReceivingDocument');
+    expect(receivingService).toContain('Posting receiving documents is disabled under controller HOLD');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);

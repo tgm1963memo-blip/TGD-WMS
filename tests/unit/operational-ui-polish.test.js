@@ -71,7 +71,8 @@ describe('Sprint 5E operational UI polish', () => {
     createPages.forEach((path) => {
       const source = readProjectFile(path);
       if (path.includes('/receiving/')) {
-        expect(source).toContain('Operational Write Gate');
+        expect(source).toContain('Controlled receiving draft mode');
+        expect(source).toContain('Confirm/Post is still locked');
         expect(source).not.toContain('DraftLineEditor');
         return;
       }

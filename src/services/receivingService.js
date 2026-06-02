@@ -97,18 +97,17 @@ export async function cancelReceivingDocument() {
   };
 }
 
-export async function addReceivingLine({ documentId, productId, lotId, locationId, quantity, weight = null }) {
+export async function addReceivingLine(input) {
   if (!supabase) {
     return missingSupabaseClientResult();
   }
 
-  // Call the RPC contract that accepts location_id. This is a draft-only RPC invocation.
   return supabase.rpc('tgd_rpc_add_receiving_line', {
-    p_document_id: documentId,
-    p_product_id: productId,
-    p_lot_id: lotId,
-    p_location_id: locationId,
-    p_quantity: quantity,
-    p_weight: weight,
+    p_document_id: input.document_id ?? input.documentId,
+    p_product_id: input.product_id ?? input.productId,
+    p_lot_id: input.lot_id ?? input.lotId,
+    p_location_id: input.location_id ?? input.locationId,
+    p_quantity: input.quantity,
+    p_weight: input.weight ?? null,
   });
 }

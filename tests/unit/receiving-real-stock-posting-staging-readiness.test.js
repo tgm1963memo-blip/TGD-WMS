@@ -71,8 +71,11 @@ describe('Sprint 13J-P receiving real stock posting staging readiness report', (
     expect(report).not.toMatch(/Migration 020 was applied/i);
     expect(report).not.toMatch(/Migration 020 is applied/i);
     expect(report).not.toContain('Receiving UI enabled');
-    expect(receivingCreate).toContain('Receiving Create Locked');
-    expect(receivingCreate).not.toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('Controlled receiving draft mode');
+    expect(receivingCreate).toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('addReceivingLine');
+    expect(receivingCreate).toContain('Confirm/Post is still locked');
+    expect(receivingCreate).not.toContain('postReceivingDocument');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);
     expect(receivingService).not.toMatch(/\.delete\s*\(/);

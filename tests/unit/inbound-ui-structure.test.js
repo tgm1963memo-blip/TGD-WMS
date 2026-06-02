@@ -88,12 +88,15 @@ describe('Sprint 5B inbound UI structure', () => {
     const receivingList = readProjectFile('src/features/operations/receiving/ReceivingListPage.jsx');
     const putawayList = readProjectFile('src/features/operations/putaway/PutawayListPage.jsx');
 
-    expect(receivingCreate).toContain('Receiving Create Locked');
-    expect(receivingCreate).not.toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('Controlled receiving draft mode');
+    expect(receivingCreate).toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('addReceivingLine');
+    expect(receivingCreate).toContain('Confirm/Post is still locked');
+    expect(receivingCreate).not.toContain('postReceivingDocument');
     expect(putawayCreate).toContain('createPutawayDocument');
     expect(receivingList).toContain('getReceivingDocuments');
     expect(putawayList).toContain('getPutawayDocuments');
-    expect(receivingCreate).not.toContain("status: 'DRAFT'");
+    expect(receivingCreate).toContain("status: 'DRAFT'");
     expect(putawayCreate).toContain("status: 'DRAFT'");
   });
 
