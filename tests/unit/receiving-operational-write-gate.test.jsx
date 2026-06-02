@@ -16,6 +16,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
 const projectRoot = resolve(__dirname, '../..');
 const listPagePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingListPage.jsx');
 const createPagePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const detailPagePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
 
 function readSource(path) {
@@ -91,6 +92,27 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     expect(source).not.toContain('updateReceivingDocument');
   });
 
+  it('ReceivingDetailPage uses postReceivingDocument wrapper and no direct RPC or DML', () => {
+    const source = readSource(detailPagePath);
+
+    // Allowed: import postReceivingDocument from service wrapper
+    expect(source).toContain('postReceivingDocument');
+    // Forbidden: direct RPC string in UI component
+    expect(source).not.toContain('tgd_rpc_post_receiving_document');
+    // Forbidden: supabase.from in UI
+    expect(source).not.toContain('supabase.from');
+    // Forbidden: direct DML
+    expect(source).not.toMatch(/\.insert\s*\(/);
+    expect(source).not.toMatch(/\.update\s*\(/);
+    expect(source).not.toMatch(/\.delete\s*\(/);
+    expect(source).not.toMatch(/\.upsert\s*\(/);
+    // Forbidden: direct .rpc call in UI
+    expect(source).not.toMatch(/\.rpc\s*\(/);
+    // Forbidden: stock table references
+    expect(source).not.toContain('tgd_stock_movements');
+    expect(source).not.toContain('tgd_stock_balances');
+  });
+
   it('receivingService.postReceivingDocument uses tgd_rpc_post_receiving_document with p_document_id', () => {
     const source = readSource(receivingServicePath);
 
@@ -121,7 +143,7 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
   });
 
   it('Receiving gate source has no private key or production env references', () => {
-    const combinedSource = `${readSource(listPagePath)}\n${readSource(createPagePath)}`;
+    const combinedSource = `${readSource(listPagePath)}\n${readSource(createPagePath)}\n${readSource(detailPagePath)}`;
 
     expect(combinedSource).not.toMatch(/service_role/i);
     expect(combinedSource).not.toMatch(/SERVICE_ROLE/);
