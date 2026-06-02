@@ -236,6 +236,13 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
     await screen.findByText('draft-123');
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'product-1' } });
+    fireEvent.change(screen.getByLabelText('Lot'), { target: { value: 'lot-1' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'location-1' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Line' }));
+    await screen.findByText(/line-/);
+
     const postButton = screen.getByRole('button', { name: 'Confirm/Post Receiving' });
     expect(postButton).toBeEnabled();
 
@@ -265,6 +272,13 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
     await screen.findByText('draft-123');
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'product-1' } });
+    fireEvent.change(screen.getByLabelText('Lot'), { target: { value: 'lot-1' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'location-1' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Line' }));
+    await screen.findByText(/line-/);
+
     fireEvent.click(screen.getByRole('button', { name: 'Confirm/Post Receiving' }));
 
     expect(screen.getByRole('button', { name: 'Posting receiving...' })).toBeDisabled();
@@ -285,6 +299,13 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
     await screen.findByText('draft-123');
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'product-1' } });
+    fireEvent.change(screen.getByLabelText('Lot'), { target: { value: 'lot-1' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'location-1' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Line' }));
+    await screen.findByText(/line-/);
+
     fireEvent.click(screen.getByRole('button', { name: 'Confirm/Post Receiving' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Document already confirmed');

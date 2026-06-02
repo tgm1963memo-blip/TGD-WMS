@@ -48,6 +48,33 @@ function getCreatedLineId(result) {
   return result.data.id || result.data.line_id || '';
 }
 
+export function normalizeReceivingError(error) {
+  if (!error) return 'An unknown error occurred.';
+  const msg = error.message || String(error);
+  
+  if (msg.includes('duplicate key value') || msg.includes('unique constraint')) {
+    return `Duplicate document number. (${msg})`;
+  }
+  if (msg.includes('invalid input syntax for type uuid')) {
+    return `Invalid UUID format. (${msg})`;
+  }
+  if (msg.includes('status is CONFIRMED') || msg.includes('already confirmed')) {
+    return `Document is already CONFIRMED and cannot be modified. (${msg})`;
+  }
+  if (msg.includes('JWT') || msg.includes('authentication')) {
+    return `Authentication required. (${msg})`;
+  }
+  if (msg.includes('null value in column') || msg.includes('violates not-null')) {
+    return `Missing required field. (${msg})`;
+  }
+  
+  return msg;
+}
+
+function isValidUUID(uuid) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+}
+
 export function ReceivingCreatePage() {
   const [masterState, setMasterState] = useState({
     customers: [],
@@ -115,13 +142,13 @@ export function ReceivingCreatePage() {
     return productLots.length ? productLots : masterState.lots;
   }, [lineForm.product_id, masterState.lots]);
 
-  const canSaveDraft = Boolean(draftForm.customer_id && draftForm.document_no.trim()) && !isSavingDraft;
+  const canSaveDraft = Boolean(draftForm.customer_id && draftForm.document_no.trim()) && !isSavingDraft && !draft;
   const canAddLine = Boolean(
     draft?.id
       && lineForm.product_id
       && lineForm.lot_id
       && lineForm.location_id
-      && Number(lineForm.quantity) > 0,
+      && lineForm.quantity !== '',
   ) && !isAddingLine;
 
   const updateDraftField = (field, value) => {
@@ -136,24 +163,39 @@ export function ReceivingCreatePage() {
     event.preventDefault();
     setError('');
     setMessage('');
+    
+    const docNo = draftForm.document_no.trim();
+    if (!draftForm.customer_id) {
+      setError('Customer is required.');
+      return;
+    }
+    if (useManualEntry && !isValidUUID(draftForm.customer_id)) {
+      setError('Invalid customer UUID format.');
+      return;
+    }
+    if (!docNo) {
+      setError('Document No is required and cannot be only whitespace.');
+      return;
+    }
+
     setIsSavingDraft(true);
 
     const result = await createReceivingDocument({
       customer_id: draftForm.customer_id,
-      document_no: draftForm.document_no,
+      document_no: docNo,
     });
 
     setIsSavingDraft(false);
 
     if (result?.error) {
-      setError(result.error.message || 'Unable to create receiving draft.');
+      setError(normalizeReceivingError(result.error));
       return;
     }
 
     const documentId = getCreatedDocumentId(result);
     setDraft({
       id: documentId,
-      document_no: draftForm.document_no,
+      document_no: docNo,
       status: 'DRAFT',
     });
     setPostSucceeded(false);
@@ -166,8 +208,49 @@ export function ReceivingCreatePage() {
     setMessage('');
 
     if (!draft?.id) {
-      setError('Add Line requires document id.');
+      setError('Draft document id is required.');
       return;
+    }
+
+    if (!lineForm.product_id || !lineForm.lot_id || !lineForm.location_id) {
+      setError('Product, lot, and location are required.');
+      return;
+    }
+
+    if (useManualEntry) {
+      if (!isValidUUID(lineForm.product_id)) {
+        setError('Invalid product UUID format.');
+        return;
+      }
+      if (!isValidUUID(lineForm.lot_id)) {
+        setError('Invalid lot UUID format.');
+        return;
+      }
+      if (!isValidUUID(lineForm.location_id)) {
+        setError('Invalid location UUID format.');
+        return;
+      }
+    } else {
+      const selectedLot = masterState.lots.find((l) => l.id === lineForm.lot_id);
+      if (selectedLot && selectedLot.product_id && selectedLot.product_id !== lineForm.product_id) {
+        setError('Selected lot does not match the selected product.');
+        return;
+      }
+    }
+
+    const qty = Number(lineForm.quantity);
+    if (isNaN(qty) || qty <= 0) {
+      setError('Quantity must be a number greater than 0.');
+      return;
+    }
+
+    let weightVal = null;
+    if (lineForm.weight !== '') {
+      weightVal = Number(lineForm.weight);
+      if (isNaN(weightVal) || weightVal < 0) {
+        setError('Weight must be a number greater than or equal to 0.');
+        return;
+      }
     }
 
     setIsAddingLine(true);
@@ -176,13 +259,13 @@ export function ReceivingCreatePage() {
       product_id: lineForm.product_id,
       lot_id: lineForm.lot_id,
       location_id: lineForm.location_id,
-      quantity: Number(lineForm.quantity),
-      weight: lineForm.weight === '' ? null : Number(lineForm.weight),
+      quantity: qty,
+      weight: weightVal,
     });
     setIsAddingLine(false);
 
     if (result?.error) {
-      setError(result.error.message || 'Unable to add receiving line.');
+      setError(normalizeReceivingError(result.error));
       return;
     }
 
@@ -194,7 +277,17 @@ export function ReceivingCreatePage() {
     setError('');
     setMessage('');
 
-    if (!draft?.id || postSucceeded) {
+    if (!draft?.id) {
+      setError('Draft document id is required.');
+      return;
+    }
+    
+    if (!lastLineId) {
+      setError('Must have at least one line before Confirm/Post.');
+      return;
+    }
+
+    if (postSucceeded) {
       return;
     }
 
@@ -203,7 +296,7 @@ export function ReceivingCreatePage() {
     setIsPosting(false);
 
     if (result?.error) {
-      setError(result.error.message || 'Unable to Confirm/Post receiving document.');
+      setError(normalizeReceivingError(result.error));
       return;
     }
 
@@ -263,7 +356,7 @@ export function ReceivingCreatePage() {
         </p>
         {masterState.error ? (
           <p role="alert" style={{ color: '#991b1b', marginBottom: 10 }}>
-            Master lookup error: {masterState.error.message || String(masterState.error)}
+            Master lookup error: {normalizeReceivingError(masterState.error)}
           </p>
         ) : null}
         <label style={{ alignItems: 'center', display: 'inline-flex', gap: 8 }}>
@@ -291,7 +384,6 @@ export function ReceivingCreatePage() {
             {useManualEntry ? (
               <input
                 aria-label="Customer ID"
-                required
                 style={inputStyle}
                 value={draftForm.customer_id}
                 onChange={(event) => updateDraftField('customer_id', event.target.value)}
@@ -299,7 +391,6 @@ export function ReceivingCreatePage() {
             ) : (
               <select
                 aria-label="Customer"
-                required
                 style={inputStyle}
                 value={draftForm.customer_id}
                 onChange={(event) => updateDraftField('customer_id', event.target.value)}
@@ -316,7 +407,6 @@ export function ReceivingCreatePage() {
             Document No
             <input
               aria-label="Document No"
-              required
               style={inputStyle}
               value={draftForm.document_no}
               onChange={(event) => updateDraftField('document_no', event.target.value)}
@@ -377,7 +467,6 @@ export function ReceivingCreatePage() {
             {useManualEntry ? (
               <input
                 aria-label="Product ID"
-                required
                 style={inputStyle}
                 value={lineForm.product_id}
                 onChange={(event) => updateLineField('product_id', event.target.value)}
@@ -385,7 +474,6 @@ export function ReceivingCreatePage() {
             ) : (
               <select
                 aria-label="Product"
-                required
                 style={inputStyle}
                 value={lineForm.product_id}
                 onChange={(event) => updateLineField('product_id', event.target.value)}
@@ -403,7 +491,6 @@ export function ReceivingCreatePage() {
             {useManualEntry ? (
               <input
                 aria-label="Lot ID"
-                required
                 style={inputStyle}
                 value={lineForm.lot_id}
                 onChange={(event) => updateLineField('lot_id', event.target.value)}
@@ -411,7 +498,6 @@ export function ReceivingCreatePage() {
             ) : (
               <select
                 aria-label="Lot"
-                required
                 style={inputStyle}
                 value={lineForm.lot_id}
                 onChange={(event) => updateLineField('lot_id', event.target.value)}
@@ -429,7 +515,6 @@ export function ReceivingCreatePage() {
             {useManualEntry ? (
               <input
                 aria-label="Location ID"
-                required
                 style={inputStyle}
                 value={lineForm.location_id}
                 onChange={(event) => updateLineField('location_id', event.target.value)}
@@ -437,7 +522,6 @@ export function ReceivingCreatePage() {
             ) : (
               <select
                 aria-label="Location"
-                required
                 style={inputStyle}
                 value={lineForm.location_id}
                 onChange={(event) => updateLineField('location_id', event.target.value)}
@@ -455,7 +539,6 @@ export function ReceivingCreatePage() {
             <input
               aria-label="Quantity"
               min="0"
-              required
               step="any"
               style={inputStyle}
               type="number"
