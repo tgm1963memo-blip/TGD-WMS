@@ -358,6 +358,7 @@ begin
       quantity,
       weight,
       movement_type,
+      movement_date,
       related_document_id,
       source_module,
       source_document_id,
@@ -374,6 +375,7 @@ begin
       v_line.quantity,
       v_line.weight,
       'RECEIVE_CONFIRM',
+      now(),
       p_document_id,
       'RECEIVING',
       p_document_id,
@@ -399,9 +401,11 @@ $$;
 -- E. Grants
 -- ============================================================================
 
--- Revoke from public to ensure only authenticated users can call.
+-- Revoke from public and anon to ensure only authenticated users can call.
 revoke execute on function public.tgd_rpc_post_receiving_document_dry(uuid) from public;
 revoke execute on function public.tgd_rpc_post_receiving_document(uuid) from public;
+revoke execute on function public.tgd_rpc_post_receiving_document_dry(uuid) from anon;
+revoke execute on function public.tgd_rpc_post_receiving_document(uuid) from anon;
 
 -- Grant to authenticated only.
 grant execute on function public.tgd_rpc_post_receiving_document_dry(uuid) to authenticated;

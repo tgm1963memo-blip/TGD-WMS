@@ -175,8 +175,39 @@ describe('Sprint 13J-O Receiving Real Stock Posting Migration Draft', () => {
     }
   });
 
+  test('post RPC uses actual receiving line columns only', () => {
+    const postSection = sql.match(
+      /function\s+public\.tgd_rpc_post_receiving_document\s*\([\s\S]*?\$\$;/i
+    );
+    expect(postSection).not.toBeNull();
+    if (postSection) {
+      const body = postSection[0].toLowerCase();
+      expect(body).toContain('l.document_id');
+      expect(body).toContain('l.quantity');
+      expect(body).not.toContain('receiving_document_id');
+      expect(body).not.toContain('received_qty');
+    }
+  });
+
   test('post RPC uses movement_type RECEIVE_CONFIRM', () => {
     expect(lower).toContain("'receive_confirm'");
+  });
+
+  test('post RPC sets movement_date for stock movement insert', () => {
+    const postSection = sql.match(
+      /function\s+public\.tgd_rpc_post_receiving_document\s*\([\s\S]*?\$\$;/i
+    );
+    expect(postSection).not.toBeNull();
+    if (postSection) {
+      const body = postSection[0].toLowerCase();
+      expect(body).toContain('movement_date');
+      expect(body).toMatch(/movement_type,\s*movement_date,\s*related_document_id/);
+      expect(body).toMatch(/'receive_confirm',\s*now\(\),\s*p_document_id/);
+    }
+  });
+
+  test('post RPC avoids confirmed_at because staging document table does not have it', () => {
+    expect(lower).not.toContain('confirmed_at');
   });
 
   test('post RPC updates receiving document status only AFTER insert section', () => {
@@ -220,6 +251,15 @@ describe('Sprint 13J-O Receiving Real Stock Posting Migration Draft', () => {
   test('revokes execute from public', () => {
     expect(lower).toContain('revoke execute');
     expect(lower).toContain('from public');
+  });
+
+  test('revokes execute from anon and does not grant execute to public or anon', () => {
+    expect(lower).toContain('revoke execute on function public.tgd_rpc_post_receiving_document_dry(uuid) from anon');
+    expect(lower).toContain('revoke execute on function public.tgd_rpc_post_receiving_document(uuid) from anon');
+    expect(lower).not.toContain('grant execute on function public.tgd_rpc_post_receiving_document_dry(uuid) to public');
+    expect(lower).not.toContain('grant execute on function public.tgd_rpc_post_receiving_document(uuid) to public');
+    expect(lower).not.toContain('grant execute on function public.tgd_rpc_post_receiving_document_dry(uuid) to anon');
+    expect(lower).not.toContain('grant execute on function public.tgd_rpc_post_receiving_document(uuid) to anon');
   });
 
   // --- G. Safety: no frontend changes ---
