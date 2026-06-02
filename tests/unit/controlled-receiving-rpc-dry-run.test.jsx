@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ControlledReceivingRpcDryRunPanel } from '../../src/components/dashboard/ControlledReceivingRpcDryRunPanel.jsx';
 
 vi.mock('../../src/services/controlledReceivingRpcDryRunService.js', () => ({
+  CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID: '0ffcec05-c1d9-4e56-bf05-a7434e679603',
   runControlledReceivingRpcDryRun: vi.fn(async () => ({
     data: {
       before: {
@@ -56,11 +57,12 @@ function readSource(filePath) {
 }
 
 describe('controlled receiving RPC dry run', () => {
-  it('renders panel warning that Receiving UI remains locked', () => {
-    render(<ControlledReceivingRpcDryRunPanel session={{ user: { email: 'admin.demo@tgd-wms.local' } }} />);
+  it('renders panel warning that dry run is only for staging and no stock movement will be posted', () => {
+    render(<ControlledReceivingRpcDryRunPanel session={{ user: { email: 'admin.demo@tgd-wms.local', id: 'user-123' } }} />);
 
     expect(screen.getByText('Controlled Receiving RPC Dry Run')).toBeInTheDocument();
-    expect(screen.getByText('Staging only / Receiving UI remains locked / No stock posting')).toBeInTheDocument();
+    expect(screen.getByText('DRY RUN ONLY — no stock movement will be posted')).toBeInTheDocument();
+    expect(screen.getByText('Authenticated user ID: user-123')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run Receiving RPC Dry Run' })).toBeInTheDocument();
   });
 
@@ -71,14 +73,13 @@ describe('controlled receiving RPC dry run', () => {
     expect(dashboard).toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
   });
 
-  it('service uses only the approved receiving RPC names', () => {
+  it('service calls only the fixed dry-run RPC and not the full post RPC', () => {
     const source = readSource(servicePath);
     const rpcCalls = source.match(/\.rpc\s*\(/g) ?? [];
 
-    expect(rpcCalls).toHaveLength(3);
-    expect(source).toContain('tgd_rpc_create_receiving_draft');
-    expect(source).toContain('tgd_rpc_add_receiving_line');
-    expect(source).toContain('tgd_rpc_confirm_receiving_document');
+    expect(rpcCalls).toHaveLength(1);
+    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
+    expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
   });
 
   it('service does not use direct write methods or stock movement RPCs', () => {
@@ -93,15 +94,19 @@ describe('controlled receiving RPC dry run', () => {
     expect(source).not.toMatch(/DATABASE_URL/i);
   });
 
-  it('panel displays before and after baseline, ids, expected confirm block, and validation', () => {
+  it('panel source contains the fixed document ID constant and renders raw dry run JSON', () => {
     const panel = readSource(panelPath);
 
-    expect(panel).toContain('Before baseline');
-    expect(panel).toContain('After baseline');
-    expect(panel).toContain('document_id');
-    expect(panel).toContain('line_id');
-    expect(panel).toContain('expected confirm block');
-    expect(panel).toContain('Validation:');
+    expect(panel).toContain('CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID');
+    expect(panel).toContain('JSON.stringify(result.dryRunResult, null, 2)');
+  });
+
+  it('service source contains the fixed document ID UUID and only calls the dry run RPC', () => {
+    const source = readSource(servicePath);
+
+    expect(source).toContain('0ffcec05-c1d9-4e56-bf05-a7434e679603');
+    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
+    expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
   });
 
   it('ReceivingCreatePage remains locked and does not import createReceivingDocument', () => {

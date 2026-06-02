@@ -47,12 +47,13 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     expect(dashboardVisibleSource).not.toContain('tgd_rpc_create_stock_movement');
   });
 
-  it('new Receiving RPC dry-run service uses only receiving RPCs and no direct writes', () => {
+  it('new Receiving RPC dry-run service uses only the dry-run RPC and no direct writes', () => {
     const source = readProjectFile(newReceivingServicePath);
 
-    expect(source).toContain('tgd_rpc_create_receiving_draft');
-    expect(source).toContain('tgd_rpc_add_receiving_line');
-    expect(source).toContain('tgd_rpc_confirm_receiving_document');
+    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
+    expect(source).not.toContain('tgd_rpc_create_receiving_draft');
+    expect(source).not.toContain('tgd_rpc_add_receiving_line');
+    expect(source).not.toContain('tgd_rpc_confirm_receiving_document');
     expect(source).not.toMatch(/\.insert\s*\(/);
     expect(source).not.toMatch(/\.update\s*\(/);
     expect(source).not.toMatch(/\.delete\s*\(/);

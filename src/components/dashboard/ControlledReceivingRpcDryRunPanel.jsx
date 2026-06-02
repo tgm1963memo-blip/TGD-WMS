@@ -1,46 +1,15 @@
 import { useState } from 'react';
-import { runControlledReceivingRpcDryRun } from '../../services/controlledReceivingRpcDryRunService.js';
-
-function BaselineTable({ title, baseline }) {
-  if (!baseline) {
-    return null;
-  }
-
-  return (
-    <div style={{ minWidth: 240 }}>
-      <h4 style={{ margin: '0 0 8px' }}>{title}</h4>
-      <dl style={{ display: 'grid', gap: 6, margin: 0 }}>
-        <div>receiving_documents: {baseline.receivingDocuments}</div>
-        <div>receiving_lines: {baseline.receivingLines}</div>
-        <div>stock_movements: {baseline.stockMovements}</div>
-        <div>stock_balances: {baseline.stockBalances}</div>
-        <div>total_stock_quantity: {baseline.totalStockQuantity}</div>
-      </dl>
-    </div>
-  );
-}
-
-function ValidationList({ validation }) {
-  if (!validation) {
-    return null;
-  }
-
-  return (
-    <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-      {Object.entries(validation).map(([key, value]) => (
-        <li key={key}>
-          {key}: {value ? 'PASS' : 'FAIL'}
-        </li>
-      ))}
-    </ul>
-  );
-}
+import {
+  CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID,
+  runControlledReceivingRpcDryRun,
+} from '../../services/controlledReceivingRpcDryRunService.js';
 
 export function ControlledReceivingRpcDryRunPanel({ session }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const authenticated = Boolean(session?.user);
+  const userId = session?.user?.id ?? session?.user?.email ?? 'unknown';
 
   async function handleRunDryRun() {
     setBusy(true);
@@ -72,14 +41,14 @@ export function ControlledReceivingRpcDryRunPanel({ session }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
         <h3 style={{ color: '#334155', margin: 0 }}>Controlled Receiving RPC Dry Run</h3>
         <strong style={{ color: '#9a3412' }}>
-          Staging only / Receiving UI remains locked / No stock posting
+          DRY RUN ONLY — no stock movement will be posted
         </strong>
       </div>
 
       <ul style={{ color: '#475569', marginTop: 0 }}>
-        <li>Runs through the authenticated Supabase session only.</li>
-        <li>Uses Receiving RPCs only; no direct table insert/update/delete/upsert from the frontend.</li>
-        <li>Confirm RPC is expected to stop before stock posting.</li>
+        <li>Requires an authenticated Staging session.</li>
+        <li>Calls only <code>tgd_rpc_post_receiving_document_dry</code>.</li>
+        <li>Uses fixed document_id: {CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID}</li>
       </ul>
 
       <button
@@ -95,31 +64,42 @@ export function ControlledReceivingRpcDryRunPanel({ session }) {
         <p style={{ color: '#92400e', marginBottom: 0 }}>
           Please sign in to Staging before running the controlled Receiving RPC dry run.
         </p>
-      ) : null}
+      ) : (
+        <p style={{ color: '#0f172a', marginTop: 12, marginBottom: 0 }}>
+          Authenticated user ID: {userId}
+        </p>
+      )}
 
       {result ? (
         <section
           role="status"
           style={{
-            background: result.validationStatus === 'PASS' ? '#ecfdf5' : '#fef2f2',
-            border: result.validationStatus === 'PASS' ? '1px solid #bbf7d0' : '1px solid #fecaca',
+            background: '#f1f5f9',
+            border: '1px solid #cbd5e1',
             borderRadius: 8,
-            color: result.validationStatus === 'PASS' ? '#166534' : '#991b1b',
+            color: '#0f172a',
             marginTop: 12,
             padding: 12,
           }}
         >
-          <strong>Validation: {result.validationStatus}</strong>
-          <div>document_id: {String(result.documentId)}</div>
-          <div>line_id: {String(result.lineId)}</div>
-          <div>expected confirm block: {result.confirmExpectedError}</div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, marginTop: 12 }}>
-            <BaselineTable title="Before baseline" baseline={result.before} />
-            <BaselineTable title="After baseline" baseline={result.after} />
+          <strong>Dry run result</strong>
+          <div style={{ marginTop: 8 }}>document_id: {CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID}</div>
+          <div style={{ marginTop: 12 }}>
+            <pre
+              style={{
+                background: '#fff',
+                border: '1px solid #cbd5e1',
+                borderRadius: 8,
+                margin: 0,
+                padding: 12,
+                overflowX: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {JSON.stringify(result.dryRunResult, null, 2)}
+            </pre>
           </div>
-
-          <ValidationList validation={result.validation} />
         </section>
       ) : null}
 
