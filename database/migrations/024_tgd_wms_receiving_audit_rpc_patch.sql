@@ -1,3 +1,8 @@
+-- Add missing audit columns if they do not exist due to 001/004 IF NOT EXISTS conflict
+alter table public.tgd_receiving_documents add column if not exists created_by uuid references public.tgd_user_profiles(id);
+alter table public.tgd_receiving_documents add column if not exists posted_by uuid references public.tgd_user_profiles(id);
+alter table public.tgd_receiving_documents add column if not exists posted_at timestamptz;
+alter table public.tgd_stock_movements add column if not exists created_by uuid references public.tgd_user_profiles(id);
 -- 024_tgd_wms_receiving_audit_rpc_patch.sql
 -- Sprint 13J-AQ Receiving Audit RPC Patch Draft.
 -- Staging review required. Production locked until Controller approval.
@@ -236,3 +241,4 @@ begin
   return p_document_id;
 end;
 $$;
+
