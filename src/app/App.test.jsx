@@ -7,11 +7,11 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'TGD WMS' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'แดชบอร์ดคลังสินค้า' })).toBeInTheDocument();
   });
 
   it.each([
-    ['/', 'Dashboard'],
+    ['/', 'แดชบอร์ดคลังสินค้า', false],
     ['/customers', 'Customers'],
     ['/products', 'Products'],
     ['/locations', 'Locations'],
@@ -22,12 +22,16 @@ describe('App', () => {
     ['/transfer', 'Transfer'],
     ['/adjustment', 'Adjustment'],
     ['/audit', 'Audit'],
-  ])('renders %s route', (path, title) => {
+  ])('renders %s route', (path, title, expectsPlaceholder = true) => {
     window.history.pushState({}, '', path);
 
     render(<App />);
 
     expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
-    expect(screen.getByText('Sprint status: placeholder only')).toBeInTheDocument();
+    if (expectsPlaceholder) {
+      expect(screen.getByText('Sprint status: placeholder only')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Sprint status: placeholder only')).not.toBeInTheDocument();
+    }
   });
 });
