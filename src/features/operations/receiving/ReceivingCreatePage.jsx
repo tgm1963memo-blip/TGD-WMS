@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import {
   addReceivingLine,
   createReceivingDocument,
+  getReceivingCustomers,
+  getReceivingLocations,
+  getReceivingLots,
+  getReceivingProducts,
   postReceivingDocument,
 } from '../../../services/receivingService.js';
 
@@ -27,6 +31,11 @@ const cardStyle = {
   padding: 16,
 };
 
+const helperStyle = {
+  color: '#64748b',
+  fontSize: 12,
+};
+
 function getCreatedDocumentId(result) {
   if (!result?.data) return '';
   if (typeof result.data === 'string') return result.data;
@@ -40,6 +49,15 @@ function getCreatedLineId(result) {
 }
 
 export function ReceivingCreatePage() {
+  const [masterState, setMasterState] = useState({
+    customers: [],
+    products: [],
+    lots: [],
+    locations: [],
+    loading: true,
+    error: null,
+  });
+  const [useManualEntry, setUseManualEntry] = useState(false);
   const [draftForm, setDraftForm] = useState({
     customer_id: '',
     document_no: '',
@@ -59,6 +77,52 @@ export function ReceivingCreatePage() {
   const [isAddingLine, setIsAddingLine] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [postSucceeded, setPostSucceeded] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMasters() {
+      const [customers, products, lots, locations] = await Promise.all([
+        getReceivingCustomers(),
+        getReceivingProducts(),
+        getReceivingLots(),
+        getReceivingLocations(),
+      ]);
+
+      if (!isMounted) return;
+
+      const lookupError = customers.error || products.error || lots.error || locations.error;
+      setMasterState({
+        customers: customers.data ?? [],
+        products: products.data ?? [],
+        lots: lots.data ?? [],
+        locations: locations.data ?? [],
+        loading: false,
+        error: lookupError,
+      });
+    }
+
+    loadMasters();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const visibleLots = useMemo(() => {
+    if (!lineForm.product_id) return masterState.lots;
+    const productLots = masterState.lots.filter((lot) => lot.product_id === lineForm.product_id);
+    return productLots.length ? productLots : masterState.lots;
+  }, [lineForm.product_id, masterState.lots]);
+
+  const canSaveDraft = Boolean(draftForm.customer_id && draftForm.document_no.trim()) && !isSavingDraft;
+  const canAddLine = Boolean(
+    draft?.id
+      && lineForm.product_id
+      && lineForm.lot_id
+      && lineForm.location_id
+      && Number(lineForm.quantity) > 0,
+  ) && !isAddingLine;
 
   const updateDraftField = (field, value) => {
     setDraftForm((current) => ({ ...current, [field]: value }));
@@ -192,6 +256,27 @@ export function ReceivingCreatePage() {
         </section>
       ) : null}
 
+      <section style={cardStyle}>
+        <strong>Master lookup mode</strong>
+        <p style={{ color: '#475569', marginBottom: 10 }}>
+          {masterState.loading ? 'Loading receiving master pickers...' : 'Use read-only master pickers for receiving IDs.'}
+        </p>
+        {masterState.error ? (
+          <p role="alert" style={{ color: '#991b1b', marginBottom: 10 }}>
+            Master lookup error: {masterState.error.message || String(masterState.error)}
+          </p>
+        ) : null}
+        <label style={{ alignItems: 'center', display: 'inline-flex', gap: 8 }}>
+          <input
+            aria-label="Use manual UUID entry"
+            checked={useManualEntry}
+            type="checkbox"
+            onChange={(event) => setUseManualEntry(event.target.checked)}
+          />
+          Use manual UUID entry
+        </label>
+      </section>
+
       <form onSubmit={handleSaveDraft} style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Save Draft</h3>
         <div
@@ -202,14 +287,30 @@ export function ReceivingCreatePage() {
           }}
         >
           <label style={fieldStyle}>
-            Customer ID
-            <input
-              aria-label="Customer ID"
-              required
-              style={inputStyle}
-              value={draftForm.customer_id}
-              onChange={(event) => updateDraftField('customer_id', event.target.value)}
-            />
+            Customer
+            {useManualEntry ? (
+              <input
+                aria-label="Customer ID"
+                required
+                style={inputStyle}
+                value={draftForm.customer_id}
+                onChange={(event) => updateDraftField('customer_id', event.target.value)}
+              />
+            ) : (
+              <select
+                aria-label="Customer"
+                required
+                style={inputStyle}
+                value={draftForm.customer_id}
+                onChange={(event) => updateDraftField('customer_id', event.target.value)}
+              >
+                <option value="">Select customer</option>
+                {masterState.customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>{customer.label}</option>
+                ))}
+              </select>
+            )}
+            <span style={helperStyle}>Selected customer id: {draftForm.customer_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
             Document No
@@ -224,13 +325,13 @@ export function ReceivingCreatePage() {
         </div>
         <button
           type="submit"
-          disabled={isSavingDraft}
+          disabled={!canSaveDraft}
           style={{
-            background: '#0f766e',
+            background: canSaveDraft ? '#0f766e' : '#94a3b8',
             border: 0,
             borderRadius: 8,
             color: '#ffffff',
-            cursor: isSavingDraft ? 'not-allowed' : 'pointer',
+            cursor: canSaveDraft ? 'pointer' : 'not-allowed',
             marginTop: 16,
             minHeight: 42,
             padding: '10px 16px',
@@ -272,34 +373,82 @@ export function ReceivingCreatePage() {
           }}
         >
           <label style={fieldStyle}>
-            Product ID
-            <input
-              aria-label="Product ID"
-              required
-              style={inputStyle}
-              value={lineForm.product_id}
-              onChange={(event) => updateLineField('product_id', event.target.value)}
-            />
+            Product
+            {useManualEntry ? (
+              <input
+                aria-label="Product ID"
+                required
+                style={inputStyle}
+                value={lineForm.product_id}
+                onChange={(event) => updateLineField('product_id', event.target.value)}
+              />
+            ) : (
+              <select
+                aria-label="Product"
+                required
+                style={inputStyle}
+                value={lineForm.product_id}
+                onChange={(event) => updateLineField('product_id', event.target.value)}
+              >
+                <option value="">Select product</option>
+                {masterState.products.map((product) => (
+                  <option key={product.id} value={product.id}>{product.label}</option>
+                ))}
+              </select>
+            )}
+            <span style={helperStyle}>Selected product id: {lineForm.product_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
-            Lot ID
-            <input
-              aria-label="Lot ID"
-              required
-              style={inputStyle}
-              value={lineForm.lot_id}
-              onChange={(event) => updateLineField('lot_id', event.target.value)}
-            />
+            Lot
+            {useManualEntry ? (
+              <input
+                aria-label="Lot ID"
+                required
+                style={inputStyle}
+                value={lineForm.lot_id}
+                onChange={(event) => updateLineField('lot_id', event.target.value)}
+              />
+            ) : (
+              <select
+                aria-label="Lot"
+                required
+                style={inputStyle}
+                value={lineForm.lot_id}
+                onChange={(event) => updateLineField('lot_id', event.target.value)}
+              >
+                <option value="">Select lot</option>
+                {visibleLots.map((lot) => (
+                  <option key={lot.id} value={lot.id}>{lot.label}</option>
+                ))}
+              </select>
+            )}
+            <span style={helperStyle}>Selected lot id: {lineForm.lot_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
-            Location ID
-            <input
-              aria-label="Location ID"
-              required
-              style={inputStyle}
-              value={lineForm.location_id}
-              onChange={(event) => updateLineField('location_id', event.target.value)}
-            />
+            Location
+            {useManualEntry ? (
+              <input
+                aria-label="Location ID"
+                required
+                style={inputStyle}
+                value={lineForm.location_id}
+                onChange={(event) => updateLineField('location_id', event.target.value)}
+              />
+            ) : (
+              <select
+                aria-label="Location"
+                required
+                style={inputStyle}
+                value={lineForm.location_id}
+                onChange={(event) => updateLineField('location_id', event.target.value)}
+              >
+                <option value="">Select location</option>
+                {masterState.locations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.label}</option>
+                ))}
+              </select>
+            )}
+            <span style={helperStyle}>Selected location id: {lineForm.location_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
             Quantity
@@ -329,13 +478,13 @@ export function ReceivingCreatePage() {
         </div>
         <button
           type="submit"
-          disabled={!draft?.id || isAddingLine}
+          disabled={!canAddLine}
           style={{
-            background: draft?.id ? '#1d4ed8' : '#94a3b8',
+            background: canAddLine ? '#1d4ed8' : '#94a3b8',
             border: 0,
             borderRadius: 8,
             color: '#ffffff',
-            cursor: !draft?.id || isAddingLine ? 'not-allowed' : 'pointer',
+            cursor: canAddLine ? 'pointer' : 'not-allowed',
             marginTop: 16,
             minHeight: 42,
             padding: '10px 16px',

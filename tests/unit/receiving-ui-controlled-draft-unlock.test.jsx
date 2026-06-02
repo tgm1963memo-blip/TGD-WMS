@@ -5,7 +5,16 @@ import { AppRoutes } from '../../src/app/routes.jsx';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
 
-const { createReceivingDocument, addReceivingLine, postReceivingDocument, getReceivingDocumentById } = vi.hoisted(() => ({
+const {
+  createReceivingDocument,
+  addReceivingLine,
+  postReceivingDocument,
+  getReceivingDocumentById,
+  getReceivingCustomers,
+  getReceivingProducts,
+  getReceivingLots,
+  getReceivingLocations,
+} = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
     data: 'draft-123',
     error: null,
@@ -27,6 +36,22 @@ const { createReceivingDocument, addReceivingLine, postReceivingDocument, getRec
     },
     error: null,
   })),
+  getReceivingCustomers: vi.fn(async () => ({
+    data: [{ id: 'customer-1', code: 'CUST-1', name: 'Customer One', label: 'CUST-1 - Customer One' }],
+    error: null,
+  })),
+  getReceivingProducts: vi.fn(async () => ({
+    data: [{ id: 'product-1', code: 'PROD-1', name: 'Product One', label: 'PROD-1 - Product One' }],
+    error: null,
+  })),
+  getReceivingLots: vi.fn(async () => ({
+    data: [{ id: 'lot-1', lot_no: 'LOT-1', code: 'LOT-1', product_id: 'product-1', label: 'LOT-1' }],
+    error: null,
+  })),
+  getReceivingLocations: vi.fn(async () => ({
+    data: [{ id: 'location-1', code: 'LOC-1', name: 'Location One', label: 'LOC-1 - Location One' }],
+    error: null,
+  })),
 }));
 
 vi.mock('../../src/services/receivingService.js', () => ({
@@ -35,6 +60,10 @@ vi.mock('../../src/services/receivingService.js', () => ({
   postReceivingDocument: (...args) => postReceivingDocument(...args),
   getReceivingDocumentById: (...args) => getReceivingDocumentById(...args),
   getReceivingStockMovements: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingCustomers: (...args) => getReceivingCustomers(...args),
+  getReceivingProducts: (...args) => getReceivingProducts(...args),
+  getReceivingLots: (...args) => getReceivingLots(...args),
+  getReceivingLocations: (...args) => getReceivingLocations(...args),
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
@@ -70,14 +99,30 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
       },
       error: null,
     });
+    getReceivingCustomers.mockResolvedValue({
+      data: [{ id: 'customer-1', code: 'CUST-1', name: 'Customer One', label: 'CUST-1 - Customer One' }],
+      error: null,
+    });
+    getReceivingProducts.mockResolvedValue({
+      data: [{ id: 'product-1', code: 'PROD-1', name: 'Product One', label: 'PROD-1 - Product One' }],
+      error: null,
+    });
+    getReceivingLots.mockResolvedValue({
+      data: [{ id: 'lot-1', lot_no: 'LOT-1', code: 'LOT-1', product_id: 'product-1', label: 'LOT-1' }],
+      error: null,
+    });
+    getReceivingLocations.mockResolvedValue({
+      data: [{ id: 'location-1', code: 'LOC-1', name: 'Location One', label: 'LOC-1 - Location One' }],
+      error: null,
+    });
   });
 
-  it('shows controlled draft mode and no longer uses the locked page title', () => {
+  it('shows controlled draft mode and no longer uses the locked page title', async () => {
     renderPage();
 
     expect(screen.queryByRole('heading', { name: 'Receiving Create Locked' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Controlled receiving draft mode' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Customer ID')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Customer')).toBeInTheDocument();
     expect(screen.getByLabelText('Document No')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
     expect(screen.getByText('Controlled Confirm/Post')).toBeInTheDocument();
@@ -86,10 +131,11 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
   });
 
-  it('Save Draft calls createReceivingDocument with customer_id and document_no', async () => {
+  it('customer picker loads and Save Draft uses selected customer id', async () => {
     renderPage();
 
-    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    expect(await screen.findByRole('option', { name: 'CUST-1 - Customer One' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AG-001' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
@@ -103,24 +149,42 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(await screen.findByText('draft-123')).toBeInTheDocument();
     expect(screen.getByText('RCV-13J-AG-001')).toBeInTheDocument();
     expect(screen.getByText('DRAFT')).toBeInTheDocument();
+    expect(screen.getByText('Selected customer id: customer-1')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Add Line section' })).toBeInTheDocument();
   });
 
-  it('Add Line requires document id and then calls addReceivingLine with explicit location', async () => {
+  it('Save Draft disabled without customer/document no', async () => {
+    renderPage();
+
+    const saveButton = screen.getByRole('button', { name: 'Save Draft' });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AG-002' } });
+    expect(saveButton).toBeEnabled();
+  });
+
+  it('product/lot/location pickers load and Add Line uses selected ids', async () => {
     renderPage();
 
     expect(screen.getByRole('button', { name: 'Add Line' })).toBeDisabled();
     expect(screen.getByText('Add Line requires document id.')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AG-002' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
     await screen.findByText('draft-123');
 
-    fireEvent.change(screen.getByLabelText('Product ID'), { target: { value: 'product-1' } });
-    fireEvent.change(screen.getByLabelText('Lot ID'), { target: { value: 'lot-1' } });
-    fireEvent.change(screen.getByLabelText('Location ID'), { target: { value: 'location-1' } });
+    expect(screen.getByRole('option', { name: 'PROD-1 - Product One' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'LOT-1' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'LOC-1 - Location One' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'product-1' } });
+    fireEvent.change(screen.getByLabelText('Lot'), { target: { value: 'lot-1' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'location-1' } });
     fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Line' }));
@@ -137,6 +201,29 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     });
 
     expect(await screen.findByText(/line-456/)).toBeInTheDocument();
+    expect(screen.getByText('Selected product id: product-1')).toBeInTheDocument();
+    expect(screen.getByText('Selected lot id: lot-1')).toBeInTheDocument();
+    expect(screen.getByText('Selected location id: location-1')).toBeInTheDocument();
+  });
+
+  it('Add Line disabled without product/lot/location/quantity', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AL-003' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await screen.findByText('draft-123');
+    const addButton = screen.getByRole('button', { name: 'Add Line' });
+    expect(addButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Product'), { target: { value: 'product-1' } });
+    fireEvent.change(screen.getByLabelText('Lot'), { target: { value: 'lot-1' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'location-1' } });
+    expect(addButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '5' } });
+    expect(addButton).toBeEnabled();
   });
 
   it('shows Confirm/Post after draft creation and posts through the service wrapper', async () => {
@@ -144,7 +231,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
 
     expect(screen.queryByRole('button', { name: 'Confirm/Post Receiving' })).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-001' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
@@ -173,7 +260,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
 
     renderPage();
 
-    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-002' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
@@ -193,7 +280,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
 
     renderPage();
 
-    fireEvent.change(screen.getByLabelText('Customer ID'), { target: { value: 'customer-1' } });
+    fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AI-003' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
@@ -211,6 +298,8 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     const source = fs.readFileSync(pagePath, 'utf8');
 
     expect(source).toContain('postReceivingDocument');
+    expect(source).toContain('createReceivingDocument');
+    expect(source).toContain('addReceivingLine');
     expect(source).not.toContain('tgd_rpc_post_receiving_document');
     expect(source).not.toContain('tgd_stock_movements');
     expect(source).not.toContain('tgd_stock_balances');
@@ -219,6 +308,27 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(source).not.toMatch(/\.update\s*\(/);
     expect(source).not.toMatch(/\.delete\s*\(/);
     expect(source).not.toMatch(/\.upsert\s*\(/);
+  });
+
+  it('picker lookup functions are SELECT-only', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const servicePath = path.resolve(process.cwd(), 'src/services/receivingService.js');
+    const source = fs.readFileSync(servicePath, 'utf8');
+
+    ['getReceivingCustomers', 'getReceivingProducts', 'getReceivingLots', 'getReceivingLocations'].forEach((name) => {
+      const functionStart = source.indexOf(`export async function ${name}`);
+      const nextFunctionStart = source.indexOf('export async function', functionStart + 1);
+      const functionSource = source.slice(functionStart, nextFunctionStart === -1 ? undefined : nextFunctionStart);
+
+      expect(functionSource).toContain('.select(');
+      expect(functionSource).not.toMatch(/\.insert\s*\(/);
+      expect(functionSource).not.toMatch(/\.update\s*\(/);
+      expect(functionSource).not.toMatch(/\.delete\s*\(/);
+      expect(functionSource).not.toMatch(/\.upsert\s*\(/);
+      expect(functionSource).not.toMatch(/\.rpc\s*\(/);
+      expect(functionSource).not.toMatch(/production/i);
+    });
   });
 
   it('ReceivingListPage links to the controlled receiving draft page', () => {

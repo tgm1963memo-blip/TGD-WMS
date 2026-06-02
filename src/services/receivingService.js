@@ -7,6 +7,11 @@ function missingSupabaseClientResult() {
   };
 }
 
+function buildLabel(code, name, id) {
+  const parts = [code, name].filter(Boolean);
+  return parts.length ? parts.join(' - ') : id;
+}
+
 export async function getReceivingDocuments(filters = {}) {
   if (!supabase) {
     return missingSupabaseClientResult();
@@ -62,6 +67,97 @@ export async function getReceivingStockMovements(documentId) {
     .eq('source_module', 'RECEIVING')
     .eq('source_document_id', documentId)
     .order('created_at', { ascending: true });
+}
+
+export async function getReceivingCustomers() {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  const { data, error } = await supabase
+    .from('tgd_customers')
+    .select('id, customer_code, customer_name')
+    .eq('is_active', true)
+    .order('customer_code', { ascending: true });
+
+  return {
+    data: (data ?? []).map((customer) => ({
+      id: customer.id,
+      code: customer.customer_code,
+      name: customer.customer_name,
+      label: buildLabel(customer.customer_code, customer.customer_name, customer.id),
+    })),
+    error,
+  };
+}
+
+export async function getReceivingProducts() {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  const { data, error } = await supabase
+    .from('tgd_products')
+    .select('id, product_code, product_name')
+    .eq('is_active', true)
+    .order('product_code', { ascending: true });
+
+  return {
+    data: (data ?? []).map((product) => ({
+      id: product.id,
+      code: product.product_code,
+      name: product.product_name,
+      label: buildLabel(product.product_code, product.product_name, product.id),
+    })),
+    error,
+  };
+}
+
+export async function getReceivingLots() {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  const { data, error } = await supabase
+    .from('tgd_lots')
+    .select('id, lot_no, product_id')
+    .eq('is_active', true)
+    .order('lot_no', { ascending: true });
+
+  return {
+    data: (data ?? []).map((lot) => ({
+      id: lot.id,
+      lot_no: lot.lot_no,
+      code: lot.lot_no,
+      product_id: lot.product_id,
+      label: buildLabel(lot.lot_no, null, lot.id),
+    })),
+    error,
+  };
+}
+
+export async function getReceivingLocations() {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  const { data, error } = await supabase
+    .from('tgd_locations')
+    .select('id, location_code, location_name, room_id')
+    .eq('is_active', true)
+    .order('location_code', { ascending: true });
+
+  return {
+    data: (data ?? []).map((location) => ({
+      id: location.id,
+      code: location.location_code,
+      name: location.location_name,
+      room_id: location.room_id,
+      warehouse_id: location.warehouse_id,
+      label: buildLabel(location.location_code, location.location_name, location.id),
+    })),
+    error,
+  };
 }
 
 export async function createReceivingDocument(input) {

@@ -11,6 +11,10 @@ vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
   addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
   postReceivingDocument: vi.fn(async () => ({ data: { status: 'CONFIRMED' }, error: null })),
+  getReceivingCustomers: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingProducts: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingLots: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingLocations: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 const projectRoot = resolve(__dirname, '../..');
@@ -49,7 +53,7 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     );
   });
 
-  it('Receiving create page keeps Confirm/Post hidden until draft exists', () => {
+  it('Receiving create page keeps Confirm/Post hidden until draft exists', async () => {
     render(
       <MemoryRouter>
         <ReceivingCreatePage />
@@ -57,7 +61,7 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Controlled receiving draft mode' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Customer ID')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Customer')).toBeInTheDocument();
     expect(screen.getByLabelText('Document No')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
     expect(screen.getByText('Controlled Confirm/Post')).toBeInTheDocument();
