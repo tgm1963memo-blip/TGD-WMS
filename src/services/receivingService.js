@@ -12,6 +12,18 @@ function buildLabel(code, name, id) {
   return parts.length ? parts.join(' - ') : id;
 }
 
+function firstPresent(row, keys) {
+  return keys.map((key) => row?.[key]).find((value) => value !== undefined && value !== null && value !== '') ?? null;
+}
+
+function isActiveRow(row) {
+  return row?.is_active !== false;
+}
+
+function sortByLabel(left, right) {
+  return String(left.label).localeCompare(String(right.label));
+}
+
 export async function getReceivingDocuments(filters = {}) {
   if (!supabase) {
     return missingSupabaseClientResult();
@@ -76,17 +88,22 @@ export async function getReceivingCustomers() {
 
   const { data, error } = await supabase
     .from('tgd_customers')
-    .select('id, customer_code, customer_name')
-    .eq('is_active', true)
-    .order('customer_code', { ascending: true });
+    .select('id, name');
 
   return {
-    data: (data ?? []).map((customer) => ({
-      id: customer.id,
-      code: customer.customer_code,
-      name: customer.customer_name,
-      label: buildLabel(customer.customer_code, customer.customer_name, customer.id),
-    })),
+    data: (data ?? [])
+      .filter(isActiveRow)
+      .map((customer) => {
+        const name = customer.name ?? null;
+
+        return {
+          id: customer.id,
+          code: null,
+          name,
+          label: buildLabel(null, name, customer.id),
+        };
+      })
+      .sort(sortByLabel),
     error,
   };
 }
@@ -98,17 +115,23 @@ export async function getReceivingProducts() {
 
   const { data, error } = await supabase
     .from('tgd_products')
-    .select('id, product_code, product_name')
-    .eq('is_active', true)
-    .order('product_code', { ascending: true });
+    .select('id, sku, name');
 
   return {
-    data: (data ?? []).map((product) => ({
-      id: product.id,
-      code: product.product_code,
-      name: product.product_name,
-      label: buildLabel(product.product_code, product.product_name, product.id),
-    })),
+    data: (data ?? [])
+      .filter(isActiveRow)
+      .map((product) => {
+        const code = product.sku ?? null;
+        const name = product.name ?? null;
+
+        return {
+          id: product.id,
+          code,
+          name,
+          label: buildLabel(code, name, product.id),
+        };
+      })
+      .sort(sortByLabel),
     error,
   };
 }
@@ -120,18 +143,25 @@ export async function getReceivingLots() {
 
   const { data, error } = await supabase
     .from('tgd_lots')
-    .select('id, lot_no, product_id')
-    .eq('is_active', true)
-    .order('lot_no', { ascending: true });
+    .select('id, lot_number, product_id, customer_id');
 
   return {
-    data: (data ?? []).map((lot) => ({
-      id: lot.id,
-      lot_no: lot.lot_no,
-      code: lot.lot_no,
-      product_id: lot.product_id,
-      label: buildLabel(lot.lot_no, null, lot.id),
-    })),
+    data: (data ?? [])
+      .filter(isActiveRow)
+      .map((lot) => {
+        const code = lot.lot_number ?? null;
+
+        return {
+          id: lot.id,
+          lot_no: code,
+          code,
+          name: code,
+          product_id: lot.product_id ?? null,
+          customer_id: lot.customer_id ?? null,
+          label: code || lot.id,
+        };
+      })
+      .sort(sortByLabel),
     error,
   };
 }
@@ -143,19 +173,25 @@ export async function getReceivingLocations() {
 
   const { data, error } = await supabase
     .from('tgd_locations')
-    .select('id, location_code, location_name, room_id')
-    .eq('is_active', true)
-    .order('location_code', { ascending: true });
+    .select('id, code, name');
 
   return {
-    data: (data ?? []).map((location) => ({
-      id: location.id,
-      code: location.location_code,
-      name: location.location_name,
-      room_id: location.room_id,
-      warehouse_id: location.warehouse_id,
-      label: buildLabel(location.location_code, location.location_name, location.id),
-    })),
+    data: (data ?? [])
+      .filter(isActiveRow)
+      .map((location) => {
+        const code = location.code ?? null;
+        const name = location.name ?? null;
+
+        return {
+          id: location.id,
+          code,
+          name,
+          room_id: location.room_id ?? null,
+          warehouse_id: location.warehouse_id ?? null,
+          label: buildLabel(code, name, location.id),
+        };
+      })
+      .sort(sortByLabel),
     error,
   };
 }
