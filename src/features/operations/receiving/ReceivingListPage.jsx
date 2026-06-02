@@ -38,7 +38,21 @@ export function ReceivingListPage() {
     <section className="page-shell">
       <PageHeader title="Receiving" description="Inbound receiving document list." />
       <p className="sprint-status">Sprint status: placeholder only</p>
-      <DocumentToolbar title="Receiving Documents" createHref="/operations/receiving/new" onRefresh={() => window.location.reload()} />
+      <section
+        className="warning-panel"
+        role="status"
+        style={{
+          background: '#fffbeb',
+          border: '1px solid #fde68a',
+          borderRadius: 8,
+          color: '#92400e',
+          marginBottom: 16,
+          padding: 14,
+        }}
+      >
+        การสร้างเอกสารรับเข้าใหม่ยังถูกล็อกอยู่ระหว่าง Operational Write Gate
+      </section>
+      <DocumentToolbar title="Receiving Documents" onRefresh={() => window.location.reload()} />
       <DocumentFilterBar onChange={() => {}} />
       <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No receiving documents found." />
     </section>

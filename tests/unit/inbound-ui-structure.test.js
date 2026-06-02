@@ -88,11 +88,12 @@ describe('Sprint 5B inbound UI structure', () => {
     const receivingList = readProjectFile('src/features/operations/receiving/ReceivingListPage.jsx');
     const putawayList = readProjectFile('src/features/operations/putaway/PutawayListPage.jsx');
 
-    expect(receivingCreate).toContain('createReceivingDocument');
+    expect(receivingCreate).toContain('Receiving Create Locked');
+    expect(receivingCreate).not.toContain('createReceivingDocument');
     expect(putawayCreate).toContain('createPutawayDocument');
     expect(receivingList).toContain('getReceivingDocuments');
     expect(putawayList).toContain('getPutawayDocuments');
-    expect(receivingCreate).toContain("status: 'DRAFT'");
+    expect(receivingCreate).not.toContain("status: 'DRAFT'");
     expect(putawayCreate).toContain("status: 'DRAFT'");
   });
 

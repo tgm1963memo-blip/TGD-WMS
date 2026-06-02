@@ -70,6 +70,12 @@ describe('Sprint 5E operational UI polish', () => {
   it('wires create pages to the draft line editor foundation', () => {
     createPages.forEach((path) => {
       const source = readProjectFile(path);
+      if (path.includes('/receiving/')) {
+        expect(source).toContain('Operational Write Gate');
+        expect(source).not.toContain('DraftLineEditor');
+        return;
+      }
+
       expect(source).toContain('DraftLineEditor');
     });
   });
