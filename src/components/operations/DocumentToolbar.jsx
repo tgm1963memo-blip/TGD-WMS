@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-export function DocumentToolbar({ title, createHref, onRefresh, exportDisabled = true }) {
+export function DocumentToolbar({ title, createHref, createLabel, onRefresh, exportDisabled = true }) {
   const t = useTranslation();
 
   return (
@@ -35,7 +35,7 @@ export function DocumentToolbar({ title, createHref, onRefresh, exportDisabled =
             }}
             to={createHref}
           >
-            {t('create_draft') || 'Create draft'}
+            {createLabel || t('create_draft') || 'Create draft'}
           </Link>
         ) : null}
         <button type="button" onClick={onRefresh} style={secondaryButtonStyle}>

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
+import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
 
 const { createReceivingDocument, addReceivingLine } = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
@@ -17,6 +18,7 @@ const { createReceivingDocument, addReceivingLine } = vi.hoisted(() => ({
 vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDocument: (...args) => createReceivingDocument(...args),
   addReceivingLine: (...args) => addReceivingLine(...args),
+  getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 function renderPage() {
@@ -98,6 +100,35 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const pagePath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+    const source = fs.readFileSync(pagePath, 'utf8');
+
+    expect(source).not.toContain('postReceivingDocument');
+    expect(source).not.toContain('tgd_rpc_post_receiving_document');
+    expect(source).not.toContain('supabase.from');
+    expect(source).not.toMatch(/\.insert\s*\(/);
+    expect(source).not.toMatch(/\.update\s*\(/);
+    expect(source).not.toMatch(/\.delete\s*\(/);
+    expect(source).not.toMatch(/\.upsert\s*\(/);
+  });
+
+  it('ReceivingListPage links to the controlled receiving draft page', () => {
+    render(
+      <MemoryRouter>
+        <ReceivingListPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post remains locked.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
+      'href',
+      '/operations/receiving/create',
+    );
+  });
+
+  it('ReceivingListPage does not import postReceivingDocument or use direct write patterns', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const pagePath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingListPage.jsx');
     const source = fs.readFileSync(pagePath, 'utf8');
 
     expect(source).not.toContain('postReceivingDocument');

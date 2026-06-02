@@ -8,7 +8,11 @@ import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 
 const columns = [
-  { key: 'receiving_no', header: 'Receiving No', render: (row) => <Link to={`/operations/receiving/${row.id}`}>{row.receiving_no}</Link> },
+  {
+    key: 'receiving_no',
+    header: 'Receiving No',
+    render: (row) => <Link to={`/operations/receiving/${row.id}`}>{row.receiving_no}</Link>,
+  },
   { key: 'customer_id', header: 'Customer' },
   { key: 'warehouse_id', header: 'Warehouse' },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
@@ -37,7 +41,7 @@ export function ReceivingListPage() {
   return (
     <section className="page-shell">
       <PageHeader title="Receiving" description="Inbound receiving document list." />
-      <p className="sprint-status">Sprint status: placeholder only</p>
+      <p className="sprint-status">Sprint status: controlled draft only</p>
       <section
         className="warning-panel"
         role="status"
@@ -50,11 +54,22 @@ export function ReceivingListPage() {
           padding: 14,
         }}
       >
-        การสร้างเอกสารรับเข้าใหม่ยังถูกล็อกอยู่ระหว่าง Operational Write Gate
+        Receiving creation is controlled draft mode only. Confirm/Post remains locked.
       </section>
-      <DocumentToolbar title="Receiving Documents" onRefresh={() => window.location.reload()} />
+      <DocumentToolbar
+        title="Receiving Documents"
+        createHref="/operations/receiving/create"
+        createLabel="Create Receiving Draft"
+        onRefresh={() => window.location.reload()}
+      />
       <DocumentFilterBar onChange={() => {}} />
-      <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No receiving documents found." />
+      <DataTable
+        columns={columns}
+        data={state.data}
+        loading={state.loading}
+        error={state.error}
+        emptyMessage="No receiving documents found."
+      />
     </section>
   );
 }

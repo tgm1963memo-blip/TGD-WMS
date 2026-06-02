@@ -15,7 +15,7 @@ describe('App', () => {
     ['/customers', 'Customers'],
     ['/products', 'Products'],
     ['/locations', 'Locations'],
-    ['/receiving', 'Receiving'],
+    ['/receiving', 'Receiving', false],
     ['/inventory', 'Inventory'],
     ['/movement-ledger', 'Movement Ledger'],
     ['/picking', 'Picking'],

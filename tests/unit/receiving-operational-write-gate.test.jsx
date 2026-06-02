@@ -26,18 +26,23 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     const source = readSource(listPagePath);
 
     expect(source).not.toContain('createHref="/operations/receiving/new"');
-    expect(source).toContain('การสร้างเอกสารรับเข้าใหม่ยังถูกล็อกอยู่ระหว่าง Operational Write Gate');
+    expect(source).toContain('createHref="/operations/receiving/create"');
+    expect(source).toContain('createLabel="Create Receiving Draft"');
+    expect(source).toContain('Receiving creation is controlled draft mode only. Confirm/Post remains locked.');
   });
 
-  it('Receiving list renders read-only locked message without active create draft link', async () => {
+  it('Receiving list renders controlled draft navigation with post locked warning', async () => {
     render(
       <MemoryRouter>
         <ReceivingListPage />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('การสร้างเอกสารรับเข้าใหม่ยังถูกล็อกอยู่ระหว่าง Operational Write Gate')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /create draft/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post remains locked.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
+      'href',
+      '/operations/receiving/create',
+    );
   });
 
   it('Receiving create page is controlled draft only with Confirm/Post locked', () => {
