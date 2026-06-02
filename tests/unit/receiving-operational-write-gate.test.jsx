@@ -64,15 +64,23 @@ describe('Sprint 13J-I receiving operational write gate', () => {
     expect(source).not.toMatch(/\.rpc\s*\(/);
   });
 
-  it('Receiving service direct write functions remain detected as locked risk only', () => {
+  it('Receiving service write wrappers are RPC-only and direct table writes are removed', () => {
     const source = readSource(receivingServicePath);
 
     expect(source).toContain('createReceivingDocument');
-    expect(source).toMatch(/\.insert\s*\(/);
+    expect(source).toContain('tgd_rpc_create_receiving_draft');
+    expect(source).toContain('p_document_no: input.document_no');
+    expect(source).not.toContain('p_reference');
     expect(source).toContain('updateReceivingDocument');
-    expect(source).toMatch(/\.update\s*\(/);
     expect(source).toContain('postReceivingDocument');
-    expect(source).toMatch(/\.rpc\s*\(\s*'tgd_post_receiving_document'/);
+    expect(source).toContain('tgd_rpc_post_receiving_document');
+    expect(source).toContain('Posting receiving documents is disabled under controller HOLD');
+    expect(source).toContain('tgd_rpc_add_receiving_line');
+    expect(source).toContain('p_location_id: locationId');
+    expect(source).not.toMatch(/\.insert\s*\(/);
+    expect(source).not.toMatch(/\.update\s*\(/);
+    expect(source).not.toMatch(/\.delete\s*\(/);
+    expect(source).not.toMatch(/\.upsert\s*\(/);
   });
 
   it('Receiving gate source has no private key or production env references', () => {

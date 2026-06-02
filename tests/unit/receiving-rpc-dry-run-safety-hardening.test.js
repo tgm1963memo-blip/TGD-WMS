@@ -68,11 +68,15 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     expect(receivingCreate).not.toMatch(/Save draft/i);
   });
 
-  it('receivingService is not modified to call new Receiving RPCs', () => {
+  it('receivingService remains RPC-only for receiving draft writes', () => {
     const receivingService = readProjectFile(receivingServicePath);
 
-    expect(receivingService).not.toContain('tgd_rpc_create_receiving_draft');
-    expect(receivingService).not.toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
+    expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
+    expect(receivingService).not.toMatch(/\.insert\s*\(/);
+    expect(receivingService).not.toMatch(/\.update\s*\(/);
+    expect(receivingService).not.toMatch(/\.delete\s*\(/);
+    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
   });
 });

@@ -119,11 +119,15 @@ describe('controlled receiving RPC dry run', () => {
     expect(receivingCreate).not.toMatch(/Save draft/i);
   });
 
-  it('receivingService is not modified to call new receiving RPCs', () => {
+  it('receivingService remains RPC-only for draft writes and does not use direct table DML', () => {
     const receivingService = readSource(receivingServicePath);
 
-    expect(receivingService).not.toContain('tgd_rpc_create_receiving_draft');
-    expect(receivingService).not.toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
+    expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
+    expect(receivingService).not.toMatch(/\.insert\s*\(/);
+    expect(receivingService).not.toMatch(/\.update\s*\(/);
+    expect(receivingService).not.toMatch(/\.delete\s*\(/);
+    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
   });
 });

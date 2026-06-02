@@ -73,7 +73,10 @@ describe('Sprint 13J-P receiving real stock posting staging readiness report', (
     expect(report).not.toContain('Receiving UI enabled');
     expect(receivingCreate).toContain('Receiving Create Locked');
     expect(receivingCreate).not.toContain('createReceivingDocument');
-    expect(receivingService).not.toContain('tgd_rpc_post_receiving_document');
+    expect(receivingService).not.toMatch(/\.insert\s*\(/);
+    expect(receivingService).not.toMatch(/\.update\s*\(/);
+    expect(receivingService).not.toMatch(/\.delete\s*\(/);
+    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
   });
 
   it('does not include unsafe execution instructions outside migration 020 references', () => {

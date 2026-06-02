@@ -81,7 +81,7 @@ describe('Sprint 13J-R stock privilege hardening migration draft', () => {
     expect(migration).not.toMatch(/drop\s+policy/i);
   });
 
-  it('does not modify receiving service or enable ReceivingCreatePage', () => {
+  it('does not enable ReceivingCreatePage and keeps receiving service free of direct table writes', () => {
     const migration = readProjectFile(migrationPath);
     const receivingCreate = readProjectFile(receivingCreatePath);
     const receivingService = readProjectFile(receivingServicePath);
@@ -90,8 +90,12 @@ describe('Sprint 13J-R stock privilege hardening migration draft', () => {
     expect(receivingCreate).toContain('Receiving Create Locked');
     expect(receivingCreate).not.toContain('createReceivingDocument');
     expect(receivingCreate).not.toMatch(/Save draft/i);
-    expect(receivingService).not.toContain('tgd_rpc_create_receiving_draft');
-    expect(receivingService).not.toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
+    expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
+    expect(receivingService).not.toMatch(/\.insert\s*\(/);
+    expect(receivingService).not.toMatch(/\.update\s*\(/);
+    expect(receivingService).not.toMatch(/\.delete\s*\(/);
+    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
   });
 });

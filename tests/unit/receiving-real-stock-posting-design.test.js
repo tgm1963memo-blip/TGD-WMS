@@ -162,13 +162,14 @@ describe('Receiving Real Stock Posting RPC Design Document', () => {
     expect(lower).not.toContain('receivingcreatepage');
   });
 
-  test('receivingService.js is not modified', () => {
+  test('receivingService.js remains RPC-only and Receiving UI locked', () => {
     const receivingServicePath = path.resolve(__dirname, '../../src/services/receivingService.js');
     if (fs.existsSync(receivingServicePath)) {
       const serviceContent = fs.readFileSync(receivingServicePath, 'utf8');
-      // receivingService.js must NOT contain tgd_rpc_post_receiving_document
-      // (the proposed RPC is design-only, not wired into UI)
-      expect(serviceContent.toLowerCase()).not.toContain('tgd_rpc_post_receiving_document');
+      expect(serviceContent).not.toMatch(/\.insert\s*\(/);
+      expect(serviceContent).not.toMatch(/\.update\s*\(/);
+      expect(serviceContent).not.toMatch(/\.delete\s*\(/);
+      expect(serviceContent).not.toMatch(/\.upsert\s*\(/);
     }
     // Also verify the design doc does not reference receivingService.js as modified
     expect(lower).not.toContain('receivingservice.js');

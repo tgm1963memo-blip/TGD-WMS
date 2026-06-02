@@ -56,15 +56,19 @@ describe('Sprint 13J-L receiving privilege hardening migration', () => {
     expect(migration).not.toMatch(/DATABASE_URL/i);
   });
 
-  it('keeps ReceivingCreatePage locked and receivingService free of new receiving RPC calls', () => {
+  it('keeps ReceivingCreatePage locked and receivingService free of direct table writes', () => {
     const receivingCreate = readProjectFile(receivingCreatePath);
     const receivingService = readProjectFile(receivingServicePath);
 
     expect(receivingCreate).toContain('Receiving Create Locked');
     expect(receivingCreate).not.toContain('createReceivingDocument');
     expect(receivingCreate).not.toMatch(/Save draft/i);
-    expect(receivingService).not.toContain('tgd_rpc_create_receiving_draft');
-    expect(receivingService).not.toContain('tgd_rpc_add_receiving_line');
+    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
+    expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
+    expect(receivingService).not.toMatch(/\.insert\s*\(/);
+    expect(receivingService).not.toMatch(/\.update\s*\(/);
+    expect(receivingService).not.toMatch(/\.delete\s*\(/);
+    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
   });
 });

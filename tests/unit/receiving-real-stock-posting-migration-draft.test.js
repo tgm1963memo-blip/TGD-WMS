@@ -269,11 +269,14 @@ describe('Sprint 13J-O Receiving Real Stock Posting Migration Draft', () => {
     expect(lower).not.toContain('receivingcreatepage');
   });
 
-  test('receivingService.js does not call tgd_rpc_post_receiving_document', () => {
+  test('receivingService.js remains free of direct table write methods', () => {
     const servicePath = path.resolve(__dirname, '../../src/services/receivingService.js');
     if (fs.existsSync(servicePath)) {
       const serviceContent = fs.readFileSync(servicePath, 'utf8');
-      expect(serviceContent.toLowerCase()).not.toContain('tgd_rpc_post_receiving_document');
+      expect(serviceContent).not.toMatch(/\.insert\s*\(/);
+      expect(serviceContent).not.toMatch(/\.update\s*\(/);
+      expect(serviceContent).not.toMatch(/\.delete\s*\(/);
+      expect(serviceContent).not.toMatch(/\.upsert\s*\(/);
     }
   });
 
