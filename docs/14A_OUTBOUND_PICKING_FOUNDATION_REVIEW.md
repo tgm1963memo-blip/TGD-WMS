@@ -117,4 +117,9 @@
 
 ---
 
-**Note**: Production is strictly not touched in this sprint.. All work is limited to design, documentation, and read‑only inspection.
+**Note**: Production is strictly not touched in this sprint. All work is limited to design, documentation, and read‑only inspection.
+
+Safety hard rules:
+- no manual stock movement insert
+- no manual stock balance update
+- Production is strictly not touched in this sprint.
