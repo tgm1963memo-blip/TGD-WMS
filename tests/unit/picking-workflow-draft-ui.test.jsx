@@ -82,11 +82,11 @@ describe('Sprint 14O picking workflow draft UI', () => {
   it('loads outbound document detail and renders document, lines, and reservations', async () => {
     renderPage();
 
-    fireEvent.change(screen.getByLabelText('Picking outbound document id'), { target: { value: 'document-1' } });
+    fireEvent.change(screen.getByLabelText('Picking outbound document id'), { target: { value: '11111111-1111-4111-8111-111111111111' } });
     fireEvent.click(screen.getByRole('button', { name: 'Load Document Detail' }));
 
     await waitFor(() => {
-      expect(getOutboundDocumentDetail).toHaveBeenCalledWith('document-1');
+      expect(getOutboundDocumentDetail).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
     });
 
     expect(await screen.findByText('OB-14O-001')).toBeInTheDocument();

@@ -48,6 +48,21 @@ const cellStyle = {
 };
 
 const safetyNote = 'Picking draft workflow only. No stock posting. No stock movement OUT. No stock balance update.';
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateDocumentId(value) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return 'Outbound Document ID is required.';
+  }
+
+  if (!uuidPattern.test(normalizedValue)) {
+    return 'Outbound Document ID must be a valid UUID.';
+  }
+
+  return '';
+}
 
 function StatusPill({ value }) {
   return (
@@ -80,18 +95,44 @@ export function PickingDraftWorkflowPage() {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emptyDetailMessage, setEmptyDetailMessage] = useState('');
 
   async function handleLoadDetail(event) {
     event.preventDefault();
+    const validationError = validateDocumentId(documentId);
+
     setError('');
     setDetail(null);
+    setEmptyDetailMessage('');
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const nextDetail = await getOutboundDocumentDetail(documentId);
-      setDetail(nextDetail);
+      const nextDetail = await getOutboundDocumentDetail(documentId.trim());
+      const serviceError = nextDetail?.error;
+
+      if (serviceError) {
+        setError('Unable to load outbound document detail. Please check the document ID or your permission.');
+        return;
+      }
+
+      if (!nextDetail?.document) {
+        setEmptyDetailMessage('Outbound document was not found or you do not have permission to view it.');
+        return;
+      }
+
+      setDetail({
+        ...nextDetail,
+        lines: nextDetail.lines ?? [],
+        reservations: nextDetail.reservations ?? [],
+      });
     } catch (loadError) {
-      setError(loadError.message || String(loadError));
+      setError('Unable to load outbound document detail. Please check the document ID or your permission.');
     } finally {
       setLoading(false);
     }
@@ -123,20 +164,21 @@ export function PickingDraftWorkflowPage() {
           Outbound Document ID
           <input
             aria-label="Picking outbound document id"
-            required
             style={inputStyle}
             value={documentId}
             onChange={(event) => setDocumentId(event.target.value)}
           />
         </label>
         <button disabled={loading} type="submit" style={{ ...buttonStyle, marginTop: 12 }}>
-          {loading ? 'Loading detail...' : 'Load Document Detail'}
+          {loading ? 'Loading...' : 'Load Document Detail'}
         </button>
       </form>
 
       <section style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Outbound document detail</h3>
-        {!detail ? <p>Load an outbound document to review picking readiness.</p> : null}
+        {loading ? <p>Loading outbound document detail...</p> : null}
+        {emptyDetailMessage ? <p>{emptyDetailMessage}</p> : null}
+        {!loading && !emptyDetailMessage && !detail ? <p>Load an outbound document to review picking readiness.</p> : null}
         {detail ? (
           <dl style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <div><dt>Document No</dt><dd>{detail.document?.document_no || '-'}</dd></div>
@@ -166,7 +208,8 @@ export function PickingDraftWorkflowPage() {
               </tr>
             </thead>
             <tbody>
-              {!detail || detail.lines.length === 0 ? <EmptyRow colSpan={8} label="No picking candidates loaded." /> : null}
+              {!detail ? <EmptyRow colSpan={8} label="No picking candidates loaded." /> : null}
+              {detail && detail.lines.length === 0 ? <EmptyRow colSpan={8} label="No outbound lines found for this document." /> : null}
               {detail?.lines.map((line) => {
                 const reservation = detail.reservations.find((item) => item.outbound_line_id === line.id);
 
@@ -186,6 +229,9 @@ export function PickingDraftWorkflowPage() {
             </tbody>
           </table>
         </div>
+        {detail && detail.reservations.length === 0 ? (
+          <p>No outbound reservations found for this document.</p>
+        ) : null}
       </section>
 
       <section style={cardStyle}>
@@ -201,7 +247,7 @@ export function PickingDraftWorkflowPage() {
           />
         </label>
         <p style={{ color: '#475569', marginBottom: 0 }}>
-          This note is local-only for UAT readiness and is not saved to the database.
+          This note is local-only and is not saved to the database.
         </p>
       </section>
     </section>
