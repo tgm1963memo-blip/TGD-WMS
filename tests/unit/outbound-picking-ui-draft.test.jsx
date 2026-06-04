@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   createOutboundDraft,
@@ -30,6 +30,13 @@ function renderPage() {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  createOutboundDraft.mockClear();
+  addOutboundLine.mockClear();
+  reserveOutboundStock.mockClear();
+  releaseOutboundReservation.mockClear();
+});
 
 describe('Sprint 14H outbound picking UI draft screens', () => {
   it('renders the safety note and no post outbound buttons', () => {
@@ -104,7 +111,7 @@ describe('Sprint 14H outbound picking UI draft screens', () => {
     });
   });
 
-  it('release action calls releaseOutboundReservation', async () => {
+  it('release action passes reservation_id and displays the successful result', async () => {
     renderPage();
 
     fireEvent.change(screen.getByLabelText('Release reservation id'), { target: { value: 'reservation-1' } });
@@ -115,6 +122,22 @@ describe('Sprint 14H outbound picking UI draft screens', () => {
         reservation_id: 'reservation-1',
       });
     });
+    expect(await screen.findByText(/RELEASED/)).toBeInTheDocument();
+  });
+
+  it('release action displays service errors', async () => {
+    releaseOutboundReservation.mockRejectedValueOnce(new Error('Release RPC failed'));
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Release reservation id'), { target: { value: 'reservation-error' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Release Reservation' }));
+
+    await waitFor(() => {
+      expect(releaseOutboundReservation).toHaveBeenCalledWith({
+        reservation_id: 'reservation-error',
+      });
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Release RPC failed');
   });
 
   it('source avoids post outbound, stock mutation tables, and destructive SQL patterns', async () => {
@@ -133,3 +156,5 @@ describe('Sprint 14H outbound picking UI draft screens', () => {
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
   });
 });
+
+
