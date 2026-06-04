@@ -24,6 +24,8 @@ const navSections = [
       { key: 'allocation', fallback: 'จัดสรรสินค้า', path: '/operations/allocations' },
       { key: 'picking', fallback: 'หยิบสินค้า', path: '/operations/picking' },
       { key: 'dispatch_goods_issue', fallback: 'จ่ายสินค้าออก', path: '/operations/dispatch' },
+      { key: 'outbound_documents', fallback: 'รายการจ่ายสินค้าออก', path: '/operations/outbound' },
+      { key: 'outbound_draft', fallback: 'ทดลองสร้างเอกสารจ่ายออก', path: '/operations/outbound-draft' },
     ],
   },
   {

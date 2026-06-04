@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import {
   addOutboundLine,
@@ -44,7 +45,7 @@ const buttonStyle = {
   padding: '10px 16px',
 };
 
-const safetyNote = 'Draft/reserve/release only. No stock posting. No stock movement OUT. No stock balance update.';
+const safetyNote = 'Draft/reserve/release only. No stock posting.';
 
 function stringifyResult(result) {
   return JSON.stringify(result, null, 2);
@@ -147,6 +148,12 @@ export function OutboundDraftPage() {
   return (
     <section className="page-shell">
       <PageHeader title="Outbound Draft Smoke UI" description="Draft, reservation, and release service integration only." />
+
+      <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <Link to="/operations/outbound" style={{ ...buttonStyle, alignItems: 'center', display: 'inline-flex', marginTop: 0, textDecoration: 'none' }}>
+          Back to Outbound Documents
+        </Link>
+      </nav>
 
       <section role="status" style={{ ...cardStyle, borderColor: '#fde68a', color: '#92400e' }}>
         {safetyNote}

@@ -42,7 +42,7 @@ describe('Sprint 14H outbound picking UI draft screens', () => {
   it('renders the safety note and no post outbound buttons', () => {
     renderPage();
 
-    expect(screen.getByText('Draft/reserve/release only. No stock posting. No stock movement OUT. No stock balance update.')).toBeInTheDocument();
+    expect(screen.getByText('Draft/reserve/release only. No stock posting.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Post Outbound/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Post$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Confirm Stock Out/i })).not.toBeInTheDocument();

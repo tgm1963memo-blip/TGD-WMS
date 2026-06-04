@@ -23,6 +23,8 @@ export const navigationGroups = [
       { label: 'Allocations', path: '/operations/allocations' },
       { label: 'Picking', path: '/operations/picking' },
       { label: 'Dispatch', path: '/operations/dispatch' },
+      { label: 'Outbound Documents', path: '/operations/outbound' },
+      { label: 'Outbound Draft', path: '/operations/outbound-draft' },
     ],
   },
   {

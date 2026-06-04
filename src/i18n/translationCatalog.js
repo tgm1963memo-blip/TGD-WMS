@@ -274,6 +274,8 @@ Object.assign(TRANSLATION_CATALOG, {
   picking_task: { th: 'งานหยิบสินค้า', en: 'Picking Task' },
   dispatch_goods_issue: { th: 'จ่ายสินค้าออก', en: 'Dispatch / Goods Issue' },
   dispatch_list: { th: 'รายการจ่ายสินค้าออก', en: 'Dispatch List' },
+  outbound_documents: { th: 'รายการจ่ายสินค้าออก', en: 'Outbound Documents' },
+  outbound_draft: { th: 'ทดลองสร้างเอกสารจ่ายออก', en: 'Outbound Draft' },
   goods_issue: { th: 'จ่ายสินค้าออก', en: 'Goods Issue' },
   scan_barcode: { th: 'สแกนบาร์โค้ด', en: 'Scan Barcode' },
   scan_pallet: { th: 'สแกนพาเลท', en: 'Scan Pallet' },

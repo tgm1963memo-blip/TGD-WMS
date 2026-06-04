@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import {
   getOutboundDocumentDetail,
@@ -138,7 +139,12 @@ export function OutboundListPage() {
       <section style={cardStyle}>
         <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Outbound document list</h3>
-          <button type="button" style={secondaryButtonStyle} onClick={loadDocuments}>Refresh</button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <Link to="/operations/outbound-draft" style={{ ...secondaryButtonStyle, alignItems: 'center', display: 'inline-flex', textDecoration: 'none' }}>
+              Open Draft Smoke UI
+            </Link>
+            <button type="button" style={secondaryButtonStyle} onClick={loadDocuments}>Refresh</button>
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -155,7 +161,7 @@ export function OutboundListPage() {
             </thead>
             <tbody>
               {loadingList ? <EmptyRow colSpan={6} label="Loading outbound documents..." /> : null}
-              {!loadingList && documents.length === 0 ? <EmptyRow colSpan={6} label="No outbound documents found." /> : null}
+              {!loadingList && documents.length === 0 ? <EmptyRow colSpan={6} label="No outbound documents found or you may not have read permission." /> : null}
               {!loadingList && documents.map((document) => (
                 <tr key={document.id}>
                   <td style={cellStyle}>{document.document_no}</td>
