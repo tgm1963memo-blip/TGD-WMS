@@ -3,12 +3,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  confirmOutboundPickDraft,
   getOutboundDocumentDetail,
 } = vi.hoisted(() => ({
+  confirmOutboundPickDraft: vi.fn(),
   getOutboundDocumentDetail: vi.fn(),
 }));
 
 vi.mock('../../src/services/outboundPickingService.js', () => ({
+  confirmOutboundPickDraft: (...args) => confirmOutboundPickDraft(...args),
   getOutboundDocumentDetail: (...args) => getOutboundDocumentDetail(...args),
 }));
 
@@ -40,6 +43,7 @@ function submitDocumentId(value) {
 }
 
 beforeEach(() => {
+  confirmOutboundPickDraft.mockReset();
   getOutboundDocumentDetail.mockReset();
 });
 

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { getOutboundDocumentDetail } from '../../../services/outboundPickingService.js';
+import {
+  confirmOutboundPickDraft,
+  getOutboundDocumentDetail,
+} from '../../../services/outboundPickingService.js';
 
 const cardStyle = {
   background: '#ffffff',
@@ -48,17 +51,74 @@ const cellStyle = {
 };
 
 const safetyNote = 'Picking draft workflow only. No stock posting. No stock movement OUT. No stock balance update.';
+const pickConfirmSafetyNote = 'Confirm Pick updates outbound picking state only. No stock posting. No stock movement OUT. No stock balance update.';
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function validateDocumentId(value) {
+function validateUuid(value, requiredMessage, invalidMessage) {
   const normalizedValue = value.trim();
 
   if (!normalizedValue) {
-    return 'Outbound Document ID is required.';
+    return requiredMessage;
   }
 
   if (!uuidPattern.test(normalizedValue)) {
-    return 'Outbound Document ID must be a valid UUID.';
+    return invalidMessage;
+  }
+
+  return '';
+}
+
+function validateDocumentId(value) {
+  return validateUuid(
+    value,
+    'Outbound Document ID is required.',
+    'Outbound Document ID must be a valid UUID.',
+  );
+}
+
+function validatePickConfirmation({
+  documentId,
+  outboundLineId,
+  reservationId,
+  pickedQuantity,
+  pickedWeight,
+  pickReference,
+}) {
+  const documentError = validateDocumentId(documentId);
+  if (documentError) {
+    return documentError;
+  }
+
+  const lineError = validateUuid(
+    outboundLineId,
+    'Outbound line ID is required.',
+    'Outbound line ID must be a valid UUID.',
+  );
+  if (lineError) {
+    return lineError;
+  }
+
+  const reservationError = validateUuid(
+    reservationId,
+    'Reservation ID is required.',
+    'Reservation ID must be a valid UUID.',
+  );
+  if (reservationError) {
+    return reservationError;
+  }
+
+  const quantityValue = pickedQuantity.trim();
+  if (!quantityValue || Number(quantityValue) <= 0 || Number.isNaN(Number(quantityValue))) {
+    return 'Picked quantity must be greater than 0.';
+  }
+
+  const weightValue = pickedWeight.trim();
+  if (weightValue !== '' && (Number.isNaN(Number(weightValue)) || Number(weightValue) < 0)) {
+    return 'Picked weight must be 0 or greater.';
+  }
+
+  if (!pickReference.trim()) {
+    return 'Pick reference is required for idempotency.';
   }
 
   return '';
@@ -96,6 +156,41 @@ export function PickingDraftWorkflowPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [emptyDetailMessage, setEmptyDetailMessage] = useState('');
+  const [outboundLineId, setOutboundLineId] = useState('');
+  const [reservationId, setReservationId] = useState('');
+  const [pickedQuantity, setPickedQuantity] = useState('');
+  const [pickedWeight, setPickedWeight] = useState('0');
+  const [pickReference, setPickReference] = useState('');
+  const [pickNote, setPickNote] = useState('');
+  const [pickConfirmLoading, setPickConfirmLoading] = useState(false);
+  const [pickConfirmError, setPickConfirmError] = useState('');
+  const [pickConfirmSuccess, setPickConfirmSuccess] = useState('');
+  const [pickConfirmResult, setPickConfirmResult] = useState(null);
+
+  async function loadDocumentDetail(nextDocumentId) {
+    const nextDetail = await getOutboundDocumentDetail(nextDocumentId.trim());
+    const serviceError = nextDetail?.error;
+
+    if (serviceError) {
+      setError('Unable to load outbound document detail. Please check the document ID or your permission.');
+      return null;
+    }
+
+    if (!nextDetail?.document) {
+      setEmptyDetailMessage('Outbound document was not found or you do not have permission to view it.');
+      return null;
+    }
+
+    const normalizedDetail = {
+      ...nextDetail,
+      lines: nextDetail.lines ?? [],
+      reservations: nextDetail.reservations ?? [],
+    };
+
+    setDetail(normalizedDetail);
+    setEmptyDetailMessage('');
+    return normalizedDetail;
+  }
 
   async function handleLoadDetail(event) {
     event.preventDefault();
@@ -113,27 +208,59 @@ export function PickingDraftWorkflowPage() {
     setLoading(true);
 
     try {
-      const nextDetail = await getOutboundDocumentDetail(documentId.trim());
-      const serviceError = nextDetail?.error;
-
-      if (serviceError) {
-        setError('Unable to load outbound document detail. Please check the document ID or your permission.');
-        return;
-      }
-
-      if (!nextDetail?.document) {
-        setEmptyDetailMessage('Outbound document was not found or you do not have permission to view it.');
-        return;
-      }
-
-      setDetail({
-        ...nextDetail,
-        lines: nextDetail.lines ?? [],
-        reservations: nextDetail.reservations ?? [],
-      });
-    } catch (loadError) {
+      await loadDocumentDetail(documentId);
+    } catch {
       setError('Unable to load outbound document detail. Please check the document ID or your permission.');
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirmPickDraft(event) {
+    event.preventDefault();
+
+    const activeDocumentId = (detail?.document?.id ?? documentId).trim();
+    const validationError = validatePickConfirmation({
+      documentId: activeDocumentId,
+      outboundLineId,
+      reservationId,
+      pickedQuantity,
+      pickedWeight,
+      pickReference,
+    });
+
+    setPickConfirmError('');
+    setPickConfirmSuccess('');
+    setPickConfirmResult(null);
+
+    if (validationError) {
+      setPickConfirmError(validationError);
+      return;
+    }
+
+    setPickConfirmLoading(true);
+
+    try {
+      const result = await confirmOutboundPickDraft({
+        outboundDocumentId: activeDocumentId,
+        outboundLineId: outboundLineId.trim(),
+        reservationId: reservationId.trim(),
+        pickedQuantity: Number(pickedQuantity),
+        pickedWeight: pickedWeight.trim() === '' ? 0 : Number(pickedWeight),
+        pickReference: pickReference.trim(),
+        note: pickNote.trim() || null,
+      });
+
+      setPickConfirmSuccess('Pick confirmation draft saved.');
+      setPickConfirmResult(result);
+
+      setLoading(true);
+      setError('');
+      await loadDocumentDetail(activeDocumentId);
+    } catch {
+      setPickConfirmError('Unable to confirm pick draft. Please check reservation status, quantities, or permission.');
+    } finally {
+      setPickConfirmLoading(false);
       setLoading(false);
     }
   }
@@ -232,6 +359,101 @@ export function PickingDraftWorkflowPage() {
         {detail && detail.reservations.length === 0 ? (
           <p>No outbound reservations found for this document.</p>
         ) : null}
+      </section>
+
+      <section style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Controlled Pick Confirmation Draft</h3>
+        <section role="status" style={{ border: '1px solid #fde68a', borderRadius: 8, color: '#92400e', marginBottom: 14, padding: 12 }}>
+          {pickConfirmSafetyNote}
+        </section>
+
+        {pickConfirmError ? (
+          <section role="alert" style={{ border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', marginBottom: 14, padding: 12 }}>
+            {pickConfirmError}
+          </section>
+        ) : null}
+
+        {pickConfirmSuccess ? (
+          <section role="status" style={{ border: '1px solid #bbf7d0', borderRadius: 8, color: '#166534', marginBottom: 14, padding: 12 }}>
+            {pickConfirmSuccess}
+          </section>
+        ) : null}
+
+        {pickConfirmResult ? (
+          <pre style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 14, overflowX: 'auto', padding: 12 }}>
+            {JSON.stringify(pickConfirmResult, null, 2)}
+          </pre>
+        ) : null}
+
+        <form onSubmit={handleConfirmPickDraft} style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Outbound Document ID
+            <input
+              aria-label="Pick confirmation outbound document id"
+              readOnly
+              style={{ ...inputStyle, background: '#f8fafc' }}
+              value={detail?.document?.id ?? documentId}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Outbound Line ID
+            <input
+              aria-label="Pick confirmation outbound line id"
+              style={inputStyle}
+              value={outboundLineId}
+              onChange={(event) => setOutboundLineId(event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Reservation ID
+            <input
+              aria-label="Pick confirmation reservation id"
+              style={inputStyle}
+              value={reservationId}
+              onChange={(event) => setReservationId(event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Picked Quantity
+            <input
+              aria-label="Pick confirmation picked quantity"
+              style={inputStyle}
+              value={pickedQuantity}
+              onChange={(event) => setPickedQuantity(event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Picked Weight
+            <input
+              aria-label="Pick confirmation picked weight"
+              style={inputStyle}
+              value={pickedWeight}
+              onChange={(event) => setPickedWeight(event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Pick Reference
+            <input
+              aria-label="Pick confirmation pick reference"
+              style={inputStyle}
+              value={pickReference}
+              onChange={(event) => setPickReference(event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            Pick Note
+            <textarea
+              aria-label="Pick confirmation pick note"
+              rows={3}
+              style={inputStyle}
+              value={pickNote}
+              onChange={(event) => setPickNote(event.target.value)}
+            />
+          </label>
+          <button disabled={pickConfirmLoading} type="submit" style={buttonStyle}>
+            {pickConfirmLoading ? 'Saving...' : 'Save Pick Confirmation Draft'}
+          </button>
+        </form>
       </section>
 
       <section style={cardStyle}>

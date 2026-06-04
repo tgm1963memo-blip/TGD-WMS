@@ -6,12 +6,14 @@ import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 const {
   addOutboundLine,
+  confirmOutboundPickDraft,
   createOutboundDraft,
   getOutboundDocumentDetail,
   releaseOutboundReservation,
   reserveOutboundStock,
 } = vi.hoisted(() => ({
   addOutboundLine: vi.fn(),
+  confirmOutboundPickDraft: vi.fn(),
   createOutboundDraft: vi.fn(),
   getOutboundDocumentDetail: vi.fn(async () => ({
     document: {
@@ -47,6 +49,7 @@ const {
 
 vi.mock('../../src/services/outboundPickingService.js', () => ({
   addOutboundLine: (...args) => addOutboundLine(...args),
+  confirmOutboundPickDraft: (...args) => confirmOutboundPickDraft(...args),
   createOutboundDraft: (...args) => createOutboundDraft(...args),
   getOutboundDocumentDetail: (...args) => getOutboundDocumentDetail(...args),
   releaseOutboundReservation: (...args) => releaseOutboundReservation(...args),
@@ -65,6 +68,7 @@ function renderPage() {
 
 beforeEach(() => {
   addOutboundLine.mockClear();
+  confirmOutboundPickDraft.mockClear();
   createOutboundDraft.mockClear();
   getOutboundDocumentDetail.mockClear();
   releaseOutboundReservation.mockClear();
