@@ -22,6 +22,7 @@ export const navigationGroups = [
       { label: 'Withdrawal Requests', path: '/operations/withdrawal-requests' },
       { label: 'Allocations', path: '/operations/allocations' },
       { label: 'Picking', path: '/operations/picking' },
+      { label: 'Picking Draft', path: '/operations/picking-draft' },
       { label: 'Dispatch', path: '/operations/dispatch' },
       { label: 'Outbound Documents', path: '/operations/outbound' },
       { label: 'Outbound Draft', path: '/operations/outbound-draft' },

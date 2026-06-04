@@ -27,6 +27,7 @@ import { AllocationDetailPage } from '../features/operations/allocation/Allocati
 import { PickingPage } from '../features/operations/PickingPage.jsx';
 import { PickingCreatePage } from '../features/operations/picking/PickingCreatePage.jsx';
 import { PickingDetailPage } from '../features/operations/picking/PickingDetailPage.jsx';
+import { PickingDraftWorkflowPage } from '../features/operations/picking/PickingDraftWorkflowPage.jsx';
 import { DispatchPage } from '../features/operations/DispatchPage.jsx';
 import { DispatchCreatePage } from '../features/operations/dispatch/DispatchCreatePage.jsx';
 import { DispatchDetailPage } from '../features/operations/dispatch/DispatchDetailPage.jsx';
@@ -90,6 +91,7 @@ export function AppRoutes() {
         <Route path="/operations/allocations/new" element={<AllocationCreatePage />} />
         <Route path="/operations/allocations/:id" element={<AllocationDetailPage />} />
         <Route path="/operations/picking" element={<PickingPage />} />
+        <Route path="/operations/picking-draft" element={<PickingDraftWorkflowPage />} />
         <Route path="/operations/picking/new" element={<PickingCreatePage />} />
         <Route path="/operations/picking/:id" element={<PickingDetailPage />} />
         <Route path="/operations/dispatch" element={<DispatchPage />} />

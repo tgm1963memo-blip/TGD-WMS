@@ -23,6 +23,7 @@ const navSections = [
       { key: 'customer_withdrawal', fallback: 'เบิกสินค้าโดยลูกค้า', path: '/operations/withdrawal-requests' },
       { key: 'allocation', fallback: 'จัดสรรสินค้า', path: '/operations/allocations' },
       { key: 'picking', fallback: 'หยิบสินค้า', path: '/operations/picking' },
+      { key: 'picking_draft', fallback: 'ทดลองหยิบสินค้าแบบร่าง', path: '/operations/picking-draft' },
       { key: 'dispatch_goods_issue', fallback: 'จ่ายสินค้าออก', path: '/operations/dispatch' },
       { key: 'outbound_documents', fallback: 'รายการจ่ายสินค้าออก', path: '/operations/outbound' },
       { key: 'outbound_draft', fallback: 'ทดลองสร้างเอกสารจ่ายออก', path: '/operations/outbound-draft' },

@@ -39,6 +39,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/operations/outbound-draft', route_name: 'OutboundDraftPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'write', notes: 'Draft/reserve/release only; no stock posting' },
   // Picking
   { route_path: '/operations/picking', route_name: 'PickingPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
+  { route_path: '/operations/picking-draft', route_name: 'PickingDraftWorkflowPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'Read-only picking draft workflow from outbound detail' },
   { route_path: '/operations/picking/new', route_name: 'PickingCreatePage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'write', notes: '' },
   { route_path: '/operations/picking/:id', route_name: 'PickingDetailPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
   // Dispatch
