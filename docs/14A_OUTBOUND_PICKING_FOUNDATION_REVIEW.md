@@ -122,5 +122,6 @@
 Safety hard rules:
 - no manual stock movement insert
 - no manual stock balance update
-- Production is strictly not touched in this sprint.
-outbound posting must be idempotent.
+- production is strictly not touched in this sprint.
+- outbound posting must be idempotent.
+- stock_balance decrease must be trigger-driven only.
