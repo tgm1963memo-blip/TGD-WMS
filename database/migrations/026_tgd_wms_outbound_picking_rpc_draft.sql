@@ -49,12 +49,12 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION tgd_rpc_add_outbound_line(
+create or replace function public.tgd_rpc_add_outbound_line(
   p_document_id uuid,
   p_product_id uuid,
-  p_lot_id uuid DEFAULT NULL,
   p_requested_quantity numeric,
-  p_requested_weight numeric DEFAULT 0
+  p_lot_id uuid default null,
+  p_requested_weight numeric default 0
 )
 RETURNS tgd_outbound_lines
 LANGUAGE plpgsql
