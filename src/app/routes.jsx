@@ -31,6 +31,7 @@ import { DispatchPage } from '../features/operations/DispatchPage.jsx';
 import { DispatchCreatePage } from '../features/operations/dispatch/DispatchCreatePage.jsx';
 import { DispatchDetailPage } from '../features/operations/dispatch/DispatchDetailPage.jsx';
 import { OutboundDraftPage } from '../features/operations/outbound/OutboundDraftPage.jsx';
+import { OutboundListPage } from '../features/operations/outbound/OutboundListPage.jsx';
 import { HandheldPage } from '../features/handheld/HandheldPage.jsx';
 import { StockCountPage } from '../features/stock-count/StockCountPage.jsx';
 import { StockCountCreatePage } from '../features/stock-count/StockCountCreatePage.jsx';
@@ -94,6 +95,7 @@ export function AppRoutes() {
         <Route path="/operations/dispatch" element={<DispatchPage />} />
         <Route path="/operations/dispatch/new" element={<DispatchCreatePage />} />
         <Route path="/operations/dispatch/:id" element={<DispatchDetailPage />} />
+        <Route path="/operations/outbound" element={<OutboundListPage />} />
         <Route path="/operations/outbound-draft" element={<OutboundDraftPage />} />
         <Route path="/handheld" element={<HandheldPage />} />
         <Route path="/stock-count" element={<StockCountPage />} />
@@ -127,3 +129,4 @@ export function AppRoutes() {
     </Routes>
   );
 }
+

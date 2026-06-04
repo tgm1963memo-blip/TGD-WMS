@@ -34,6 +34,9 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/operations/allocations', route_name: 'AllocationsPage', permission_area: 'allocation', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
   { route_path: '/operations/allocations/new', route_name: 'AllocationCreatePage', permission_area: 'allocation', minimum_role: 'warehouse_staff', access_level: 'write', notes: '' },
   { route_path: '/operations/allocations/:id', route_name: 'AllocationDetailPage', permission_area: 'allocation', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
+  // Outbound
+  { route_path: '/operations/outbound', route_name: 'OutboundListPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'Read-only outbound list/detail' },
+  { route_path: '/operations/outbound-draft', route_name: 'OutboundDraftPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'write', notes: 'Draft/reserve/release only; no stock posting' },
   // Picking
   { route_path: '/operations/picking', route_name: 'PickingPage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
   { route_path: '/operations/picking/new', route_name: 'PickingCreatePage', permission_area: 'picking', minimum_role: 'warehouse_staff', access_level: 'write', notes: '' },
@@ -129,3 +132,6 @@ export function validateRoutePermissionCatalog(routes) {
   // Ensure all provided routes exist in catalog (optional, external callers can check)
   return errors;
 }
+
+
+
