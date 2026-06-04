@@ -148,3 +148,21 @@ export async function releaseOutboundReservation(payload = {}) {
     p_reservation_id: payload.reservation_id,
   });
 }
+
+export async function confirmOutboundPickDraft(payload = {}) {
+  requireValue(payload.outbound_document_id, 'outbound_document_id');
+  requireValue(payload.outbound_line_id, 'outbound_line_id');
+  requireValue(payload.reservation_id, 'reservation_id');
+  requirePositiveNumber(payload.picked_quantity, 'picked_quantity');
+  requireNonnegativeNumber(payload.picked_weight, 'picked_weight');
+
+  return callRpc('tgd_rpc_confirm_outbound_pick_draft', {
+    p_outbound_document_id: payload.outbound_document_id,
+    p_outbound_line_id: payload.outbound_line_id,
+    p_reservation_id: payload.reservation_id,
+    p_picked_quantity: payload.picked_quantity,
+    p_picked_weight: payload.picked_weight ?? 0,
+    p_pick_reference: payload.pick_reference ?? null,
+    p_note: payload.note ?? null,
+  });
+}
