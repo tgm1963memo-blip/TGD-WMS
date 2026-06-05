@@ -106,7 +106,7 @@ describe('Sprint 14T controlled pick confirmation RPC draft', () => {
 
     expect(source).toContain('confirmOutboundPickDraft');
     expect(source).toContain('tgd_rpc_confirm_outbound_pick_draft');
-    expect(source).not.toContain('tgd_rpc_post_outbound_document');
+    expect(source).toContain('postOutboundDocumentDraft');
     expect(source).not.toContain('tgd_stock_movements');
     expect(source).not.toContain('tgd_stock_balances');
   });

@@ -24,6 +24,7 @@ const {
   listOutboundDocuments,
   releaseOutboundReservation,
   reserveOutboundStock,
+  postOutboundDocumentDraft,
 } = await import('../../src/services/outboundPickingService.js');
 
 function readService() {
@@ -67,6 +68,7 @@ describe('Sprint 14G outbound picking service integration draft', () => {
     expect(releaseOutboundReservation).toBeTypeOf('function');
     expect(listOutboundDocuments).toBeTypeOf('function');
     expect(getOutboundDocumentDetail).toBeTypeOf('function');
+    expect(postOutboundDocumentDraft).toBeTypeOf('function');
   });
 
   it('listOutboundDocuments reads tgd_outbound_documents only', async () => {
@@ -154,12 +156,28 @@ describe('Sprint 14G outbound picking service integration draft', () => {
     });
   });
 
+  it('postOutboundDocumentDraft calls only the controlled post outbound RPC', async () => {
+    const data = await postOutboundDocumentDraft({
+      outboundDocumentId: 'document-1',
+      postReference: 'POST-REF-15D-001',
+      note: 'post note',
+    });
+
+    expect(data).toEqual({ id: 'rpc-row-1' });
+    expect(rpcMock).toHaveBeenCalledWith('tgd_rpc_post_outbound_document', {
+      p_outbound_document_id: 'document-1',
+      p_post_reference: 'POST-REF-15D-001',
+      p_note: 'post note',
+    });
+  });
+
   it('throws clear validation errors for required fields before RPC call', async () => {
     await expect(createOutboundDraft({})).rejects.toThrow('document_no is required.');
     await expect(addOutboundLine({ document_id: 'document-1', product_id: 'product-1' })).rejects.toThrow('requested_quantity is required.');
     await expect(addOutboundLine({ document_id: 'document-1', product_id: 'product-1', requested_quantity: 0 })).rejects.toThrow('requested_quantity must be greater than zero.');
     await expect(reserveOutboundStock({ outbound_document_id: 'document-1', outbound_line_id: 'line-1', reserved_quantity: 1 })).rejects.toThrow('location_id is required.');
     await expect(releaseOutboundReservation({})).rejects.toThrow('reservation_id is required.');
+    await expect(postOutboundDocumentDraft({ outboundDocumentId: 'document-1' })).rejects.toThrow('post_reference is required.');
     await expect(getOutboundDocumentDetail()).rejects.toThrow('documentId is required.');
     expect(rpcMock).not.toHaveBeenCalled();
   });
@@ -188,10 +206,10 @@ describe('Sprint 14G outbound picking service integration draft', () => {
     expect(source).toContain('tgd_rpc_add_outbound_line');
     expect(source).toContain('tgd_rpc_reserve_outbound_stock');
     expect(source).toContain('tgd_rpc_release_outbound_reservation');
+    expect(source).toContain('tgd_rpc_post_outbound_document');
     expect(source).toContain('tgd_outbound_documents');
     expect(source).toContain('tgd_outbound_lines');
     expect(source).toContain('tgd_outbound_reservations');
-    expect(source).not.toContain('tgd_rpc_post_outbound_document');
     expect(source).not.toContain('tgd_stock_movements');
     expect(source).not.toContain('tgd_stock_balances');
     expect(source).not.toMatch(/\.insert\s*\(/);

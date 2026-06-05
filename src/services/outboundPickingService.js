@@ -173,3 +173,17 @@ export async function confirmOutboundPickDraft(payload = {}) {
     p_note: payload.note ?? null,
   });
 }
+
+export async function postOutboundDocumentDraft(payload = {}) {
+  const outboundDocumentId = payload.outboundDocumentId ?? payload.outbound_document_id;
+  const postReference = payload.postReference ?? payload.post_reference;
+
+  requireValue(outboundDocumentId, 'outbound_document_id');
+  requireValue(postReference, 'post_reference');
+
+  return callRpc('tgd_rpc_post_outbound_document', {
+    p_outbound_document_id: outboundDocumentId,
+    p_post_reference: postReference,
+    p_note: payload.note ?? null,
+  });
+}

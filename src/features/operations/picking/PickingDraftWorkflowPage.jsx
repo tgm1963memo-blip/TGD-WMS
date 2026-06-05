@@ -4,6 +4,7 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import {
   confirmOutboundPickDraft,
   getOutboundDocumentDetail,
+  postOutboundDocumentDraft,
 } from '../../../services/outboundPickingService.js';
 
 const cardStyle = {
@@ -52,6 +53,8 @@ const cellStyle = {
 
 const safetyNote = 'Picking draft workflow only. No stock posting. No stock movement OUT. No stock balance update.';
 const pickConfirmSafetyNote = 'Confirm Pick updates outbound picking state only. No stock posting. No stock movement OUT. No stock balance update.';
+const postOutboundSafetyNote = 'Post Outbound creates PICK_CONFIRM movement and decreases stock balance. Use only after document is fully picked.';
+const isPostOutboundUiEnabled = import.meta.env.VITE_ENABLE_POST_OUTBOUND_UI === 'true';
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function validateUuid(value, requiredMessage, invalidMessage) {
@@ -124,6 +127,27 @@ function validatePickConfirmation({
   return '';
 }
 
+function validatePostOutbound({
+  outboundDocumentId,
+  postReference,
+  acknowledged,
+}) {
+  const documentError = validateDocumentId(outboundDocumentId);
+  if (documentError) {
+    return documentError;
+  }
+
+  if (!postReference.trim()) {
+    return 'Post reference is required.';
+  }
+
+  if (!acknowledged) {
+    return 'Posting requires confirmation acknowledgment.';
+  }
+
+  return '';
+}
+
 function StatusPill({ value }) {
   return (
     <span style={{
@@ -166,6 +190,13 @@ export function PickingDraftWorkflowPage() {
   const [pickConfirmError, setPickConfirmError] = useState('');
   const [pickConfirmSuccess, setPickConfirmSuccess] = useState('');
   const [pickConfirmResult, setPickConfirmResult] = useState(null);
+  const [postReference, setPostReference] = useState('');
+  const [postNote, setPostNote] = useState('');
+  const [postAcknowledged, setPostAcknowledged] = useState(false);
+  const [postLoading, setPostLoading] = useState(false);
+  const [postError, setPostError] = useState('');
+  const [postSuccess, setPostSuccess] = useState('');
+  const [postResult, setPostResult] = useState(null);
 
   async function loadDocumentDetail(nextDocumentId) {
     const nextDetail = await getOutboundDocumentDetail(nextDocumentId.trim());
@@ -264,6 +295,53 @@ export function PickingDraftWorkflowPage() {
       setLoading(false);
     }
   }
+
+  async function handlePostOutboundDraft(event) {
+    event.preventDefault();
+
+    const activeDocumentId = (detail?.document?.id ?? documentId).trim();
+    const validationError = validatePostOutbound({
+      outboundDocumentId: activeDocumentId,
+      postReference,
+      acknowledged: postAcknowledged,
+    });
+
+    setPostError('');
+    setPostSuccess('');
+    setPostResult(null);
+
+    if (validationError) {
+      setPostError(validationError);
+      return;
+    }
+
+    setPostLoading(true);
+
+    try {
+      const result = await postOutboundDocumentDraft({
+        outboundDocumentId: activeDocumentId,
+        postReference: postReference.trim(),
+        note: postNote.trim() || null,
+      });
+
+      setPostSuccess('Post outbound completed.');
+      setPostResult(result);
+
+      setLoading(true);
+      setError('');
+      await loadDocumentDetail(activeDocumentId);
+    } catch {
+      setPostError('Unable to post outbound document. Please check document status, stock availability, reference, or permission.');
+    } finally {
+      setPostLoading(false);
+      setLoading(false);
+    }
+  }
+
+  const activeDocumentStatus = detail?.document?.status;
+  const canShowPostOutboundForm = isPostOutboundUiEnabled
+    && detail?.document
+    && activeDocumentStatus === 'PICKED';
 
   return (
     <section className="page-shell">
@@ -454,6 +532,88 @@ export function PickingDraftWorkflowPage() {
             {pickConfirmLoading ? 'Saving...' : 'Save Pick Confirmation Draft'}
           </button>
         </form>
+      </section>
+
+      <section style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Post Outbound Draft</h3>
+        <section role="status" style={{ border: '1px solid #fde68a', borderRadius: 8, color: '#92400e', marginBottom: 14, padding: 12 }}>
+          {postOutboundSafetyNote}
+        </section>
+
+        {!isPostOutboundUiEnabled ? (
+          <p>Post Outbound UI is disabled by safety gate.</p>
+        ) : null}
+
+        {isPostOutboundUiEnabled && detail?.document && activeDocumentStatus !== 'PICKED' && activeDocumentStatus !== 'CONFIRMED' ? (
+          <p>Post Outbound is available only for PICKED documents.</p>
+        ) : null}
+
+        {isPostOutboundUiEnabled && activeDocumentStatus === 'CONFIRMED' ? (
+          <p>Post Outbound is complete for this confirmed document.</p>
+        ) : null}
+
+        {postError ? (
+          <section role="alert" style={{ border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', marginBottom: 14, padding: 12 }}>
+            {postError}
+          </section>
+        ) : null}
+
+        {postSuccess ? (
+          <section role="status" style={{ border: '1px solid #bbf7d0', borderRadius: 8, color: '#166534', marginBottom: 14, padding: 12 }}>
+            {postSuccess}
+          </section>
+        ) : null}
+
+        {postResult ? (
+          <pre style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 14, overflowX: 'auto', padding: 12 }}>
+            {JSON.stringify(postResult, null, 2)}
+          </pre>
+        ) : null}
+
+        {canShowPostOutboundForm ? (
+          <form onSubmit={handlePostOutboundDraft} style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Outbound Document ID
+              <input
+                aria-label="Post outbound document id"
+                readOnly
+                style={{ ...inputStyle, background: '#f8fafc' }}
+                value={detail.document.id}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Post Reference
+              <input
+                aria-label="Post outbound post reference"
+                style={inputStyle}
+                value={postReference}
+                onChange={(event) => setPostReference(event.target.value)}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Post Note
+              <textarea
+                aria-label="Post outbound note"
+                rows={3}
+                style={inputStyle}
+                value={postNote}
+                onChange={(event) => setPostNote(event.target.value)}
+              />
+            </label>
+            <label style={{ alignItems: 'flex-start', display: 'flex', gap: 8 }}>
+              <input
+                aria-label="Post outbound confirmation acknowledgment"
+                checked={postAcknowledged}
+                type="checkbox"
+                onChange={(event) => setPostAcknowledged(event.target.checked)}
+              />
+              <span>I understand this will create a PICK_CONFIRM movement and decrease stock balance.</span>
+            </label>
+            <button disabled={postLoading} type="submit" style={buttonStyle}>
+              {postLoading ? 'Posting...' : 'Post Outbound Draft'}
+            </button>
+          </form>
+        ) : null}
       </section>
 
       <section style={cardStyle}>

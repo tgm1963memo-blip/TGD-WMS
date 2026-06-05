@@ -134,7 +134,7 @@ describe('Sprint 14J outbound picking read model UI', () => {
     const servicePath = path.resolve(process.cwd(), 'src/services/outboundPickingService.js');
     const source = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(servicePath, 'utf8')}`;
 
-    expect(source).not.toContain('tgd_rpc_post_outbound_document');
+    expect(source).toContain('postOutboundDocumentDraft');
     expect(source).not.toMatch(/insert\s+into\s+tgd_stock_movements/i);
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
     expect(source).not.toMatch(/delete\s+from/i);

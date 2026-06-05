@@ -128,7 +128,7 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
       .map((sourcePath) => fs.readFileSync(path.resolve(process.cwd(), sourcePath), 'utf8'))
       .join('\n');
 
-    expect(source).not.toContain('tgd_rpc_post_outbound_document');
+    expect(source).toContain('postOutboundDocumentDraft');
     expect(source).not.toMatch(/insert\s+into\s+tgd_stock_movements/i);
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
     expect(source).not.toMatch(/delete\s+from/i);
