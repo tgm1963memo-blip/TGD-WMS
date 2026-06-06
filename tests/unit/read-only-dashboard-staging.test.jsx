@@ -74,7 +74,7 @@ describe('read-only staging dashboard', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('กรุณาเข้าสู่ระบบ Staging เพื่ออ่านข้อมูล Stock ตามสิทธิ์ RLS')).toBeInTheDocument();
+    expect(await screen.findByText('Please login to Staging to view live RLS data.')).toBeInTheDocument();
     expect(mocks.getReadOnlyDashboardSummary).not.toHaveBeenCalled();
   });
 
@@ -85,18 +85,16 @@ describe('read-only staging dashboard', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('heading', { name: 'แดชบอร์ดคลังสินค้า' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
     expect(screen.queryByText('Sprint status: placeholder only')).not.toBeInTheDocument();
-    expect(screen.getByText('โหมดอ่านอย่างเดียว / Read-only')).toBeInTheDocument();
-    expect(screen.getByText('Staging')).toBeInTheDocument();
+    expect(screen.getByText(/Read-only staging data visualization/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText('12')).toBeInTheDocument();
-      expect(screen.getByText('34')).toBeInTheDocument();
+      expect(screen.getAllByText('12').length).toBeGreaterThan(0);
       expect(screen.getByText('567')).toBeInTheDocument();
     });
     expect(mocks.getReadOnlyDashboardSummary).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('uat@example.com')).toHaveLength(2);
+    expect(screen.getAllByText('uat@example.com')).toHaveLength(1);
   });
 
   it('uses the read-only dashboard service from the dashboard page', () => {

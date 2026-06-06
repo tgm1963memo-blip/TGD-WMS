@@ -7,11 +7,11 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'TGD WMS' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'แดชบอร์ดคลังสินค้า' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
   });
 
   it.each([
-    ['/', 'แดชบอร์ดคลังสินค้า', false],
+    ['/', 'Operations Dashboard', false],
     ['/customers', 'Customers'],
     ['/products', 'Products'],
     ['/locations', 'Locations'],

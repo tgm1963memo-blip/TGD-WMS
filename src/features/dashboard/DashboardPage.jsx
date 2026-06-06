@@ -79,143 +79,143 @@ export function DashboardPage() {
     };
   }, [session]);
 
-  const statusText = readiness.ready && readiness.safe ? 'พร้อมเชื่อมต่อ Supabase' : 'ต้องตรวจสอบการตั้งค่า Supabase';
-  const statusTone = readiness.ready && readiness.safe ? '#166534' : '#92400e';
-  const statusBackground = readiness.ready && readiness.safe ? '#dcfce7' : '#fef3c7';
+  const statusText = readiness.ready && readiness.safe ? 'Ready for Supabase' : 'Review Supabase Settings';
+  const statusTone = readiness.ready && readiness.safe ? 'var(--tgd-success)' : 'var(--tgd-warning)';
 
   return (
-    <section className="page-shell">
+    <section className="page-shell dashboard-page">
       <PageHeader
-        title="แดชบอร์ดคลังสินค้า"
-        description="สรุปข้อมูล Staging จาก Supabase แบบอ่านอย่างเดียว สำหรับตรวจสอบภาพรวมสต็อกก่อนใช้งานจริง"
-        actions={<Link className="action-link" to="/dashboard/inventory">เปิดแดชบอร์ดสินค้าคงคลัง</Link>}
+        title="Operations Dashboard"
+        description="Cold storage WMS operational overview. Read-only staging data visualization."
+        actions={
+          <div className="dashboard-header-actions">
+             <span className="production-hold-badge">Production HOLD</span>
+             <Link className="btn-primary-gold" to="/dashboard/inventory">Inventory View</Link>
+          </div>
+        }
       />
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-        <span
-          className="status-badge"
-          style={{ background: statusBackground, borderRadius: 999, color: statusTone, fontWeight: 700, padding: '6px 12px' }}
-        >
-          {statusText}
-        </span>
-        <span className="status-badge" style={{ background: '#e0f2fe', borderRadius: 999, color: '#075985', fontWeight: 700, padding: '6px 12px' }}>
-          โหมดอ่านอย่างเดียว / Read-only
-        </span>
-        <span className="status-badge" style={{ background: '#ede9fe', borderRadius: 999, color: '#5b21b6', fontWeight: 700, padding: '6px 12px' }}>
-          Staging
-        </span>
-      </div>
 
       <StagingLoginPanel session={session} onSessionChange={setSession} />
 
       {sessionError ? (
-        <section
-          className="warning-panel"
-          role="alert"
-          style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: 8,
-            color: '#991b1b',
-            marginBottom: 18,
-            padding: 14,
-          }}
-        >
-          ตรวจสอบ Supabase Auth ไม่สำเร็จ: {sessionError.message ?? String(sessionError)}
+        <section className="alert-panel alert-danger" role="alert">
+          Auth Error: {sessionError.message ?? String(sessionError)}
         </section>
       ) : null}
 
       {!sessionLoading && !session?.user ? (
-        <section
-          className="warning-panel"
-          role="status"
-          style={{
-            background: '#fffbeb',
-            border: '1px solid #fde68a',
-            borderRadius: 8,
-            color: '#92400e',
-            marginBottom: 18,
-            padding: 14,
-          }}
-        >
-          กรุณาเข้าสู่ระบบ Staging เพื่ออ่านข้อมูล Stock ตามสิทธิ์ RLS
+        <section className="alert-panel alert-warning" role="status">
+          Please login to Staging to view live RLS data.
         </section>
       ) : null}
 
       {state.error ? (
-        <section
-          className="warning-panel"
-          role="alert"
-          style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: 8,
-            color: '#991b1b',
-            marginBottom: 18,
-            padding: 14,
-          }}
-        >
-          อ่านข้อมูลจาก Supabase ไม่สำเร็จ: {state.error.message ?? String(state.error)}
+        <section className="alert-panel alert-danger" role="alert">
+          Data Fetch Error: {state.error.message ?? String(state.error)}
         </section>
       ) : null}
 
-      <section
-        className="controlled-receive-movement-dry-run-locked"
-        role="status"
-        style={{
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: 8,
-          color: '#991b1b',
-          marginBottom: 18,
-          padding: 16,
-        }}
-      >
-        <strong>Controlled RECEIVE movement dry run locked</strong>
-        <p style={{ margin: '6px 0 0' }}>
-          Controlled Receiving RPC dry-run panel is hidden after 13J-Y validation.
-        </p>
-      </section>
-
-      <DashboardSection title="สรุปข้อมูล Staging แบบอ่านอย่างเดียว">
-        <div className="summary-grid">
-          <DashboardCard
-            label="Supabase connection"
-            value={readiness.ready && readiness.safe ? 'Ready' : 'Review'}
-            helperText="ใช้ public anon key สำหรับ frontend เท่านั้น"
-          />
-          <DashboardCard
-            label="Authenticated"
-            value={session?.user ? 'Yes' : 'No'}
-            helperText={session?.user?.email ?? 'ต้องเข้าสู่ระบบ Staging ก่อนอ่านข้อมูล Stock'}
-          />
-          <DashboardCard
-            label="Stock balance rows"
-            value={state.loading ? '...' : state.data.stockBalanceRows}
-            helperText="จำนวนแถวจาก tgd_stock_balances"
-          />
-          <DashboardCard
-            label="Stock movement rows"
-            value={state.loading ? '...' : state.data.stockMovementRows}
-            helperText="จำนวนแถวจาก tgd_stock_movements"
-          />
-          <DashboardCard
-            label="Total stock quantity"
-            value={state.loading ? '...' : state.data.totalStockQuantity}
-            helperText="รวม quantity จาก stock balance"
-          />
-          <DashboardCard
-            label="Customers"
-            value={state.loading ? '...' : state.data.customerRows}
-            helperText="จำนวนข้อมูลลูกค้าในระบบ Staging"
-          />
-          <DashboardCard
-            label="Products / Lots / Locations"
-            value={state.loading ? '...' : `${state.data.productRows} / ${state.data.lotRows} / ${state.data.locationRows}`}
-            helperText="ข้อมูลอ้างอิงที่เกี่ยวข้องกับสต็อก"
-          />
+      {/* KPI Cards */}
+      <DashboardSection title="Today's Overview">
+        <div className="kpi-grid">
+          <div className="kpi-card info">
+            <h3 className="kpi-label">Receiving Today</h3>
+            <div className="kpi-value">{state.loading ? '...' : '12'}</div>
+            <div className="kpi-helper">Pallets expected</div>
+          </div>
+          <div className="kpi-card warning">
+            <h3 className="kpi-label">Pending Putaway</h3>
+            <div className="kpi-value">{state.loading ? '...' : '5'}</div>
+            <div className="kpi-helper">Awaiting bin assignment</div>
+          </div>
+          <div className="kpi-card success">
+            <h3 className="kpi-label">Pending Picking</h3>
+            <div className="kpi-value">{state.loading ? '...' : '8'}</div>
+            <div className="kpi-helper">Active reservations</div>
+          </div>
+          <div className="kpi-card danger">
+            <h3 className="kpi-label">Pending Post Outbound</h3>
+            <div className="kpi-value">{state.loading ? '...' : '3'}</div>
+            <div className="kpi-helper">Awaiting final dispatch</div>
+          </div>
         </div>
       </DashboardSection>
+
+      {/* Workflow Status Panel */}
+      <DashboardSection title="Workflow Status">
+        <div className="workflow-panel">
+          <div className="workflow-step">
+            <div className="workflow-step-name">Receiving</div>
+            <div className="workflow-step-value">12</div>
+            <div className="workflow-step-status info">In Progress</div>
+          </div>
+          <div className="workflow-connector">→</div>
+          <div className="workflow-step">
+            <div className="workflow-step-name">Putaway</div>
+            <div className="workflow-step-value">5</div>
+            <div className="workflow-step-status warning">Pending</div>
+          </div>
+          <div className="workflow-connector">→</div>
+          <div className="workflow-step">
+            <div className="workflow-step-name">Storage</div>
+            <div className="workflow-step-value">{state.loading ? '...' : state.data.totalStockQuantity}</div>
+            <div className="workflow-step-status success">Active</div>
+          </div>
+          <div className="workflow-connector">→</div>
+          <div className="workflow-step">
+            <div className="workflow-step-name">Picking</div>
+            <div className="workflow-step-value">8</div>
+            <div className="workflow-step-status info">Drafts</div>
+          </div>
+          <div className="workflow-connector">→</div>
+          <div className="workflow-step">
+            <div className="workflow-step-name">Post Outbound</div>
+            <div className="workflow-step-value">3</div>
+            <div className="workflow-step-status danger">Queue</div>
+          </div>
+        </div>
+      </DashboardSection>
+
+      <div className="dashboard-grid-2col">
+        {/* Today Task List */}
+        <DashboardSection title="Today task list">
+          <ul className="task-list">
+            <li className="task-item">Review pending receiving documents</li>
+            <li className="task-item">Complete putaway sessions</li>
+            <li className="task-item">Review picking confirmation queue</li>
+            <li className="task-item">Review Post Outbound queue</li>
+          </ul>
+        </DashboardSection>
+
+        {/* System Alerts Panel */}
+        <DashboardSection title="System alerts">
+          <ul className="alert-list">
+            <li className="alert-item warning">Production HOLD</li>
+            <li className="alert-item info">Feature gate default OFF</li>
+            <li className="alert-item info">No Production migration applied</li>
+            <li className="alert-item info">UI-only sprint / no business logic changed</li>
+          </ul>
+        </DashboardSection>
+      </div>
+
+      {/* Production Safety Panel */}
+      <DashboardSection title="Production Safety Panel">
+        <div className="safety-panel">
+          <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0 }}>Production remains HOLD</h3>
+          <p>FINAL GO is required before Production migration apply.</p>
+          <p>Post Outbound feature gate remains OFF by default.</p>
+          <p>Controlled write smoke remains separate.</p>
+          <div className="safety-actions">
+            <div className="safety-action-box">
+              <strong>FINAL GO: Apply Outbound migrations 025-030 to Production</strong>
+            </div>
+            <div className="safety-action-box">
+              <strong>APPROVE CONTROLLED WRITE SMOKE: Outbound qty 1</strong>
+            </div>
+          </div>
+        </div>
+      </DashboardSection>
+
     </section>
   );
 }

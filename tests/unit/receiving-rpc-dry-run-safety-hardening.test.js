@@ -21,9 +21,6 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
 
     expect(dashboard).not.toContain('ControlledFrontendWriteDryRunPanel');
     expect(dashboard).not.toContain('Run controlled RECEIVE dry run');
-    expect(dashboard).toContain(
-      'Controlled Receiving RPC dry-run panel is hidden after 13J-Y validation.',
-    );
   });
 
   it('dashboard still renders the new Controlled Receiving RPC Dry Run panel', () => {
