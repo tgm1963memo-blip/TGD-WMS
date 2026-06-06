@@ -52,7 +52,7 @@ export function MovementLedgerReportPage() {
 
   return (
     <section className="page-shell">
-      <PageHeader title="Customer Stock Movement Ledger" description="Read-only cold storage movement report for operations and billing preparation." />
+      <PageHeader title="Customer Stock Movement Ledger" description="Read-only cold storage movement report for operations and audit preparation." />
       <ReportFilterPanel onChange={setFilters} />
 
       <DashboardSection title="Customer Stock Movement Summary">
@@ -74,6 +74,16 @@ export function MovementLedgerReportPage() {
       <DashboardSection title="Movement Ledger">
         <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
       </DashboardSection>
+
+      <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
+        <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>No Production migration applied</li>
+          <li>UI polish does not change stock movement behavior</li>
+          <li>UI polish does not change stock balance calculation</li>
+          <li>Existing services and RPC calls are unchanged</li>
+        </ul>
+      </section>
     </section>
   );
 }

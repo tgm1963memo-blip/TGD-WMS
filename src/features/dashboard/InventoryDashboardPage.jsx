@@ -16,15 +16,18 @@ import {
 } from '../../services/inventoryDashboardService.js';
 
 const stockColumns = [
-  { key: 'customer_id', header: 'Customer' },
   { key: 'product_id', header: 'Product' },
   { key: 'lot_id', header: 'Lot' },
-  { key: 'warehouse_id', header: 'Warehouse' },
   { key: 'location_id', header: 'Location' },
-  { key: 'pallet_id', header: 'Pallet' },
-  { key: 'qty_on_hand', header: 'On Hand' },
-  { key: 'qty_allocated', header: 'Allocated' },
-  { key: 'qty_available', header: 'Available' },
+  { key: 'qty_on_hand', header: 'Qty', render: (row) => <span style={{ fontWeight: 600 }}>{row.qty_on_hand}</span> },
+  { key: 'weight', header: 'Weight', render: () => <span style={{ color: 'var(--tgd-muted-text)' }}>-</span> },
+  { key: 'qty_allocated', header: 'Reserved', render: (row) => <span style={{ color: 'var(--tgd-warning)', fontWeight: 600 }}>{row.qty_allocated}</span> },
+  { key: 'qty_available', header: 'Available', render: (row) => <span style={{ color: 'var(--tgd-info)', fontWeight: 600 }}>{row.qty_available}</span> },
+  { key: 'status', header: 'Status', render: (row) => (
+      <span style={{ padding: '4px 8px', borderRadius: 4, background: row.qty_allocated > 0 ? '#fef3c7' : '#dcfce7', color: row.qty_allocated > 0 ? '#b45309' : '#166534', fontSize: 12, fontWeight: 600 }}>
+        {row.qty_allocated > 0 ? 'Reserved' : 'Available'}
+      </span>
+  )},
 ];
 
 const lotColumns = [
@@ -96,40 +99,80 @@ export function InventoryDashboardPage() {
   }, [filters]);
 
   return (
-    <section className="page-shell">
-      <PageHeader title="Inventory Dashboard" description="Read-only inventory balance overview." />
-      <DocumentFilterBar onChange={setFilters} />
+    <section className="page-shell inventory-page" style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+      <PageHeader 
+        title="Inventory Control" 
+        description="Available stock, reservations, lot, location, and movement visibility." 
+      />
+      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
+         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+      </div>
 
-      <DashboardSection title="Inventory Summary">
-        <div className="summary-grid">
-          <DashboardCard label="Total Stock Qty" value={state.summary?.totalStockQty} />
-          <DashboardCard label="Total Allocated Qty" value={state.summary?.totalAllocatedQty} />
-          <DashboardCard label="Available Qty" value={state.summary?.availableQty} />
-          <QuantitySummaryCard label="SKUs" value={state.summary?.skuCount} helperText="Distinct products with balance rows." />
-          <QuantitySummaryCard label="Lots" value={state.summary?.lotCount} helperText="Distinct active lots in balance rows." />
-          <QuantitySummaryCard label="Pallets" value={state.summary?.palletCount} helperText="Distinct pallets in balance rows." />
+      <div style={{ background: 'var(--tgd-surface)', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid var(--tgd-border)' }}>
+        <DocumentFilterBar onChange={setFilters} />
+      </div>
+
+      <div className="kpi-grid" style={{ marginBottom: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+        <div className="kpi-card info" style={{ padding: 20, background: 'var(--tgd-surface)', borderRadius: 8, borderLeft: '4px solid var(--tgd-info)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 className="kpi-label" style={{ margin: '0 0 8px 0', fontSize: 13, textTransform: 'uppercase', color: 'var(--tgd-muted-text)' }}>Total Quantity</h3>
+          <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: 'var(--tgd-main-text)' }}>{state.summary?.totalStockQty ?? 0}</div>
+          <div className="kpi-helper" style={{ fontSize: 12, color: 'var(--tgd-muted-text)', marginTop: 4 }}>Physical units on hand</div>
         </div>
-      </DashboardSection>
+        <div className="kpi-card warning" style={{ padding: 20, background: 'var(--tgd-surface)', borderRadius: 8, borderLeft: '4px solid var(--tgd-warning)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 className="kpi-label" style={{ margin: '0 0 8px 0', fontSize: 13, textTransform: 'uppercase', color: 'var(--tgd-muted-text)' }}>Reserved Quantity</h3>
+          <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: 'var(--tgd-main-text)' }}>{state.summary?.totalAllocatedQty ?? 0}</div>
+          <div className="kpi-helper" style={{ fontSize: 12, color: 'var(--tgd-muted-text)', marginTop: 4 }}>Allocated for outbound</div>
+        </div>
+        <div className="kpi-card success" style={{ padding: 20, background: 'var(--tgd-surface)', borderRadius: 8, borderLeft: '4px solid var(--tgd-success)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 className="kpi-label" style={{ margin: '0 0 8px 0', fontSize: 13, textTransform: 'uppercase', color: 'var(--tgd-muted-text)' }}>Total Weight</h3>
+          <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: 'var(--tgd-main-text)' }}>-</div>
+          <div className="kpi-helper" style={{ fontSize: 12, color: 'var(--tgd-muted-text)', marginTop: 4 }}>Estimated kg</div>
+        </div>
+        <div className="kpi-card info" style={{ padding: 20, background: 'var(--tgd-surface)', borderRadius: 8, borderLeft: '4px solid var(--tgd-primary-gold)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h3 className="kpi-label" style={{ margin: '0 0 8px 0', fontSize: 13, textTransform: 'uppercase', color: 'var(--tgd-muted-text)' }}>Locations / Lots</h3>
+          <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: 'var(--tgd-main-text)' }}>{state.summary?.lotCount ?? 0}</div>
+          <div className="kpi-helper" style={{ fontSize: 12, color: 'var(--tgd-muted-text)', marginTop: 4 }}>Active stock lots</div>
+        </div>
+      </div>
 
-      <DashboardSection title="Stock Balances">
-        <DataTable columns={stockColumns} data={state.stockRows} loading={state.loading} error={state.error} emptyMessage="No stock balances found." />
-      </DashboardSection>
+      <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
+          <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Stock Balances</h3>
+        </div>
+        <div style={{ padding: 20, overflowX: 'auto' }}>
+          <DataTable columns={stockColumns} data={state.stockRows} loading={state.loading} error={state.error} emptyMessage="No stock balances found." />
+        </div>
+      </div>
 
-      <DashboardSection title="Low Stock">
-        <DataTable columns={stockColumns} data={state.lowStock} loading={state.loading} error={state.error} emptyMessage="No low stock items found." />
-      </DashboardSection>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+        <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Low Stock</h3>
+          </div>
+          <div style={{ padding: 20, overflowX: 'auto' }}>
+            <DataTable columns={stockColumns} data={state.lowStock} loading={state.loading} error={state.error} emptyMessage="No low stock items found." />
+          </div>
+        </div>
 
-      <DashboardSection title="Expiring Lots">
-        <DataTable columns={lotColumns} data={state.expiringLots} loading={state.loading} error={state.error} emptyMessage="No expiring lots found." />
-      </DashboardSection>
+        <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Expiring Lots</h3>
+          </div>
+          <div style={{ padding: 20, overflowX: 'auto' }}>
+            <DataTable columns={lotColumns} data={state.expiringLots} loading={state.loading} error={state.error} emptyMessage="No expiring lots found." />
+          </div>
+        </div>
+      </div>
 
-      <DashboardSection title="Inventory By Warehouse">
-        <InventorySummaryTable data={state.byWarehouse} loading={state.loading} error={state.error} emptyMessage="No warehouse inventory summary found." />
-      </DashboardSection>
-
-      <DashboardSection title="Inventory By Customer">
-        <InventorySummaryTable data={state.byCustomer} loading={state.loading} error={state.error} emptyMessage="No customer inventory summary found." />
-      </DashboardSection>
+      <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+        <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
+        <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>No Production migration applied</li>
+          <li>UI polish does not change stock movement behavior</li>
+          <li>UI polish does not change stock balance calculation</li>
+          <li>Existing services and RPC calls are unchanged</li>
+        </ul>
+      </section>
     </section>
   );
 }

@@ -19,8 +19,8 @@ describe('App', () => {
     ['/inventory', 'Inventory'],
     ['/movement-ledger', 'Movement Ledger'],
     ['/picking', 'Picking'],
-    ['/transfer', 'Transfer'],
-    ['/adjustment', 'Adjustment'],
+    ['/transfer', 'Internal Transfer', false],
+    ['/adjustment', 'Inventory Adjustment', false],
     ['/audit', 'Audit'],
   ])('renders %s route', (path, title, expectsPlaceholder = true) => {
     window.history.pushState({}, '', path);
