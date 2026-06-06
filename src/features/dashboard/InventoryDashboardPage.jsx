@@ -164,6 +164,25 @@ export function InventoryDashboardPage() {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+        <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Inventory By Warehouse</h3>
+          </div>
+          <div style={{ padding: 20, overflowX: 'auto' }}>
+            <DataTable columns={stockColumns} data={state.byWarehouse} loading={state.loading} error={state.error} emptyMessage="No warehouse data found." />
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Inventory By Customer</h3>
+          </div>
+          <div style={{ padding: 20, overflowX: 'auto' }}>
+            <DataTable columns={stockColumns} data={state.byCustomer} loading={state.loading} error={state.error} emptyMessage="No customer data found." />
+          </div>
+        </div>
+      </div>
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
         <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
