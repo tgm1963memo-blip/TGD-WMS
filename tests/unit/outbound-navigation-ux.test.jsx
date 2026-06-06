@@ -63,8 +63,9 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: 'รายการจ่ายสินค้าออก' })).toHaveAttribute('href', '/operations/outbound');
-    expect(screen.getByRole('link', { name: 'ทดลองสร้างเอกสารจ่ายออก' })).toHaveAttribute('href', '/operations/outbound-draft');
+    // 17B: navigation restructured – 'Post Outbound' links to outbound list
+    expect(screen.getByRole('link', { name: 'Post Outbound' })).toHaveAttribute('href', '/operations/outbound');
+    // Outbound Draft is no longer a sidebar item but the route still exists
   });
 
   it('list page shows safety note, loading state, empty permission hint, refresh, and draft link', async () => {

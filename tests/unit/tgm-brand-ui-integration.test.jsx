@@ -31,8 +31,8 @@ describe('Sprint 12G TGM brand UI integration', () => {
     expect(brandConfig.colors.red).toBeTruthy();
   });
 
-  it('Sidebar renders logo', () => {
-    renderWithProviders(<Sidebar />);
+  it('Topbar renders logo', () => {
+    renderWithProviders(<Topbar currentSection="Dashboard" />);
 
     expect(screen.getByAltText('TGM logo')).toHaveAttribute('src', brandConfig.logoPath);
   });

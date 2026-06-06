@@ -1,10 +1,14 @@
 import React from 'react';
-import { brandConfig } from '../../config/brandConfig.js';
 
+/**
+ * SectionCard – uses --tgd-* design tokens from 17B Black & Gold theme.
+ * Visual container for discrete operational content.
+ */
 export function SectionCard({ title, description, actions, children, tone = 'default' }) {
-  const borderColor = tone === 'warning' ? brandConfig.colors.red : '#e5e7eb';
-  const background = tone === 'warning' ? brandConfig.colors.redSoft : brandConfig.colors.white;
-  const accentColor = tone === 'warning' ? brandConfig.colors.red : brandConfig.colors.gold;
+  const isWarning = tone === 'warning';
+  const borderColor = isWarning ? 'var(--tgd-danger)' : 'var(--tgd-border)';
+  const background = isWarning ? 'var(--tgm-red-soft)' : 'var(--tgd-surface)';
+  const accentColor = isWarning ? 'var(--tgd-danger)' : 'var(--tgd-primary-gold)';
 
   return (
     <section
@@ -12,8 +16,8 @@ export function SectionCard({ title, description, actions, children, tone = 'def
       style={{
         background,
         border: `1px solid ${borderColor}`,
-        borderRadius: brandConfig.ui.borderRadius,
-        boxShadow: brandConfig.ui.cardShadow,
+        borderRadius: '10px',
+        boxShadow: '0 18px 45px rgba(9, 9, 11, 0.10)',
         position: 'relative',
         padding: 20,
       }}
@@ -44,7 +48,7 @@ export function SectionCard({ title, description, actions, children, tone = 'def
           <div>
             {title ? <h2 style={{ fontSize: 18, lineHeight: 1.3, margin: 0 }}>{title}</h2> : null}
             {description ? (
-              <p style={{ color: '#526173', fontSize: 14, lineHeight: 1.5, margin: '6px 0 0' }}>{description}</p>
+              <p style={{ color: 'var(--tgd-muted-text)', fontSize: 14, lineHeight: 1.5, margin: '6px 0 0' }}>{description}</p>
             ) : null}
           </div>
           {actions ? <div style={{ display: 'flex', gap: 8 }}>{actions}</div> : null}

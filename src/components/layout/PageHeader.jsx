@@ -1,6 +1,9 @@
 import React from 'react';
-import { brandConfig } from '../../config/brandConfig.js';
 
+/**
+ * PageHeader – layout component for page titles.
+ * Uses --tgd-* design tokens from 17B Black & Gold theme.
+ */
 export function PageHeader({ title, description, actions }) {
   return (
     <header
@@ -14,10 +17,10 @@ export function PageHeader({ title, description, actions }) {
         paddingTop: 4,
       }}
     >
-      <div style={{ borderLeft: `4px solid ${brandConfig.colors.gold}`, paddingLeft: 14 }}>
-        <h2 style={{ color: '#102a43', fontSize: 28, lineHeight: 1.2, margin: 0 }}>{title}</h2>
+      <div style={{ borderLeft: '4px solid var(--tgd-primary-gold)', paddingLeft: 14 }}>
+        <h2 style={{ color: 'var(--tgd-main-text)', fontSize: 28, lineHeight: 1.2, margin: 0 }}>{title}</h2>
         {description ? (
-          <p style={{ color: '#526173', fontSize: 15, lineHeight: 1.6, margin: '8px 0 0', maxWidth: 760 }}>
+          <p style={{ color: 'var(--tgd-muted-text)', fontSize: 15, lineHeight: 1.6, margin: '8px 0 0', maxWidth: 760 }}>
             {description}
           </p>
         ) : null}

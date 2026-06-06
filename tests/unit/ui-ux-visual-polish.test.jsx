@@ -34,11 +34,12 @@ describe('Sprint 12D UI/UX visual polish', () => {
     renderWithShell(
       <AppShell currentSection="Dashboard">
         <div />
-      </AppShell>
+      </AppShell>,
     );
 
-    expect(screen.getByText(getTranslation('warehouse_operations', 'th'))).toBeInTheDocument();
-    expect(screen.getAllByText(getTranslation('reports', 'th')).length).toBeGreaterThan(0);
+    // 17B: sidebar uses professional English group labels
+    expect(screen.getByText('Main Operation')).toBeInTheDocument();
+    expect(screen.getByText('Reports')).toBeInTheDocument();
   });
 
   it('renders ReportsPage with Thai title and report cards', () => {

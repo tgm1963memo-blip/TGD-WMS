@@ -1,48 +1,79 @@
+/**
+ * 17B Black & Gold Professional Navigation Groups.
+ *
+ * Rules:
+ * - Full professional text labels.
+ * - No emoji icons.
+ * - No short code-only labels (RCV, PTW, PCK, PST).
+ * - Groups match the 17A design spec.
+ * - Items that map to existing routes get a `path`.
+ * - Items without a route are marked `disabled: true`.
+ */
+
 export const navigationGroups = [
   {
-    label: 'Dashboard',
-    items: [{ label: 'Dashboard', path: '/dashboard' }],
-  },
-  {
-    label: 'Master Data',
+    label: 'Main Operation',
+    key: 'main_operation',
     items: [
-      { label: 'Customers', path: '/master/customers' },
-      { label: 'Products', path: '/master/products' },
-      { label: 'Warehouses', path: '/master/warehouses' },
-      { label: 'Locations', path: '/master/locations' },
+      { label: 'Dashboard', key: 'dashboard', path: '/dashboard' },
     ],
   },
   {
-    label: 'Operations',
+    label: 'Inbound Management',
+    key: 'inbound_management',
     items: [
-      { label: 'Receiving', path: '/operations/receiving' },
-      { label: 'Putaway', path: '/operations/putaway' },
-      { label: 'Transfer', path: '/operations/transfer' },
-      { label: 'Adjustment', path: '/operations/adjustment' },
-      { label: 'Withdrawal Requests', path: '/operations/withdrawal-requests' },
-      { label: 'Allocations', path: '/operations/allocations' },
-      { label: 'Picking', path: '/operations/picking' },
-      { label: 'Picking Draft', path: '/operations/picking-draft' },
-      { label: 'Dispatch', path: '/operations/dispatch' },
-      { label: 'Outbound Documents', path: '/operations/outbound' },
-      { label: 'Outbound Draft', path: '/operations/outbound-draft' },
+      { label: 'Receiving', key: 'receiving', path: '/operations/receiving' },
+      { label: 'Putaway', key: 'putaway', path: '/operations/putaway' },
+      { label: 'Handheld Receiving', key: 'handheld_receiving', path: '/handheld' },
     ],
   },
   {
-    label: 'Handheld',
-    items: [{ label: 'Handheld', path: '/handheld' }],
+    label: 'Inventory Control',
+    key: 'inventory_control',
+    items: [
+      { label: 'Stock Balance', key: 'stock_balance', path: '/stock-count' },
+      { label: 'Transfer', key: 'transfer', path: '/operations/transfer' },
+      { label: 'Adjustment', key: 'adjustment', path: '/operations/adjustment' },
+      { label: 'Lot / Pallet', key: 'lot_pallet', disabled: true },
+    ],
   },
   {
-    label: 'Stock Count',
-    items: [{ label: 'Stock Count', path: '/stock-count' }],
+    label: 'Outbound Management',
+    key: 'outbound_management',
+    items: [
+      { label: 'Withdrawal Request', key: 'withdrawal_request', path: '/operations/withdrawal-requests' },
+      { label: 'Reservation', key: 'reservation', path: '/operations/allocations' },
+      { label: 'Picking Confirmation', key: 'picking_confirmation', path: '/operations/picking' },
+      { label: 'Post Outbound', key: 'post_outbound', path: '/operations/outbound' },
+      { label: 'Dispatch History', key: 'dispatch_history', path: '/operations/dispatch' },
+    ],
+  },
+  {
+    label: 'Barcode / Handheld',
+    key: 'barcode_handheld',
+    items: [
+      { label: 'Scan Center', key: 'scan_center', path: '/handheld' },
+      { label: 'Barcode Alias', key: 'barcode_alias', disabled: true },
+      { label: 'Scan Logs', key: 'scan_logs', disabled: true },
+    ],
   },
   {
     label: 'Reports',
-    items: [{ label: 'Reports', path: '/reports' }],
+    key: 'reports',
+    items: [
+      { label: 'Movement Ledger', key: 'movement_ledger', path: '/reports/movement-ledger' },
+      { label: 'Stock Aging', key: 'stock_aging', path: '/reports/storage-aging' },
+      { label: 'Operation Summary', key: 'operation_summary', path: '/reports' },
+    ],
   },
   {
-    label: 'Settings',
-    items: [{ label: 'Settings', path: '/settings' }],
+    label: 'System Administration',
+    key: 'system_administration',
+    items: [
+      { label: 'Master Data', key: 'master_data', path: '/master/customers' },
+      { label: 'Users and Roles', key: 'users_and_roles', path: '/admin/auth-readiness' },
+      { label: 'Audit Log', key: 'audit_log', disabled: true },
+    ],
   },
 ];
 
