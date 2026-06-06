@@ -103,7 +103,7 @@ describe('Sprint 14J outbound picking read model UI', () => {
       expect(listOutboundDocuments).toHaveBeenCalled();
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'View Detail' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View' }));
 
     await waitFor(() => {
       expect(getOutboundDocumentDetail).toHaveBeenCalledWith('document-1');

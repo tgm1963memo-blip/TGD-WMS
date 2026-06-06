@@ -80,7 +80,7 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
 
     request.resolve([]);
 
-    expect(await screen.findByText('No outbound documents found or you may not have read permission.')).toBeInTheDocument();
+    expect(await screen.findByText('No outbound documents found.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
@@ -108,7 +108,7 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
     renderWithRouter(<OutboundListPage />);
     renderWithRouter(<OutboundDraftPage />);
 
-    await screen.findByText('No outbound documents found or you may not have read permission.');
+    await screen.findByText('No outbound documents found.');
 
     expect(screen.queryByRole('button', { name: /Post Outbound/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Confirm Stock Out/i })).not.toBeInTheDocument();

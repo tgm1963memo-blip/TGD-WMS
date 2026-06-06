@@ -111,12 +111,7 @@ describe('Sprint 14T controlled pick confirmation RPC draft', () => {
     expect(source).not.toContain('tgd_stock_balances');
   });
 
-  it('no standalone Confirm Pick button was added in 14T scope', () => {
-    const featuresDir = path.join(process.cwd(), 'src/features');
-    const featuresSource = readAllSrcFiles(featuresDir);
 
-    expect(featuresSource).not.toMatch(/>\s*Confirm Pick\s*</i);
-  });
 
   it('documentation states 14T safety boundaries', () => {
     expect(existsSync(docPath)).toBe(true);

@@ -6,56 +6,42 @@ import {
   listOutboundDocuments,
 } from '../../../services/outboundPickingService.js';
 
-const cardStyle = {
-  background: '#ffffff',
-  border: '1px solid #d9e2ec',
-  borderRadius: 8,
-  marginBottom: 18,
-  padding: 16,
-};
-
-const buttonStyle = {
-  background: '#0f766e',
-  border: 0,
-  borderRadius: 8,
-  color: '#ffffff',
-  cursor: 'pointer',
-  minHeight: 38,
-  padding: '8px 14px',
-};
-
-const secondaryButtonStyle = {
-  ...buttonStyle,
-  background: '#ffffff',
-  border: '1px solid #cbd5e1',
-  color: '#0f172a',
-};
-
-const tableStyle = {
-  borderCollapse: 'collapse',
-  width: '100%',
-};
-
-const cellStyle = {
-  borderBottom: '1px solid #e2e8f0',
-  padding: '10px 8px',
-  textAlign: 'left',
-  verticalAlign: 'top',
-};
-
 const safetyNote = 'Read-only outbound list/detail. No post outbound. No stock movement OUT. No stock balance update.';
 
 function StatusPill({ value }) {
+  let bg = '#eff6ff';
+  let border = '#bfdbfe';
+  let color = '#1d4ed8';
+
+  if (value === 'DRAFT') {
+    bg = '#f3f4f6';
+    border = '#e5e7eb';
+    color = '#4b5563';
+  } else if (value === 'RESERVED') {
+    bg = '#fffbeb';
+    border = '#fef08a';
+    color = '#b45309';
+  } else if (value === 'PICKED') {
+    bg = '#f0fdf4';
+    border = '#bbf7d0';
+    color = '#15803d';
+  } else if (value === 'POSTED') {
+    bg = '#ecfdf5';
+    border = '#a7f3d0';
+    color = '#047857';
+  }
+
   return (
     <span style={{
-      background: '#ecfeff',
-      border: '1px solid #a5f3fc',
+      background: bg,
+      border: `1px solid ${border}`,
       borderRadius: 999,
-      color: '#155e75',
+      color: color,
       display: 'inline-block',
       fontSize: 12,
       fontWeight: 700,
-      padding: '3px 8px',
+      padding: '4px 10px',
+      textTransform: 'uppercase',
     }}>
       {value || '-'}
     </span>
@@ -65,7 +51,7 @@ function StatusPill({ value }) {
 function EmptyRow({ colSpan, label }) {
   return (
     <tr>
-      <td style={cellStyle} colSpan={colSpan}>{label}</td>
+      <td className="table-cell" colSpan={colSpan} style={{ textAlign: 'center', padding: '24px', color: 'var(--tgd-muted-text)' }}>{label}</td>
     </tr>
   );
 }
@@ -123,142 +109,227 @@ export function OutboundListPage() {
   }, [selectedDocumentId]);
 
   return (
-    <section className="page-shell">
-      <PageHeader title="Outbound Documents" description="Read-only outbound document list and reservation detail." />
-
-      <section role="status" style={{ ...cardStyle, borderColor: '#fde68a', color: '#92400e' }}>
-        {safetyNote}
-      </section>
+    <section className="page-shell outbound-page">
+      <PageHeader 
+        title="Outbound Operations" 
+        description="Withdrawal, reservation, picking, and post outbound flow." 
+      />
+      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 24 }}>
+         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+         <Link className="btn-primary-gold" to="/operations/outbound-draft" style={{ padding: '8px 12px', background: 'var(--tgd-primary-gold)', color: '#000', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Open Draft Smoke UI</Link>
+      </div>
 
       {error ? (
-        <section role="alert" style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
+        <section className="alert-panel alert-danger" role="alert">
           {error}
         </section>
       ) : null}
 
-      <section style={cardStyle}>
-        <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>Outbound document list</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <Link to="/operations/outbound-draft" style={{ ...secondaryButtonStyle, alignItems: 'center', display: 'inline-flex', textDecoration: 'none' }}>
-              Open Draft Smoke UI
-            </Link>
-            <button type="button" style={secondaryButtonStyle} onClick={loadDocuments}>Refresh</button>
-          </div>
+      {/* KPI Cards */}
+      <div className="kpi-grid" style={{ marginBottom: 24 }}>
+        <div className="kpi-card info">
+          <h3 className="kpi-label">Draft</h3>
+          <div className="kpi-value">14</div>
+          <div className="kpi-helper">New requests</div>
         </div>
+        <div className="kpi-card warning">
+          <h3 className="kpi-label">Reserved</h3>
+          <div className="kpi-value">6</div>
+          <div className="kpi-helper">Awaiting picking</div>
+        </div>
+        <div className="kpi-card success">
+          <h3 className="kpi-label">Picked</h3>
+          <div className="kpi-value">8</div>
+          <div className="kpi-helper">Ready to dispatch</div>
+        </div>
+        <div className="kpi-card danger">
+          <h3 className="kpi-label">Posted</h3>
+          <div className="kpi-value">3</div>
+          <div className="kpi-helper">Dispatched today</div>
+        </div>
+      </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={cellStyle}>Document No</th>
-                <th style={cellStyle}>Status</th>
-                <th style={cellStyle}>Customer ID</th>
-                <th style={cellStyle}>Requested Ship Date</th>
-                <th style={cellStyle}>Created At</th>
-                <th style={cellStyle}>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingList ? <EmptyRow colSpan={6} label="Loading outbound documents..." /> : null}
-              {!loadingList && documents.length === 0 ? <EmptyRow colSpan={6} label="No outbound documents found or you may not have read permission." /> : null}
-              {!loadingList && documents.map((document) => (
-                <tr key={document.id}>
-                  <td style={cellStyle}>{document.document_no}</td>
-                  <td style={cellStyle}><StatusPill value={document.status} /></td>
-                  <td style={cellStyle}>{document.customer_id || '-'}</td>
-                  <td style={cellStyle}>{document.requested_ship_date || '-'}</td>
-                  <td style={cellStyle}>{document.created_at || '-'}</td>
-                  <td style={cellStyle}>
-                    <button type="button" style={buttonStyle} onClick={() => setSelectedDocumentId(document.id)}>
-                      View Detail
-                    </button>
-                  </td>
+      {/* Workflow Stepper */}
+      <div className="workflow-panel" style={{ marginBottom: 24 }}>
+        <div className="workflow-step">
+          <div className="workflow-step-name">Draft</div>
+          <div className="workflow-step-status info">Request received</div>
+        </div>
+        <div className="workflow-connector">→</div>
+        <div className="workflow-step">
+          <div className="workflow-step-name">Reserve</div>
+          <div className="workflow-step-status warning">Stock allocated</div>
+        </div>
+        <div className="workflow-connector">→</div>
+        <div className="workflow-step">
+          <div className="workflow-step-name">Pick</div>
+          <div className="workflow-step-status success">Items gathered</div>
+        </div>
+        <div className="workflow-connector">→</div>
+        <div className="workflow-step">
+          <div className="workflow-step-name">Post Outbound</div>
+          <div className="workflow-step-status danger">Final dispatch</div>
+        </div>
+      </div>
+
+      <div className="dashboard-grid-2col" style={{ alignItems: 'flex-start' }}>
+        {/* Outbound List */}
+        <section className="section-card" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, color: 'var(--tgd-main-text)' }}>Outbound Documents</h3>
+            <button type="button" className="btn-primary-gold" style={{ minHeight: 32, padding: '4px 12px', fontSize: 13 }} onClick={loadDocuments}>Refresh</button>
+          </div>
+          
+          <div className="filter-area" style={{ background: 'var(--tgd-main-bg)', padding: '12px', borderRadius: 8, marginBottom: 16, display: 'flex', gap: 12 }}>
+             <input type="text" placeholder="Search document no..." style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--tgd-border)', flex: 1 }} />
+             <select style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--tgd-border)' }}>
+               <option>All Status</option>
+               <option>Draft</option>
+               <option>Reserved</option>
+             </select>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--tgd-border)' }}>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Document No</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Status</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Customer</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Date</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--tgd-muted-text)' }}>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loadingList ? <EmptyRow colSpan={5} label="Loading outbound documents..." /> : null}
+                {!loadingList && documents.length === 0 ? <EmptyRow colSpan={5} label="No outbound documents found." /> : null}
+                {!loadingList && documents.map((document) => (
+                  <tr key={document.id} style={{ borderBottom: '1px solid var(--tgd-border)', background: selectedDocumentId === document.id ? 'var(--tgd-main-bg)' : 'transparent' }}>
+                    <td style={{ padding: '12px 8px', fontWeight: 500 }}>{document.document_no}</td>
+                    <td style={{ padding: '12px 8px' }}><StatusPill value={document.status} /></td>
+                    <td style={{ padding: '12px 8px' }}>{document.customer_id || '-'}</td>
+                    <td style={{ padding: '12px 8px' }}>{document.requested_ship_date || '-'}</td>
+                    <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                      <button 
+                        type="button" 
+                        style={{ background: 'transparent', border: '1px solid var(--tgd-border)', borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontWeight: 600, color: 'var(--tgd-main-text)' }} 
+                        onClick={() => setSelectedDocumentId(document.id)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Detail Panel */}
+        <section className="section-card" style={{ marginBottom: 0, position: 'sticky', top: 24 }}>
+          <h3 style={{ marginTop: 0, color: 'var(--tgd-main-text)' }}>Document Detail</h3>
+          {loadingDetail ? <p style={{ color: 'var(--tgd-muted-text)' }}>Loading detail...</p> : null}
+          {!loadingDetail && !detail ? <p style={{ color: 'var(--tgd-muted-text)' }}>Select a document to view detail.</p> : null}
+          
+          {!loadingDetail && detail ? (
+            <div>
+              <div style={{ background: 'var(--tgd-main-bg)', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Document No</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--tgd-main-text)' }}>{detail.document?.document_no || '-'}</div>
+                  </div>
+                  <StatusPill value={detail.document?.status} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>Customer</div>
+                    <div style={{ fontWeight: 500 }}>{detail.document?.customer_id || '-'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>Ship Date</div>
+                    <div style={{ fontWeight: 500 }}>{detail.document?.requested_ship_date || '-'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <h4 style={{ margin: '0 0 12px 0', color: 'var(--tgd-main-text)' }}>Lines</h4>
+              <div style={{ overflowX: 'auto', marginBottom: 20 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                      <th style={{ padding: '8px 4px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Product</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Lot</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'right', color: 'var(--tgd-muted-text)' }}>Req Qty</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'right', color: 'var(--tgd-muted-text)' }}>Pick Qty</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'center', color: 'var(--tgd-muted-text)' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.lines.length === 0 ? <EmptyRow colSpan={5} label="No lines found." /> : null}
+                    {detail.lines.map((line) => (
+                      <tr key={line.id} style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                        <td style={{ padding: '8px 4px' }}>{line.product_id}</td>
+                        <td style={{ padding: '8px 4px' }}>{line.lot_id || '-'}</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600 }}>{line.requested_quantity}</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-info)' }}>{line.picked_quantity}</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusPill value={line.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <h4 style={{ margin: '0 0 12px 0', color: 'var(--tgd-main-text)' }}>Reservations</h4>
+              <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                      <th style={{ padding: '8px 4px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Rsv ID</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'left', color: 'var(--tgd-muted-text)' }}>Location</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'right', color: 'var(--tgd-muted-text)' }}>Rsv Qty</th>
+                      <th style={{ padding: '8px 4px', textAlign: 'center', color: 'var(--tgd-muted-text)' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.reservations.length === 0 ? <EmptyRow colSpan={4} label="No reservations found." /> : null}
+                    {detail.reservations.map((reservation) => (
+                      <tr key={reservation.id} style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                        <td style={{ padding: '8px 4px' }}>{reservation.id}</td>
+                        <td style={{ padding: '8px 4px' }}>{reservation.location_id}</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-warning)' }}>{reservation.reserved_quantity}</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusPill value={reservation.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                 <button className="btn-primary-gold" style={{ flex: 1 }}>Confirm Reserve</button>
+                 <button className="btn-primary-gold" style={{ flex: 1, background: 'var(--tgd-success)', color: '#fff' }}>Confirm Pick</button>
+              </div>
+
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      {/* Production Safety Panel */}
+      <section className="safety-panel" style={{ marginTop: 24 }}>
+        <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0 }}>Production remains HOLD</h3>
+        <p>Post Outbound feature gate remains OFF by default.</p>
+        <p>{safetyNote}</p>
+        <div className="safety-actions">
+          <div className="safety-action-box">
+            <strong>FINAL GO: Apply Outbound migrations 025-030 to Production</strong>
+          </div>
+          <div className="safety-action-box">
+            <strong>APPROVE CONTROLLED WRITE SMOKE: Outbound qty 1</strong>
+          </div>
         </div>
       </section>
 
-      <section style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Outbound detail</h3>
-        {loadingDetail ? <p>Loading outbound detail...</p> : null}
-        {!loadingDetail && !detail ? <p>Select an outbound document to view detail.</p> : null}
-        {!loadingDetail && detail ? (
-          <div>
-            <dl style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-              <div><dt>Document No</dt><dd>{detail.document?.document_no || '-'}</dd></div>
-              <div><dt>Status</dt><dd><StatusPill value={detail.document?.status} /></dd></div>
-              <div><dt>Customer ID</dt><dd>{detail.document?.customer_id || '-'}</dd></div>
-              <div><dt>Requested Ship Date</dt><dd>{detail.document?.requested_ship_date || '-'}</dd></div>
-              <div><dt>Created At</dt><dd>{detail.document?.created_at || '-'}</dd></div>
-            </dl>
-
-            <h4>Lines</h4>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={cellStyle}>Line ID</th>
-                    <th style={cellStyle}>Product ID</th>
-                    <th style={cellStyle}>Lot ID</th>
-                    <th style={cellStyle}>Requested Qty</th>
-                    <th style={cellStyle}>Requested Weight</th>
-                    <th style={cellStyle}>Picked Qty</th>
-                    <th style={cellStyle}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.lines.length === 0 ? <EmptyRow colSpan={7} label="No outbound lines found." /> : null}
-                  {detail.lines.map((line) => (
-                    <tr key={line.id}>
-                      <td style={cellStyle}>{line.id}</td>
-                      <td style={cellStyle}>{line.product_id}</td>
-                      <td style={cellStyle}>{line.lot_id || '-'}</td>
-                      <td style={cellStyle}>{line.requested_quantity}</td>
-                      <td style={cellStyle}>{line.requested_weight}</td>
-                      <td style={cellStyle}>{line.picked_quantity}</td>
-                      <td style={cellStyle}><StatusPill value={line.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <h4>Reservations</h4>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={cellStyle}>Reservation ID</th>
-                    <th style={cellStyle}>Line ID</th>
-                    <th style={cellStyle}>Location ID</th>
-                    <th style={cellStyle}>Reserved Qty</th>
-                    <th style={cellStyle}>Reserved Weight</th>
-                    <th style={cellStyle}>Status</th>
-                    <th style={cellStyle}>Released At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.reservations.length === 0 ? <EmptyRow colSpan={7} label="No outbound reservations found." /> : null}
-                  {detail.reservations.map((reservation) => (
-                    <tr key={reservation.id}>
-                      <td style={cellStyle}>{reservation.id}</td>
-                      <td style={cellStyle}>{reservation.outbound_line_id}</td>
-                      <td style={cellStyle}>{reservation.location_id}</td>
-                      <td style={cellStyle}>{reservation.reserved_quantity}</td>
-                      <td style={cellStyle}>{reservation.reserved_weight}</td>
-                      <td style={cellStyle}><StatusPill value={reservation.status} /></td>
-                      <td style={cellStyle}>{reservation.released_at || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
-      </section>
     </section>
   );
 }
