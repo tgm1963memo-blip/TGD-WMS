@@ -51,6 +51,9 @@ import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdminPage.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 
+import { AuthGuard } from '../features/auth/AuthGuard.jsx';
+import { LoginPage } from '../features/auth/LoginPage.jsx';
+
 function LegacyPlaceholderPage({ title }) {
   return (
     <section className="page-shell">
@@ -63,69 +66,72 @@ function LegacyPlaceholderPage({ title }) {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/dashboard/inventory" element={<InventoryDashboardPage />} />
-        <Route path="/master/customers" element={<CustomersPage />} />
-        <Route path="/master/products" element={<ProductsPage />} />
-        <Route path="/master/warehouses" element={<WarehousesPage />} />
-        <Route path="/master/locations" element={<LocationsPage />} />
-        <Route path="/operations/receiving" element={<ReceivingPage />} />
-        <Route path="/operations/receiving/create" element={<ReceivingCreatePage />} />
-        <Route path="/operations/receiving/new" element={<ReceivingCreatePage />} />
-        <Route path="/operations/receiving/:id" element={<ReceivingDetailPage />} />
-        <Route path="/operations/putaway" element={<PutawayPage />} />
-        <Route path="/operations/putaway/new" element={<PutawayCreatePage />} />
-        <Route path="/operations/putaway/:id" element={<PutawayDetailPage />} />
-        <Route path="/operations/transfer" element={<TransferPage />} />
-        <Route path="/operations/transfer/new" element={<TransferCreatePage />} />
-        <Route path="/operations/transfer/:id" element={<TransferDetailPage />} />
-        <Route path="/operations/adjustment" element={<AdjustmentPage />} />
-        <Route path="/operations/adjustment/new" element={<AdjustmentCreatePage />} />
-        <Route path="/operations/adjustment/:id" element={<AdjustmentDetailPage />} />
-        <Route path="/operations/withdrawal-requests" element={<WithdrawalRequestsPage />} />
-        <Route path="/operations/withdrawal-requests/new" element={<WithdrawalRequestCreatePage />} />
-        <Route path="/operations/withdrawal-requests/:id" element={<WithdrawalRequestDetailPage />} />
-        <Route path="/operations/allocations" element={<AllocationsPage />} />
-        <Route path="/operations/allocations/new" element={<AllocationCreatePage />} />
-        <Route path="/operations/allocations/:id" element={<AllocationDetailPage />} />
-        <Route path="/operations/picking" element={<PickingPage />} />
-        <Route path="/operations/picking-draft" element={<PickingDraftWorkflowPage />} />
-        <Route path="/operations/picking/new" element={<PickingCreatePage />} />
-        <Route path="/operations/picking/:id" element={<PickingDetailPage />} />
-        <Route path="/operations/dispatch" element={<DispatchPage />} />
-        <Route path="/operations/dispatch/new" element={<DispatchCreatePage />} />
-        <Route path="/operations/dispatch/:id" element={<DispatchDetailPage />} />
-        <Route path="/operations/outbound" element={<OutboundListPage />} />
-        <Route path="/operations/outbound-draft" element={<OutboundDraftPage />} />
-        <Route path="/handheld" element={<HandheldPage />} />
-        <Route path="/stock-count" element={<StockCountPage />} />
-        <Route path="/stock-count/new" element={<StockCountCreatePage />} />
-        <Route path="/stock-count/:id" element={<StockCountDetailPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/reports/movement-ledger" element={<MovementLedgerReportPage />} />
-        <Route path="/reports/customer-storage-balance" element={<CustomerStorageBalanceReportPage />} />
-        <Route path="/reports/storage-aging" element={<StorageAgingReportPage />} />
-        <Route path="/reports/warehouse-operation-performance" element={<WarehouseOperationPerformanceReportPage />} />
-        <Route path="/reports/monthly-storage-billing-summary" element={<MonthlyStorageBillingSummaryPage />} />
-        <Route path="/reports/accounting-charge-staging-preview" element={<AccountingChargeStagingPreviewPage />} />
-        <Route path="/reports/accounting-charge-handoff-review" element={<AccountingChargeHandoffReviewPage />} />
-        <Route path="/admin/document-branding" element={<DocumentBrandingAdminPage />} />
-        <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
-        <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<AuthGuard />}>
+        <Route element={<AppLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dashboard/inventory" element={<InventoryDashboardPage />} />
+          <Route path="/master/customers" element={<CustomersPage />} />
+          <Route path="/master/products" element={<ProductsPage />} />
+          <Route path="/master/warehouses" element={<WarehousesPage />} />
+          <Route path="/master/locations" element={<LocationsPage />} />
+          <Route path="/operations/receiving" element={<ReceivingPage />} />
+          <Route path="/operations/receiving/create" element={<ReceivingCreatePage />} />
+          <Route path="/operations/receiving/new" element={<ReceivingCreatePage />} />
+          <Route path="/operations/receiving/:id" element={<ReceivingDetailPage />} />
+          <Route path="/operations/putaway" element={<PutawayPage />} />
+          <Route path="/operations/putaway/new" element={<PutawayCreatePage />} />
+          <Route path="/operations/putaway/:id" element={<PutawayDetailPage />} />
+          <Route path="/operations/transfer" element={<TransferPage />} />
+          <Route path="/operations/transfer/new" element={<TransferCreatePage />} />
+          <Route path="/operations/transfer/:id" element={<TransferDetailPage />} />
+          <Route path="/operations/adjustment" element={<AdjustmentPage />} />
+          <Route path="/operations/adjustment/new" element={<AdjustmentCreatePage />} />
+          <Route path="/operations/adjustment/:id" element={<AdjustmentDetailPage />} />
+          <Route path="/operations/withdrawal-requests" element={<WithdrawalRequestsPage />} />
+          <Route path="/operations/withdrawal-requests/new" element={<WithdrawalRequestCreatePage />} />
+          <Route path="/operations/withdrawal-requests/:id" element={<WithdrawalRequestDetailPage />} />
+          <Route path="/operations/allocations" element={<AllocationsPage />} />
+          <Route path="/operations/allocations/new" element={<AllocationCreatePage />} />
+          <Route path="/operations/allocations/:id" element={<AllocationDetailPage />} />
+          <Route path="/operations/picking" element={<PickingPage />} />
+          <Route path="/operations/picking-draft" element={<PickingDraftWorkflowPage />} />
+          <Route path="/operations/picking/new" element={<PickingCreatePage />} />
+          <Route path="/operations/picking/:id" element={<PickingDetailPage />} />
+          <Route path="/operations/dispatch" element={<DispatchPage />} />
+          <Route path="/operations/dispatch/new" element={<DispatchCreatePage />} />
+          <Route path="/operations/dispatch/:id" element={<DispatchDetailPage />} />
+          <Route path="/operations/outbound" element={<OutboundListPage />} />
+          <Route path="/operations/outbound-draft" element={<OutboundDraftPage />} />
+          <Route path="/handheld" element={<HandheldPage />} />
+          <Route path="/stock-count" element={<StockCountPage />} />
+          <Route path="/stock-count/new" element={<StockCountCreatePage />} />
+          <Route path="/stock-count/:id" element={<StockCountDetailPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports/movement-ledger" element={<MovementLedgerReportPage />} />
+          <Route path="/reports/customer-storage-balance" element={<CustomerStorageBalanceReportPage />} />
+          <Route path="/reports/storage-aging" element={<StorageAgingReportPage />} />
+          <Route path="/reports/warehouse-operation-performance" element={<WarehouseOperationPerformanceReportPage />} />
+          <Route path="/reports/monthly-storage-billing-summary" element={<MonthlyStorageBillingSummaryPage />} />
+          <Route path="/reports/accounting-charge-staging-preview" element={<AccountingChargeStagingPreviewPage />} />
+          <Route path="/reports/accounting-charge-handoff-review" element={<AccountingChargeHandoffReviewPage />} />
+          <Route path="/admin/document-branding" element={<DocumentBrandingAdminPage />} />
+          <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
+          <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
 
-        <Route path="/customers" element={<CustomersPage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/locations" element={<LocationsPage />} />
-        <Route path="/receiving" element={<ReceivingPage />} />
-        <Route path="/picking" element={<PickingPage />} />
-        <Route path="/transfer" element={<TransferPage />} />
-        <Route path="/adjustment" element={<AdjustmentPage />} />
-        <Route path="/inventory" element={<LegacyPlaceholderPage title="Inventory" />} />
-        <Route path="/movement-ledger" element={<LegacyPlaceholderPage title="Movement Ledger" />} />
-        <Route path="/audit" element={<LegacyPlaceholderPage title="Audit" />} />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/locations" element={<LocationsPage />} />
+          <Route path="/receiving" element={<ReceivingPage />} />
+          <Route path="/picking" element={<PickingPage />} />
+          <Route path="/transfer" element={<TransferPage />} />
+          <Route path="/adjustment" element={<AdjustmentPage />} />
+          <Route path="/inventory" element={<LegacyPlaceholderPage title="Inventory" />} />
+          <Route path="/movement-ledger" element={<LegacyPlaceholderPage title="Movement Ledger" />} />
+          <Route path="/audit" element={<LegacyPlaceholderPage title="Audit" />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

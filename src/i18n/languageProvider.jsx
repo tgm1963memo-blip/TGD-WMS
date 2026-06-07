@@ -25,9 +25,25 @@ export const LanguageContext = createContext({
  * Wraps the application (or a subtree) to provide language via context.
  */
 export const LanguageProvider = ({ children, initialLanguage }) => {
-  const [language, setLanguage] = useState(getInitialLanguage(initialLanguage));
+  const getStoredLanguage = () => {
+    try {
+      const stored = localStorage.getItem('tgd_wms_lang');
+      return stored ? normalizeLanguage(stored) : getInitialLanguage(initialLanguage);
+    } catch (e) {
+      return getInitialLanguage(initialLanguage);
+    }
+  };
+
+  const [language, setLanguageState] = useState(getStoredLanguage);
+
   const setNormalizedLanguage = (nextLanguage) => {
-    setLanguage(normalizeLanguage(nextLanguage));
+    const normalized = normalizeLanguage(nextLanguage);
+    setLanguageState(normalized);
+    try {
+      localStorage.setItem('tgd_wms_lang', normalized);
+    } catch (e) {
+      // Ignore
+    }
   };
 
   return (

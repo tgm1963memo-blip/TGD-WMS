@@ -234,6 +234,51 @@ a {
   text-transform: uppercase;
 }
 
+/* ─── Auth Layout ─────────────────────────────────── */
+
+.layout-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--tgd-sidebar-bg);
+  padding: 24px;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo {
+  height: 64px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--tgd-surface);
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.login-header h1 {
+  color: #ffffff;
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+
+.login-header p {
+  color: var(--tgd-primary-gold);
+  margin: 0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 14px;
+}
+
 /* ─── Page Shell & Header ─────────────────────────── */
 
 .page-shell {

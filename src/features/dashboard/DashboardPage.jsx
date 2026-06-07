@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardCard } from '../../components/dashboard/DashboardCard.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
-import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import {
   getReadOnlyDashboardEmptySummary,
   getReadOnlyDashboardSummary,
 } from '../../services/readOnlyDashboardService.js';
-import { getStagingSession, subscribeToStagingAuth } from '../../services/stagingAuthService.js';
 import { summarizeSupabaseReadiness } from '../../services/supabaseConnectionReadinessService.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const initialState = {
   data: getReadOnlyDashboardEmptySummary(),
@@ -19,33 +18,8 @@ const initialState = {
 
 export function DashboardPage() {
   const [state, setState] = useState(initialState);
-  const [session, setSession] = useState(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [sessionError, setSessionError] = useState(null);
+  const { session } = useAuth();
   const readiness = summarizeSupabaseReadiness();
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getStagingSession().then((result) => {
-      if (!isMounted) return;
-
-      setSession(result.data ?? null);
-      setSessionError(result.error ?? null);
-      setSessionLoading(false);
-    });
-
-    const subscription = subscribeToStagingAuth((nextSession) => {
-      setSession(nextSession);
-      setSessionError(null);
-      setSessionLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,20 +68,6 @@ export function DashboardPage() {
           </div>
         }
       />
-
-      <StagingLoginPanel session={session} onSessionChange={setSession} />
-
-      {sessionError ? (
-        <section className="alert-panel alert-danger" role="alert">
-          Auth Error: {sessionError.message ?? String(sessionError)}
-        </section>
-      ) : null}
-
-      {!sessionLoading && !session?.user ? (
-        <section className="alert-panel alert-warning" role="status">
-          Please login to Staging to view live RLS data.
-        </section>
-      ) : null}
 
       {state.error ? (
         <section className="alert-panel alert-danger" role="alert">
