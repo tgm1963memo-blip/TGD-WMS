@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import App from './App.jsx';
+
+vi.mock('../features/auth/AuthContext.jsx', () => ({
+  useAuth: vi.fn(() => ({ session: { user: { email: 'uat@example.com' } }, loading: false, isAuthenticated: true })),
+  AuthProvider: ({ children }) => children,
+}));
 
 describe('App', () => {
   it('renders without crashing', () => {

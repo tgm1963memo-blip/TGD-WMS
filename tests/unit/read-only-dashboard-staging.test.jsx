@@ -31,6 +31,11 @@ vi.mock('../../src/services/stagingAuthService.js', () => ({
   subscribeToStagingAuth: mocks.subscribeToStagingAuth,
 }));
 
+vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
+  useAuth: vi.fn(() => ({ session: { user: { email: 'uat@example.com' } }, loading: false, isAuthenticated: true })),
+  AuthProvider: ({ children }) => children,
+}));
+
 const repoRoot = process.cwd();
 const dashboardPath = path.join(repoRoot, 'src/features/dashboard/DashboardPage.jsx');
 const servicePath = path.join(repoRoot, 'src/services/readOnlyDashboardService.js');

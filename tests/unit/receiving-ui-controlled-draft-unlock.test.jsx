@@ -67,6 +67,11 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
+vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
+  useAuth: vi.fn(() => ({ session: { user: { id: 'test-user' } }, loading: false, isAuthenticated: true })),
+  AuthProvider: ({ children }) => children,
+}));
+
 function renderPage() {
   return render(
     <MemoryRouter>
