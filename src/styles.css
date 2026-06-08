@@ -1,4 +1,4 @@
-﻿/* TGD WMS runtime styles – Phase 21C (mockup design system) */
+/* TGD WMS runtime styles – Phase 21C (mockup design system) */
 
 :root {
   --tgm-black: #09090b;
@@ -142,8 +142,7 @@ a:hover { text-decoration: underline; }
 }
 .nav-link.disabled, .nav-item.disabled { color: rgba(255, 255, 255, 0.32); cursor: default; pointer-events: none; }
 
-.main-content, .app-content { flex: 1; overflow-y: auto; background: var(--tgd-main-bg); padding: 24px; }
-
+.main-content, .app-content { flex: 1; overflow-y: auto; background: var(--tgd-main-bg); padding: 24px 32px; }
 .tgm-sidebar-brand { align-items: center; display: flex; gap: 12px; margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
 .tgm-sidebar-logo {
   background: var(--tgd-surface);
@@ -277,7 +276,7 @@ button, .btn {
 .btn-primary-gold { background: var(--tgd-primary-gold); border: 0; border-radius: 6px; color: #111111; cursor: pointer; font-weight: 700; padding: 8px 14px; transition: background 0.15s; }
 .btn-primary-gold:hover { background: var(--tgd-primary-gold-hover); }
 
-.form-group { margin-bottom: 16px; }
+.form-group { margin-bottom: 12px; }
 label, .form-label { font-weight: 500; margin-bottom: 4px; display: block; color: var(--tgd-main-text); }
 input, select, textarea, .form-control {
   display: block;
@@ -293,23 +292,24 @@ input, select, textarea, .form-control {
 .form-control:focus, input:focus, select:focus, textarea:focus { outline: none; border-color: var(--tgd-sidebar-bg); box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.1); }
 .form-control.is-invalid { border-color: var(--tgd-danger); }
 .invalid-feedback { display: block; width: 100%; margin-top: 4px; font-size: 12px; color: var(--tgd-danger); }
-.filter-grid, .form-grid { display: grid; gap: 12px; }
+.filter-grid, .form-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.filter-grid > *, .form-grid > * { min-width: 0; }
 .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
 .search-input { flex: 1; max-width: 300px; }
 
-.page-shell { max-width: 960px; margin: 0 auto; }
+.page-shell { max-width: 1200px; width: 100%; margin: 0 auto; padding-bottom: 32px; }
 .page-header, .modern-page-header, .doc-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
 .page-header h2, .doc-info h2 { color: var(--tgd-main-text); font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0 0 4px; }
 .page-header p, .doc-meta { color: var(--tgd-muted-text); font-size: 14px; line-height: 1.5; margin: 0; }
-.page-header-actions, .doc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.page-header-actions, .doc-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .sprint-status, .barcode-placeholder { background: var(--tgd-surface); border: 1px solid var(--tgd-border); border-radius: 6px; display: inline-flex; font-size: 14px; font-weight: 700; margin-top: 20px; padding: 10px 12px; }
 .barcode-placeholder { display: flex; margin-top: 16px; width: fit-content; }
 
 .card, .section-card { background: var(--tgd-surface); border: 1px solid var(--tgd-border); border-radius: 6px; box-shadow: var(--tgd-shadow-sm); position: relative; margin-bottom: 16px; }
 .section-card { padding: 0; }
-.card-header, .section-card-header { padding: 16px; border-bottom: 1px solid var(--tgd-border); background-color: #fcfcfc; border-top-left-radius: 6px; border-top-right-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.card-title, .section-card-title { margin: 0; font-size: 16px; font-weight: 600; }
-.section-card-description { margin: 4px 0 0; font-size: 14px; color: var(--tgd-muted-text); }
+.card-header, .section-card-header { padding: 12px 16px; border-bottom: 1px solid var(--tgd-border); background-color: #fcfcfc; border-top-left-radius: 6px; border-top-right-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.card-title, .section-card-title { margin: 0; font-size: 15px; font-weight: 600; }
+.section-card-description { margin: 2px 0 0; font-size: 13px; color: var(--tgd-muted-text); }
 .card-body { padding: 16px; }
 
 .table-responsive { overflow-x: auto; }
@@ -318,8 +318,10 @@ th, .table-header, .table th { padding: 10px 16px; background: #f8f9fa; color: v
 td, .table-cell, .table td { padding: 10px 16px; border-bottom: 1px solid var(--tgd-border); vertical-align: middle; }
 .table tbody tr:hover, .tgd-table tbody tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 
-.empty-state { padding: 32px; text-align: center; color: var(--tgd-muted-text); }
-.empty-icon { font-size: 48px; color: var(--tgd-border); margin-bottom: 16px; }
+.empty-state { padding: 48px 32px; text-align: center; color: var(--tgd-muted-text); background: var(--tgd-surface); border: 1px dashed var(--tgd-border); border-radius: 6px; margin: 16px 0; }
+.empty-icon { font-size: 40px; color: #d1d5db; margin-bottom: 12px; }
+.empty-state h3 { margin: 0 0 8px; font-size: 16px; color: var(--tgd-main-text); font-weight: 600; }
+.empty-state p { margin: 0; font-size: 14px; }
 
 .dashboard-header-actions { display: flex; align-items: center; gap: 16px; }
 .production-hold-badge { background: rgba(220, 53, 69, 0.12); border: 1px solid var(--tgd-danger); border-radius: 6px; color: var(--tgd-danger); font-size: 11px; font-weight: 700; padding: 6px 12px; text-transform: uppercase; }
@@ -369,6 +371,7 @@ td, .table-cell, .table td { padding: 10px 16px; border-bottom: 1px solid var(--
 
 @media (max-width: 760px) {
   .app-body { flex-direction: column; }
+  .main-content, .app-content { padding: 16px; }
   .sidebar, .app-sidebar { width: 100%; border-bottom: 1px solid rgba(255, 255, 255, 0.1); border-right: 0; }
   .nav-list { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
   .tgm-sidebar-brand { align-items: flex-start; }
@@ -379,6 +382,10 @@ td, .table-cell, .table td { padding: 10px 16px; border-bottom: 1px solid var(--
   .workflow-connector { text-align: center; transform: rotate(90deg); }
   input, select, textarea, .form-control, button, .btn, .btn-primary-gold { height: 42px; font-size: 0.95rem; }
   label, .form-label { font-size: 0.9rem; }
+  .page-header, .modern-page-header, .doc-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-header-actions, .doc-actions { justify-content: flex-start; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .search-input { max-width: 100%; }
 }
 
 /* ─── Operational Report Print (Phase 20B) ─────────────────── */
