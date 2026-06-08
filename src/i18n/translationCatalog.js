@@ -392,6 +392,27 @@ Object.assign(TRANSLATION_CATALOG, {
   'nav.auditLog': { th: 'บันทึกการตรวจสอบ', en: 'Audit Log' },
 });
 
+Object.assign(TRANSLATION_CATALOG, {
+  'actions': { th: 'การกระทำ', en: 'Actions' },
+  'view_detail': { th: 'ดูรายละเอียด', en: 'View detail' },
+  'create': { th: 'สร้าง', en: 'Create' },
+  'date_from': { th: 'วันที่เริ่มต้น', en: 'Date From' },
+  'date_to': { th: 'วันที่สิ้นสุด', en: 'Date To' },
+  'receiving_no': { th: 'เลขที่รับเข้า', en: 'Receiving No' },
+  'putaway_no': { th: 'เลขที่จัดเก็บ', en: 'Putaway No' },
+  'transfer_no': { th: 'เลขที่โอนย้าย', en: 'Transfer No' },
+  'adjustment_no': { th: 'เลขที่ปรับปรุง', en: 'Adjustment No' },
+  'withdrawal_no': { th: 'เลขที่เบิก', en: 'Withdrawal No' },
+  'allocation_no': { th: 'เลขที่จัดสรร', en: 'Allocation No' },
+  'picking_no': { th: 'เลขที่หยิบ', en: 'Picking No' },
+  'dispatch_no': { th: 'เลขที่จ่ายออก', en: 'Dispatch No' },
+  'receiving_type': { th: 'ประเภทรับเข้า', en: 'Type' },
+  'source_id': { th: 'อ้างอิงต้นทาง', en: 'Source Ref' },
+  'source_type': { th: 'ประเภทต้นทาง', en: 'Type' },
+  'expected_receive_date': { th: 'วันที่คาดว่าจะรับ', en: 'Date' },
+  'reason': { th: 'เหตุผล', en: 'Reason' },
+});
+
 /** Retrieve a translation for a given key and language. */
 export function getTranslation(key, language) {
   const entry = TRANSLATION_CATALOG[key];

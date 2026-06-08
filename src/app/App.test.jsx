@@ -1,16 +1,60 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import React from 'react';
 import App from './App.jsx';
 
+// Stable mock reference to prevent infinite React re-renders in useEffect dependencies
+const mockAuthContextValue = {
+  session: { user: { email: 'uat@example.com' } },
+  loading: false,
+  isAuthenticated: true
+};
+
 vi.mock('../features/auth/AuthContext.jsx', () => ({
-  useAuth: vi.fn(() => ({ session: { user: { email: 'uat@example.com' } }, loading: false, isAuthenticated: true })),
+  useAuth: vi.fn(() => mockAuthContextValue),
   AuthProvider: ({ children }) => children,
 }));
 
-describe('App', () => {
-  it('renders without crashing', () => {
-    render(<App />);
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    BrowserRouter: ({ children }) => <actual.MemoryRouter initialEntries={[window.location.pathname]}>{children}</actual.MemoryRouter>,
+  };
+});
 
+// Provide a stable mock for supabaseClient that doesn't instantiate createClient
+vi.mock('../lib/supabaseClient.js', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      then: function(resolve) {
+        return Promise.resolve({ data: [], error: null }).then(resolve);
+      }
+    })),
+    rpc: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } }))
+    }
+  }
+}));
+
+describe('App', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('renders without crashing', () => {
+    window.history.pushState({}, '', '/');
+    render(<App />);
     expect(screen.getByRole('heading', { name: 'TGD WMS' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
   });
@@ -40,3 +84,5 @@ describe('App', () => {
     }
   });
 });
+
+
