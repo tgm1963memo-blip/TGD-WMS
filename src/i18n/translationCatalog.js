@@ -360,6 +360,38 @@ Object.assign(TRANSLATION_CATALOG, {
   "supabase_readiness.masked_anon_key": { th: 'Anon Key ที่แสดง', en: 'Masked Anon Key' },
 });
 
+Object.assign(TRANSLATION_CATALOG, {
+  'nav.mainOperation': { th: 'เมนูหลัก', en: 'MAIN OPERATION' },
+  'nav.dashboard': { th: 'แดชบอร์ด', en: 'Dashboard' },
+  'nav.inboundManagement': { th: 'งานรับเข้า', en: 'INBOUND MANAGEMENT' },
+  'nav.receiving': { th: 'รับเข้า', en: 'Receiving' },
+  'nav.putaway': { th: 'จัดเก็บ', en: 'Putaway' },
+  'nav.handheldReceiving': { th: 'รับเข้าด้วย Handheld', en: 'Handheld Receiving' },
+  'nav.inventoryControl': { th: 'ควบคุมสินค้าคงคลัง', en: 'INVENTORY CONTROL' },
+  'nav.stockBalance': { th: 'ยอดคงเหลือ', en: 'Stock Balance' },
+  'nav.transfer': { th: 'โอนย้าย', en: 'Transfer' },
+  'nav.adjustment': { th: 'ปรับปรุงสต็อก', en: 'Adjustment' },
+  'nav.lotPallet': { th: 'ล็อต / พาเลท', en: 'Lot / Pallet' },
+  'nav.outboundManagement': { th: 'งานจ่ายออก', en: 'OUTBOUND MANAGEMENT' },
+  'nav.withdrawalRequest': { th: 'ใบขอเบิก', en: 'Withdrawal Request' },
+  'nav.reservation': { th: 'จองสินค้า', en: 'Reservation' },
+  'nav.pickingConfirmation': { th: 'ยืนยันการหยิบ', en: 'Picking Confirmation' },
+  'nav.postOutbound': { th: 'ตัดจ่ายออก', en: 'Post Outbound' },
+  'nav.dispatchHistory': { th: 'ประวัติการจ่ายออก', en: 'Dispatch History' },
+  'nav.barcodeHandheld': { th: 'บาร์โค้ด / Handheld', en: 'BARCODE / HANDHELD' },
+  'nav.scanCenter': { th: 'ศูนย์สแกน', en: 'Scan Center' },
+  'nav.barcodeAlias': { th: 'รหัสบาร์โค้ดแทน', en: 'Barcode Alias' },
+  'nav.scanLogs': { th: 'บันทึกการสแกน', en: 'Scan Logs' },
+  'nav.reports': { th: 'รายงาน', en: 'Reports' },
+  'nav.movementLedger': { th: 'บัญชีความเคลื่อนไหว', en: 'Movement Ledger' },
+  'nav.stockAging': { th: 'อายุการจัดเก็บ', en: 'Stock Aging' },
+  'nav.operationSummary': { th: 'สรุปการทำงาน', en: 'Operation Summary' },
+  'nav.systemAdministration': { th: 'ผู้ดูแลระบบ', en: 'System Administration' },
+  'nav.masterData': { th: 'ข้อมูลหลัก', en: 'Master Data' },
+  'nav.usersAndRoles': { th: 'ผู้ใช้และสิทธิ์', en: 'Users and Roles' },
+  'nav.auditLog': { th: 'บันทึกการตรวจสอบ', en: 'Audit Log' },
+});
+
 /** Retrieve a translation for a given key and language. */
 export function getTranslation(key, language) {
   const entry = TRANSLATION_CATALOG[key];

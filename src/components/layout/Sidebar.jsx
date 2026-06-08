@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { navigationGroups } from '../../app/navigation.js';
-import { brandConfig } from '../../config/brandConfig.js';
+import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 /**
  * Professional Black & Gold sidebar navigation.
@@ -16,6 +16,11 @@ import { brandConfig } from '../../config/brandConfig.js';
  * - Production HOLD indicator.
  */
 export function Sidebar() {
+  const t = useTranslation();
+
+  const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+  const getNavKey = (key) => `nav.${toCamelCase(key)}`;
+
   return (
     <aside
       className="sidebar"
@@ -23,39 +28,43 @@ export function Sidebar() {
       data-testid="sidebar"
     >
       <nav aria-label="TGD WMS navigation">
-        {navigationGroups.map((group) => (
-          <div key={group.key}>
-            <p className="nav-group-label">{group.label}</p>
-            <div className="nav-list">
-              {group.items.map((item) => {
-                if (item.disabled) {
-                  return (
-                    <span
-                      key={item.key}
-                      className="nav-link disabled"
-                      aria-disabled="true"
-                      title="Coming soon"
-                    >
-                      {item.label}
-                    </span>
-                  );
-                }
+        {navigationGroups.map((group) => {
+          const groupLabel = t(getNavKey(group.key)) || group.label;
+          return (
+            <div key={group.key}>
+              <p className="nav-group-label">{groupLabel}</p>
+              <div className="nav-list">
+                {group.items.map((item) => {
+                  const itemLabel = t(getNavKey(item.key)) || item.label;
+                  if (item.disabled) {
+                    return (
+                      <span
+                        key={item.key}
+                        className="nav-link disabled"
+                        aria-disabled="true"
+                        title="Coming soon"
+                      >
+                        {itemLabel}
+                      </span>
+                    );
+                  }
 
-                return (
-                  <NavLink
-                    key={item.key}
-                    className={({ isActive }) =>
-                      isActive ? 'nav-link active' : 'nav-link'
-                    }
-                    to={item.path}
-                  >
-                    {item.label}
-                  </NavLink>
-                );
-              })}
+                  return (
+                    <NavLink
+                      key={item.key}
+                      className={({ isActive }) =>
+                        isActive ? 'nav-link active' : 'nav-link'
+                      }
+                      to={item.path}
+                    >
+                      {itemLabel}
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Production HOLD safety indicator */}
