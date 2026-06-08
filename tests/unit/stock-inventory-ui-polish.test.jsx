@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { InventoryDashboardPage } from '../../src/features/dashboard/InventoryDashboardPage.jsx';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 vi.mock('../../src/services/inventoryDashboardService.js', () => ({
   getInventorySummary: vi.fn().mockResolvedValue({ data: { totalStockQty: 100, totalAllocatedQty: 10, lotCount: 5 }, error: null }),
@@ -15,7 +16,9 @@ vi.mock('../../src/services/inventoryDashboardService.js', () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <InventoryDashboardPage />
+      <LanguageProvider initialLanguage="en">
+        <InventoryDashboardPage />
+      </LanguageProvider>
     </MemoryRouter>
   );
 }

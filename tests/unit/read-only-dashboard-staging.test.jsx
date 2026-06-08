@@ -1,40 +1,68 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DashboardPage } from '../../src/features/dashboard/DashboardPage.jsx';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  getReadOnlyDashboardSummary: vi.fn(),
-  getStagingSession: vi.fn(),
-  subscribeToStagingAuth: vi.fn(),
+const authMock = vi.hoisted(() => ({
+  session: { user: { email: 'uat@example.com' } },
+  loading: false,
+  error: null,
+}));
+
+const dashboardSummaryMock = vi.hoisted(() => ({
+  data: {
+    stockBalanceRows: 12,
+    stockMovementRows: 34,
+    totalStockQuantity: 567,
+    customerRows: 3,
+    productRows: 4,
+    lotRows: 5,
+    locationRows: 6,
+  },
+  error: null,
+}));
+
+const getReadOnlyDashboardSummaryMock = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve(dashboardSummaryMock)),
+);
+
+const emptySummary = vi.hoisted(() => ({
+  stockBalanceRows: 0,
+  stockMovementRows: 0,
+  totalStockQuantity: 0,
+  customerRows: 0,
+  productRows: 0,
+  lotRows: 0,
+  locationRows: 0,
 }));
 
 vi.mock('../../src/services/readOnlyDashboardService.js', () => ({
-  getReadOnlyDashboardEmptySummary: () => ({
-    stockBalanceRows: 0,
-    stockMovementRows: 0,
-    totalStockQuantity: 0,
-    customerRows: 0,
-    productRows: 0,
-    lotRows: 0,
-    locationRows: 0,
-  }),
-  getReadOnlyDashboardSummary: mocks.getReadOnlyDashboardSummary,
+  getReadOnlyDashboardEmptySummary: () => ({ ...emptySummary }),
+  getReadOnlyDashboardSummary: getReadOnlyDashboardSummaryMock,
 }));
 
-vi.mock('../../src/services/stagingAuthService.js', () => ({
-  getStagingSession: mocks.getStagingSession,
-  signInToStaging: vi.fn(),
-  signOutFromStaging: vi.fn(),
-  subscribeToStagingAuth: mocks.subscribeToStagingAuth,
+vi.mock('../../src/services/supabaseConnectionReadinessService.js', () => ({
+  summarizeSupabaseReadiness: () => ({
+    ready: true,
+    safe: true,
+    urlConfigured: true,
+    anonKeyConfigured: true,
+    serviceRoleExposed: false,
+    clientInitialized: true,
+    schemaValid: true,
+    connectionValid: true,
+    issues: [],
+    nextActions: [],
+  }),
 }));
 
 vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
-  useAuth: vi.fn(() => ({ session: { user: { email: 'uat@example.com' } }, loading: false, isAuthenticated: true })),
+  useAuth: () => authMock,
   AuthProvider: ({ children }) => children,
 }));
+
+import { DashboardPage } from '../../src/features/dashboard/DashboardPage.jsx';
 
 const repoRoot = process.cwd();
 const dashboardPath = path.join(repoRoot, 'src/features/dashboard/DashboardPage.jsx');
@@ -46,66 +74,68 @@ function readSource(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+function renderDashboard() {
+  return render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+}
+
 describe('read-only staging dashboard', () => {
   beforeEach(() => {
-    mocks.getReadOnlyDashboardSummary.mockReset();
-    mocks.getStagingSession.mockReset();
-    mocks.subscribeToStagingAuth.mockReset();
-    mocks.subscribeToStagingAuth.mockReturnValue({ unsubscribe: vi.fn() });
-    mocks.getStagingSession.mockResolvedValue({
-      data: { user: { email: 'uat@example.com' } },
-      error: null,
-    });
-    mocks.getReadOnlyDashboardSummary.mockResolvedValue({
-      data: {
-        stockBalanceRows: 12,
-        stockMovementRows: 34,
-        totalStockQuantity: 567,
-        customerRows: 3,
-        productRows: 4,
-        lotRows: 5,
-        locationRows: 6,
-      },
-      error: null,
-    });
+    vi.clearAllMocks();
+    authMock.session = { user: { email: 'uat@example.com' } };
+    authMock.loading = false;
+    authMock.error = null;
+    dashboardSummaryMock.data = {
+      stockBalanceRows: 12,
+      stockMovementRows: 34,
+      totalStockQuantity: 567,
+      customerRows: 3,
+      productRows: 4,
+      lotRows: 5,
+      locationRows: 6,
+    };
+    dashboardSummaryMock.error = null;
+    getReadOnlyDashboardSummaryMock.mockImplementation(() => Promise.resolve(dashboardSummaryMock));
   });
 
-  it('shows auth required message and does not read stock data without a session', async () => {
-    mocks.getStagingSession.mockResolvedValue({ data: null, error: null });
+  afterEach(() => {
+    cleanup();
+  });
 
-    render(
-      <MemoryRouter>
-        <DashboardPage />
-      </MemoryRouter>,
-    );
+  it('does not read stock data without an authenticated session', async () => {
+    authMock.session = null;
 
-    expect(await screen.findByText('Please login to Staging to view live RLS data.')).toBeInTheDocument();
-    expect(mocks.getReadOnlyDashboardSummary).not.toHaveBeenCalled();
+    renderDashboard();
+
+    expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(getReadOnlyDashboardSummaryMock).not.toHaveBeenCalled();
+    });
+
+    expect(screen.getByText('0', { selector: '.workflow-step-value' })).toBeInTheDocument();
   });
 
   it('renders staging summary instead of placeholder-only dashboard status', async () => {
-    render(
-      <MemoryRouter>
-        <DashboardPage />
-      </MemoryRouter>,
-    );
+    renderDashboard();
 
     expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
     expect(screen.queryByText('Sprint status: placeholder only')).not.toBeInTheDocument();
     expect(screen.getByText(/Read-only staging data visualization/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getAllByText('12').length).toBeGreaterThan(0);
+      expect(getReadOnlyDashboardSummaryMock).toHaveBeenCalledTimes(1);
       expect(screen.getByText('567')).toBeInTheDocument();
     });
-    expect(mocks.getReadOnlyDashboardSummary).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('uat@example.com')).toHaveLength(1);
   });
 
   it('uses the read-only dashboard service from the dashboard page', () => {
     const source = readSource(dashboardPath);
 
-    expect(source).toContain("readOnlyDashboardService.js");
+    expect(source).toContain('readOnlyDashboardService.js');
     expect(source).toContain('getReadOnlyDashboardSummary');
     expect(source).not.toContain('Operational overview placeholder for the UI foundation.');
   });

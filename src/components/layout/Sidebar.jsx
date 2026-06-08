@@ -29,7 +29,8 @@ export function Sidebar() {
     >
       <nav aria-label="TGD WMS navigation">
         {navigationGroups.map((group) => {
-          const groupLabel = t(getNavKey(group.key)) || group.label;
+          // 17B: professional English group labels regardless of UI language
+          const groupLabel = group.label;
           return (
             <div key={group.key}>
               <p className="nav-group-label">{groupLabel}</p>

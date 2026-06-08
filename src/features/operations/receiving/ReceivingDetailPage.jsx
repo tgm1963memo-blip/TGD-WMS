@@ -11,11 +11,16 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
 import { hasRoleAccess } from '../../../security/permissionGuard.js';
+import { ReceivingReportTemplate } from '../../../components/reports/ReceivingReportTemplate.jsx';
+import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
+import { getTranslation } from '../../../i18n/translationCatalog.js';
+import { useLanguage } from '../../../i18n/languageProvider.jsx';
 import {
   getReceivingDocumentById,
   getReceivingStockMovements,
   postReceivingDocument,
 } from '../../../services/receivingService.js';
+import { mapReceivingDocumentToReportData } from '../../../services/operationalReportMapper.js';
 
 const lineColumns = [
   { key: 'product_id', header: 'Product ID' },
@@ -46,6 +51,7 @@ const cardStyle = {
 
 export function ReceivingDetailPage() {
   const { id } = useParams();
+  const { language } = useLanguage();
   const [state, setState] = useState({ data: null, loading: true, error: null });
   const [movementsState, setMovementsState] = useState({ data: [], loading: false, error: null });
   const [isPosting, setIsPosting] = useState(false);
@@ -139,12 +145,22 @@ export function ReceivingDetailPage() {
         title="Receiving Detail"
         description="Receiving document detail with controlled Confirm/Post."
       />
-      <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+      <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <Link className="action-link" to="/operations/receiving">Back to receiving list</Link>
         <Link className="action-link" to="/operations/receiving/create">Create another receiving draft</Link>
         <button type="button" onClick={handleRefresh} style={secondaryButtonStyle}>
           Refresh
         </button>
+        <ReportPrintActions
+          title={getTranslation('receiving_information_report', language) || 'Receiving Information'}
+          disabled={!document}
+          renderReport={(reportLanguage) => (
+            <ReceivingReportTemplate
+              data={mapReceivingDocumentToReportData(document)}
+              language={reportLanguage}
+            />
+          )}
+        />
       </nav>
 
       {postError ? (

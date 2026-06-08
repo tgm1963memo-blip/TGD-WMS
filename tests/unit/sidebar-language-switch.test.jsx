@@ -20,10 +20,10 @@ describe('19B Sidebar Language Switch', () => {
       </MemoryRouter>
     );
 
-    // Verify main keys in Thai
-    expect(screen.getByText('เมนูหลัก')).toBeInTheDocument();
+    // 17B: group labels stay professional English; nav items localize to Thai
+    expect(screen.getByText('Main Operation')).toBeInTheDocument();
+    expect(screen.getByText('Inbound Management')).toBeInTheDocument();
     expect(screen.getByText('แดชบอร์ด')).toBeInTheDocument();
-    expect(screen.getByText('งานรับเข้า')).toBeInTheDocument();
     expect(screen.getByText('รับเข้า')).toBeInTheDocument();
     expect(screen.getByText('จัดเก็บ')).toBeInTheDocument();
     expect(screen.getByText('รับเข้าด้วย Handheld')).toBeInTheDocument();
@@ -39,9 +39,9 @@ describe('19B Sidebar Language Switch', () => {
     );
 
     // Verify main keys in English
-    expect(screen.getByText('MAIN OPERATION')).toBeInTheDocument();
+    expect(screen.getByText('Main Operation')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('INBOUND MANAGEMENT')).toBeInTheDocument();
+    expect(screen.getByText('Inbound Management')).toBeInTheDocument();
     expect(screen.getByText('Receiving')).toBeInTheDocument();
     expect(screen.getByText('Putaway')).toBeInTheDocument();
     expect(screen.getByText('Handheld Receiving')).toBeInTheDocument();

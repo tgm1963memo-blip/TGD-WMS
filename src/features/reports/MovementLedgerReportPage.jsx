@@ -5,11 +5,16 @@ import { MovementLedgerTable } from '../../components/reports/MovementLedgerTabl
 import { MovementTypeBreakdown } from '../../components/reports/MovementTypeBreakdown.jsx';
 import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.jsx';
 import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
+import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
+import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
+import { getTranslation } from '../../i18n/translationCatalog.js';
+import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
   getMovementLedgerRows,
   getMovementLedgerSummary,
   getMovementTypeBreakdown,
 } from '../../services/movementLedgerReportService.js';
+import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
 
 const initialState = {
   rows: [],
@@ -20,6 +25,7 @@ const initialState = {
 };
 
 export function MovementLedgerReportPage() {
+  const { language } = useLanguage();
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
 
@@ -53,6 +59,22 @@ export function MovementLedgerReportPage() {
   return (
     <section className="page-shell">
       <PageHeader title="Customer Stock Movement Ledger" description="Read-only cold storage movement report for operations and audit preparation." />
+      <div className="section-card operational-report-actions-card">
+        <ReportPrintActions
+          title={getTranslation('entry_delivery_inventory_report', language) || 'Entry-Delivery Inventory Report'}
+          disabled={state.loading || !state.rows.length}
+          renderReport={(reportLanguage) => (
+            <InventoryMovementReportTemplate
+              data={mapMovementLedgerToInventoryReportData({
+                rows: state.rows,
+                filters,
+                summary: state.summary,
+              })}
+              language={reportLanguage}
+            />
+          )}
+        />
+      </div>
       <ReportFilterPanel onChange={setFilters} />
 
       <DashboardSection title="Customer Stock Movement Summary">

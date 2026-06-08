@@ -57,7 +57,7 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
   it('sidebar navigation includes outbound list and draft routes', () => {
     render(
       <MemoryRouter>
-        <LanguageProvider>
+        <LanguageProvider initialLanguage="en">
           <Sidebar />
         </LanguageProvider>
       </MemoryRouter>,

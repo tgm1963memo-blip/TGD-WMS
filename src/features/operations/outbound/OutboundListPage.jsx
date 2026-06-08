@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { DeliverySlipTemplate } from '../../../components/reports/DeliverySlipTemplate.jsx';
+import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
+import { getTranslation } from '../../../i18n/translationCatalog.js';
+import { useLanguage } from '../../../i18n/languageProvider.jsx';
 import {
   getOutboundDocumentDetail,
   listOutboundDocuments,
 } from '../../../services/outboundPickingService.js';
+import { mapOutboundDetailToDeliverySlipData } from '../../../services/operationalReportMapper.js';
 
 const safetyNote = 'Read-only outbound list/detail. No post outbound. No stock movement OUT. No stock balance update.';
 
@@ -57,6 +62,7 @@ function EmptyRow({ colSpan, label }) {
 }
 
 export function OutboundListPage() {
+  const { language } = useLanguage();
   const [documents, setDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
   const [detail, setDetail] = useState(null);
@@ -227,7 +233,19 @@ export function OutboundListPage() {
 
         {/* Detail Panel */}
         <section className="section-card" style={{ marginBottom: 0, position: 'sticky', top: 24 }}>
-          <h3 style={{ marginTop: 0, color: 'var(--tgd-main-text)' }}>Document Detail</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <h3 style={{ margin: 0, color: 'var(--tgd-main-text)' }}>Document Detail</h3>
+            <ReportPrintActions
+              title={getTranslation('delivery_slip_report', language) || 'Delivery Slip'}
+              disabled={!detail}
+              renderReport={(reportLanguage) => (
+                <DeliverySlipTemplate
+                  data={mapOutboundDetailToDeliverySlipData(detail)}
+                  language={reportLanguage}
+                />
+              )}
+            />
+          </div>
           {loadingDetail ? <p style={{ color: 'var(--tgd-muted-text)' }}>Loading detail...</p> : null}
           {!loadingDetail && !detail ? <p style={{ color: 'var(--tgd-muted-text)' }}>Select a document to view detail.</p> : null}
           
