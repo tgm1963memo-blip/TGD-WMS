@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TGD WMS Modern UI Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Use Phosphor Icons for simple clean icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link rel="stylesheet" href="tgd-wms-modern-ui-mockup.css">
+  <style>
+    /* Navigation for this mockup file only */
+    .mockup-nav {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 9999;
+      display: flex;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .mockup-nav button {
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .mockup-nav button:hover {
+      background: #555;
+    }
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen 1: Login -->
+  <div id="screen-login" class="screen active">
+    <div class="login-layout">
+      <div class="login-brand-panel">
+        <div class="login-brand-content">
+          <div class="login-logo">TGD WMS</div>
+          <div class="login-subtitle">Cold Storage Management System</div>
+        </div>
+      </div>
+      <div class="login-form-panel">
+        <div class="login-card">
+          <div class="login-header">
+            <h2>Welcome Back</h2>
+            <p>Please enter your credentials to log in.</p>
+          </div>
+          
+          <div class="banner banner-danger mb-md">
+            <i class="ph ph-warning"></i> Login Failed: Invalid email or password.
+          </div>
+          
+          <form onsubmit="event.preventDefault(); showScreen('screen-dashboard');">
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input type="email" class="form-control is-invalid" value="admin@tgm.co.th" placeholder="name@tgm.co.th">
+              <div class="invalid-feedback">Please check your email and password.</div>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control is-invalid" value="password123" placeholder="••••••••">
+            </div>
+            
+            <div class="form-group">
+              <button type="button" class="btn btn-primary btn-block mb-sm" onclick="showScreen('screen-dashboard')">Sign In</button>
+            </div>
+          </form>
+          
+          <div class="login-footer text-danger font-bold">
+            <div>Controlled UAT only</div>
+            <div>Production remains HOLD</div>
+            <div>FINAL GO is NOT AUTHORIZED</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 2: Dashboard -->
+  <div id="screen-dashboard" class="screen">
+    <div class="banner banner-warning">
+      <i class="ph ph-warning"></i> CONTROLLED UAT ENVIRONMENT - PRODUCTION REMAINS HOLD - FINAL GO IS NOT AUTHORIZED
+    </div>
+    <div class="app-layout">
+      <!-- Sidebar -->
+      <aside class="app-sidebar">
+        <div class="sidebar-header">
+          TGD WMS
+        </div>
+        <div class="sidebar-nav">
+          <a href="#" class="nav-item active">
+            <i class="ph ph-squares-four nav-icon"></i> Dashboard
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-download-simple nav-icon"></i> Receiving
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-arrows-left-right nav-icon"></i> Transfer
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-upload-simple nav-icon"></i> Dispatch
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-package nav-icon"></i> Stock Balance
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-file-text nav-icon"></i> Reports
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-gear nav-icon"></i> Settings
+          </a>
+        </div>
+        <div class="sidebar-footer">
+          <div class="user-info">
+            <div class="user-avatar">AD</div>
+            <div class="user-details">
+              <div class="user-name">Admin User</div>
+              <div class="user-role">System Administrator</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Main Content -->
+      <main class="app-main">
+        <header class="app-header">
+          <div class="header-title">Dashboard Overview</div>
+          <div class="header-actions">
+            <span class="badge badge-warning">UAT Mode</span>
+            <button class="btn btn-outline"><i class="ph ph-bell"></i></button>
+            <button class="btn btn-outline" onclick="showScreen('screen-login')"><i class="ph ph-sign-out"></i> Logout</button>
+          </div>
+        </header>
+        
+        <div class="app-content">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon"><i class="ph ph-download-simple"></i></div>
+              <div class="kpi-details">
+                <div class="kpi-title">Receiving Today</div>
+                <div class="kpi-value">12<span style="font-size: 14px; font-weight: 400; color: #666;"> pallets</span></div>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon"><i class="ph ph-upload-simple"></i></div>
+              <div class="kpi-details">
+                <div class="kpi-title">Dispatch Today</div>
+                <div class="kpi-value">45<span style="font-size: 14px; font-weight: 400; color: #666;"> pallets</span></div>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon"><i class="ph ph-package"></i></div>
+              <div class="kpi-details">
+                <div class="kpi-title">Pallets in Storage</div>
+                <div class="kpi-value">1,248</div>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon"><i class="ph ph-arrows-in-line-horizontal"></i></div>
+              <div class="kpi-details">
+                <div class="kpi-title">Pending Putaway</div>
+                <div class="kpi-value text-warning">8</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="dashboard-grid">
+            <!-- Left Column -->
+            <div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Recent Movements</h3>
+                  <button class="btn btn-outline btn-sm">View All</button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Document</th>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>User</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>10:45 AM</td>
+                        <td><span class="badge badge-success">Receive</span></td>
+                        <td>RCV-2606-0012</td>
+                        <td>Pork Belly (A)</td>
+                        <td>+12</td>
+                        <td>Somchai</td>
+                      </tr>
+                      <tr>
+                        <td>10:30 AM</td>
+                        <td><span class="badge badge-neutral">Transfer</span></td>
+                        <td>TRN-2606-0045</td>
+                        <td>Bacon Sliced</td>
+                        <td>0</td>
+                        <td>Wichai</td>
+                      </tr>
+                      <tr>
+                        <td>09:15 AM</td>
+                        <td><span class="badge badge-warning">Dispatch</span></td>
+                        <td>DSP-2606-0088</td>
+                        <td>Sausage (Classic)</td>
+                        <td>-45</td>
+                        <td>Somsak</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Right Column -->
+            <div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Quick Actions</h3>
+                </div>
+                <div class="card-body">
+                  <button class="btn btn-primary btn-block mb-sm text-left"><i class="ph ph-plus-circle mr-sm"></i> New Receiving</button>
+                  <button class="btn btn-outline btn-block mb-sm text-left" onclick="showScreen('screen-transfer')"><i class="ph ph-arrows-left-right mr-sm"></i> New Transfer</button>
+                  <button class="btn btn-outline btn-block mb-sm text-left"><i class="ph ph-upload-simple mr-sm"></i> New Dispatch</button>
+                  <button class="btn btn-outline btn-block text-left"><i class="ph ph-magnifying-glass mr-sm"></i> Stock Inquiry</button>
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">System Status</h3>
+                </div>
+                <div class="card-body">
+                  <div class="d-flex align-items-center mb-sm">
+                    <div class="mr-sm" style="color: var(--color-success);"><i class="ph ph-check-circle ph-lg"></i></div>
+                    <div>
+                      <div class="font-semibold text-sm">Database Connected</div>
+                      <div class="text-xs text-muted">Latency: 12ms</div>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center">
+                    <div class="mr-sm" style="color: var(--color-success);"><i class="ph ph-check-circle ph-lg"></i></div>
+                    <div>
+                      <div class="font-semibold text-sm">Printers Online</div>
+                      <div class="text-xs text-muted">Zebra-ZTC-ZT411 (Ready)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Screen 3: Operational (Transfer) -->
+  <div id="screen-transfer" class="screen">
+    <div class="banner banner-warning">
+      <i class="ph ph-warning"></i> CONTROLLED UAT ENVIRONMENT - PRODUCTION REMAINS HOLD - FINAL GO IS NOT AUTHORIZED
+    </div>
+    <div class="app-layout">
+      <!-- Sidebar -->
+      <aside class="app-sidebar">
+        <div class="sidebar-header">
+          TGD WMS
+        </div>
+        <div class="sidebar-nav">
+          <a href="#" class="nav-item" onclick="showScreen('screen-dashboard')">
+            <i class="ph ph-squares-four nav-icon"></i> Dashboard
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-download-simple nav-icon"></i> Receiving
+          </a>
+          <a href="#" class="nav-item active">
+            <i class="ph ph-arrows-left-right nav-icon"></i> Transfer
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-upload-simple nav-icon"></i> Dispatch
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-package nav-icon"></i> Stock Balance
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-file-text nav-icon"></i> Reports
+          </a>
+          <a href="#" class="nav-item">
+            <i class="ph ph-gear nav-icon"></i> Settings
+          </a>
+        </div>
+        <div class="sidebar-footer">
+          <div class="user-info">
+            <div class="user-avatar">AD</div>
+            <div class="user-details">
+              <div class="user-name">Admin User</div>
+              <div class="user-role">System Administrator</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Main Content -->
+      <main class="app-main">
+        <header class="app-header">
+          <div class="header-title">Transfer Documents</div>
+          <div class="header-actions">
+            <span class="badge badge-warning">UAT Mode</span>
+            <button class="btn btn-outline"><i class="ph ph-bell"></i></button>
+            <button class="btn btn-outline" onclick="showScreen('screen-login')"><i class="ph ph-sign-out"></i> Logout</button>
+          </div>
+        </header>
+        
+        <div class="app-content">
+          <div class="doc-header">
+            <div class="doc-info">
+              <h2>TRN-2606-0046</h2>
+              <div class="doc-meta">
+                <span><i class="ph ph-calendar-blank"></i> Jun 08, 2026</span>
+                <span><i class="ph ph-user"></i> Created by: Admin User</span>
+                <span class="badge badge-warning">DRAFT</span>
+              </div>
+            </div>
+            <div class="doc-actions">
+              <button class="btn btn-outline"><i class="ph ph-printer mr-sm"></i> Print Tag</button>
+              <button class="btn btn-primary"><i class="ph ph-check mr-sm"></i> Confirm Transfer</button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Transfer Items</h3>
+              <div class="filter-bar mb-0">
+                <input type="text" class="form-control search-input form-control-sm" placeholder="Scan Pallet Barcode...">
+                <button class="btn btn-accent"><i class="ph ph-barcode mr-sm"></i> Scan</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Pallet ID</th>
+                    <th>Item Code</th>
+                    <th>Description</th>
+                    <th>Source Location</th>
+                    <th>Target Location</th>
+                    <th>Qty</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="font-bold">PLT-2606-1024</td>
+                    <td>RM-001</td>
+                    <td>Pork Belly (A)</td>
+                    <td>STG-01</td>
+                    <td>
+                      <select class="form-control" style="padding: 4px 8px; font-size: 12px; height: auto;">
+                        <option>FZ-A-01-01</option>
+                        <option>FZ-A-01-02</option>
+                        <option>FZ-A-01-03</option>
+                      </select>
+                    </td>
+                    <td>1,200 kg</td>
+                    <td>
+                      <button class="btn btn-outline btn-sm text-danger" style="padding: 2px 6px;"><i class="ph ph-trash"></i></button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="font-bold">PLT-2606-1025</td>
+                    <td>RM-002</td>
+                    <td>Pork Shoulder</td>
+                    <td>STG-01</td>
+                    <td>
+                      <select class="form-control" style="padding: 4px 8px; font-size: 12px; height: auto;">
+                        <option>FZ-B-01-01</option>
+                        <option selected>FZ-B-01-02</option>
+                        <option>FZ-B-01-03</option>
+                      </select>
+                    </td>
+                    <td>850 kg</td>
+                    <td>
+                      <button class="btn btn-outline btn-sm text-danger" style="padding: 2px 6px;"><i class="ph ph-trash"></i></button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Example of Empty State if table was empty -->
+          <!--
+          <div class="card">
+            <div class="card-body empty-state">
+              <div class="empty-icon"><i class="ph ph-package"></i></div>
+              <h3>No items in this transfer</h3>
+              <p>Scan a pallet barcode or manually add items to begin.</p>
+              <button class="btn btn-outline mt-md">Browse Inventory</button>
+            </div>
+          </div>
+          -->
+          
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Navigation helper for the mockup -->
+  <div class="mockup-nav">
+    <button onclick="showScreen('screen-login')">Login Screen</button>
+    <button onclick="showScreen('screen-dashboard')">Dashboard</button>
+    <button onclick="showScreen('screen-transfer')">Transfer Screen</button>
+  </div>
+
+  <script>
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+  </script>
+</body>
+</html>

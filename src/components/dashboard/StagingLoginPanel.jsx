@@ -40,67 +40,66 @@ export function StagingLoginPanel({ session, onSessionChange }) {
   }
 
   return (
-    <section
-      className="staging-login-panel"
-      style={{
-        background: '#ffffff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 8,
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.06)',
-        marginBottom: 18,
-        padding: 16,
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-        <strong>เข้าสู่ระบบ Staging</strong>
-        <span style={{ color: '#526173', fontSize: 14 }}>
-          ใช้ Supabase Auth เพื่ออ่านข้อมูล Stock ตามสิทธิ์ RLS
-        </span>
+    <section className="staging-login-panel">
+      <div className="login-form-header">
+        <h2>เข้าสู่ระบบ Staging</h2>
+        <p>Please enter your credentials to log in.</p>
+        <p className="login-form-helper">Use Supabase Auth account</p>
       </div>
 
+      {error ? (
+        <div className="banner banner-danger login-error-banner" role="alert">
+          เข้าสู่ระบบ Staging ไม่สำเร็จ: {error.message ?? String(error)}
+        </div>
+      ) : null}
+
       {session?.user ? (
-        <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <span style={{ color: '#166534', fontWeight: 700 }}>Authenticated: Yes</span>
+        <div className="login-session-bar">
+          <span className="login-session-status">Authenticated: Yes</span>
           <span>{session.user.email}</span>
-          <button className="secondary-button" disabled={busy} onClick={handleSignOut} type="button">
+          <button className="btn btn-outline secondary-button" disabled={busy} onClick={handleSignOut} type="button">
             ออกจากระบบ
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSignIn} style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Email</span>
+        <form className="login-form-grid" onSubmit={handleSignIn}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="staging-login-email">
+              Email Address
+            </label>
             <input
               autoComplete="email"
+              className={`form-control${error ? ' is-invalid' : ''}`}
+              id="staging-login-email"
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="name@company.com"
               required
               type="email"
               value={email}
             />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Password</span>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="staging-login-password">
+              Password
+            </label>
             <input
               autoComplete="current-password"
+              className={`form-control${error ? ' is-invalid' : ''}`}
+              id="staging-login-password"
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
               required
               type="password"
               value={password}
             />
-          </label>
-          <div style={{ alignItems: 'end', display: 'flex' }}>
-            <button className="primary-button" disabled={busy} type="submit">
+          </div>
+          <div className="form-group login-form-actions">
+            <button className="btn btn-primary btn-block primary-button" disabled={busy} type="submit">
               เข้าสู่ระบบ
             </button>
           </div>
         </form>
       )}
-
-      {error ? (
-        <p role="alert" style={{ color: '#991b1b', margin: '12px 0 0' }}>
-          เข้าสู่ระบบ Staging ไม่สำเร็จ: {error.message ?? String(error)}
-        </p>
-      ) : null}
     </section>
   );
 }

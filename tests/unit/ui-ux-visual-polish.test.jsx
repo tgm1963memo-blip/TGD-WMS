@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -25,7 +25,7 @@ describe('Sprint 12D UI/UX visual polish', () => {
       </AppShell>
     );
 
-    expect(screen.getByText('TGD WMS')).toBeInTheDocument();
+    expect(screen.getAllByText('TGD WMS').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Current language')).toBeInTheDocument();
     expect(screen.getByText('Shell content')).toBeInTheDocument();
   });
@@ -51,9 +51,7 @@ describe('Sprint 12D UI/UX visual polish', () => {
   });
 
   it('keeps the demo role selector visually marked as demo-only', () => {
-    renderWithShell(<ReportsPage />);
-
-    expect(screen.getByText(/สำหรับทดสอบเท่านั้น \/ Demo only/i)).toBeInTheDocument();
+    renderWithShell(<ReportsPage />);    expect(screen.getByText(/สำหรับทดสอบเท่านั้น \/ Demo only/i)).toBeInTheDocument();
   });
 
   it('renders admin readiness page with modern card sections', () => {

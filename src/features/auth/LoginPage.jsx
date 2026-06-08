@@ -10,10 +10,8 @@ export function LoginPage() {
 
   if (loading) {
     return (
-      <div className="layout-auth">
-        <div style={{ padding: '40px', color: 'var(--tgd-muted-text)' }}>
-          Loading authentication state...
-        </div>
+      <div className="layout-auth login-layout">
+        <div className="login-loading">Loading authentication state...</div>
       </div>
     );
   }
@@ -24,14 +22,23 @@ export function LoginPage() {
   }
 
   return (
-    <div className="layout-auth">
-      <div className="login-container">
-        <div className="login-header">
-          <img alt="TGM logo" className="login-logo" src={brandConfig.logoPath} />
-          <h1>{brandConfig.brandName}</h1>
-          <p>TGD Cold Storage WMS</p>
+    <div className="layout-auth login-layout">
+      <div className="login-brand-panel">
+        <div className="login-brand-content">
+          <img alt="TGM logo" className="login-brand-logo" src={brandConfig.logoPath} />
+          <h1 className="login-brand-title">{brandConfig.brandName}</h1>
+          <p className="login-subtitle">Cold Storage Management System</p>
         </div>
-        <StagingLoginPanel session={session} onSessionChange={() => {}} />
+      </div>
+      <div className="login-form-panel">
+        <div className="login-card">
+          <StagingLoginPanel session={session} onSessionChange={() => {}} />
+          <div className="login-footer login-safety-footer" role="status">
+            <div>Controlled UAT only</div>
+            <div>Production remains HOLD</div>
+            <div>FINAL GO is NOT AUTHORIZED</div>
+          </div>
+        </div>
       </div>
     </div>
   );
