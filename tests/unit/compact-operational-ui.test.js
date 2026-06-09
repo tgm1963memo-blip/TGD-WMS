@@ -7,10 +7,15 @@ describe('19B Compact Operational UI Refinement', () => {
     const cssPath = path.resolve(__dirname, '../../src/styles.css');
     const cssContent = fs.readFileSync(cssPath, 'utf8');
 
-    // Forms
+    // Forms & Buttons
+    expect(cssContent).toContain('font-size: 11px');
     expect(cssContent).toContain('font-size: 12px');
-    expect(cssContent).toContain('font-size: 13px');
-    expect(cssContent).toContain('height: 32px');
+    expect(cssContent).toContain('height: 28px');
+    expect(cssContent).toContain('height: 30px');
+    
+    // Badges & Scrollbars
+    expect(cssContent).toContain('height: 18px');
+    expect(cssContent).toContain('scrollbar-width: thin');
     
     // Tables
     expect(cssContent).toContain('table-header');
@@ -18,6 +23,6 @@ describe('19B Compact Operational UI Refinement', () => {
     
     // Responsive safeguards
     expect(cssContent).toContain('@media (max-width: 760px)');
-    expect(cssContent).toContain('height: 40px'); // Touch-friendly size
+    expect(cssContent).toContain('height: 38px'); // Touch-friendly size
   });
 });

@@ -67,7 +67,7 @@ export function StorageAgingReportPage() {
       <ReportFilterPanel onChange={setFilters} />
 
       <DashboardSection title="Storage Aging Summary">
-        <div className="summary-grid">
+        <div className="kpi-grid">
           <ReportSummaryCard label="Total Lots" value={state.summary?.total_lots} />
           <ReportSummaryCard label="Total Pallets" value={state.summary?.total_pallets} />
           <ReportSummaryCard label="Total Customers" value={state.summary?.total_customers} />

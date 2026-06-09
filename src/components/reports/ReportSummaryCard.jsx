@@ -1,9 +1,9 @@
 export function ReportSummaryCard({ label, value, helperText }) {
   return (
-    <section className="quantity-summary-card">
-      <span>{label}</span>
-      <strong>{value ?? 0}</strong>
-      {helperText ? <small>{helperText}</small> : null}
-    </section>
+    <div className="kpi-card">
+      <div className="kpi-title">{label}</div>
+      <div className="kpi-value">{value ?? 0}</div>
+      {helperText ? <div className="kpi-helper">{helperText}</div> : null}
+    </div>
   );
 }
