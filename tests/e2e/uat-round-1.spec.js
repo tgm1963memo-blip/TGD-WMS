@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 
-const BASE_URL = process.env.UAT_BASE_URL || 'http://localhost:5173';
+const BASE_URL = (process.env.UAT_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
 const EMAIL = process.env.UAT_EMAIL || 'test_admin@test.com';
 const PASSWORD = process.env.UAT_PASSWORD || 'password';
 
@@ -29,11 +29,21 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
   };
 
   // 1. Navigate and Check State
-  await page.goto(`${BASE_URL}/login`);
+  await page.goto(`${BASE_URL}/`);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1500);
 
   await page.screenshot({ path: 'uat-evidence/round-1/00-before-login.png' });
+
+  try {
+    const bodyText = await page.locator('body').innerText();
+    if (bodyText.includes('404') && bodyText.includes('NOT_FOUND')) {
+      throw new Error("Vercel route fallback failed. Check vercel.json rewrite.");
+    }
+  } catch (e) {
+    if (e.message.includes("Vercel route fallback failed")) throw e;
+    // Otherwise ignore innerText failure
+  }
 
   // Check if already logged in (e.g., sidebar or dashboard is visible)
   const isDashboard = page.url().includes('dashboard');
@@ -83,6 +93,11 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
       const currentTitle = await page.title();
       const bodyText = await page.locator('body').innerText();
       fs.writeFileSync('uat-evidence/round-1/login-error-context.txt', `URL: ${currentUrl}\nTitle: ${currentTitle}\n\nVisible Text:\n${bodyText.substring(0, 1000)}`);
+      
+      if (bodyText.includes('404') && bodyText.includes('NOT_FOUND')) {
+          throw new Error("Vercel route fallback failed. Check vercel.json rewrite.");
+      }
+      
       throw new Error("Login form not found. Check UAT_BASE_URL or login selectors.");
     }
 
