@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import { detectUatErrors } from '../utils/uatErrorDetection.js';
 
 const BASE_URL = (process.env.UAT_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
 const EMAIL = process.env.UAT_EMAIL || 'test_admin@test.com';
@@ -13,16 +14,20 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
     fs.mkdirSync('uat-evidence/round-1', { recursive: true });
   }
 
-  const errors = [];
+  const allErrors = new Set();
+  const allWarnings = new Set();
+  const pagesVisited = new Set();
+
   const checkErrors = async () => {
     try {
+      const currentUrl = page.url();
+      pagesVisited.add(currentUrl);
+
       const textContent = await page.locator('body').innerText();
-      const errorKeywords = ['table not found', 'schema cache', 'RPC', 'failed', 'invalid'];
-      for (const keyword of errorKeywords) {
-        if (textContent.toLowerCase().includes(keyword.toLowerCase())) {
-          errors.push(`Found keyword "${keyword}" on ${page.url()}`);
-        }
-      }
+      const { errors, warnings } = detectUatErrors(textContent, currentUrl);
+      
+      errors.forEach(e => allErrors.add(e));
+      warnings.forEach(w => allWarnings.add(w));
     } catch (e) {
       console.log('Could not check text content:', e.message);
     }
@@ -158,8 +163,26 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
   await page.screenshot({ path: 'uat-evidence/round-1/09-stock-aging.png' });
   await checkErrors();
 
-  console.log('Errors detected:', errors);
+  const errorsArray = Array.from(allErrors);
+  const warningsArray = Array.from(allWarnings);
+
+  console.log('Errors detected:', errorsArray);
+  if (warningsArray.length > 0) {
+    console.log('Warnings detected:', warningsArray);
+  }
   
+  const resultData = {
+    errors: errorsArray,
+    warnings: warningsArray,
+    pagesVisited: Array.from(pagesVisited),
+    testedAt: new Date().toISOString(),
+    baseUrl: BASE_URL
+  };
+
   // Save results
-  fs.writeFileSync('uat-evidence/round-1/result.json', JSON.stringify({ errors }, null, 2));
+  fs.writeFileSync('uat-evidence/round-1/result.json', JSON.stringify(resultData, null, 2));
+
+  if (errorsArray.length > 0) {
+    throw new Error(`UAT failed with ${errorsArray.length} errors. Check result.json for details.`);
+  }
 });
