@@ -8,9 +8,9 @@ describe('19B Compact Operational UI Refinement', () => {
     const cssContent = fs.readFileSync(cssPath, 'utf8');
 
     // Forms
-    expect(cssContent).toContain('font-size: 0.86rem');
-    expect(cssContent).toContain('font-size: 0.9rem');
-    expect(cssContent).toContain('height: 38px');
+    expect(cssContent).toContain('font-size: 12px');
+    expect(cssContent).toContain('font-size: 13px');
+    expect(cssContent).toContain('height: 32px');
     
     // Tables
     expect(cssContent).toContain('table-header');
@@ -18,6 +18,6 @@ describe('19B Compact Operational UI Refinement', () => {
     
     // Responsive safeguards
     expect(cssContent).toContain('@media (max-width: 760px)');
-    expect(cssContent).toContain('height: 42px'); // Touch-friendly size
+    expect(cssContent).toContain('height: 40px'); // Touch-friendly size
   });
 });
