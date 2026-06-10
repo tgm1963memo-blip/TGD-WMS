@@ -218,20 +218,18 @@ export async function getReceivingLocations() {
 
   const { data, error } = await supabase
     .from('tgd_locations')
-    .select('id, code, name');
+    .select('id, code, name, description');
 
   return {
     data: (data ?? [])
       .map((location) => {
         const code = location.code ?? null;
-        const name = location.name ?? null;
+        const name = location.name || location.description || null;
 
         return {
           id: location.id,
           code,
           name,
-          room_id: location.room_id ?? null,
-          warehouse_id: location.warehouse_id ?? null,
           label: buildLabel(code, name, location.id),
         };
       })

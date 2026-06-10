@@ -133,16 +133,12 @@ describe('Sprint 13J-AL-FIX1 receiving master picker schema alignment', () => {
       id: 'location-code-name',
       code: 'LOC-A1',
       name: 'Schema Safe Location',
-      room_id: null,
-      warehouse_id: null,
       label: 'LOC-A1 - Schema Safe Location',
     });
     expect(locations.data).toContainEqual({
       id: 'location-id-only',
       code: null,
       name: null,
-      room_id: null,
-      warehouse_id: null,
       label: 'location-id-only',
     });
   });
@@ -163,7 +159,7 @@ describe('Sprint 13J-AL-FIX1 receiving master picker schema alignment', () => {
       { tableName: 'tgd_customers', columns: 'id, name' },
       { tableName: 'tgd_products', columns: 'id, sku, name, unit' },
       { tableName: 'tgd_lots', columns: 'id, lot_number, product_id, customer_id' },
-      { tableName: 'tgd_locations', columns: 'id, code, name' },
+      { tableName: 'tgd_locations', columns: 'id, code, name, description' },
     ]));
   });
 });
