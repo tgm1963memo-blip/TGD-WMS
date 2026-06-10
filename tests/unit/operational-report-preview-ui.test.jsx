@@ -16,6 +16,8 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocumentById: (...args) => receivingMocks.getReceivingDocumentById(...args),
   getReceivingStockMovements: (...args) => receivingMocks.getReceivingStockMovements(...args),
   postReceivingDocument: (...args) => receivingMocks.postReceivingDocument(...args),
+  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 const outboundMocks = vi.hoisted(() => ({

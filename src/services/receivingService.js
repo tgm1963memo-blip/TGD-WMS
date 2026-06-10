@@ -108,6 +108,34 @@ export async function getReceivingCustomers() {
   };
 }
 
+export async function getReceivingWarehouses() {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  const { data, error } = await supabase
+    .from('tgd_warehouses')
+    .select('id, code, name');
+
+  return {
+    data: (data ?? [])
+      .filter(isActiveRow)
+      .map((warehouse) => {
+        const code = warehouse.code ?? null;
+        const name = warehouse.name ?? null;
+
+        return {
+          id: warehouse.id,
+          code,
+          name,
+          label: buildLabel(code, name, warehouse.id),
+        };
+      })
+      .sort(sortByLabel),
+    error,
+  };
+}
+
 export async function getReceivingProducts() {
   if (!supabase) {
     return missingSupabaseClientResult();
@@ -115,7 +143,7 @@ export async function getReceivingProducts() {
 
   const { data, error } = await supabase
     .from('tgd_products')
-    .select('id, sku, name');
+    .select('id, sku, name, unit');
 
   return {
     data: (data ?? [])
@@ -128,6 +156,7 @@ export async function getReceivingProducts() {
           id: product.id,
           code,
           name,
+          unit: product.unit ?? null,
           label: buildLabel(code, name, product.id),
         };
       })

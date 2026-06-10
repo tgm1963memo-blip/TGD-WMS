@@ -97,18 +97,18 @@ describe('Sprint 13J-AL-FIX1 receiving master picker schema alignment', () => {
     const lots = await getReceivingLots();
     const locations = await getReceivingLocations();
 
-    expect(products.data).toContainEqual({
+    expect(products.data).toContainEqual(expect.objectContaining({
       id: 'product-code-name',
       code: 'SKU-001',
       name: 'Schema Safe Product',
       label: 'SKU-001 - Schema Safe Product',
-    });
-    expect(products.data).toContainEqual({
+    }));
+    expect(products.data).toContainEqual(expect.objectContaining({
       id: 'product-id-only',
       code: null,
       name: null,
       label: 'product-id-only',
-    });
+    }));
 
     expect(lots.data).toContainEqual({
       id: 'lot-number-1',
@@ -161,7 +161,7 @@ describe('Sprint 13J-AL-FIX1 receiving master picker schema alignment', () => {
     ]));
     expect(selectCalls).toEqual(expect.arrayContaining([
       { tableName: 'tgd_customers', columns: 'id, name' },
-      { tableName: 'tgd_products', columns: 'id, sku, name' },
+      { tableName: 'tgd_products', columns: 'id, sku, name, unit' },
       { tableName: 'tgd_lots', columns: 'id, lot_number, product_id, customer_id' },
       { tableName: 'tgd_locations', columns: 'id, code, name' },
     ]));

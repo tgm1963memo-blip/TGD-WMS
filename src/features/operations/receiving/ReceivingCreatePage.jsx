@@ -10,6 +10,7 @@ import {
   getReceivingLocations,
   getReceivingLots,
   getReceivingProducts,
+  getReceivingWarehouses,
   postReceivingDocument,
 } from '../../../services/receivingService.js';
 
@@ -78,22 +79,28 @@ function isValidUUID(uuid) {
 }
 
 export function ReceivingCreatePage() {
+  const userRole = getCurrentUserRole();
+  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+  
   const [masterState, setMasterState] = useState({
     customers: [],
     products: [],
     lots: [],
     locations: [],
+    warehouses: [],
     loading: true,
     error: null,
   });
   const [useManualEntry, setUseManualEntry] = useState(false);
   const [draftForm, setDraftForm] = useState({
     customer_id: '',
+    warehouse_id: '',
     document_no: '',
   });
   const [lineForm, setLineForm] = useState({
     product_id: '',
     lot_id: '',
+    pallet_no: '',
     location_id: '',
     quantity: '',
     weight: '',
@@ -107,28 +114,27 @@ export function ReceivingCreatePage() {
   const [isPosting, setIsPosting] = useState(false);
   const [postSucceeded, setPostSucceeded] = useState(false);
 
-  const userRole = getCurrentUserRole();
-  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
-
   useEffect(() => {
     let isMounted = true;
 
     async function loadMasters() {
-      const [customers, products, lots, locations] = await Promise.all([
+      const [customers, products, lots, locations, warehouses] = await Promise.all([
         getReceivingCustomers(),
         getReceivingProducts(),
         getReceivingLots(),
         getReceivingLocations(),
+        getReceivingWarehouses(),
       ]);
 
       if (!isMounted) return;
 
-      const lookupError = customers.error || products.error || lots.error || locations.error;
+      const lookupError = customers.error || products.error || lots.error || locations.error || warehouses.error;
       setMasterState({
         customers: customers.data ?? [],
         products: products.data ?? [],
         lots: lots.data ?? [],
         locations: locations.data ?? [],
+        warehouses: warehouses.data ?? [],
         loading: false,
         error: lookupError,
       });
@@ -313,23 +319,20 @@ export function ReceivingCreatePage() {
     setMessage('Receiving document Confirm/Post completed.');
   };
 
-  if (!canWrite) {
-    return (
-      <div className="page-shell">
-        <PageHeader title="Create Receiving Draft" description="Controlled receiving draft creation." />
-        <section role="alert" style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
-          Authentication required. Permission denied.
-        </section>
-        <Link className="action-link" to="/operations/receiving">Back to receiving list</Link>
-      </div>
-    );
-  }
+  const selectedProduct = masterState.products.find((p) => p.id === lineForm.product_id);
+  const uomDisplay = selectedProduct?.unit || '';
 
   return (
     <div className="page-shell">
       <PageHeader title="Create Receiving Draft" description="Controlled receiving draft creation." />
 
-      <section
+      {!canWrite ? (
+        <section role="alert" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: 16, borderRadius: 8, marginBottom: 18 }}>
+          Permission denied: Your role ({userRole}) does not have permission to create receiving drafts.
+        </section>
+      ) : (
+        <>
+          <section
         className="warning-panel"
         role="status"
         style={{
@@ -416,6 +419,30 @@ export function ReceivingCreatePage() {
               </select>
             )}
             <span style={helperStyle}>Selected customer id: {draftForm.customer_id || 'None'}</span>
+          </label>
+          <label style={fieldStyle}>
+            Warehouse
+            {useManualEntry ? (
+              <input
+                aria-label="Warehouse ID"
+                style={inputStyle}
+                value={draftForm.warehouse_id}
+                onChange={(event) => updateDraftField('warehouse_id', event.target.value)}
+              />
+            ) : (
+              <select
+                aria-label="Warehouse"
+                style={inputStyle}
+                value={draftForm.warehouse_id}
+                onChange={(event) => updateDraftField('warehouse_id', event.target.value)}
+              >
+                <option value="">Select warehouse</option>
+                {masterState.warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>{warehouse.label}</option>
+                ))}
+              </select>
+            )}
+            <span style={helperStyle}>Selected warehouse id: {draftForm.warehouse_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
             Document No
@@ -525,6 +552,15 @@ export function ReceivingCreatePage() {
             <span style={helperStyle}>Selected lot id: {lineForm.lot_id || 'None'}</span>
           </label>
           <label style={fieldStyle}>
+            Pallet No
+            <input
+              aria-label="Pallet No"
+              style={inputStyle}
+              value={lineForm.pallet_no}
+              onChange={(event) => updateLineField('pallet_no', event.target.value)}
+            />
+          </label>
+          <label style={fieldStyle}>
             Location
             {useManualEntry ? (
               <input
@@ -558,6 +594,15 @@ export function ReceivingCreatePage() {
               type="number"
               value={lineForm.quantity}
               onChange={(event) => updateLineField('quantity', event.target.value)}
+            />
+          </label>
+          <label style={fieldStyle}>
+            UOM
+            <input
+              aria-label="UOM"
+              style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }}
+              value={uomDisplay}
+              readOnly
             />
           </label>
           <label style={fieldStyle}>
@@ -618,6 +663,8 @@ export function ReceivingCreatePage() {
           </button>
         ) : null}
       </section>
+        </>
+      )}
 
       <Link className="action-link" to="/operations/receiving">
         Back to receiving

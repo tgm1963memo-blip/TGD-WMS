@@ -12,6 +12,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingProducts: vi.fn(async () => ({ data: [{ id: 'prod-1', label: 'P1' }], error: null })),
   getReceivingLots: vi.fn(async () => ({ data: [{ id: 'lot-1', label: 'L1', product_id: 'prod-1' }], error: null })),
   getReceivingLocations: vi.fn(async () => ({ data: [{ id: 'loc-1', label: 'Loc 1' }], error: null })),
+  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
   createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
   addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
   postReceivingDocument: vi.fn(async () => ({ data: { status: 'CONFIRMED' }, error: null })),

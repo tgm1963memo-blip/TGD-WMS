@@ -11,7 +11,8 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn().mockResolvedValue({ 
     data: [{ id: '1', receiving_no: 'RCV-001', status: 'DRAFT' }], 
     error: null 
-  })
+  }),
+  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null }))
 }));
 
 describe('19C Operational Page Polish', () => {

@@ -64,6 +64,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingProducts: (...args) => getReceivingProducts(...args),
   getReceivingLots: (...args) => getReceivingLots(...args),
   getReceivingLocations: (...args) => getReceivingLocations(...args),
+  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 

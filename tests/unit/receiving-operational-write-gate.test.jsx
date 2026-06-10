@@ -15,6 +15,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingProducts: vi.fn(async () => ({ data: [], error: null })),
   getReceivingLots: vi.fn(async () => ({ data: [], error: null })),
   getReceivingLocations: vi.fn(async () => ({ data: [], error: null })),
+  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 const projectRoot = resolve(__dirname, '../..');

@@ -68,3 +68,4 @@ describe('Sprint 12D UI/UX visual polish', () => {
     expect(screen.queryByRole('button', { name: /upload/i })).not.toBeInTheDocument();
   });
 });
+

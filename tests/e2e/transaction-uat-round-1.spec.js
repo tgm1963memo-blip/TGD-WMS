@@ -158,45 +158,52 @@ test.describe('Transaction UAT Round 1', () => {
     await runScenario('B', 'Receiving draft creation', '22N_02_receiving_create_attempt.png', async () => {
       await safeGoto(page, '/receiving', '22N_01_receiving_page.png');
       const createButtons = [
-        'button:has-text("Create")', 'button:has-text("New")', 'button:has-text("Add")',
-        'button:has-text("สร้าง")', 'button:has-text("เพิ่ม")',
-        'a:has-text("Create")', 'a:has-text("New")'
+        'a:has-text("Create Receiving Draft")',
       ];
       await clickIfVisible(page, createButtons);
-      // Wait for navigation or modal
       await page.waitForTimeout(1000);
       
-      // Attempt to fill header fields (e.g. warehouse, customer if on header)
-      const customerFields = ['input[name="customer_code"]', 'input[placeholder*="customer" i]', 'input[placeholder*="ลูกค้า" i]', 'select[name="customer_code"]'];
-      // Try to fill customer if it's there, but we won't strictly fail if it's not until line entry if it's a combined form.
-      // We will just verify we can at least click create.
+      const customerFields = ['select[aria-label="Customer"]'];
+      const warehouseFields = ['select[aria-label="Warehouse"]'];
+      const docNoFields = ['input[aria-label="Document No"]'];
+
+      await fillIfVisible(page, customerFields, process.env.UAT_CUSTOMER_CODE); // Note: using name/ID for select value if possible, or we may need to adjust
+      await fillIfVisible(page, warehouseFields, process.env.UAT_WAREHOUSE_CODE);
+      await fillIfVisible(page, docNoFields, 'UAT-DOC-001');
+
+      await clickIfVisible(page, ['button:has-text("Save Draft")']);
+      await page.waitForTimeout(2000); // wait for draft creation
+      
+
     });
 
     // Scenario C: Receiving line entry
     await runScenario('C', 'Receiving line entry', '22N_03_receiving_line_attempt.png', async () => {
-      const productFields = ['input[name="product_code"]', 'input[placeholder*="product" i]', 'input[placeholder*="สินค้า" i]', 'select[name="product_code"]'];
-      const qtyFields = ['input[name="quantity"]', 'input[name="qty"]', 'input[placeholder*="qty" i]', 'input[placeholder*="quantity" i]', 'input[placeholder*="จำนวน" i]'];
-      const uomFields = ['input[name="uom"]', 'select[name="uom"]'];
-      const lotFields = ['input[name="lot_no"]', 'input[name="lot_number"]', 'input[placeholder*="lot" i]'];
-      const palletFields = ['input[name="pallet_no"]', 'input[name="pallet_number"]', 'input[placeholder*="pallet" i]'];
-      const locationFields = ['input[name="location_code"]', 'input[placeholder*="location" i]', 'input[placeholder*="ตำแหน่ง" i]', 'select[name="location_code"]'];
+      const productFields = ['select[aria-label="Product"]'];
+      const lotFields = ['select[aria-label="Lot"]'];
+      const palletFields = ['input[aria-label="Pallet No"]'];
+      const locationFields = ['select[aria-label="Location"]'];
+      const qtyFields = ['input[aria-label="Quantity"]'];
+      const weightFields = ['input[aria-label="Weight"]'];
 
       await fillIfVisible(page, productFields, process.env.UAT_PRODUCT_CODE);
-      await fillIfVisible(page, qtyFields, process.env.UAT_QTY);
       await fillIfVisible(page, lotFields, process.env.UAT_LOT_NO);
       await fillIfVisible(page, palletFields, process.env.UAT_PALLET_NO);
       await fillIfVisible(page, locationFields, process.env.UAT_RECEIVING_LOCATION);
+      await fillIfVisible(page, qtyFields, process.env.UAT_QTY);
+      // weight is optional but we can add if needed
+
+      await clickIfVisible(page, ['button:has-text("Add Line")']);
+      await page.waitForTimeout(2000); // wait for line add
     });
 
     // Scenario D: Receiving post/confirm
     await runScenario('D', 'Receiving post/confirm', '22N_04_receiving_post_attempt.png', async () => {
       const postButtons = [
-        'button:has-text("Save")', 'button:has-text("บันทึก")', 
-        'button:has-text("Post")', 'button:has-text("Confirm")', 
-        'button:has-text("ยืนยัน")', 'button:has-text("รับเข้า")'
+        'button:has-text("Confirm/Post Receiving")'
       ];
       await clickIfVisible(page, postButtons);
-      await page.waitForTimeout(2000); // wait for post
+      await page.waitForTimeout(3000); // wait for post
     });
 
     // Scenario E: Verify receiving movement ledger evidence
