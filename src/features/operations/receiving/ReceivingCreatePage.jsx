@@ -90,6 +90,8 @@ export function ReceivingCreatePage() {
     warehouses: [],
     loading: true,
     error: null,
+    productsError: null,
+    warehousesError: null,
   });
   const [useManualEntry, setUseManualEntry] = useState(false);
   const [draftForm, setDraftForm] = useState({
@@ -131,10 +133,10 @@ export function ReceivingCreatePage() {
       const lookupError = customers.error || products.error || lots.error || locations.error || warehouses.error;
       
       if (customers.error) console.error("Customer load error:", customers.error);
-      if (products.error) console.error("Product load error:", products.error);
+      if (products.error) console.error("Receiving products load failed", products.error.message || products.error);
       if (lots.error) console.error("Lot load error:", lots.error);
       if (locations.error) console.error("Location load error:", locations.error);
-      if (warehouses.error) console.error("Warehouse load error:", warehouses.error);
+      if (warehouses.error) console.error("Receiving warehouses load failed", warehouses.error.message || warehouses.error);
 
       setMasterState({
         customers: customers.data ?? [],
@@ -144,6 +146,8 @@ export function ReceivingCreatePage() {
         warehouses: warehouses.data ?? [],
         loading: false,
         error: lookupError,
+        productsError: products.error ?? null,
+        warehousesError: warehouses.error ?? null,
       });
     }
 
@@ -382,6 +386,28 @@ export function ReceivingCreatePage() {
           <p role="alert" style={{ color: '#991b1b', marginBottom: 10 }}>
             Master lookup error: {normalizeReceivingError(masterState.error)}
           </p>
+        ) : null}
+
+        {masterState.productsError || masterState.warehousesError ? (
+          <section
+            className="diagnostic-panel"
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fca5a5',
+              borderRadius: 8,
+              color: '#991b1b',
+              marginBottom: 18,
+              padding: 16,
+            }}
+          >
+            <h4 style={{ marginTop: 0 }}>UAT Master Data Diagnostics</h4>
+            <ul style={{ marginBottom: 0 }}>
+              <li>Products loaded: {masterState.products.length}</li>
+              <li>Warehouses loaded: {masterState.warehouses.length}</li>
+              {masterState.productsError && <li>Products error: {masterState.productsError.message || String(masterState.productsError)}</li>}
+              {masterState.warehousesError && <li>Warehouses error: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
+            </ul>
+          </section>
         ) : null}
         <label style={{ alignItems: 'center', display: 'inline-flex', gap: 8 }}>
           <input

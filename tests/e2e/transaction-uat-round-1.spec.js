@@ -33,6 +33,7 @@ test.describe('Transaction UAT Round 1', () => {
     ],
     missingSelectors: [],
     selectDiagnostics: [],
+    runtimeDiagnostics: [],
     finalDecision: {
       "Receiving Transaction Automation": "BLOCKED",
       "Production": "HOLD",
@@ -143,6 +144,13 @@ test.describe('Transaction UAT Round 1', () => {
   };
 
   test('UAT Transaction Execution', async ({ page }) => {
+    page.on('console', msg => {
+      const text = msg.text();
+      if (text.includes('Receiving products load failed') || text.includes('Receiving warehouses load failed')) {
+        resultData.runtimeDiagnostics.push(text);
+      }
+    });
+
     const runScenario = async (id, name, evidenceFile, actionFn) => {
       let status = 'PENDING';
       let notes = '';
