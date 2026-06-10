@@ -230,7 +230,7 @@ test.describe('Transaction UAT Round 1', () => {
     // Scenario C: Receiving line entry
     await runScenario('C', 'Receiving line entry', '22N_03_receiving_line_attempt.png', async () => {
       const productFields = ['select[aria-label="Product"]'];
-      const lotFields = ['select[aria-label="Lot"]'];
+      const lotFields = ['input[aria-label="Lot No"]', 'select[aria-label="Lot"]'];
       const palletFields = ['input[aria-label="Pallet No"]'];
       const locationFields = ['select[aria-label="Location"]'];
       const qtyFields = ['input[aria-label="Quantity"]'];
