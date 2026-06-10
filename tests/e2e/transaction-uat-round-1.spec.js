@@ -32,6 +32,7 @@ test.describe('Transaction UAT Round 1', () => {
       "Note: UAT_CUSTOMER_CODE is interpreted as customer name since tgd_customers has no customer_code column."
     ],
     missingSelectors: [],
+    selectDiagnostics: [],
     finalDecision: {
       "Receiving Transaction Automation": "BLOCKED",
       "Production": "HOLD",
@@ -94,14 +95,30 @@ test.describe('Transaction UAT Round 1', () => {
 
     const tagName = await element.evaluate(e => e.tagName.toLowerCase());
     if (tagName === 'select') {
-      const optionToSelect = await element.evaluate((select, val) => {
-        const ops = Array.from(select.options);
-        const match = ops.find(o => o.value === val || o.text === val || o.text.includes(val));
-        return match ? match.value : null;
+      const { optionToSelect, allOptions } = await element.evaluate((select, val) => {
+        const ops = Array.from(select.options).map((o, idx) => ({ value: o.value, text: o.text, index: idx }));
+        const lowerVal = val.toLowerCase();
+        const match = ops.find(o => 
+          o.value === val || 
+          o.text === val || 
+          o.text.includes(val) || 
+          o.value.includes(val) ||
+          o.value.toLowerCase() === lowerVal ||
+          o.text.toLowerCase() === lowerVal ||
+          o.text.toLowerCase().includes(lowerVal) ||
+          o.value.toLowerCase().includes(lowerVal)
+        );
+        return { optionToSelect: match ? match.value : null, allOptions: ops };
       }, value);
       
+      resultData.selectDiagnostics.push({
+        selector: selectors.join(', '),
+        attemptedValue: value,
+        availableOptions: allOptions
+      });
+
       if (optionToSelect === null) {
-        throw new Error(`MISSING_OPTION: Cannot find option matching '${value}' in select [${selectors.join(', ')}]`);
+        throw new Error(`MISSING_OPTION: Cannot find option matching '${value}' in select [${selectors.join(', ')}]. Available: ${JSON.stringify(allOptions)}`);
       }
       await element.selectOption(optionToSelect);
     } else {
@@ -184,7 +201,8 @@ test.describe('Transaction UAT Round 1', () => {
       const docNoFields = ['input[aria-label="Document No"]'];
 
       await fillIfVisible(page, customerFields, process.env.UAT_CUSTOMER_CODE); // Note: using name/ID for select value if possible, or we may need to adjust
-      await fillIfVisible(page, warehouseFields, process.env.UAT_WAREHOUSE_CODE);
+      const warehouseVal = process.env.UAT_WAREHOUSE_NAME || process.env.UAT_WAREHOUSE_CODE;
+      await fillIfVisible(page, warehouseFields, warehouseVal);
       await fillIfVisible(page, docNoFields, 'UAT-DOC-001');
 
       await clickIfVisible(page, ['button:has-text("Save Draft")']);
@@ -202,7 +220,8 @@ test.describe('Transaction UAT Round 1', () => {
       const qtyFields = ['input[aria-label="Quantity"]'];
       const weightFields = ['input[aria-label="Weight"]'];
 
-      await fillIfVisible(page, productFields, process.env.UAT_PRODUCT_CODE);
+      const productVal = process.env.UAT_PRODUCT_NAME || process.env.UAT_PRODUCT_CODE;
+      await fillIfVisible(page, productFields, productVal);
       await fillIfVisible(page, lotFields, process.env.UAT_LOT_NO);
       await fillIfVisible(page, palletFields, process.env.UAT_PALLET_NO);
       await fillIfVisible(page, locationFields, process.env.UAT_RECEIVING_LOCATION);
