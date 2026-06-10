@@ -157,7 +157,13 @@ test.describe('Transaction UAT Round 1', () => {
     }
     const isDisabled = await element.evaluate(e => e.disabled);
     if (isDisabled) {
-      throw new Error(`DISABLED_CONTROL: Button [${selectors.join(', ')}] is disabled`);
+      let reasonText = '';
+      try {
+        if (selectors.some(s => s.includes('Add Line'))) {
+          reasonText = await page.locator('p:has-text("Add Line requires:")').innerText({ timeout: 500 });
+        }
+      } catch (e) {}
+      throw new Error(`DISABLED_CONTROL: Button [${selectors.join(', ')}] is disabled. ${reasonText}`);
     }
     await element.click();
   };
@@ -256,6 +262,17 @@ test.describe('Transaction UAT Round 1', () => {
 
       await clickIfVisible(page, ['button:has-text("Save Draft")']);
       await page.waitForSelector('select[aria-label="Product"]', { state: 'visible', timeout: 5000 }).catch(() => {});
+      
+      const draftCreated = await firstVisible(page, ['h3:has-text("Draft Created")']);
+      if (!draftCreated) {
+         const errorEl = await firstVisible(page, ['section[role="alert"]']);
+         if (errorEl) {
+           const errText = await errorEl.innerText();
+           if (errText.includes('DRAFT_ID_MISSING')) throw new Error('BLOCKED: DRAFT_ID_MISSING');
+           throw new Error('FAIL: Save draft failed with error: ' + errText);
+         }
+         throw new Error('BLOCKED: DRAFT_ID_MISSING');
+      }
       
 
     });

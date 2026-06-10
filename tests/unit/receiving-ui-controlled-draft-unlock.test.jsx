@@ -176,7 +176,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     renderPage();
 
     expect(screen.getByRole('button', { name: 'Add Line' })).toBeDisabled();
-    expect(screen.getByText('Add Line requires document id.')).toBeInTheDocument();
+    expect(screen.getByText('Add Line requires: Missing document id')).toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText('Customer'), { target: { value: 'customer-1' } });
     fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-13J-AG-002' } });

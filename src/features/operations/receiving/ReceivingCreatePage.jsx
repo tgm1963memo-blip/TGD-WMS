@@ -197,6 +197,14 @@ export function ReceivingCreatePage() {
       && lineForm.quantity !== '',
   ) && !isAddingLine;
 
+  let addLineDisabledReason = '';
+  if (!draft?.id) addLineDisabledReason = 'Missing document id';
+  else if (!lineForm.product_id) addLineDisabledReason = 'Missing product';
+  else if (!lineForm.lot_id && !lineForm.lot_no) addLineDisabledReason = 'Missing lot id or lot no';
+  else if (!lineForm.location_id) addLineDisabledReason = 'Missing location';
+  else if (lineForm.quantity === '') addLineDisabledReason = 'Missing quantity';
+  else if (isAddingLine) addLineDisabledReason = 'Already adding line';
+
   const updateDraftField = (field, value) => {
     setDraftForm((current) => ({ ...current, [field]: value }));
   };
@@ -239,6 +247,10 @@ export function ReceivingCreatePage() {
     }
 
     const documentId = getCreatedDocumentId(result);
+    if (!documentId) {
+      setError('Save draft succeeded but returned no document id (DRAFT_ID_MISSING).');
+      return;
+    }
     setDraft({
       id: documentId,
       document_no: docNo,
@@ -456,6 +468,10 @@ export function ReceivingCreatePage() {
             <li>Products after filter count: {masterState.productsMeta?.filteredCount ?? 0}</li>
             <li>Warehouses after filter count: {masterState.warehousesMeta?.filteredCount ?? 0}</li>
             <li>Supabase Host: {supabaseHost}</li>
+            <li>Draft id: {draft?.id || 'None'}</li>
+            <li>lotNo present: {lineForm.lot_no ? 'true' : 'false'}</li>
+            <li>selectedLotId present: {lineForm.lot_id ? 'true' : 'false'}</li>
+            <li>Add line disabled reason: {addLineDisabledReason || 'None'}</li>
             {masterState.productsError && <li>Products error message: {masterState.productsError.message || String(masterState.productsError)}</li>}
             {masterState.warehousesError && <li>Warehouses error message: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
           </ul>
@@ -579,7 +595,7 @@ export function ReceivingCreatePage() {
 
       <form onSubmit={handleAddLine} style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Add Line section</h3>
-        <p style={{ color: '#475569', marginTop: 0 }}>Add Line requires document id.</p>
+        <p style={{ color: '#475569', marginTop: 0 }}>Add Line requires: {addLineDisabledReason || 'All valid'}</p>
         <div
           style={{
             display: 'grid',
