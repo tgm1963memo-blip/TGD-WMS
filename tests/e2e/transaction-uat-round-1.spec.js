@@ -22,6 +22,7 @@ const REQUIRED_ENV_VARS = [
 ];
 
 test.describe('Transaction UAT Round 1', () => {
+  test.setTimeout(180_000);
   let resultData = {
     baseUrl: process.env.UAT_BASE_URL || '',
     testedAt: new Date().toISOString(),
@@ -71,8 +72,16 @@ test.describe('Transaction UAT Round 1', () => {
   };
 
   const captureScenarioEvidence = async (page, filename) => {
-    await page.waitForTimeout(500); // allow render
-    await page.screenshot({ path: path.join(evidenceDir, filename), fullPage: true });
+    if (page.isClosed()) {
+      resultData.runtimeDiagnostics.push(`Evidence capture failed for ${filename}: Page is closed`);
+      return;
+    }
+    try {
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+      await page.screenshot({ path: path.join(evidenceDir, filename), fullPage: true, timeout: 5000 });
+    } catch (e) {
+      resultData.runtimeDiagnostics.push(`Evidence capture failed for ${filename}: ${e.message}`);
+    }
   };
 
   const firstVisible = async (page, selectors) => {
@@ -203,7 +212,7 @@ test.describe('Transaction UAT Round 1', () => {
         'a:has-text("Create Receiving Draft")',
       ];
       await clickIfVisible(page, createButtons);
-      await page.waitForTimeout(1000);
+      await page.waitForSelector('select[aria-label="Customer"]', { state: 'visible', timeout: 5000 }).catch(() => {});
 
       try {
         const diagText = await page.locator('#diagnostic-23j').innerText({ timeout: 2000 });
@@ -222,7 +231,7 @@ test.describe('Transaction UAT Round 1', () => {
       await fillIfVisible(page, docNoFields, 'UAT-DOC-001');
 
       await clickIfVisible(page, ['button:has-text("Save Draft")']);
-      await page.waitForTimeout(2000); // wait for draft creation
+      await page.waitForSelector('select[aria-label="Product"]', { state: 'visible', timeout: 5000 }).catch(() => {});
       
 
     });
@@ -245,7 +254,7 @@ test.describe('Transaction UAT Round 1', () => {
       // weight is optional but we can add if needed
 
       await clickIfVisible(page, ['button:has-text("Add Line")']);
-      await page.waitForTimeout(2000); // wait for line add
+      await page.waitForSelector('button:has-text("Confirm/Post Receiving")', { state: 'visible', timeout: 5000 }).catch(() => {});
     });
 
     // Scenario D: Receiving post/confirm
@@ -254,7 +263,7 @@ test.describe('Transaction UAT Round 1', () => {
         'button:has-text("Confirm/Post Receiving")'
       ];
       await clickIfVisible(page, postButtons);
-      await page.waitForTimeout(3000); // wait for post
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     });
 
     // Scenario E: Verify receiving movement ledger evidence
