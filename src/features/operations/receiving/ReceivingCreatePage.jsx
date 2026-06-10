@@ -12,6 +12,7 @@ import {
   getReceivingProducts,
   getReceivingWarehouses,
   postReceivingDocument,
+  resolveLotForReceiving,
 } from '../../../services/receivingService.js';
 
 let supabaseHost = 'Unknown';
@@ -114,6 +115,7 @@ export function ReceivingCreatePage() {
   const [lineForm, setLineForm] = useState({
     product_id: '',
     lot_id: '',
+    lot_no: '',
     pallet_no: '',
     location_id: '',
     quantity: '',
@@ -190,7 +192,7 @@ export function ReceivingCreatePage() {
   const canAddLine = Boolean(
     draft?.id
       && lineForm.product_id
-      && lineForm.lot_id
+      && (lineForm.lot_id || lineForm.lot_no)
       && lineForm.location_id
       && lineForm.quantity !== '',
   ) && !isAddingLine;
@@ -256,8 +258,8 @@ export function ReceivingCreatePage() {
       return;
     }
 
-    if (!lineForm.product_id || !lineForm.lot_id || !lineForm.location_id) {
-      setError('Product, lot, and location are required.');
+    if (!lineForm.product_id || (!lineForm.lot_id && !lineForm.lot_no) || !lineForm.location_id) {
+      setError('Product, lot (id or no), and location are required.');
       return;
     }
 
@@ -266,7 +268,7 @@ export function ReceivingCreatePage() {
         setError('Invalid product UUID format.');
         return;
       }
-      if (!isValidUUID(lineForm.lot_id)) {
+      if (lineForm.lot_id && !isValidUUID(lineForm.lot_id)) {
         setError('Invalid lot UUID format.');
         return;
       }
@@ -275,10 +277,12 @@ export function ReceivingCreatePage() {
         return;
       }
     } else {
-      const selectedLot = masterState.lots.find((l) => l.id === lineForm.lot_id);
-      if (selectedLot && selectedLot.product_id && selectedLot.product_id !== lineForm.product_id) {
-        setError('Selected lot does not match the selected product.');
-        return;
+      if (lineForm.lot_id) {
+        const selectedLot = masterState.lots.find((l) => l.id === lineForm.lot_id);
+        if (selectedLot && selectedLot.product_id && selectedLot.product_id !== lineForm.product_id) {
+          setError('Selected lot does not match the selected product.');
+          return;
+        }
       }
     }
 
@@ -298,10 +302,21 @@ export function ReceivingCreatePage() {
     }
 
     setIsAddingLine(true);
+    let finalLotId = lineForm.lot_id;
+    if (lineForm.lot_no) {
+      const resolveResult = await resolveLotForReceiving(lineForm.product_id, lineForm.lot_no);
+      if (resolveResult?.error) {
+        setIsAddingLine(false);
+        setError(normalizeReceivingError(resolveResult.error));
+        return;
+      }
+      finalLotId = resolveResult.data;
+    }
+
     const result = await addReceivingLine({
       document_id: draft.id,
       product_id: lineForm.product_id,
-      lot_id: lineForm.lot_id,
+      lot_id: finalLotId,
       location_id: lineForm.location_id,
       quantity: qty,
       weight: weightVal,
@@ -595,6 +610,16 @@ export function ReceivingCreatePage() {
               </select>
             )}
             <span style={helperStyle}>Selected product id: {lineForm.product_id || 'None'}</span>
+          </label>
+          <label style={fieldStyle}>
+            Lot No
+            <input
+              aria-label="Lot No"
+              style={inputStyle}
+              value={lineForm.lot_no}
+              onChange={(event) => updateLineField('lot_no', event.target.value)}
+              placeholder="New lot no"
+            />
           </label>
           <label style={fieldStyle}>
             Lot

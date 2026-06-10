@@ -290,6 +290,24 @@ export async function cancelReceivingDocument() {
   };
 }
 
+export async function resolveLotForReceiving(productId, lotNo) {
+  if (!supabase) {
+    return missingSupabaseClientResult();
+  }
+
+  if (!productId || !lotNo) {
+    return {
+      data: null,
+      error: new Error('product_id and lot_no are required for lot resolution.'),
+    };
+  }
+
+  return supabase.rpc('tgd_rpc_resolve_or_create_lot', {
+    p_product_id: productId,
+    p_lot_no: lotNo,
+  });
+}
+
 export async function addReceivingLine(input) {
   if (!supabase) {
     return missingSupabaseClientResult();
