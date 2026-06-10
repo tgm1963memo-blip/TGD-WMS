@@ -14,6 +14,15 @@ The scope of this phase is restricted strictly to the **Receiving** module. Othe
   - Production remains **HOLD**.
   - FINAL GO is **NOT AUTHORIZED**.
 
+## 2.1 Actual Master Schema Mapping Notes
+- `UAT_PRODUCT_CODE` maps to `tgd_products.sku`
+- `UAT_CUSTOMER_CODE` currently maps to `tgd_customers.name` because no customer code column exists
+- `UAT_WAREHOUSE_CODE` maps to `tgd_warehouses.code`
+- `UAT_*_LOCATION` maps to `tgd_locations.code`
+- `UAT_UOM` maps to `tgd_products.unit`
+- `UAT_REASON_CODE` is currently not backed by `tgd_reason_codes` because table does not exist. (Adjustment scenarios will be marked as BLOCKED rather than FAIL due to this missing table).
+
+
 ## 3. Implemented Scenarios & Selectors
 
 ### A. Login

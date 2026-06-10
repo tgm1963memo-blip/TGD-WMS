@@ -28,7 +28,9 @@ test.describe('Transaction UAT Round 1', () => {
     testerMode: 'Playwright',
     scenarios: [],
     errors: [],
-    warnings: [],
+    warnings: [
+      "Note: UAT_CUSTOMER_CODE is interpreted as customer name since tgd_customers has no customer_code column."
+    ],
     missingSelectors: [],
     finalDecision: {
       "Receiving Transaction Automation": "BLOCKED",
@@ -119,7 +121,7 @@ test.describe('Transaction UAT Round 1', () => {
         if (err.message === 'SKIPPED_WITH_REASON') {
           status = 'SKIPPED_WITH_REASON';
           notes = 'Module not yet operational from UI';
-        } else if (err.message.startsWith('MISSING_SELECTOR')) {
+        } else if (err.message.startsWith('MISSING_SELECTOR') || err.message.startsWith('MISSING_TABLE_BLOCKED')) {
           status = 'BLOCKED';
           notes = err.message;
           resultData.missingSelectors.push(err.message);
@@ -229,6 +231,9 @@ test.describe('Transaction UAT Round 1', () => {
 
     for (const sc of scenariosToSkip) {
       await runScenario(sc.id, sc.name, sc.file, async () => {
+        if (sc.name.startsWith('Adjustment')) {
+          throw new Error('MISSING_TABLE_BLOCKED: tgd_reason_codes table is missing');
+        }
         throw new Error('SKIPPED_WITH_REASON');
       });
     }

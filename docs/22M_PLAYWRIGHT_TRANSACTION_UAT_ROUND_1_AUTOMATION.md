@@ -8,18 +8,18 @@ The Playwright execution requires the following environment variables to be set.
 - `UAT_BASE_URL`
 - `UAT_EMAIL`
 - `UAT_PASSWORD`
-- `UAT_PRODUCT_CODE`
-- `UAT_CUSTOMER_CODE`
-- `UAT_WAREHOUSE_CODE`
-- `UAT_RECEIVING_LOCATION`
-- `UAT_PUTAWAY_LOCATION`
-- `UAT_TRANSFER_FROM_LOCATION`
-- `UAT_TRANSFER_TO_LOCATION`
+- `UAT_PRODUCT_CODE` (maps to `tgd_products.sku`)
+- `UAT_CUSTOMER_CODE` (maps to `tgd_customers.name` because no customer code column exists)
+- `UAT_WAREHOUSE_CODE` (maps to `tgd_warehouses.code`)
+- `UAT_RECEIVING_LOCATION` (maps to `tgd_locations.code`)
+- `UAT_PUTAWAY_LOCATION` (maps to `tgd_locations.code`)
+- `UAT_TRANSFER_FROM_LOCATION` (maps to `tgd_locations.code`)
+- `UAT_TRANSFER_TO_LOCATION` (maps to `tgd_locations.code`)
 - `UAT_LOT_NO`
 - `UAT_PALLET_NO`
 - `UAT_QTY`
-- `UAT_UOM`
-- `UAT_REASON_CODE`
+- `UAT_UOM` (maps to `tgd_products.unit` as `tgd_uoms` does not exist)
+- `UAT_REASON_CODE` (currently not backed by `tgd_reason_codes` because table does not exist)
 
 ## 3. Scenarios
 1. Login
