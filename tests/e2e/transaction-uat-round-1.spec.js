@@ -176,6 +176,15 @@ test.describe('Transaction UAT Round 1', () => {
     }
   };
 
+  const waitForAuthenticatedShell = async (page) => {
+    await expect(page).toHaveURL(/(\/|\/dashboard)$/, { timeout: 15000 });
+
+    await expect(page.locator('body')).toContainText(
+      /Dashboard|Receiving|Warehouse|Operations|Logout|Inventory/i,
+      { timeout: 15000 }
+    );
+  };
+
   test('UAT Transaction Execution', async ({ page }) => {
     page.on('console', msg => {
       const text = msg.text();
@@ -252,11 +261,14 @@ test.describe('Transaction UAT Round 1', () => {
       await page.fill('input[type="email"], input[name="email"]', process.env.UAT_EMAIL);
       await page.fill('input[type="password"], input[name="password"]', process.env.UAT_PASSWORD);
       await page.click('button[type="submit"]');
-      await page.waitForURL('**/dashboard', { timeout: 10000 });
+      await waitForAuthenticatedShell(page);
     });
 
     // Scenario B: Receiving draft creation
     await runScenario('B', 'Receiving draft creation', '22N_02_receiving_create_attempt.png', async () => {
+      if (getScenarioStatus('A') !== 'PASS') {
+        throw new Error('DEPENDENCY_BLOCKED: Scenario A did not PASS');
+      }
       await safeGoto(page, '/receiving', '22N_01_receiving_page.png');
       const createButtons = [
         'a:has-text("Create Receiving Draft")',

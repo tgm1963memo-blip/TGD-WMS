@@ -25,7 +25,7 @@ describe('23J: Supabase RLS and Environment Diagnosis', () => {
     const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingCreatePage.jsx');
     const pageContent = fs.readFileSync(pagePath, 'utf8');
     
-    expect(pageContent).toContain('Diagnostic version: 23J');
+    expect(pageContent).toContain('Diagnostic version: 23S');
     expect(pageContent).toContain('Supabase Host: {supabaseHost}');
   });
   
