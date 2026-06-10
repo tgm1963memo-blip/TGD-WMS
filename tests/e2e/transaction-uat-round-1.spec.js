@@ -118,16 +118,17 @@ test.describe('Transaction UAT Round 1', () => {
         await actionFn();
         status = 'PASS';
       } catch (err) {
-        if (err.message === 'SKIPPED_WITH_REASON') {
+        const msg = err?.message || String(err);
+        if (msg.includes('SKIPPED_WITH_REASON')) {
           status = 'SKIPPED_WITH_REASON';
           notes = 'Module not yet operational from UI';
-        } else if (err.message.startsWith('MISSING_SELECTOR') || err.message.startsWith('MISSING_TABLE_BLOCKED')) {
+        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED')) {
           status = 'BLOCKED';
-          notes = err.message;
-          resultData.missingSelectors.push(err.message);
+          notes = msg;
+          resultData.missingSelectors.push(msg);
         } else {
           status = 'FAIL';
-          notes = err.message;
+          notes = msg;
         }
       }
       
@@ -254,11 +255,19 @@ test.describe('Transaction UAT Round 1', () => {
 
     if (hasErrors || hasFailures) {
       resultData.finalDecision["Receiving Transaction Automation"] = "FAIL";
-      throw new Error(`UAT failed with errors or test failures. Check 22N_result.json`);
     } else if (hasBlockers) {
       resultData.finalDecision["Receiving Transaction Automation"] = "BLOCKED";
     } else {
       resultData.finalDecision["Receiving Transaction Automation"] = "PASS"; // if fully implemented and pass
+    }
+
+    fs.writeFileSync(
+      path.join(evidenceDir, '22N_result.json'),
+      JSON.stringify(resultData, null, 2)
+    );
+
+    if (hasErrors || hasFailures) {
+      throw new Error(`UAT failed with errors or test failures. Check 22N_result.json`);
     }
   });
 });
