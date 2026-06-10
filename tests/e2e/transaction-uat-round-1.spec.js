@@ -91,7 +91,22 @@ test.describe('Transaction UAT Round 1', () => {
     if (!element) {
       throw new Error(`MISSING_SELECTOR: Cannot find any of [${selectors.join(', ')}] to fill '${value}'`);
     }
-    await element.fill(value);
+
+    const tagName = await element.evaluate(e => e.tagName.toLowerCase());
+    if (tagName === 'select') {
+      const optionToSelect = await element.evaluate((select, val) => {
+        const ops = Array.from(select.options);
+        const match = ops.find(o => o.value === val || o.text === val || o.text.includes(val));
+        return match ? match.value : null;
+      }, value);
+      
+      if (optionToSelect === null) {
+        throw new Error(`MISSING_OPTION: Cannot find option matching '${value}' in select [${selectors.join(', ')}]`);
+      }
+      await element.selectOption(optionToSelect);
+    } else {
+      await element.fill(value);
+    }
   };
 
   const clickIfVisible = async (page, selectors) => {
@@ -122,7 +137,7 @@ test.describe('Transaction UAT Round 1', () => {
         if (msg.includes('SKIPPED_WITH_REASON')) {
           status = 'SKIPPED_WITH_REASON';
           notes = 'Module not yet operational from UI';
-        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED')) {
+        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED') || msg.includes('MISSING_OPTION')) {
           status = 'BLOCKED';
           notes = msg;
           resultData.missingSelectors.push(msg);
