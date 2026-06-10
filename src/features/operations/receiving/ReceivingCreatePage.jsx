@@ -92,6 +92,8 @@ export function ReceivingCreatePage() {
     error: null,
     productsError: null,
     warehousesError: null,
+    productsMeta: null,
+    warehousesMeta: null,
   });
   const [useManualEntry, setUseManualEntry] = useState(false);
   const [draftForm, setDraftForm] = useState({
@@ -148,6 +150,16 @@ export function ReceivingCreatePage() {
         error: lookupError,
         productsError: products.error ?? null,
         warehousesError: warehouses.error ?? null,
+        productsMeta: {
+          called: products.called,
+          rawCount: products.rawCount,
+          filteredCount: products.filteredCount,
+        },
+        warehousesMeta: {
+          called: warehouses.called,
+          rawCount: warehouses.rawCount,
+          filteredCount: warehouses.filteredCount,
+        },
       });
     }
 
@@ -388,27 +400,30 @@ export function ReceivingCreatePage() {
           </p>
         ) : null}
 
-        {masterState.productsError || masterState.warehousesError ? (
-          <section
-            className="diagnostic-panel"
-            style={{
-              background: '#fef2f2',
-              border: '1px solid #fca5a5',
-              borderRadius: 8,
-              color: '#991b1b',
-              marginBottom: 18,
-              padding: 16,
-            }}
-          >
-            <h4 style={{ marginTop: 0 }}>UAT Master Data Diagnostics</h4>
-            <ul style={{ marginBottom: 0 }}>
-              <li>Products loaded: {masterState.products.length}</li>
-              <li>Warehouses loaded: {masterState.warehouses.length}</li>
-              {masterState.productsError && <li>Products error: {masterState.productsError.message || String(masterState.productsError)}</li>}
-              {masterState.warehousesError && <li>Warehouses error: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
-            </ul>
-          </section>
-        ) : null}
+        <section
+          className="diagnostic-panel"
+          style={{
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: 8,
+            color: '#0369a1',
+            marginBottom: 18,
+            padding: 16,
+          }}
+          id="diagnostic-23i"
+        >
+          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23I</h4>
+          <ul style={{ marginBottom: 0 }}>
+            <li>Products loader called: {masterState.productsMeta?.called ? 'true' : 'false'}</li>
+            <li>Warehouses loader called: {masterState.warehousesMeta?.called ? 'true' : 'false'}</li>
+            <li>Raw products returned count: {masterState.productsMeta?.rawCount ?? 0}</li>
+            <li>Raw warehouses returned count: {masterState.warehousesMeta?.rawCount ?? 0}</li>
+            <li>Products after filter count: {masterState.productsMeta?.filteredCount ?? 0}</li>
+            <li>Warehouses after filter count: {masterState.warehousesMeta?.filteredCount ?? 0}</li>
+            {masterState.productsError && <li>Products error message: {masterState.productsError.message || String(masterState.productsError)}</li>}
+            {masterState.warehousesError && <li>Warehouses error message: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
+          </ul>
+        </section>
         <label style={{ alignItems: 'center', display: 'inline-flex', gap: 8 }}>
           <input
             aria-label="Use manual UUID entry"

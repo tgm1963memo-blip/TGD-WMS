@@ -34,6 +34,7 @@ test.describe('Transaction UAT Round 1', () => {
     missingSelectors: [],
     selectDiagnostics: [],
     runtimeDiagnostics: [],
+    pageDiagnostics: null,
     finalDecision: {
       "Receiving Transaction Automation": "BLOCKED",
       "Production": "HOLD",
@@ -146,7 +147,7 @@ test.describe('Transaction UAT Round 1', () => {
   test('UAT Transaction Execution', async ({ page }) => {
     page.on('console', msg => {
       const text = msg.text();
-      if (text.includes('Receiving products load failed') || text.includes('Receiving warehouses load failed')) {
+      if (text.includes('Receiving products') || text.includes('Receiving warehouses')) {
         resultData.runtimeDiagnostics.push(text);
       }
     });
@@ -203,6 +204,13 @@ test.describe('Transaction UAT Round 1', () => {
       ];
       await clickIfVisible(page, createButtons);
       await page.waitForTimeout(1000);
+
+      try {
+        const diagText = await page.locator('#diagnostic-23i').innerText({ timeout: 2000 });
+        resultData.pageDiagnostics = diagText;
+      } catch (e) {
+        resultData.pageDiagnostics = "Diagnostic panel not found";
+      }
       
       const customerFields = ['select[aria-label="Customer"]'];
       const warehouseFields = ['select[aria-label="Warehouse"]'];

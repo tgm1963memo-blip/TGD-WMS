@@ -110,12 +110,15 @@ export async function getReceivingWarehouses() {
     return missingSupabaseClientResult();
   }
 
+  console.info("Receiving warehouses loader called");
   const { data, error } = await supabase
     .from('tgd_warehouses')
     .select('id, code, name');
 
-  return {
-    data: (data ?? [])
+  const rawCount = data ? data.length : 0;
+  console.info(`Receiving warehouses returned count: ${rawCount}`);
+
+  const finalData = (data ?? [])
       .map((warehouse) => {
         const code = warehouse.code ?? null;
         const name = warehouse.name ?? null;
@@ -127,8 +130,16 @@ export async function getReceivingWarehouses() {
           label: buildLabel(code, name, warehouse.id),
         };
       })
-      .sort(sortByLabel),
+      .sort(sortByLabel);
+
+  console.info(`Receiving warehouses after filter count: ${finalData.length}`);
+
+  return {
+    data: finalData,
     error,
+    rawCount,
+    filteredCount: finalData.length,
+    called: true,
   };
 }
 
@@ -137,12 +148,15 @@ export async function getReceivingProducts() {
     return missingSupabaseClientResult();
   }
 
+  console.info("Receiving products loader called");
   const { data, error } = await supabase
     .from('tgd_products')
     .select('id, sku, name, unit');
 
-  return {
-    data: (data ?? [])
+  const rawCount = data ? data.length : 0;
+  console.info(`Receiving products returned count: ${rawCount}`);
+
+  const finalData = (data ?? [])
       .map((product) => {
         const code = product.sku ?? null;
         const name = product.name ?? null;
@@ -155,8 +169,16 @@ export async function getReceivingProducts() {
           label: buildLabel(code, name, product.id),
         };
       })
-      .sort(sortByLabel),
+      .sort(sortByLabel);
+
+  console.info(`Receiving products after filter count: ${finalData.length}`);
+
+  return {
+    data: finalData,
     error,
+    rawCount,
+    filteredCount: finalData.length,
+    called: true,
   };
 }
 
