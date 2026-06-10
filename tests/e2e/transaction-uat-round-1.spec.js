@@ -65,10 +65,15 @@ test.describe('Transaction UAT Round 1', () => {
   });
 
   const checkPageForErrors = async (page) => {
-    const bodyText = await page.evaluate(() => document.body.innerText);
-    const detectionResult = detectUatErrors(bodyText, page.url());
-    detectionResult.errors.forEach(e => accumulatedErrors.add(e));
-    detectionResult.warnings.forEach(w => accumulatedWarnings.add(w));
+    if (page.isClosed()) return;
+    try {
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const detectionResult = detectUatErrors(bodyText, page.url());
+      detectionResult.errors.forEach(e => accumulatedErrors.add(e));
+      detectionResult.warnings.forEach(w => accumulatedWarnings.add(w));
+    } catch (e) {
+      resultData.runtimeDiagnostics.push(`checkPageForErrors failed: ${e.message}`);
+    }
   };
 
   const captureScenarioEvidence = async (page, filename) => {
@@ -96,6 +101,14 @@ test.describe('Transaction UAT Round 1', () => {
       }
     }
     return null;
+  };
+
+  const waitForSelectOptions = async (page, selectors) => {
+    const element = await firstVisible(page, selectors);
+    if (!element) return;
+    try {
+      await page.waitForFunction((el) => el.options && el.options.length >= 2, await element.elementHandle(), { timeout: 5000 });
+    } catch (e) {}
   };
 
   const fillIfVisible = async (page, selectors, value) => {
@@ -142,6 +155,10 @@ test.describe('Transaction UAT Round 1', () => {
     if (!element) {
       throw new Error(`MISSING_SELECTOR: Cannot find any of [${selectors.join(', ')}] to click`);
     }
+    const isDisabled = await element.evaluate(e => e.disabled);
+    if (isDisabled) {
+      throw new Error(`DISABLED_CONTROL: Button [${selectors.join(', ')}] is disabled`);
+    }
     await element.click();
   };
 
@@ -161,6 +178,11 @@ test.describe('Transaction UAT Round 1', () => {
       }
     });
 
+    const getScenarioStatus = (id) => {
+      const sc = resultData.scenarios.find(s => s.id === id);
+      return sc ? sc.status : 'PENDING';
+    };
+
     const runScenario = async (id, name, evidenceFile, actionFn) => {
       let status = 'PENDING';
       let notes = '';
@@ -172,7 +194,7 @@ test.describe('Transaction UAT Round 1', () => {
         if (msg.includes('SKIPPED_WITH_REASON')) {
           status = 'SKIPPED_WITH_REASON';
           notes = 'Module not yet operational from UI';
-        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED') || msg.includes('MISSING_OPTION')) {
+        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED') || msg.includes('MISSING_OPTION') || msg.includes('DISABLED_CONTROL') || msg.includes('DEPENDENCY_BLOCKED')) {
           status = 'BLOCKED';
           notes = msg;
           resultData.missingSelectors.push(msg);
@@ -225,7 +247,9 @@ test.describe('Transaction UAT Round 1', () => {
       const warehouseFields = ['select[aria-label="Warehouse"]'];
       const docNoFields = ['input[aria-label="Document No"]'];
 
+      await waitForSelectOptions(page, customerFields);
       await fillIfVisible(page, customerFields, process.env.UAT_CUSTOMER_CODE); // Note: using name/ID for select value if possible, or we may need to adjust
+      await waitForSelectOptions(page, warehouseFields);
       const warehouseVal = process.env.UAT_WAREHOUSE_NAME || process.env.UAT_WAREHOUSE_CODE;
       await fillIfVisible(page, warehouseFields, warehouseVal);
       await fillIfVisible(page, docNoFields, 'UAT-DOC-001');
@@ -238,6 +262,8 @@ test.describe('Transaction UAT Round 1', () => {
 
     // Scenario C: Receiving line entry
     await runScenario('C', 'Receiving line entry', '22N_03_receiving_line_attempt.png', async () => {
+      if (getScenarioStatus('B') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario B did not PASS');
+
       const productFields = ['select[aria-label="Product"]'];
       const lotFields = ['input[aria-label="Lot No"]', 'select[aria-label="Lot"]'];
       const palletFields = ['input[aria-label="Pallet No"]'];
@@ -245,10 +271,12 @@ test.describe('Transaction UAT Round 1', () => {
       const qtyFields = ['input[aria-label="Quantity"]'];
       const weightFields = ['input[aria-label="Weight"]'];
 
+      await waitForSelectOptions(page, productFields);
       const productVal = process.env.UAT_PRODUCT_NAME || process.env.UAT_PRODUCT_CODE;
       await fillIfVisible(page, productFields, productVal);
       await fillIfVisible(page, lotFields, process.env.UAT_LOT_NO);
       await fillIfVisible(page, palletFields, process.env.UAT_PALLET_NO);
+      await waitForSelectOptions(page, locationFields);
       await fillIfVisible(page, locationFields, process.env.UAT_RECEIVING_LOCATION);
       await fillIfVisible(page, qtyFields, process.env.UAT_QTY);
       // weight is optional but we can add if needed
@@ -259,6 +287,8 @@ test.describe('Transaction UAT Round 1', () => {
 
     // Scenario D: Receiving post/confirm
     await runScenario('D', 'Receiving post/confirm', '22N_04_receiving_post_attempt.png', async () => {
+      if (getScenarioStatus('C') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario C did not PASS');
+
       const postButtons = [
         'button:has-text("Confirm/Post Receiving")'
       ];
@@ -268,6 +298,8 @@ test.describe('Transaction UAT Round 1', () => {
 
     // Scenario E: Verify receiving movement ledger evidence
     await runScenario('E', 'Verify receiving movement ledger evidence', '22N_05_receiving_ledger_check.png', async () => {
+      if (getScenarioStatus('D') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario D did not PASS');
+
       await safeGoto(page, '/movement-ledger', null);
       // verify something here
       const tableRows = ['tr:has-text("'+process.env.UAT_PRODUCT_CODE+'")'];
@@ -277,6 +309,8 @@ test.describe('Transaction UAT Round 1', () => {
 
     // Scenario F: Verify stock balance increase evidence
     await runScenario('F', 'Verify stock balance increase evidence', '22N_06_stock_balance_check.png', async () => {
+      if (getScenarioStatus('D') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario D did not PASS');
+
       await safeGoto(page, '/stock-balance', null);
       const tableRows = ['tr:has-text("'+process.env.UAT_PRODUCT_CODE+'")'];
       const element = await firstVisible(page, tableRows);
