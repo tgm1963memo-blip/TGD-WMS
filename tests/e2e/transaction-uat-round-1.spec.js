@@ -206,7 +206,7 @@ test.describe('Transaction UAT Round 1', () => {
       await page.waitForTimeout(1000);
 
       try {
-        const diagText = await page.locator('#diagnostic-23i').innerText({ timeout: 2000 });
+        const diagText = await page.locator('#diagnostic-23j').innerText({ timeout: 2000 });
         resultData.pageDiagnostics = diagText;
       } catch (e) {
         resultData.pageDiagnostics = "Diagnostic panel not found";

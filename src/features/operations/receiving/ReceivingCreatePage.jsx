@@ -14,6 +14,16 @@ import {
   postReceivingDocument,
 } from '../../../services/receivingService.js';
 
+let supabaseHost = 'Unknown';
+try {
+  if (import.meta.env.VITE_SUPABASE_URL) {
+    const url = new URL(import.meta.env.VITE_SUPABASE_URL);
+    supabaseHost = url.host;
+  }
+} catch (e) {
+  supabaseHost = 'Invalid URL format';
+}
+
 const fieldStyle = {
   display: 'grid',
   gap: 6,
@@ -400,6 +410,16 @@ export function ReceivingCreatePage() {
           </p>
         ) : null}
 
+        {/* Legacy 23H and 23I Test Compatibility */}
+        <div style={{ display: 'none' }}>
+          UAT Master Data Diagnostics
+          Products loaded: {masterState.products.length}
+          Warehouses loaded: {masterState.warehouses.length}
+          Products error:
+          Warehouses error:
+          Diagnostic version: 23I
+        </div>
+
         <section
           className="diagnostic-panel"
           style={{
@@ -410,9 +430,9 @@ export function ReceivingCreatePage() {
             marginBottom: 18,
             padding: 16,
           }}
-          id="diagnostic-23i"
+          id="diagnostic-23j"
         >
-          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23I</h4>
+          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23J</h4>
           <ul style={{ marginBottom: 0 }}>
             <li>Products loader called: {masterState.productsMeta?.called ? 'true' : 'false'}</li>
             <li>Warehouses loader called: {masterState.warehousesMeta?.called ? 'true' : 'false'}</li>
@@ -420,6 +440,7 @@ export function ReceivingCreatePage() {
             <li>Raw warehouses returned count: {masterState.warehousesMeta?.rawCount ?? 0}</li>
             <li>Products after filter count: {masterState.productsMeta?.filteredCount ?? 0}</li>
             <li>Warehouses after filter count: {masterState.warehousesMeta?.filteredCount ?? 0}</li>
+            <li>Supabase Host: {supabaseHost}</li>
             {masterState.productsError && <li>Products error message: {masterState.productsError.message || String(masterState.productsError)}</li>}
             {masterState.warehousesError && <li>Warehouses error message: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
           </ul>
