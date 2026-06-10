@@ -16,6 +16,27 @@ function firstPresent(row, keys) {
   return keys.map((key) => row?.[key]).find((value) => value !== undefined && value !== null && value !== '') ?? null;
 }
 
+export function normalizeReceivingDocumentId(data) {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  
+  if (Array.isArray(data)) {
+    if (data.length === 0) return '';
+    const first = data[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object') {
+      return first.id || first.document_id || first.receiving_document_id || first.receiving_id || '';
+    }
+    return '';
+  }
+
+  if (typeof data === 'object') {
+    return data.id || data.document_id || data.receiving_document_id || data.receiving_id || '';
+  }
+
+  return '';
+}
+
 
 
 function sortByLabel(left, right) {
@@ -250,10 +271,30 @@ export async function createReceivingDocument(input) {
     };
   }
 
-  return supabase.rpc('tgd_rpc_create_receiving_draft', {
+  const response = await supabase.rpc('tgd_rpc_create_receiving_draft', {
     p_customer_id: input.customer_id,
     p_document_no: input.document_no,
   });
+
+  if (response.error) {
+    return response;
+  }
+
+  const documentId = normalizeReceivingDocumentId(response.data);
+  if (!documentId) {
+    return {
+      data: null,
+      error: new Error(`DRAFT_ID_MISSING: Could not parse document id from RPC response: ${JSON.stringify(response.data)}`),
+    };
+  }
+
+  return {
+    data: {
+      id: documentId,
+      document_id: documentId,
+    },
+    error: null,
+  };
 }
 
 export async function updateReceivingDocument() {

@@ -27,7 +27,7 @@ const { postReceivingDocument, getReceivingDocumentById, getReceivingStockMoveme
 
 vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
-  createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
+  createReceivingDocument: vi.fn(async () => ({ data: { id: 'draft-1', document_id: 'draft-1' }, error: null })),
   addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
   getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
   postReceivingDocument: (...args) => postReceivingDocument(...args),

@@ -16,7 +16,7 @@ const {
   getReceivingLocations,
 } = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
-    data: 'draft-123',
+    data: { id: 'draft-1', document_id: 'draft-1' },
     error: null,
   })),
   addReceivingLine: vi.fn(async () => ({
@@ -85,7 +85,7 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createReceivingDocument.mockResolvedValue({
-      data: 'draft-123',
+      data: { id: 'draft-123', document_id: 'draft-123' },
       error: null,
     });
     addReceivingLine.mockResolvedValue({

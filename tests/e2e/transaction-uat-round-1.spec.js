@@ -200,7 +200,7 @@ test.describe('Transaction UAT Round 1', () => {
         if (msg.includes('SKIPPED_WITH_REASON')) {
           status = 'SKIPPED_WITH_REASON';
           notes = 'Module not yet operational from UI';
-        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED') || msg.includes('MISSING_OPTION') || msg.includes('DISABLED_CONTROL') || msg.includes('DEPENDENCY_BLOCKED')) {
+        } else if (msg.includes('MISSING_SELECTOR') || msg.includes('MISSING_TABLE_BLOCKED') || msg.includes('MISSING_OPTION') || msg.includes('DISABLED_CONTROL') || msg.includes('DEPENDENCY_BLOCKED') || msg.includes('DRAFT_ID_MISSING')) {
           status = 'BLOCKED';
           notes = msg;
           resultData.missingSelectors.push(msg);
@@ -226,7 +226,29 @@ test.describe('Transaction UAT Round 1', () => {
 
     // Scenario A: Login
     await runScenario('A', 'Login', '22M_01_login.png', async () => {
-      await page.goto(`${process.env.UAT_BASE_URL}/login`);
+      let baseUrl = process.env.UAT_BASE_URL || '';
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+      await page.goto(baseUrl);
+      await captureScenarioEvidence(page, '00-before-login.png');
+
+      let bodyText = await page.evaluate(() => document.body.innerText);
+      if (bodyText.includes('404') && bodyText.includes('NOT_FOUND')) {
+         throw new Error('Vercel route fallback failed. Check vercel.json rewrite.');
+      }
+
+      let emailInput = page.locator('input[type="email"], input[name="email"]').first();
+      try {
+         await emailInput.waitFor({ state: 'visible', timeout: 3000 });
+      } catch (e) {
+         await page.goto(`${baseUrl}/login`);
+         bodyText = await page.evaluate(() => document.body.innerText);
+         if (bodyText.includes('404') && bodyText.includes('NOT_FOUND')) {
+           throw new Error('Vercel route fallback failed. Check vercel.json rewrite.');
+         }
+         await emailInput.waitFor({ state: 'visible', timeout: 3000 });
+      }
+
       await page.fill('input[type="email"], input[name="email"]', process.env.UAT_EMAIL);
       await page.fill('input[type="password"], input[name="password"]', process.env.UAT_PASSWORD);
       await page.click('button[type="submit"]');

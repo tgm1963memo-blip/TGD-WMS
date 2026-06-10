@@ -8,7 +8,7 @@ import { ReceivingListPage } from '../../src/features/operations/receiving/Recei
 
 vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
-  createReceivingDocument: vi.fn(async () => ({ data: 'draft-1', error: null })),
+  createReceivingDocument: vi.fn(async () => ({ data: { id: 'draft-1', document_id: 'draft-1' }, error: null })),
   addReceivingLine: vi.fn(async () => ({ data: 'line-1', error: null })),
   postReceivingDocument: vi.fn(async () => ({ data: { status: 'CONFIRMED' }, error: null })),
   getReceivingCustomers: vi.fn(async () => ({ data: [], error: null })),

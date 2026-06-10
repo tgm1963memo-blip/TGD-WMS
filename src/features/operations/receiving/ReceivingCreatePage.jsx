@@ -50,11 +50,7 @@ const helperStyle = {
   fontSize: 12,
 };
 
-function getCreatedDocumentId(result) {
-  if (!result?.data) return '';
-  if (typeof result.data === 'string') return result.data;
-  return result.data.id || result.data.document_id || '';
-}
+
 
 function getCreatedLineId(result) {
   if (!result?.data) return '';
@@ -246,7 +242,7 @@ export function ReceivingCreatePage() {
       return;
     }
 
-    const documentId = getCreatedDocumentId(result);
+    const documentId = result.data?.id || result.data?.document_id;
     if (!documentId) {
       setError('Save draft succeeded but returned no document id (DRAFT_ID_MISSING).');
       return;
