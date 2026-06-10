@@ -129,6 +129,13 @@ export function ReceivingCreatePage() {
       if (!isMounted) return;
 
       const lookupError = customers.error || products.error || lots.error || locations.error || warehouses.error;
+      
+      if (customers.error) console.error("Customer load error:", customers.error);
+      if (products.error) console.error("Product load error:", products.error);
+      if (lots.error) console.error("Lot load error:", lots.error);
+      if (locations.error) console.error("Location load error:", locations.error);
+      if (warehouses.error) console.error("Warehouse load error:", warehouses.error);
+
       setMasterState({
         customers: customers.data ?? [],
         products: products.data ?? [],

@@ -16,9 +16,7 @@ function firstPresent(row, keys) {
   return keys.map((key) => row?.[key]).find((value) => value !== undefined && value !== null && value !== '') ?? null;
 }
 
-function isActiveRow(row) {
-  return row?.is_active !== false;
-}
+
 
 function sortByLabel(left, right) {
   return String(left.label).localeCompare(String(right.label));
@@ -92,7 +90,6 @@ export async function getReceivingCustomers() {
 
   return {
     data: (data ?? [])
-      .filter(isActiveRow)
       .map((customer) => {
         const name = customer.name ?? null;
 
@@ -119,7 +116,6 @@ export async function getReceivingWarehouses() {
 
   return {
     data: (data ?? [])
-      .filter(isActiveRow)
       .map((warehouse) => {
         const code = warehouse.code ?? null;
         const name = warehouse.name ?? null;
@@ -147,7 +143,6 @@ export async function getReceivingProducts() {
 
   return {
     data: (data ?? [])
-      .filter(isActiveRow)
       .map((product) => {
         const code = product.sku ?? null;
         const name = product.name ?? null;
@@ -176,7 +171,6 @@ export async function getReceivingLots() {
 
   return {
     data: (data ?? [])
-      .filter(isActiveRow)
       .map((lot) => {
         const code = lot.lot_number ?? null;
 
@@ -206,7 +200,6 @@ export async function getReceivingLocations() {
 
   return {
     data: (data ?? [])
-      .filter(isActiveRow)
       .map((location) => {
         const code = location.code ?? null;
         const name = location.name ?? null;

@@ -12,12 +12,7 @@ export async function getCustomers(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_customers').select('*').order('customer_code');
-
-  if (typeof filters.isActive === 'boolean') {
-    query = query.eq('is_active', filters.isActive);
-  }
-
+  let query = supabase.from('tgd_customers').select('*');
   return query;
 }
 
@@ -26,12 +21,7 @@ export async function getProducts(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_products').select('*').order('product_code');
-
-  if (typeof filters.isActive === 'boolean') {
-    query = query.eq('is_active', filters.isActive);
-  }
-
+  let query = supabase.from('tgd_products').select('*').order('sku');
   return query;
 }
 
@@ -40,12 +30,7 @@ export async function getWarehouses(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_warehouses').select('*').order('warehouse_code');
-
-  if (typeof filters.isActive === 'boolean') {
-    query = query.eq('is_active', filters.isActive);
-  }
-
+  let query = supabase.from('tgd_warehouses').select('*').order('code');
   return query;
 }
 
@@ -54,14 +39,10 @@ export async function getLocations(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_locations').select('*').order('location_code');
+  let query = supabase.from('tgd_locations').select('*').order('code');
 
   if (filters.roomId) {
     query = query.eq('room_id', filters.roomId);
-  }
-
-  if (typeof filters.isActive === 'boolean') {
-    query = query.eq('is_active', filters.isActive);
   }
 
   return query;
