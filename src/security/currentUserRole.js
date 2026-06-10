@@ -2,6 +2,7 @@
 
 import { getAppRuntimeConfig } from '../config/appConfig.js';
 import { isDemoRoleSelectorAllowed } from './demoRoleSelectorControl.js';
+import { getUatRoleOverride } from './uatRoleOverride.js';
 
 /**
  * Frontend‑only demo role source.
@@ -18,6 +19,11 @@ let _demoRole = DEFAULT_DEMO_ROLE;
  * @returns {string}
  */
 export function getCurrentUserRole() {
+  const uatOverride = getUatRoleOverride();
+  if (uatOverride) {
+    return uatOverride;
+  }
+
   if (!isDemoRoleSelectorAllowed(getAppRuntimeConfig())) {
     return PRODUCTION_FALLBACK_ROLE;
   }
