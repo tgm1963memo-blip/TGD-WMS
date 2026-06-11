@@ -169,11 +169,14 @@ describe('Gate 3A billing movement weight report', () => {
     expect(serviceSource).not.toContain('BILLED');
   });
 
-  it('keeps gate 3A page read-only without invoice draft workflow', () => {
+  it('keeps gate 3B-2 page bounded without approve/export/mark billed workflow', () => {
     const pageSource = readProjectFile('src/features/reports/BillingMovementWeightReportPage.jsx');
 
-    expect(pageSource).not.toMatch(/invoice draft/i);
-    expect(pageSource).not.toContain('Mark as BILLED');
+    expect(pageSource).toContain('create-invoice-draft-button');
+    expect(pageSource).not.toContain('approve-invoice-draft-button');
+    expect(pageSource).not.toContain('export-bplus-button');
+    expect(pageSource).not.toContain('mark-billed-button');
+    expect(pageSource).not.toContain('bplus-invoice-no-input');
     expect(pageSource).not.toContain('billingExportService');
     expect(pageSource).not.toContain('AccountingChargeHandoff');
     expect(pageSource).toContain('NEEDS_WEIGHT_REVIEW');

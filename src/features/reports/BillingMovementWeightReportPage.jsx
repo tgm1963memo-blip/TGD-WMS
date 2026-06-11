@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
@@ -7,7 +8,13 @@ import { BillingMovementWeightTable } from '../../components/reports/BillingMove
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { getBillingMovementWeightRows } from '../../services/billingMovementWeightService.js';
+import { createBillingInvoiceDraftFromMovements } from '../../services/billingInvoiceDraftService.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
+import {
+  formatInvoiceDraftError,
+  getMovementDraftSelectionState,
+  validateInvoiceDraftSourceRows,
+} from '../../utils/billingInvoiceDraftUtils.js';
 import {
   calculateBillingMovementWeightSummary,
   classifyBillingMovementWeightError,
@@ -22,11 +29,16 @@ const initialState = {
 };
 
 export function BillingMovementWeightReportPage() {
+  const navigate = useNavigate();
   const { language } = useLanguage();
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [selectedMovementIds, setSelectedMovementIds] = useState(() => new Set());
+  const [creatingDraft, setCreatingDraft] = useState(false);
+  const [draftValidationError, setDraftValidationError] = useState(null);
+  const [draftSuccess, setDraftSuccess] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +74,17 @@ export function BillingMovementWeightReportPage() {
     };
   }, [filters]);
 
+  useEffect(() => {
+    setSelectedMovementIds(new Set());
+    setDraftValidationError(null);
+    setDraftSuccess(null);
+  }, [filters, state.rows]);
+
+  const selectedRows = useMemo(
+    () => state.rows.filter((row) => selectedMovementIds.has(String(row.movement_id))),
+    [state.rows, selectedMovementIds],
+  );
+
   const summary = useMemo(
     () => calculateBillingMovementWeightSummary(state.rows),
     [state.rows],
@@ -80,6 +103,61 @@ export function BillingMovementWeightReportPage() {
     downloadBillingMovementWeightCsv(state.rows);
   }
 
+  function toggleRowSelection(movementId) {
+    setDraftValidationError(null);
+    setDraftSuccess(null);
+    setSelectedMovementIds((current) => {
+      const next = new Set(current);
+      if (next.has(movementId)) next.delete(movementId);
+      else next.add(movementId);
+      return next;
+    });
+  }
+
+  function toggleAllSelectable(movementIds = []) {
+    setDraftValidationError(null);
+    setDraftSuccess(null);
+    setSelectedMovementIds((current) => {
+      const allSelected = movementIds.every((id) => current.has(id));
+      if (allSelected) return new Set();
+      return new Set(movementIds);
+    });
+  }
+
+  async function handleCreateDraft() {
+    const movementIds = [...selectedMovementIds];
+    const clientValidation = validateInvoiceDraftSourceRows(selectedRows);
+    if (!clientValidation.valid) {
+      setDraftValidationError(new Error(clientValidation.errors.join(' ')));
+      setDraftSuccess(null);
+      return;
+    }
+
+    setCreatingDraft(true);
+    setDraftValidationError(null);
+    setDraftSuccess(null);
+
+    const result = await createBillingInvoiceDraftFromMovements({
+      movementIds,
+      note: 'E2E_TEST',
+    });
+
+    setCreatingDraft(false);
+
+    if (result.error) {
+      setDraftValidationError(result.error);
+      return;
+    }
+
+    const draft = result.data?.draft;
+    setDraftSuccess(draft);
+    setSelectedMovementIds(new Set());
+
+    if (draft?.id) {
+      navigate(`/billing/invoice-drafts/${draft.id}`);
+    }
+  }
+
   return (
     <section className="page-shell" data-testid="billing-movement-weight-report-page">
       <PageHeader
@@ -88,10 +166,11 @@ export function BillingMovementWeightReportPage() {
       />
 
       <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
-        <strong>Gate 3A Preview Only</strong>
+        <strong>Gate 3B-2 Billing Preview</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14 }}>
-          No billing draft workflow, no billing amount calculation, no BILLED lock, no Bplus export.
-          NEEDS_WEIGHT_REVIEW rows are shown for manual review only.
+          Select READY_FOR_PREVIEW billable rows to create invoice drafts.
+          No approve, no Bplus export, no Mark BILLED.
+          NEEDS_WEIGHT_REVIEW rows remain review-only and cannot be selected.
         </p>
       </div>
 
@@ -102,17 +181,59 @@ export function BillingMovementWeightReportPage() {
         products={products}
       />
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '12px 0' }}>
-        <button
-          type="button"
-          className="btn btn-outline"
-          onClick={handleExport}
-          disabled={state.loading || !state.rows.length}
-          data-testid="billing-movement-weight-export-button"
-        >
-          Export CSV
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, margin: '12px 0', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, color: 'var(--tgd-muted-text)' }}>
+          Selected rows: {selectedMovementIds.size}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleCreateDraft}
+            disabled={state.loading || creatingDraft || selectedMovementIds.size === 0}
+            data-testid="create-invoice-draft-button"
+          >
+            {creatingDraft ? 'Creating Draft...' : 'Create Draft'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleExport}
+            disabled={state.loading || !state.rows.length}
+            data-testid="billing-movement-weight-export-button"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
+
+      {draftValidationError ? (
+        <div
+          className="section-card"
+          role="alert"
+          data-testid="invoice-draft-validation-alert"
+          style={{ border: '1px solid var(--tgd-danger)', background: '#fff5f5', padding: 16, marginBottom: 16 }}
+        >
+          {formatInvoiceDraftError(draftValidationError)}
+        </div>
+      ) : null}
+
+      {draftSuccess ? (
+        <div
+          className="section-card"
+          role="status"
+          data-testid="invoice-draft-success-alert"
+          style={{ border: '1px solid #86efac', background: '#f0fdf4', padding: 16, marginBottom: 16 }}
+        >
+          Invoice draft <strong>{draftSuccess.draft_no}</strong> created.
+          {draftSuccess.id ? (
+            <>
+              {' '}
+              <Link to={`/billing/invoice-drafts/${draftSuccess.id}`}>View draft detail</Link>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {classifiedError ? (
         <div
@@ -153,6 +274,10 @@ export function BillingMovementWeightReportPage() {
           data={state.rows}
           loading={state.loading}
           error={state.error}
+          selectedMovementIds={selectedMovementIds}
+          onToggleRow={toggleRowSelection}
+          onToggleAllSelectable={toggleAllSelectable}
+          getSelectionState={getMovementDraftSelectionState}
           emptyState={(
             <div
               className="section-card"
@@ -173,8 +298,8 @@ export function BillingMovementWeightReportPage() {
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
         <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <li>Gate 3A is read-only preview only</li>
-          <li>No billing draft workflow in this gate</li>
+          <li>Gate 3B-2 supports create/list/cancel invoice drafts only</li>
+          <li>No approve / Bplus export / Mark BILLED</li>
           <li>No billing amount calculation when weight is incomplete</li>
           <li>FINAL GO is NOT AUTHORIZED</li>
         </ul>

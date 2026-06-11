@@ -42,6 +42,10 @@ export function BillingMovementWeightTable({
   loading = false,
   error = null,
   emptyState = null,
+  selectedMovementIds = new Set(),
+  onToggleRow,
+  onToggleAllSelectable,
+  getSelectionState,
 }) {
   if (loading) {
     return <LoadingState />;
@@ -55,11 +59,27 @@ export function BillingMovementWeightTable({
     return emptyState;
   }
 
+  const selectableRows = data.filter((row) => getSelectionState?.(row)?.selectable);
+  const allSelectableSelected = selectableRows.length > 0
+    && selectableRows.every((row) => selectedMovementIds.has(String(row.movement_id)));
+
   return (
     <div className="table-responsive responsive-table" data-testid="billing-movement-weight-table">
       <table className="tgd-table">
         <thead>
           <tr>
+            <th>
+              {getSelectionState ? (
+                <input
+                  type="checkbox"
+                  checked={allSelectableSelected}
+                  disabled={!selectableRows.length}
+                  onChange={() => onToggleAllSelectable?.(selectableRows.map((row) => String(row.movement_id)))}
+                  data-testid="billing-movement-select-all-checkbox"
+                  aria-label="Select all billable rows"
+                />
+              ) : 'Select'}
+            </th>
             <th>Movement Date</th>
             <th>Movement Type</th>
             <th>Canonical Type</th>
@@ -81,8 +101,26 @@ export function BillingMovementWeightTable({
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
+          {data.map((row) => {
+            const selectionState = getSelectionState?.(row) ?? { selectable: false, reason: null };
+            const movementId = String(row.movement_id ?? '');
+            const isSelected = selectedMovementIds.has(movementId);
+
+            return (
             <tr key={row.movement_id ?? `${row.movement_type}-${row.movement_date}`}>
+              <td>
+                {getSelectionState ? (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    disabled={!selectionState.selectable}
+                    title={selectionState.reason ?? 'Selectable for invoice draft'}
+                    onChange={() => onToggleRow?.(movementId)}
+                    data-testid="billing-movement-row-checkbox"
+                    aria-label={`Select movement ${movementId}`}
+                  />
+                ) : null}
+              </td>
               <td>{formatDate(row.movement_date)}</td>
               <td>{row.movement_type ?? '-'}</td>
               <td>{row.canonical_movement_type ?? '-'}</td>
@@ -102,7 +140,8 @@ export function BillingMovementWeightTable({
               <td><BillingExclusionReasonBadge reason={row.billing_exclusion_reason} /></td>
               <td>{row.source_document_no ?? '-'}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

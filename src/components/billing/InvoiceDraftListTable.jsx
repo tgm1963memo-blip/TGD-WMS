@@ -1,0 +1,79 @@
+import { Link } from 'react-router-dom';
+import { LoadingState } from '../ui/LoadingState.jsx';
+import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function formatNumber(value) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number.toLocaleString() : '-';
+}
+
+export function InvoiceDraftListTable({
+  data = [],
+  loading = false,
+  error = null,
+}) {
+  if (loading) return <LoadingState />;
+
+  if (error) {
+    return (
+      <div className="section-card" role="alert" style={{ padding: 16, border: '1px solid var(--tgd-danger)' }}>
+        {error.message || String(error)}
+      </div>
+    );
+  }
+
+  if (!data.length) {
+    return (
+      <div className="section-card" style={{ padding: 24, textAlign: 'center' }} data-testid="invoice-draft-empty-state">
+        No invoice drafts match the selected filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className="table-responsive responsive-table" data-testid="billing-invoice-drafts-table">
+      <table className="tgd-table">
+        <thead>
+          <tr>
+            <th>Draft No</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Period Start</th>
+            <th>Period End</th>
+            <th>Total Qty</th>
+            <th>Total Chargeable Weight</th>
+            <th>Total Amount</th>
+            <th>Created At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((draft) => (
+            <tr key={draft.id}>
+              <td>{draft.draft_no}</td>
+              <td>{draft.customer_name ?? '-'}</td>
+              <td><InvoiceDraftStatusBadge status={draft.status} /></td>
+              <td>{draft.billing_period_start ?? '-'}</td>
+              <td>{draft.billing_period_end ?? '-'}</td>
+              <td>{formatNumber(draft.total_qty)}</td>
+              <td>{formatNumber(draft.total_chargeable_weight)}</td>
+              <td>{draft.total_amount == null ? '-' : formatNumber(draft.total_amount)}</td>
+              <td>{formatDate(draft.created_at)}</td>
+              <td>
+                <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>
+                  View
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

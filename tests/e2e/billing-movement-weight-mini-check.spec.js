@@ -105,11 +105,12 @@ test.describe('Billing Movement Weight Mini Check', () => {
     }
   });
 
-  test('Scenario 7: Gate 3B features must not exist', async ({ page }) => {
+  test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }) => {
     await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible();
     const forbiddenSelectors = [
-      '[data-testid="create-invoice-draft-button"]',
       '[data-testid="approve-invoice-draft-button"]',
+      '[data-testid="export-bplus-button"]',
       '[data-testid="mark-billed-button"]',
       '[data-testid="bplus-invoice-no-input"]',
     ];

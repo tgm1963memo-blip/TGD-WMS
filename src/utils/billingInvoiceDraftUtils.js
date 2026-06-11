@@ -239,6 +239,44 @@ export function canCancelBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
 
+export function getMovementDraftSelectionState(row = {}) {
+  if (!row.is_billable) {
+    return { selectable: false, reason: 'Not billable' };
+  }
+
+  if (row.billing_status === BILLING_STATUS_FOUNDATION.EXCLUDED) {
+    return { selectable: false, reason: 'Excluded from billing' };
+  }
+
+  if (row.billing_status === BILLING_STATUS_FOUNDATION.NEEDS_WEIGHT_REVIEW) {
+    return { selectable: false, reason: 'Needs weight review' };
+  }
+
+  if (!BILLABLE_SOURCE_BILLING_STATUSES.includes(row.billing_status)) {
+    return { selectable: false, reason: `Unsupported status: ${row.billing_status ?? 'UNKNOWN'}` };
+  }
+
+  const chargeableWeight = toNumber(row.chargeable_weight);
+  const grossWeight = toNumber(row.gross_weight);
+  const netWeight = toNumber(row.net_weight);
+  if (chargeableWeight <= 0 && grossWeight <= 0 && netWeight <= 0) {
+    return { selectable: false, reason: 'Incomplete weight data' };
+  }
+
+  return { selectable: true, reason: null };
+}
+
+export function formatInvoiceDraftError(error) {
+  if (!error) return 'Unknown invoice draft error.';
+  if (error.code === 'INVOICE_DRAFT_VALIDATION') {
+    if (Array.isArray(error.details?.errors) && error.details.errors.length) {
+      return error.details.errors.join(' ');
+    }
+    return error.message;
+  }
+  return error.message || String(error);
+}
+
 export function buildInvoiceDraftCreatePayload({
   draftNo,
   movements = [],

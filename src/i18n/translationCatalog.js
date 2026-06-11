@@ -228,6 +228,9 @@ Object.assign(TRANSLATION_CATALOG, {
   monthly_storage_billing_summary_description: { th: 'ข้อมูลสรุปรายเดือนแบบตัวอย่างสำหรับให้บัญชีตรวจสอบก่อนจัดทำค่าบริการจัดเก็บ', en: 'Preview-only monthly storage billing support for accounting review.' },
   billing_movement_weight_report: { th: 'รายงานน้ำหนักการเคลื่อนไหวสำหรับบิลลิ่ง', en: 'Billing Movement Weight Report' },
   billing_movement_weight_report_description: { th: 'ตัวอย่างอ่านอย่างเดียวสำหรับตรวจสอบน้ำหนัก สถานะ billable และเหตุผลการยกเว้นก่อนอนุมัติบิลลิ่ง', en: 'Read-only preview of movement weight and billable status before billing approval.' },
+  billing_invoice_drafts: { th: 'ร่างใบแจ้งหนี้บิลลิ่ง', en: 'Billing Invoice Drafts' },
+  billing_invoice_drafts_description: { th: 'ดูรายการร่างใบแจ้งหนี้ที่สร้างจาก movement สำหรับบิลลิ่ง', en: 'Review invoice draft headers created from billing movement weight rows.' },
+  billing_invoice_draft_detail: { th: 'รายละเอียดร่างใบแจ้งหนี้', en: 'Invoice Draft Detail' },
   accounting_charge_staging_preview_description: { th: 'พื้นที่ตัวอย่างสำหรับตรวจสอบรายการค่าบริการและร่างการแมปไปยัง Bplus', en: 'Read-only staging area to review canonical charges and Bplus draft mappings.' },
   accounting_charge_handoff_review_draft_description: { th: 'ร่างตรวจสอบการส่งต่อข้อมูลค่าบริการให้บัญชีแบบอ่านอย่างเดียว ไม่มีการส่งออก สร้างเอกสาร หรือบันทึกบัญชี', en: 'Review-only accounting charge handoff draft for Bplus preview. No send, export, invoice, or posting actions.' },
 });
