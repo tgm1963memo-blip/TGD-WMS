@@ -240,39 +240,12 @@ export function ReceivingCreatePage() {
     event.preventDefault();
     setError('');
     setMessage('');
-    
-    // Auth diagnostics
-    let authSuccess = false;
-    let sessionExists = false;
-    let userId = null;
-    let userEmailMasked = null;
-    let authErrorMessage = null;
-    try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        authErrorMessage = userError.message;
-      } else if (userData?.user) {
-        authSuccess = true;
-        userId = userData.user.id;
-        userEmailMasked = maskEmail(userData.user.email);
-      }
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (!sessionError && sessionData?.session) {
-        sessionExists = true;
-      }
-    } catch (e) {
-      authErrorMessage = e.message || String(e);
-    }
-    const uatOverrideActive = Boolean(getUatRoleOverride());
 
     setDraftDiagnostics((current) => ({
       ...current,
-      supabaseUserSuccess: authSuccess,
-      supabaseSessionExists: sessionExists,
-      supabaseUserId: userId,
-      supabaseUserEmailMasked: userEmailMasked,
-      supabaseAuthErrorMessage: authErrorMessage,
-      uatRoleOverrideActive: uatOverrideActive,
+      saveDraftClicked: true,
+      validationPassed: false,
+      uatRoleOverrideActive: Boolean(getUatRoleOverride()),
     }));
 
     const docNo = draftForm.document_no.trim();
@@ -296,6 +269,44 @@ export function ReceivingCreatePage() {
       rpcCalled: true,
       rpcName: 'tgd_rpc_create_receiving_draft',
     }));
+
+    // Authentication details are diagnostic only and must not delay the write RPC.
+    void (async () => {
+      let authSuccess = false;
+      let sessionExists = false;
+      let userId = null;
+      let userEmailMasked = null;
+      let authErrorMessage = null;
+
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          authErrorMessage = userError.message;
+        } else if (userData?.user) {
+          authSuccess = true;
+          userId = userData.user.id;
+          userEmailMasked = maskEmail(userData.user.email);
+        }
+
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          authErrorMessage ||= sessionError.message;
+        } else if (sessionData?.session) {
+          sessionExists = true;
+        }
+      } catch (authError) {
+        authErrorMessage = authError?.message || String(authError);
+      }
+
+      setDraftDiagnostics((current) => ({
+        ...current,
+        supabaseUserSuccess: authSuccess,
+        supabaseSessionExists: sessionExists,
+        supabaseUserId: userId,
+        supabaseUserEmailMasked: userEmailMasked,
+        supabaseAuthErrorMessage: authErrorMessage,
+      }));
+    })();
 
     console.info('[Receiving Save Draft] validation passed', {
       hasCustomerId: Boolean(draftForm.customer_id),

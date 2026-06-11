@@ -81,6 +81,7 @@ describe('Phase 23U receiving save draft RPC and UAT error detection fix', () =>
   it('ignores None RPC diagnostics but still detects actual RPC errors', () => {
     expect(detectUatErrors('Save draft RPC error: None', '/receiving').errors).toEqual([]);
     expect(detectUatErrors('RPC error: None', '/receiving').errors).toEqual([]);
+    expect(detectUatErrors('Supabase auth error: None', '/receiving').errors).toEqual([]);
 
     const actual = detectUatErrors(
       'Save draft RPC error: permission denied',

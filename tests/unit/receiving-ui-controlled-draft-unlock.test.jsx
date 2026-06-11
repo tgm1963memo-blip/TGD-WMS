@@ -14,6 +14,8 @@ const {
   getReceivingProducts,
   getReceivingLots,
   getReceivingLocations,
+  getUser,
+  getSession,
 } = vi.hoisted(() => ({
   createReceivingDocument: vi.fn(async () => ({
     data: { id: 'draft-1', document_id: 'draft-1' },
@@ -52,6 +54,17 @@ const {
     data: [{ id: 'location-1', code: 'LOC-1', name: 'Location One', label: 'LOC-1 - Location One' }],
     error: null,
   })),
+  getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
+  getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
+}));
+
+vi.mock('../../src/services/supabaseClient.js', () => ({
+  supabase: {
+    auth: {
+      getUser: (...args) => getUser(...args),
+      getSession: (...args) => getSession(...args),
+    },
+  },
 }));
 
 vi.mock('../../src/services/receivingService.js', () => ({
@@ -84,6 +97,8 @@ function renderPage() {
 describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getUser.mockResolvedValue({ data: { user: null }, error: null });
+    getSession.mockResolvedValue({ data: { session: null }, error: null });
     createReceivingDocument.mockResolvedValue({
       data: { id: 'draft-123', document_id: 'draft-123' },
       error: null,
@@ -157,6 +172,23 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
     expect(screen.getByText('DRAFT')).toBeInTheDocument();
     expect(screen.getByText('Selected customer id: customer-1')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Add Line section' })).toBeInTheDocument();
+  });
+
+  it('does not wait for auth diagnostics before creating the draft', async () => {
+    getUser.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    expect(await screen.findByRole('option', { name: 'CUST-1 - Customer One' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'customer-1' } });
+    fireEvent.change(screen.getByLabelText('Document No'), { target: { value: 'RCV-AUTH-DIAG-001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await waitFor(() => {
+      expect(createReceivingDocument).toHaveBeenCalledWith({
+        customer_id: 'customer-1',
+        document_no: 'RCV-AUTH-DIAG-001',
+      });
+    });
   });
 
   it('Save Draft disabled without customer/document no', async () => {

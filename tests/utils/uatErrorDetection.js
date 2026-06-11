@@ -1,6 +1,7 @@
 const SAFE_DIAGNOSTIC_ERROR_LINES = [
   /^Save draft RPC error:\s*None$/i,
   /^RPC error:\s*None$/i,
+  /^Supabase auth error:\s*None$/i,
 ];
 
 export function sanitizeUatBodyText(bodyText) {
