@@ -8,9 +8,13 @@ import { BillingMovementWeightTable } from '../../components/reports/BillingMove
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { getBillingMovementWeightRows } from '../../services/billingMovementWeightService.js';
-import { createBillingInvoiceDraftFromMovements } from '../../services/billingInvoiceDraftService.js';
+import {
+  createBillingInvoiceDraftFromMovements,
+  findActiveDuplicateDraftLines,
+} from '../../services/billingInvoiceDraftService.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import {
+  applyActiveDuplicateDraftGuards,
   formatInvoiceDraftError,
   getMovementDraftSelectionState,
   validateInvoiceDraftSourceRows,
@@ -58,13 +62,38 @@ export function BillingMovementWeightReportPage() {
     let isMounted = true;
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    getBillingMovementWeightRows(filters).then((result) => {
+    getBillingMovementWeightRows(filters).then(async (result) => {
       if (!isMounted) return;
 
+      if (result.error) {
+        setState({
+          rows: [],
+          loading: false,
+          error: result.error,
+          source: result.source ?? null,
+        });
+        return;
+      }
+
+      const rows = result.data ?? [];
+      const movementIds = rows.map((row) => row.movement_id).filter(Boolean);
+      const duplicateResult = await findActiveDuplicateDraftLines(movementIds);
+      if (!isMounted) return;
+
+      if (duplicateResult.error) {
+        setState({
+          rows: [],
+          loading: false,
+          error: duplicateResult.error,
+          source: result.source ?? null,
+        });
+        return;
+      }
+
       setState({
-        rows: result.data ?? [],
+        rows: applyActiveDuplicateDraftGuards(rows, duplicateResult.data ?? []),
         loading: false,
-        error: result.error ?? null,
+        error: null,
         source: result.source ?? null,
       });
     });

@@ -240,6 +240,20 @@ export function findDuplicateDraftLines(movementIds = [], activeDraftLines = [])
   return duplicates;
 }
 
+export function applyActiveDuplicateDraftGuards(rows = [], activeDraftLines = []) {
+  const guardedMovementIds = new Set(
+    (activeDraftLines ?? [])
+      .filter((line) => line?.duplicate_guard_active !== false)
+      .map((line) => String(line.source_movement_id ?? ''))
+      .filter(Boolean),
+  );
+
+  return (rows ?? []).map((row) => ({
+    ...row,
+    active_duplicate_guard: guardedMovementIds.has(String(row.movement_id ?? '')),
+  }));
+}
+
 export function canCancelBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
@@ -249,6 +263,10 @@ export function canApproveBillingInvoiceDraft(draft = {}) {
 }
 
 export function getMovementDraftSelectionState(row = {}) {
+  if (row.active_duplicate_guard) {
+    return { selectable: false, reason: 'Already linked to an active invoice draft' };
+  }
+
   if (!row.is_billable) {
     return { selectable: false, reason: 'Not billable' };
   }

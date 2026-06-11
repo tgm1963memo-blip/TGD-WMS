@@ -11,6 +11,7 @@ const {
   createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraftMock,
+  findActiveDuplicateDraftLinesMock,
   getBillingMovementWeightRowsMock,
   getCustomersMock,
   getProductsMock,
@@ -20,6 +21,7 @@ const {
   createBillingInvoiceDraftFromMovementsMock: vi.fn(),
   approveBillingInvoiceDraftMock: vi.fn(),
   cancelBillingInvoiceDraftMock: vi.fn(),
+  findActiveDuplicateDraftLinesMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
   getCustomersMock: vi.fn(),
   getProductsMock: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
   createBillingInvoiceDraftFromMovements: createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraft: approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraft: cancelBillingInvoiceDraftMock,
+  findActiveDuplicateDraftLines: findActiveDuplicateDraftLinesMock,
 }));
 
 vi.mock('../../src/services/billingMovementWeightService.js', () => ({
@@ -88,6 +91,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     createBillingInvoiceDraftFromMovementsMock.mockReset();
     approveBillingInvoiceDraftMock.mockReset();
     cancelBillingInvoiceDraftMock.mockReset();
+    findActiveDuplicateDraftLinesMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
@@ -135,6 +139,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
       error: null,
       source: 'billing_database_view',
     });
+    findActiveDuplicateDraftLinesMock.mockResolvedValue({ data: [], error: null });
   });
 
   it('creates invoice draft UI files and routes', () => {
@@ -341,6 +346,51 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
   it('marks NEEDS_WEIGHT_REVIEW rows as not selectable', () => {
     expect(getMovementDraftSelectionState(blockedMovement).selectable).toBe(false);
     expect(getMovementDraftSelectionState(validMovement).selectable).toBe(true);
+  });
+
+  it('disables guarded movement and excludes it from select-all', async () => {
+    const guardedMovement = { ...validMovement, movement_id: 'mv-guarded' };
+    const releasedMovement = { ...validMovement, movement_id: 'mv-released' };
+    getBillingMovementWeightRowsMock.mockResolvedValue({
+      data: [guardedMovement, releasedMovement],
+      error: null,
+      source: 'billing_database_view',
+    });
+    findActiveDuplicateDraftLinesMock.mockResolvedValue({
+      data: [{
+        source_movement_id: 'mv-guarded',
+        invoice_draft_id: 'draft-active',
+        line_id: 'line-active',
+      }],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
+        <Routes>
+          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const guardedCheckbox = await screen.findByRole('checkbox', { name: 'Select movement mv-guarded' });
+    const releasedCheckbox = screen.getByRole('checkbox', { name: 'Select movement mv-released' });
+    expect(guardedCheckbox).toBeDisabled();
+    expect(guardedCheckbox).toHaveAttribute('title', 'Already linked to an active invoice draft');
+    expect(releasedCheckbox).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('billing-movement-select-all-checkbox'));
+
+    expect(guardedCheckbox).not.toBeChecked();
+    expect(releasedCheckbox).toBeChecked();
+    expect(screen.getByText('Selected rows: 1')).toBeInTheDocument();
+  });
+
+  it('keeps movement selectable when duplicate guard has been released', () => {
+    expect(getMovementDraftSelectionState({
+      ...validMovement,
+      active_duplicate_guard: false,
+    })).toEqual({ selectable: true, reason: null });
   });
 
   it('does not expose forbidden Gate 3B controls in report page source', () => {

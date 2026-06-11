@@ -8,6 +8,7 @@ import {
   buildInvoiceDraftCreatePayload,
   buildInvoiceDraftLineFromMovement,
   calculateInvoiceDraftTotals,
+  applyActiveDuplicateDraftGuards,
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   findDuplicateDraftLines,
@@ -257,6 +258,21 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     ]);
 
     expect(duplicates).toHaveLength(0);
+  });
+
+  it('enriches movement rows with active duplicate guard state', () => {
+    const rows = applyActiveDuplicateDraftGuards(
+      [{ movement_id: 'mv-1' }, { movement_id: 'mv-2' }],
+      [
+        { source_movement_id: 'mv-1', duplicate_guard_active: true },
+        { source_movement_id: 'mv-2', duplicate_guard_active: false },
+      ],
+    );
+
+    expect(rows).toEqual([
+      { movement_id: 'mv-1', active_duplicate_guard: true },
+      { movement_id: 'mv-2', active_duplicate_guard: false },
+    ]);
   });
 
   it('calculates totals correctly', () => {
