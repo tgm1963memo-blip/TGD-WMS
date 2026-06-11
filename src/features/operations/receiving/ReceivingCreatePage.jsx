@@ -573,7 +573,6 @@ export function ReceivingCreatePage() {
           id="diagnostic-23v"
           data-testid="receiving-create-diagnostics"
         >
-          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23V</h4>
           <ul style={{ marginBottom: 0 }}>
             <li>Save draft clicked: {draftDiagnostics.saveDraftClicked ? 'true' : 'false'}</li>
             <li>Save draft validation passed: {draftDiagnostics.validationPassed ? 'true' : 'false'}</li>

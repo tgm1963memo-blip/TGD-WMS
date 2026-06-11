@@ -275,13 +275,6 @@ test.describe('Transaction UAT Round 1', () => {
       ];
       await clickIfVisible(page, createButtons);
       await page.waitForSelector('select[aria-label="Customer"]', { state: 'visible', timeout: 5000 }).catch(() => {});
-
-      try {
-        const diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
-        resultData.pageDiagnostics = diagText;
-      } catch (e) {
-        resultData.pageDiagnostics = "Diagnostic panel not found";
-      }
       
       const customerFields = ['select[aria-label="Customer"]'];
       const warehouseFields = ['select[aria-label="Warehouse"]'];
@@ -296,28 +289,34 @@ test.describe('Transaction UAT Round 1', () => {
       await fillIfVisible(page, docNoFields, safeDocNo);
 
       await clickIfVisible(page, ['button:has-text("Save Draft")']);
-      await page.waitForFunction(() => {
-        const diagText = document.querySelector('[data-testid="receiving-create-diagnostics"]')?.innerText || '';
-        const draftCreated = !!document.querySelector('h3:has-text("Draft Created")');
-        const draftIdText = diagText.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
-        const hasDraftId = draftIdText && draftIdText[1] !== 'None';
-        const hasDraftMissing = diagText.includes('DRAFT_ID_MISSING');
-        const hasRpcError = diagText.includes('Save draft RPC error:') && !diagText.includes('Save draft RPC error: None');
-        return draftCreated || hasDraftId || hasDraftMissing || hasRpcError;
-      }, { timeout: 10000 }).catch(() => {});
+await page.waitForFunction(() => {
+  const diagText = document.querySelector('[data-testid="receiving-create-diagnostics"]')?.innerText || '';
+  const draftCreated = !!document.querySelector('h3:has-text("Draft Created")');
+  const draftIdText = diagText.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
+  const hasDraftId = draftIdText && draftIdText[1] !== 'None';
+  const hasDraftMissing = diagText.includes('DRAFT_ID_MISSING');
+  const hasRpcError = diagText.includes('Save draft RPC error:') && !diagText.includes('Save draft RPC error: None');
+  const authMissing = diagText.includes('Supabase user success: false') || diagText.includes('Supabase session exists: false');
+  const hasAddLineDisabled = diagText.includes('Add line disabled reason: Missing document id');
+  const hasAuthRequiredRpcBlocked = diagText.includes('AUTH_REQUIRED_RPC_BLOCKED');
+  const hasRpcEmptyNoError = diagText.includes('RPC_EMPTY_RESPONSE_WITHOUT_ERROR');
+  return draftCreated || hasDraftId || hasDraftMissing || hasRpcError || authMissing || hasAddLineDisabled || hasAuthRequiredRpcBlocked || hasRpcEmptyNoError;
+}, { timeout: 10000 }).catch(() => {});
 
-      try {
-        const diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
-        resultData.pageDiagnostics = diagText;
-        const diagnosticDetection = detectUatErrors(diagText, page.url());
-        diagnosticDetection.errors.forEach((error) => accumulatedErrors.add(error));
-        diagnosticDetection.warnings.forEach((warning) => accumulatedWarnings.add(warning));
-      } catch (e) {
-        const bodyText = await page.evaluate(() => document.body.innerText);
-        resultData.pageDiagnostics = "Diagnostic panel not found";
-        resultData.runtimeDiagnostics.push(`Body excerpt: ${bodyText.substring(0, 500)}`);
-      }
-      
+// Capture diagnostics panel safely
+let diagText = '';
+try {
+  diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
+  resultData.pageDiagnostics = diagText;
+  const diagnosticDetection = detectUatErrors(diagText, page.url());
+  diagnosticDetection.errors.forEach((error) => accumulatedErrors.add(error));
+  diagnosticDetection.warnings.forEach((warning) => accumulatedWarnings.add(warning));
+} catch (e) {
+  const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
+  resultData.pageDiagnostics = 'Diagnostic panel not found';
+  resultData.runtimeDiagnostics.push(`Body excerpt: ${bodyText.substring(0, 500)}`);
+}
+
       const draftCreated = await firstVisible(page, ['h3:has-text("Draft Created")']);
       if (!draftCreated) {
          const diagText = resultData.pageDiagnostics || '';

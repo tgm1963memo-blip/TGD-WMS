@@ -1,20 +1,26 @@
-const SAFE_DIAGNOSTIC_ERROR_LINES = [
-  /^Save draft RPC error:\s*None$/i,
-  /^RPC error:\s*None$/i,
-  /^Supabase auth error:\s*None$/i,
-];
+const SAFE_NONE_ERROR_DIAGNOSTIC_LINE = /^[A-Za-z0-9 _-]+ error:\s*None$/i;
 
-export function sanitizeUatBodyText(bodyText) {
-  return String(bodyText ?? '')
+/**
+ * Remove diagnostic lines that are safe (value None) before scanning for errors.
+ * This ensures lines like "Save draft RPC error: None" are ignored.
+ */
+export function sanitizeUatBodyTextForErrorScan(bodyText = '') {
+  return String(bodyText)
     .split(/\r?\n/)
-    .filter((line) => !SAFE_DIAGNOSTIC_ERROR_LINES.some((pattern) => pattern.test(line.trim())))
+    .filter((line) => !SAFE_NONE_ERROR_DIAGNOSTIC_LINE.test(line.trim()))
     .join('\n');
+}
+
+/** Backward compatible helper used elsewhere */
+export function sanitizeUatBodyText(bodyText) {
+  return sanitizeUatBodyTextForErrorScan(bodyText);
 }
 
 export function detectUatErrors(textContent, currentUrl) {
   const errors = [];
   const warnings = [];
 
+  // Use sanitized text to avoid false positives from safe diagnostics
   let cleanText = sanitizeUatBodyText(textContent);
 
   const ignorePhrases = [
