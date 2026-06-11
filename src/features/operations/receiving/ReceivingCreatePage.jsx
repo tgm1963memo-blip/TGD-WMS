@@ -107,6 +107,7 @@ export function ReceivingCreatePage() {
     saveDraftClicked: false,
     validationPassed: false,
     rpcCalled: false,
+    rpcName: 'tgd_rpc_create_receiving_draft',
     errorMessage: '',
     rawResponseType: '',
     rawResponsePreview: '',
@@ -241,21 +242,53 @@ export function ReceivingCreatePage() {
       ...current,
       saveDraftClicked: true,
       validationPassed: true,
+      rpcCalled: true,
+      rpcName: 'tgd_rpc_create_receiving_draft',
     }));
+
+    console.info('[Receiving Save Draft] validation passed', {
+      hasCustomerId: Boolean(draftForm.customer_id),
+      hasDocumentNo: Boolean(docNo),
+    });
+    console.info('[Receiving Save Draft] rpc called', {
+      rpcName: 'tgd_rpc_create_receiving_draft',
+    });
 
     setIsSavingDraft(true);
 
-    const result = await createReceivingDocument({
-      customer_id: draftForm.customer_id,
-      document_no: docNo,
-    });
-
-    setIsSavingDraft(false);
+    let result;
+    try {
+      result = await createReceivingDocument({
+        customer_id: draftForm.customer_id,
+        document_no: docNo,
+      });
+    } catch (saveError) {
+      result = {
+        data: null,
+        error: saveError,
+        diagnostics: {
+          rpcCalled: true,
+          rpcName: 'tgd_rpc_create_receiving_draft',
+          errorMessage: saveError?.message || String(saveError),
+          rawResponseType: null,
+          rawResponsePreview: null,
+          normalizedDocumentId: null,
+        },
+      };
+    } finally {
+      setIsSavingDraft(false);
+    }
 
     setDraftDiagnostics((current) => ({
       ...current,
       ...(result?.diagnostics || {}),
     }));
+
+    console.info('[Receiving Save Draft] rpc result', {
+      rawResponseType: result?.diagnostics?.rawResponseType || null,
+      normalizedDocumentId: result?.diagnostics?.normalizedDocumentId || null,
+      hasError: Boolean(result?.diagnostics?.errorMessage),
+    });
 
     if (result?.error) {
       setError(normalizeReceivingError(result.error));
@@ -461,6 +494,7 @@ export function ReceivingCreatePage() {
           Products error:
           Warehouses error:
           Diagnostic version: 23I
+          <span id="diagnostic-23t">Diagnostic version: 23T</span>
         </div>
 
         <section
@@ -473,21 +507,22 @@ export function ReceivingCreatePage() {
             marginBottom: 18,
             padding: 16,
           }}
-          id="diagnostic-23t"
+          id="diagnostic-23u"
           data-testid="receiving-create-diagnostics"
         >
-          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23T</h4>
+          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23U</h4>
           <ul style={{ marginBottom: 0 }}>
             <li>Save draft clicked: {draftDiagnostics.saveDraftClicked ? 'true' : 'false'}</li>
             <li>Save draft validation passed: {draftDiagnostics.validationPassed ? 'true' : 'false'}</li>
             <li>Save draft RPC called: {draftDiagnostics.rpcCalled ? 'true' : 'false'}</li>
+            <li>Save draft RPC name: {draftDiagnostics.rpcName || 'None'}</li>
             <li>Save draft RPC error: {draftDiagnostics.errorMessage || 'None'}</li>
             <li>Save draft raw response type: {draftDiagnostics.rawResponseType || 'None'}</li>
             <li>Save draft raw response preview: {draftDiagnostics.rawResponsePreview || 'None'}</li>
             <li>Normalized draft id: {draftDiagnostics.normalizedDocumentId || 'None'}</li>
             <li>Draft id: {draft?.id || 'None'}</li>
-            <li>Diagnostic customer id: {draftForm.customer_id || 'None'}</li>
             <li>Document no: {draftForm.document_no || 'None'}</li>
+            <li>Customer id: {draftForm.customer_id || 'None'}</li>
             <li>lotNo present: {lineForm.lot_no ? 'true' : 'false'}</li>
             <li>selectedLotId present: {lineForm.lot_id ? 'true' : 'false'}</li>
             <li>Add line disabled reason: {addLineDisabledReason || 'None'}</li>

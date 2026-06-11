@@ -21,6 +21,12 @@ export function detectUatErrors(textContent, currentUrl) {
     cleanText = cleanText.replace(regex, '');
   }
 
+  // Diagnostic labels with an explicit empty value are status, not failures.
+  cleanText = cleanText.replace(
+    /\b(?:save draft\s+)?rpc error:\s*(?:none|null|n\/a)\b/gi,
+    '',
+  );
+
   const errorPhrases = [
     'rpc failed',
     'function not found',

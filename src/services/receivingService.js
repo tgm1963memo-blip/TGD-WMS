@@ -260,8 +260,25 @@ export async function getReceivingLocations() {
 }
 
 export async function createReceivingDocument(input) {
+  const rpcName = 'tgd_rpc_create_receiving_draft';
+  const baseDiagnostics = {
+    rpcCalled: false,
+    rpcName,
+    errorMessage: null,
+    rawResponseType: null,
+    rawResponsePreview: null,
+    normalizedDocumentId: null,
+  };
+
   if (!supabase) {
-    return missingSupabaseClientResult();
+    const result = missingSupabaseClientResult();
+    return {
+      ...result,
+      diagnostics: {
+        ...baseDiagnostics,
+        errorMessage: result.error.message,
+      },
+    };
   }
 
   if (!input?.document_no) {
@@ -269,16 +286,32 @@ export async function createReceivingDocument(input) {
       data: null,
       error: new Error('document_no is required for receiving draft creation.'),
       diagnostics: {
-        rpcCalled: false,
-        errorMessage: 'document_no is required'
-      }
+        ...baseDiagnostics,
+        errorMessage: 'document_no is required',
+      },
     };
   }
 
-  const response = await supabase.rpc('tgd_rpc_create_receiving_draft', {
-    p_customer_id: input.customer_id,
-    p_document_no: input.document_no,
-  });
+  let rpcCalled = false;
+  let response;
+
+  try {
+    rpcCalled = true;
+    response = await supabase.rpc('tgd_rpc_create_receiving_draft', {
+      p_customer_id: input.customer_id,
+      p_document_no: input.document_no,
+    });
+  } catch (error) {
+    return {
+      data: null,
+      error,
+      diagnostics: {
+        ...baseDiagnostics,
+        rpcCalled,
+        errorMessage: error?.message || String(error),
+      },
+    };
+  }
 
   const rawResponseType = response.data === null ? 'null' : Array.isArray(response.data) ? 'array' : typeof response.data;
   const rawResponsePreview = response.data ? JSON.stringify(response.data).substring(0, 50) : 'null';
@@ -287,13 +320,12 @@ export async function createReceivingDocument(input) {
     return {
       ...response,
       diagnostics: {
-        rpcCalled: true,
-        rpcName: 'tgd_rpc_create_receiving_draft',
+        ...baseDiagnostics,
+        rpcCalled,
         rawResponseType,
         rawResponsePreview,
-        normalizedDocumentId: null,
-        errorMessage: response.error.message || String(response.error)
-      }
+        errorMessage: response.error.message || String(response.error),
+      },
     };
   }
 
@@ -303,13 +335,12 @@ export async function createReceivingDocument(input) {
       data: null,
       error: new Error(`DRAFT_ID_MISSING: Could not parse document id from RPC response: ${JSON.stringify(response.data)}`),
       diagnostics: {
-        rpcCalled: true,
-        rpcName: 'tgd_rpc_create_receiving_draft',
+        ...baseDiagnostics,
+        rpcCalled,
         rawResponseType,
         rawResponsePreview,
-        normalizedDocumentId: null,
-        errorMessage: 'DRAFT_ID_MISSING'
-      }
+        errorMessage: 'DRAFT_ID_MISSING',
+      },
     };
   }
 
@@ -320,13 +351,12 @@ export async function createReceivingDocument(input) {
     },
     error: null,
     diagnostics: {
-      rpcCalled: true,
-      rpcName: 'tgd_rpc_create_receiving_draft',
+      ...baseDiagnostics,
+      rpcCalled,
       rawResponseType,
       rawResponsePreview,
       normalizedDocumentId: documentId,
-      errorMessage: null
-    }
+    },
   };
 }
 

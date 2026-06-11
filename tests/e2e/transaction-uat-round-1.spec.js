@@ -319,7 +319,8 @@ test.describe('Transaction UAT Round 1', () => {
       if (!draftCreated) {
          const diagText = resultData.pageDiagnostics || '';
          if (diagText.includes('DRAFT_ID_MISSING')) {
-           throw new Error('BLOCKED: DRAFT_ID_MISSING');
+           resultData.runtimeDiagnostics.push(`Scenario B diagnostics:\n${diagText}`);
+           throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagText}`);
          }
          const rpcErrorMatch = diagText.match(/Save draft RPC error:\s*(.*)/);
          if (rpcErrorMatch && rpcErrorMatch[1] !== 'None') {
@@ -328,11 +329,15 @@ test.describe('Transaction UAT Round 1', () => {
          const errorEl = await firstVisible(page, ['section[role="alert"]']);
          if (errorEl) {
            const errText = await errorEl.innerText();
-           if (errText.includes('DRAFT_ID_MISSING')) throw new Error('BLOCKED: DRAFT_ID_MISSING');
+           if (errText.includes('DRAFT_ID_MISSING')) {
+             resultData.runtimeDiagnostics.push(`Scenario B diagnostics:\n${diagText}`);
+             throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagText}`);
+           }
            if (errText.includes('Customer is required')) throw new Error('BLOCKED: CUSTOMER_ID_MISSING');
            throw new Error('FAIL: Save draft failed with error: ' + errText);
          }
-         throw new Error('BLOCKED: DRAFT_ID_MISSING');
+         resultData.runtimeDiagnostics.push(`Scenario B diagnostics:\n${diagText}`);
+         throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagText}`);
       }
       
 
