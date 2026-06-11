@@ -31,10 +31,10 @@ describe('Phase 23S: Transaction UAT Login Assertion and Deployment Diagnostics'
     const jsxPath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
     const content = fs.readFileSync(jsxPath, 'utf8');
 
-    expect(content).toContain('id="diagnostic-23s"');
-    expect(content).toContain('Diagnostic version: 23S');
-    expect(content).toContain('Save draft raw response shape:');
-    expect(content).toContain('Normalized draft id present:');
-    expect(content).toContain('DRAFT_ID_MISSING reason:');
+    expect(content).toContain('data-testid="receiving-create-diagnostics"');
+    expect(content).toContain('Diagnostic version: 23T');
+    expect(content).toContain('Save draft raw response type:');
+    expect(content).toContain('Normalized draft id:');
+    expect(content).toContain('Save draft RPC error:');
   });
 });

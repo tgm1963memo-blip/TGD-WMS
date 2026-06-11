@@ -25,14 +25,13 @@ describe('23J: Supabase RLS and Environment Diagnosis', () => {
     const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingCreatePage.jsx');
     const pageContent = fs.readFileSync(pagePath, 'utf8');
     
-    expect(pageContent).toContain('Diagnostic version: 23S');
-    expect(pageContent).toContain('Supabase Host: {supabaseHost}');
+    expect(pageContent).toContain('Diagnostic version: 23T');
   });
   
   it('should verify transaction-uat-round-1.spec.js captures pageDiagnostics 23J', () => {
     const testPath = path.join(process.cwd(), 'tests', 'e2e', 'transaction-uat-round-1.spec.js');
     const testContent = fs.readFileSync(testPath, 'utf8');
     
-    expect(testContent).toContain('#diagnostic-23j');
+    expect(testContent).toContain('data-testid="receiving-create-diagnostics"');
   });
 });

@@ -277,7 +277,7 @@ test.describe('Transaction UAT Round 1', () => {
       await page.waitForSelector('select[aria-label="Customer"]', { state: 'visible', timeout: 5000 }).catch(() => {});
 
       try {
-        const diagText = await page.locator('#diagnostic-23j').innerText({ timeout: 2000 });
+        const diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
         resultData.pageDiagnostics = diagText;
       } catch (e) {
         resultData.pageDiagnostics = "Diagnostic panel not found";
@@ -292,17 +292,44 @@ test.describe('Transaction UAT Round 1', () => {
       await waitForSelectOptions(page, warehouseFields);
       const warehouseVal = process.env.UAT_WAREHOUSE_NAME || process.env.UAT_WAREHOUSE_CODE;
       await fillIfVisible(page, warehouseFields, warehouseVal);
-      await fillIfVisible(page, docNoFields, 'UAT-DOC-001');
+      const safeDocNo = `UAT-DOC-${Date.now()}`;
+      await fillIfVisible(page, docNoFields, safeDocNo);
 
       await clickIfVisible(page, ['button:has-text("Save Draft")']);
-      await page.waitForSelector('select[aria-label="Product"]', { state: 'visible', timeout: 5000 }).catch(() => {});
+      await page.waitForFunction(() => {
+        const diagText = document.querySelector('[data-testid="receiving-create-diagnostics"]')?.innerText || '';
+        const draftCreated = !!document.querySelector('h3:has-text("Draft Created")');
+        const draftIdText = diagText.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
+        const hasDraftId = draftIdText && draftIdText[1] !== 'None';
+        const hasDraftMissing = diagText.includes('DRAFT_ID_MISSING');
+        const hasRpcError = diagText.includes('Save draft RPC error:') && !diagText.includes('Save draft RPC error: None');
+        return draftCreated || hasDraftId || hasDraftMissing || hasRpcError;
+      }, { timeout: 10000 }).catch(() => {});
+
+      try {
+        const diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
+        resultData.pageDiagnostics = diagText;
+      } catch (e) {
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        resultData.pageDiagnostics = "Diagnostic panel not found";
+        resultData.runtimeDiagnostics.push(`Body excerpt: ${bodyText.substring(0, 500)}`);
+      }
       
       const draftCreated = await firstVisible(page, ['h3:has-text("Draft Created")']);
       if (!draftCreated) {
+         const diagText = resultData.pageDiagnostics || '';
+         if (diagText.includes('DRAFT_ID_MISSING')) {
+           throw new Error('BLOCKED: DRAFT_ID_MISSING');
+         }
+         const rpcErrorMatch = diagText.match(/Save draft RPC error:\s*(.*)/);
+         if (rpcErrorMatch && rpcErrorMatch[1] !== 'None') {
+           throw new Error('FAIL: RPC Error: ' + rpcErrorMatch[1]);
+         }
          const errorEl = await firstVisible(page, ['section[role="alert"]']);
          if (errorEl) {
            const errText = await errorEl.innerText();
            if (errText.includes('DRAFT_ID_MISSING')) throw new Error('BLOCKED: DRAFT_ID_MISSING');
+           if (errText.includes('Customer is required')) throw new Error('BLOCKED: CUSTOMER_ID_MISSING');
            throw new Error('FAIL: Save draft failed with error: ' + errText);
          }
          throw new Error('BLOCKED: DRAFT_ID_MISSING');

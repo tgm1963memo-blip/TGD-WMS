@@ -103,7 +103,15 @@ export function ReceivingCreatePage() {
     warehousesMeta: null,
   });
   const [useManualEntry, setUseManualEntry] = useState(false);
-  const [draftDiagnostics, setDraftDiagnostics] = useState(null);
+  const [draftDiagnostics, setDraftDiagnostics] = useState({
+    saveDraftClicked: false,
+    validationPassed: false,
+    rpcCalled: false,
+    errorMessage: '',
+    rawResponseType: '',
+    rawResponsePreview: '',
+    normalizedDocumentId: '',
+  });
   const [draftForm, setDraftForm] = useState({
     customer_id: '',
     warehouse_id: '',
@@ -229,6 +237,12 @@ export function ReceivingCreatePage() {
       return;
     }
 
+    setDraftDiagnostics((current) => ({
+      ...current,
+      saveDraftClicked: true,
+      validationPassed: true,
+    }));
+
     setIsSavingDraft(true);
 
     const result = await createReceivingDocument({
@@ -238,13 +252,10 @@ export function ReceivingCreatePage() {
 
     setIsSavingDraft(false);
 
-    setDraftDiagnostics({
-      rawShape: typeof result?.data,
-      hasId: !!result?.data?.id,
-      hasDocumentId: !!result?.data?.document_id,
-      errorPresent: !!result?.error,
-      errorMessage: result?.error?.message || ''
-    });
+    setDraftDiagnostics((current) => ({
+      ...current,
+      ...(result?.diagnostics || {}),
+    }));
 
     if (result?.error) {
       setError(normalizeReceivingError(result.error));
@@ -462,28 +473,24 @@ export function ReceivingCreatePage() {
             marginBottom: 18,
             padding: 16,
           }}
-          id="diagnostic-23s"
+          id="diagnostic-23t"
+          data-testid="receiving-create-diagnostics"
         >
-          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23S</h4>
+          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23T</h4>
           <ul style={{ marginBottom: 0 }}>
-            <li>Products loader called: {masterState.productsMeta?.called ? 'true' : 'false'}</li>
-            <li>Warehouses loader called: {masterState.warehousesMeta?.called ? 'true' : 'false'}</li>
-            <li>Raw products returned count: {masterState.productsMeta?.rawCount ?? 0}</li>
-            <li>Raw warehouses returned count: {masterState.warehousesMeta?.rawCount ?? 0}</li>
-            <li>Products after filter count: {masterState.productsMeta?.filteredCount ?? 0}</li>
-            <li>Warehouses after filter count: {masterState.warehousesMeta?.filteredCount ?? 0}</li>
-            <li>Supabase Host: {supabaseHost}</li>
+            <li>Save draft clicked: {draftDiagnostics.saveDraftClicked ? 'true' : 'false'}</li>
+            <li>Save draft validation passed: {draftDiagnostics.validationPassed ? 'true' : 'false'}</li>
+            <li>Save draft RPC called: {draftDiagnostics.rpcCalled ? 'true' : 'false'}</li>
+            <li>Save draft RPC error: {draftDiagnostics.errorMessage || 'None'}</li>
+            <li>Save draft raw response type: {draftDiagnostics.rawResponseType || 'None'}</li>
+            <li>Save draft raw response preview: {draftDiagnostics.rawResponsePreview || 'None'}</li>
+            <li>Normalized draft id: {draftDiagnostics.normalizedDocumentId || 'None'}</li>
             <li>Draft id: {draft?.id || 'None'}</li>
+            <li>Diagnostic customer id: {draftForm.customer_id || 'None'}</li>
+            <li>Document no: {draftForm.document_no || 'None'}</li>
             <li>lotNo present: {lineForm.lot_no ? 'true' : 'false'}</li>
             <li>selectedLotId present: {lineForm.lot_id ? 'true' : 'false'}</li>
             <li>Add line disabled reason: {addLineDisabledReason || 'None'}</li>
-            {draftDiagnostics && (
-              <>
-                <li>Save draft raw response shape: {draftDiagnostics.rawShape}</li>
-                <li>Normalized draft id present: {draftDiagnostics.hasId || draftDiagnostics.hasDocumentId ? 'true' : 'false'}</li>
-                <li>DRAFT_ID_MISSING reason: {draftDiagnostics.errorPresent ? draftDiagnostics.errorMessage : 'None'}</li>
-              </>
-            )}
             {masterState.productsError && <li>Products error message: {masterState.productsError.message || String(masterState.productsError)}</li>}
             {masterState.warehousesError && <li>Warehouses error message: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
           </ul>
