@@ -10,6 +10,9 @@ dist/
 # Supabase CLI temp cache
 supabase/.temp/
 
+# Local UAT seed execution artifacts
+database/seeds/.temp_*.sql
+
 # Playwright / UAT generated artifacts
 test-results/
 playwright-report/

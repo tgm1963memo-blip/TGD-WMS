@@ -17,6 +17,7 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
+import { evaluateInvoiceDraftBplusExportReadiness } from '../utils/billingInvoiceDraftBplusExportUtils.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -388,6 +389,43 @@ export async function updateBillingInvoiceDraftMeta({
 
   return {
     data: shapeBillingInvoiceDraftHeader(result.data),
+    error: null,
+  };
+}
+
+export async function getBillingInvoiceDraftBplusExportReadiness(draftId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!draftId) {
+    return { data: null, error: validationError('Invoice draft id is required.') };
+  }
+
+  const existing = await getBillingInvoiceDraftById(draftId);
+  if (existing.error) {
+    return { data: null, error: existing.error };
+  }
+
+  let customer = null;
+  const customerId = existing.data.draft.customer_id;
+  if (customerId) {
+    const customerResult = await supabase
+      .from('tgd_customers')
+      .select('id, customer_code, customer_name')
+      .eq('id', customerId)
+      .maybeSingle();
+
+    if (customerResult.error) {
+      return { data: null, error: customerResult.error };
+    }
+
+    customer = customerResult.data;
+  }
+
+  return {
+    data: evaluateInvoiceDraftBplusExportReadiness({
+      draft: existing.data.draft,
+      lines: existing.data.lines,
+      customer,
+    }),
     error: null,
   };
 }

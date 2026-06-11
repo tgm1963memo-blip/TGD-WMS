@@ -43,6 +43,7 @@ const {
   createBillingInvoiceDraftFromMovements,
   findActiveDuplicateDraftLines,
   getBillingInvoiceDraftById,
+  getBillingInvoiceDraftBplusExportReadiness,
   listBillingInvoiceDrafts,
 } = await import('../../src/services/billingInvoiceDraftService.js');
 
@@ -548,5 +549,68 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(utilsSource).toContain('BILLED');
     expect(ACTIVE_INVOICE_DRAFT_STATUSES).toContain('APPROVED');
     expect(ACTIVE_INVOICE_DRAFT_STATUSES).not.toContain('CANCELLED');
+  });
+
+  it('returns Bplus export readiness preview without mutating draft status', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260611-0002',
+      customer_id: 'cust-1',
+      customer_name: 'Alpha',
+      status: 'APPROVED',
+      billing_period_start: '2026-06-01',
+      billing_period_end: '2026-06-30',
+      total_chargeable_weight: 250,
+      total_amount: 5000,
+      currency: 'THB',
+      updated_at: '2026-06-11T10:00:00.000Z',
+    };
+    const updateMock = vi.fn();
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        const chain = createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+        });
+        chain.update = updateMock;
+        return chain;
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({
+            data: [{
+              product_code: 'FSHR-001',
+              product_name: 'Frozen Shrimp',
+              movement_type: 'RECEIVE_CONFIRM',
+              chargeable_weight: 250,
+              rate: 20,
+              amount: 5000,
+              qty: 50,
+              uom: 'kg',
+            }],
+            error: null,
+          }),
+        });
+      }
+
+      if (tableName === 'tgd_customers') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({
+            data: { id: 'cust-1', customer_code: 'ALPHA-001', customer_name: 'Alpha' },
+            error: null,
+          }),
+        });
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await getBillingInvoiceDraftBplusExportReadiness('draft-1');
+
+    expect(result.error).toBeNull();
+    expect(result.data.readiness_status).toBe('READY');
+    expect(result.data.header_preview.customer_code).toBe('ALPHA-001');
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

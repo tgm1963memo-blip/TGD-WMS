@@ -7,10 +7,12 @@ import { InvoiceDraftLinesTable } from '../../components/billing/InvoiceDraftLin
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
+import { InvoiceDraftBplusReadinessPanel } from '../../components/billing/InvoiceDraftBplusReadinessPanel.jsx';
 import {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
   getBillingInvoiceDraftById,
+  getBillingInvoiceDraftBplusExportReadiness,
 } from '../../services/billingInvoiceDraftService.js';
 import {
   canApproveBillingInvoiceDraft,
@@ -38,6 +40,9 @@ export function InvoiceDraftDetailPage() {
   const [approveError, setApproveError] = useState(null);
   const [approveSuccess, setApproveSuccess] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [readiness, setReadiness] = useState(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+  const [readinessError, setReadinessError] = useState(null);
 
   async function loadDraft() {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -130,6 +135,26 @@ export function InvoiceDraftDetailPage() {
 
     await loadDraft();
     setApproveSuccess(true);
+    setReadiness(null);
+    setReadinessError(null);
+  }
+
+  async function handlePreviewBplusReadiness() {
+    if (!state.draft) return;
+
+    setReadinessLoading(true);
+    setReadinessError(null);
+
+    const result = await getBillingInvoiceDraftBplusExportReadiness(state.draft.id);
+    setReadinessLoading(false);
+
+    if (result.error) {
+      setReadinessError(result.error);
+      setReadiness(null);
+      return;
+    }
+
+    setReadiness(result.data ?? null);
   }
 
   if (state.loading) {
@@ -247,11 +272,19 @@ export function InvoiceDraftDetailPage() {
         <InvoiceDraftLinesTable lines={state.lines} />
       </DashboardSection>
 
+      <InvoiceDraftBplusReadinessPanel
+        draft={draft}
+        readiness={readiness}
+        loading={readinessLoading}
+        error={readinessError}
+        onPreview={handlePreviewBplusReadiness}
+      />
+
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, marginTop: 16 }}>
-        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-3 boundary</h3>
+        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-4 boundary</h3>
         <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <li>Review and approve invoice drafts only</li>
-          <li>No Bplus export UI</li>
+          <li>Bplus export readiness preview only</li>
+          <li>No executable Export Bplus action</li>
           <li>No Mark BILLED</li>
           <li>No tax invoice / AR module</li>
         </ul>

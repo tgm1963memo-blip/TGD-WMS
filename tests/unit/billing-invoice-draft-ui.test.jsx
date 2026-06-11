@@ -11,6 +11,7 @@ const {
   createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraftMock,
+  getBillingInvoiceDraftBplusExportReadinessMock,
   findActiveDuplicateDraftLinesMock,
   getBillingMovementWeightRowsMock,
   getCustomersMock,
@@ -21,6 +22,7 @@ const {
   createBillingInvoiceDraftFromMovementsMock: vi.fn(),
   approveBillingInvoiceDraftMock: vi.fn(),
   cancelBillingInvoiceDraftMock: vi.fn(),
+  getBillingInvoiceDraftBplusExportReadinessMock: vi.fn(),
   findActiveDuplicateDraftLinesMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
   getCustomersMock: vi.fn(),
@@ -33,6 +35,7 @@ vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
   createBillingInvoiceDraftFromMovements: createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraft: approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraft: cancelBillingInvoiceDraftMock,
+  getBillingInvoiceDraftBplusExportReadiness: getBillingInvoiceDraftBplusExportReadinessMock,
   findActiveDuplicateDraftLines: findActiveDuplicateDraftLinesMock,
 }));
 
@@ -91,6 +94,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     createBillingInvoiceDraftFromMovementsMock.mockReset();
     approveBillingInvoiceDraftMock.mockReset();
     cancelBillingInvoiceDraftMock.mockReset();
+    getBillingInvoiceDraftBplusExportReadinessMock.mockReset();
     findActiveDuplicateDraftLinesMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
     getCustomersMock.mockReset();
@@ -409,8 +413,147 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     expect(detailSource).toContain('invoice-draft-approve-button');
     expect(detailSource).toContain('invoice-draft-approve-success-alert');
     expect(detailSource).toContain('invoice-draft-approve-error-alert');
+    expect(detailSource).toContain('InvoiceDraftBplusReadinessPanel');
+    expect(detailSource).toContain('getBillingInvoiceDraftBplusExportReadiness');
+    const panelSource = readProjectFile('src/components/billing/InvoiceDraftBplusReadinessPanel.jsx');
+    expect(panelSource).toContain('invoice-draft-bplus-readiness-panel');
+    expect(panelSource).toContain('invoice-draft-bplus-preview-button');
     expect(detailSource).not.toContain('export-bplus-button');
     expect(detailSource).not.toContain('mark-billed-button');
     expect(detailSource).not.toContain('bplus-invoice-no-input');
+  });
+});
+
+describe('Gate 3B-4 billing invoice draft Bplus readiness UI', () => {
+  beforeEach(() => {
+    getBillingInvoiceDraftByIdMock.mockResolvedValue({
+      data: {
+        draft: {
+          id: 'draft-1',
+          draft_no: 'BID-20260611-0002',
+          customer_name: 'Alpha',
+          status: 'APPROVED',
+          total_qty: 50,
+          total_chargeable_weight: 250,
+          total_amount: 5000,
+          currency: 'THB',
+        },
+        lines: [{
+          product_code: 'FSHR-001',
+          product_name: 'Frozen Shrimp',
+          movement_type: 'RECEIVE_CONFIRM',
+          chargeable_weight: 250,
+          rate: 20,
+          amount: 5000,
+          qty: 50,
+          uom: 'kg',
+        }],
+      },
+      error: null,
+    });
+    getBillingInvoiceDraftBplusExportReadinessMock.mockResolvedValue({
+      data: {
+        readiness_status: 'READY',
+        ready: true,
+        blockers: [],
+        warnings: ['Bplus import file format is pending confirmation from accounting.'],
+        header_preview: {
+          draft_no: 'BID-20260611-0002',
+          customer_name: 'Alpha',
+          customer_code: 'ALPHA-001',
+          billing_period: '2026-06',
+          total_chargeable_weight: 250,
+          total_amount: 5000,
+          currency: 'THB',
+          status: 'APPROVED',
+        },
+        line_previews: [{
+          product_code: 'FSHR-001',
+          product_name: 'Frozen Shrimp',
+          movement_type: 'RECEIVE_CONFIRM',
+          chargeable_weight: 250,
+          rate: 20,
+          amount: 5000,
+          qty: 50,
+          uom: 'kg',
+          bplus_service_code: 'INBOUND_HANDLING',
+          line_warnings: [],
+        }],
+      },
+      error: null,
+    });
+  });
+
+  it('renders readiness panel and preview button on approved draft detail', async () => {
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('invoice-draft-bplus-readiness-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-bplus-preview-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('export-bplus-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mark-billed-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bplus-invoice-no-input')).not.toBeInTheDocument();
+  });
+
+  it('loads readiness preview and shows badge, checklist, and preview table', async () => {
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('invoice-draft-bplus-preview-button'));
+
+    await waitFor(() => {
+      expect(getBillingInvoiceDraftBplusExportReadinessMock).toHaveBeenCalledWith('draft-1');
+    });
+
+    expect(await screen.findByTestId('invoice-draft-bplus-readiness-badge')).toHaveTextContent('READY');
+    expect(screen.getByTestId('invoice-draft-bplus-readiness-checklist')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-bplus-readiness-warnings')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-bplus-export-preview-table')).toBeInTheDocument();
+    expect(screen.getByText('FSHR-001')).toBeInTheDocument();
+  });
+
+  it('shows post-approve message when draft is not approved yet', async () => {
+    getBillingInvoiceDraftByIdMock.mockResolvedValue({
+      data: {
+        draft: {
+          id: 'draft-1',
+          draft_no: 'BID-20260608-0001',
+          customer_name: 'Alpha',
+          status: 'DRAFT',
+          total_qty: 10,
+          total_chargeable_weight: 100,
+          currency: 'THB',
+        },
+        lines: [],
+      },
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('invoice-draft-bplus-readiness-panel')).toBeInTheDocument();
+    expect(screen.getByText(/available after the draft is approved/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('invoice-draft-bplus-preview-button')).not.toBeInTheDocument();
+  });
+
+  it('updates list page guidance copy for Gate 3B-4', async () => {
+    render(<MemoryRouter><InvoiceDraftListPage /></MemoryRouter>);
+    expect(await screen.findByText(/Export to Bplus is not enabled yet/i)).toBeInTheDocument();
   });
 });

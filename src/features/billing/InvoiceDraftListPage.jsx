@@ -62,9 +62,9 @@ export function InvoiceDraftListPage() {
       />
 
       <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
-        <strong>Gate 3B-2 UI Only</strong>
+        <strong>Gate 3B-4 Readiness Preview</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14 }}>
-          Create, list, and cancel invoice drafts only. No approve, no Bplus export, no Mark BILLED.
+          Invoice drafts can be reviewed and approved from the detail page. Export to Bplus is not enabled yet.
         </p>
       </div>
 
