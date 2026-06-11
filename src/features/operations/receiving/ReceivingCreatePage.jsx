@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
 import { hasRoleAccess } from '../../../security/permissionGuard.js';
+import { supabase } from '../../../services/supabaseClient.js';
+import { getUatRoleOverride } from '../../../security/uatRoleOverride.js';
 import {
   addReceivingLine,
   createReceivingDocument,
@@ -112,6 +114,13 @@ export function ReceivingCreatePage() {
     rawResponseType: '',
     rawResponsePreview: '',
     normalizedDocumentId: '',
+    // New auth diagnostics
+    supabaseUserSuccess: false,
+    supabaseSessionExists: false,
+    supabaseUserId: null,
+    supabaseUserEmailMasked: null,
+    supabaseAuthErrorMessage: null,
+    uatRoleOverrideActive: false,
   });
   const [draftForm, setDraftForm] = useState({
     customer_id: '',
@@ -219,11 +228,53 @@ export function ReceivingCreatePage() {
     setLineForm((current) => ({ ...current, [field]: value }));
   };
 
+  const maskEmail = (email) => {
+    if (!email) return null;
+    const [local, domain] = email.split('@');
+    if (!domain) return email;
+    const prefix = local.slice(0, 3);
+    return `${prefix}...@${domain}`;
+  };
+
   const handleSaveDraft = async (event) => {
     event.preventDefault();
     setError('');
     setMessage('');
     
+    // Auth diagnostics
+    let authSuccess = false;
+    let sessionExists = false;
+    let userId = null;
+    let userEmailMasked = null;
+    let authErrorMessage = null;
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        authErrorMessage = userError.message;
+      } else if (userData?.user) {
+        authSuccess = true;
+        userId = userData.user.id;
+        userEmailMasked = maskEmail(userData.user.email);
+      }
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (!sessionError && sessionData?.session) {
+        sessionExists = true;
+      }
+    } catch (e) {
+      authErrorMessage = e.message || String(e);
+    }
+    const uatOverrideActive = Boolean(getUatRoleOverride());
+
+    setDraftDiagnostics((current) => ({
+      ...current,
+      supabaseUserSuccess: authSuccess,
+      supabaseSessionExists: sessionExists,
+      supabaseUserId: userId,
+      supabaseUserEmailMasked: userEmailMasked,
+      supabaseAuthErrorMessage: authErrorMessage,
+      uatRoleOverrideActive: uatOverrideActive,
+    }));
+
     const docNo = draftForm.document_no.trim();
     if (!draftForm.customer_id) {
       setError('Customer is required.');
@@ -521,6 +572,12 @@ export function ReceivingCreatePage() {
             <li>Save draft raw response type: {draftDiagnostics.rawResponseType || 'None'}</li>
             <li>Save draft raw response preview: {draftDiagnostics.rawResponsePreview || 'None'}</li>
             <li>Normalized draft id: {draftDiagnostics.normalizedDocumentId || 'None'}</li>
+            <li>Supabase user success: {draftDiagnostics.supabaseUserSuccess ? 'true' : 'false'}</li>
+            <li>Supabase session exists: {draftDiagnostics.supabaseSessionExists ? 'true' : 'false'}</li>
+            <li>Supabase user id: {draftDiagnostics.supabaseUserId || 'None'}</li>
+            <li>Supabase user email: {draftDiagnostics.supabaseUserEmailMasked || 'None'}</li>
+            <li>Supabase auth error: {draftDiagnostics.supabaseAuthErrorMessage || 'None'}</li>
+            <li>UAT role override active: {draftDiagnostics.uatRoleOverrideActive ? 'true' : 'false'}</li>
             <li>Draft id: {draft?.id || 'None'}</li>
             <li>Document no: {draftForm.document_no || 'None'}</li>
             <li>Customer id: {draftForm.customer_id || 'None'}</li>
