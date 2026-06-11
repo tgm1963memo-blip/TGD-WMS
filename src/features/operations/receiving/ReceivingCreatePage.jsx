@@ -27,33 +27,6 @@ try {
   supabaseHost = 'Invalid URL format';
 }
 
-const fieldStyle = {
-  display: 'grid',
-  gap: 6,
-};
-
-const inputStyle = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  fontSize: 14,
-  padding: '10px 12px',
-};
-
-const cardStyle = {
-  background: '#ffffff',
-  border: '1px solid #d9e2ec',
-  borderRadius: 8,
-  marginBottom: 18,
-  padding: 16,
-};
-
-const helperStyle = {
-  color: '#64748b',
-  fontSize: 12,
-};
-
-
-
 function getCreatedLineId(result) {
   if (!result?.data) return '';
   if (typeof result.data === 'string') return result.data;
@@ -495,27 +468,24 @@ export function ReceivingCreatePage() {
 
   return (
     <div className="page-shell">
-      <PageHeader title="Create Receiving Draft" description="Controlled receiving draft creation." />
+      <PageHeader
+        title="Create Receiving Draft"
+        description="Controlled receiving draft creation."
+        actions={<span className="status-badge status-badge--uat">UAT Mode</span>}
+      />
+
+      <div className="uat-banner" role="status">
+        Controlled UAT only · Production remains HOLD · FINAL GO is NOT AUTHORIZED
+      </div>
 
       {!canWrite ? (
-        <section role="alert" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: 16, borderRadius: 8, marginBottom: 18 }}>
+        <section className="alert-error-panel" role="alert">
           Permission denied: Your role ({userRole}) does not have permission to create receiving drafts.
         </section>
       ) : (
         <>
-          <section
-        className="warning-panel"
-        role="status"
-        style={{
-          background: '#fffbeb',
-          border: '1px solid #fde68a',
-          borderRadius: 8,
-          color: '#92400e',
-          marginBottom: 18,
-          padding: 16,
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Controlled receiving draft mode</h3>
+          <section className="warning-panel" role="status">
+        <h3>Controlled receiving draft mode</h3>
         <ul style={{ marginBottom: 0 }}>
           <li>Staging controlled unlock only</li>
           <li>Save Draft uses receiving RPC only</li>
@@ -526,20 +496,20 @@ export function ReceivingCreatePage() {
       </section>
 
       {error ? (
-        <section role="alert" style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
+        <section className="alert-error-panel" role="alert">
           {error}
         </section>
       ) : null}
 
       {message ? (
-        <section role="status" style={{ ...cardStyle, borderColor: '#bbf7d0', color: '#166534' }}>
+        <section className="alert-success-panel" role="status">
           {message}
         </section>
       ) : null}
 
-      <section style={cardStyle}>
-        <strong>Master lookup mode</strong>
-        <p style={{ color: '#475569', marginBottom: 10 }}>
+      <section className="form-card">
+        <h3 className="form-card-title">Master lookup mode</h3>
+        <p className="form-helper" style={{ marginBottom: 10 }}>
           {masterState.loading ? 'Loading receiving master pickers...' : 'Use read-only master pickers for receiving IDs.'}
         </p>
         {masterState.error ? (
@@ -561,19 +531,12 @@ export function ReceivingCreatePage() {
         </div>
 
         <section
-          className="diagnostic-panel"
-          style={{
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: 8,
-            color: '#0369a1',
-            marginBottom: 18,
-            padding: 16,
-          }}
+          className="diagnostic-panel uat-diagnostics-card"
           id="diagnostic-23v"
           data-testid="receiving-create-diagnostics"
         >
-          <ul style={{ marginBottom: 0 }}>
+          <h4>Developer / UAT Diagnostics</h4>
+          <ul>
             <li>Save draft clicked: {draftDiagnostics.saveDraftClicked ? 'true' : 'false'}</li>
             <li>Save draft validation passed: {draftDiagnostics.validationPassed ? 'true' : 'false'}</li>
             <li>Save draft RPC called: {draftDiagnostics.rpcCalled ? 'true' : 'false'}</li>
@@ -609,28 +572,22 @@ export function ReceivingCreatePage() {
         </label>
       </section>
 
-      <form onSubmit={handleSaveDraft} style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Save Draft</h3>
-        <div
-          style={{
-            display: 'grid',
-            gap: 12,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          }}
-        >
-          <label style={fieldStyle}>
-            Customer
+      <form className="form-card" onSubmit={handleSaveDraft}>
+        <h3 className="form-card-title">Save Draft</h3>
+        <div className="form-grid">
+          <label className="form-field">
+            <span className="form-label">Customer</span>
             {useManualEntry ? (
               <input
                 aria-label="Customer ID"
-                style={inputStyle}
+                className="form-control"
                 value={draftForm.customer_id}
                 onChange={(event) => updateDraftField('customer_id', event.target.value)}
               />
             ) : (
               <select
                 aria-label="Customer"
-                style={inputStyle}
+                className="form-control"
                 value={draftForm.customer_id}
                 onChange={(event) => updateDraftField('customer_id', event.target.value)}
               >
@@ -640,21 +597,21 @@ export function ReceivingCreatePage() {
                 ))}
               </select>
             )}
-            <span style={helperStyle}>Selected customer id: {draftForm.customer_id || 'None'}</span>
+            <span className="form-helper">Selected customer id: {draftForm.customer_id || 'None'}</span>
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Warehouse
             {useManualEntry ? (
               <input
                 aria-label="Warehouse ID"
-                style={inputStyle}
+                className="form-control"
                 value={draftForm.warehouse_id}
                 onChange={(event) => updateDraftField('warehouse_id', event.target.value)}
               />
             ) : (
               <select
                 aria-label="Warehouse"
-                style={inputStyle}
+                className="form-control"
                 value={draftForm.warehouse_id}
                 onChange={(event) => updateDraftField('warehouse_id', event.target.value)}
               >
@@ -664,38 +621,25 @@ export function ReceivingCreatePage() {
                 ))}
               </select>
             )}
-            <span style={helperStyle}>Selected warehouse id: {draftForm.warehouse_id || 'None'}</span>
+            <span className="form-helper">Selected warehouse id: {draftForm.warehouse_id || 'None'}</span>
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Document No
             <input
               aria-label="Document No"
-              style={inputStyle}
+              className="form-control"
               value={draftForm.document_no}
               onChange={(event) => updateDraftField('document_no', event.target.value)}
             />
           </label>
         </div>
-        <button
-          type="submit"
-          disabled={!canSaveDraft}
-          style={{
-            background: canSaveDraft ? '#0f766e' : '#94a3b8',
-            border: 0,
-            borderRadius: 8,
-            color: '#ffffff',
-            cursor: canSaveDraft ? 'pointer' : 'not-allowed',
-            marginTop: 16,
-            minHeight: 42,
-            padding: '10px 16px',
-          }}
-        >
+        <button className="btn-primary action-row" disabled={!canSaveDraft} style={{ marginTop: 16 }} type="submit">
           {isSavingDraft ? 'Saving draft...' : 'Save Draft'}
         </button>
       </form>
 
       {draft ? (
-        <section style={cardStyle}>
+        <section className="form-card">
           <h3 style={{ marginTop: 0 }}>Draft Created</h3>
           <dl
             style={{
@@ -715,29 +659,23 @@ export function ReceivingCreatePage() {
         </section>
       ) : null}
 
-      <form onSubmit={handleAddLine} style={cardStyle}>
+      <form onSubmit={handleAddLine} className="form-card">
         <h3 style={{ marginTop: 0 }}>Add Line section</h3>
         <p style={{ color: '#475569', marginTop: 0 }}>Add Line requires: {addLineDisabledReason || 'All valid'}</p>
-        <div
-          style={{
-            display: 'grid',
-            gap: 12,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          }}
-        >
-          <label style={fieldStyle}>
+        <div className="form-grid">
+          <label className="form-field">
             Product
             {useManualEntry ? (
               <input
                 aria-label="Product ID"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.product_id}
                 onChange={(event) => updateLineField('product_id', event.target.value)}
               />
             ) : (
               <select
                 aria-label="Product"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.product_id}
                 onChange={(event) => updateLineField('product_id', event.target.value)}
               >
@@ -747,31 +685,31 @@ export function ReceivingCreatePage() {
                 ))}
               </select>
             )}
-            <span style={helperStyle}>Selected product id: {lineForm.product_id || 'None'}</span>
+            <span className="form-helper">Selected product id: {lineForm.product_id || 'None'}</span>
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Lot No
             <input
               aria-label="Lot No"
-              style={inputStyle}
+              className="form-control"
               value={lineForm.lot_no}
               onChange={(event) => updateLineField('lot_no', event.target.value)}
               placeholder="New lot no"
             />
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Lot
             {useManualEntry ? (
               <input
                 aria-label="Lot ID"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.lot_id}
                 onChange={(event) => updateLineField('lot_id', event.target.value)}
               />
             ) : (
               <select
                 aria-label="Lot"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.lot_id}
                 onChange={(event) => updateLineField('lot_id', event.target.value)}
               >
@@ -781,30 +719,30 @@ export function ReceivingCreatePage() {
                 ))}
               </select>
             )}
-            <span style={helperStyle}>Selected lot id: {lineForm.lot_id || 'None'}</span>
+            <span className="form-helper">Selected lot id: {lineForm.lot_id || 'None'}</span>
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Pallet No
             <input
               aria-label="Pallet No"
-              style={inputStyle}
+              className="form-control"
               value={lineForm.pallet_no}
               onChange={(event) => updateLineField('pallet_no', event.target.value)}
             />
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Location
             {useManualEntry ? (
               <input
                 aria-label="Location ID"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.location_id}
                 onChange={(event) => updateLineField('location_id', event.target.value)}
               />
             ) : (
               <select
                 aria-label="Location"
-                style={inputStyle}
+                className="form-control"
                 value={lineForm.location_id}
                 onChange={(event) => updateLineField('location_id', event.target.value)}
               >
@@ -814,62 +752,50 @@ export function ReceivingCreatePage() {
                 ))}
               </select>
             )}
-            <span style={helperStyle}>Selected location id: {lineForm.location_id || 'None'}</span>
+            <span className="form-helper">Selected location id: {lineForm.location_id || 'None'}</span>
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Quantity
             <input
               aria-label="Quantity"
               min="0"
               step="any"
-              style={inputStyle}
+              className="form-control"
               type="number"
               value={lineForm.quantity}
               onChange={(event) => updateLineField('quantity', event.target.value)}
             />
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             UOM
             <input
               aria-label="UOM"
-              style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }}
-              value={uomDisplay}
+              className="form-control"
               readOnly
+              style={{ background: '#f8fafc', color: '#64748b' }}
+              value={uomDisplay}
             />
           </label>
-          <label style={fieldStyle}>
+          <label className="form-field">
             Weight
             <input
               aria-label="Weight"
               min="0"
               step="any"
-              style={inputStyle}
+              className="form-control"
               type="number"
               value={lineForm.weight}
               onChange={(event) => updateLineField('weight', event.target.value)}
             />
           </label>
         </div>
-        <button
-          type="submit"
-          disabled={!canAddLine}
-          style={{
-            background: canAddLine ? '#1d4ed8' : '#94a3b8',
-            border: 0,
-            borderRadius: 8,
-            color: '#ffffff',
-            cursor: canAddLine ? 'pointer' : 'not-allowed',
-            marginTop: 16,
-            minHeight: 42,
-            padding: '10px 16px',
-          }}
-        >
+        <button className="btn-accent" disabled={!canAddLine} style={{ marginTop: 16 }} type="submit">
           {isAddingLine ? 'Adding line...' : 'Add Line'}
         </button>
         {lastLineId ? <p>Last receiving line id: {lastLineId}</p> : null}
       </form>
 
-      <section style={{ ...cardStyle, borderColor: '#fed7aa', color: '#9a3412' }}>
+      <section className="form-card warning-panel">
         <strong>Controlled Confirm/Post</strong>
         <p style={{ marginBottom: 0 }}>
           Confirm/Post is available only after a draft exists. The action uses the receiving post RPC only and
@@ -877,19 +803,11 @@ export function ReceivingCreatePage() {
         </p>
         {draft ? (
           <button
-            type="button"
+            className="btn-primary"
             disabled={!draft?.id || isPosting || postSucceeded}
             onClick={handleConfirmPost}
-            style={{
-              background: postSucceeded ? '#94a3b8' : '#b45309',
-              border: 0,
-              borderRadius: 8,
-              color: '#ffffff',
-              cursor: !draft?.id || isPosting || postSucceeded ? 'not-allowed' : 'pointer',
-              marginTop: 16,
-              minHeight: 42,
-              padding: '10px 16px',
-            }}
+            style={{ marginTop: 16 }}
+            type="button"
           >
             {isPosting ? 'Posting receiving...' : 'Confirm/Post Receiving'}
           </button>

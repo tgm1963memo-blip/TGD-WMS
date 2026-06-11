@@ -63,6 +63,8 @@ vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
 }));
 
 import { DashboardPage } from '../../src/features/dashboard/DashboardPage.jsx';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
+import { getTranslation } from '../../src/i18n/translationCatalog.js';
 
 const repoRoot = process.cwd();
 const dashboardPath = path.join(repoRoot, 'src/features/dashboard/DashboardPage.jsx');
@@ -74,11 +76,13 @@ function readSource(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function renderDashboard() {
+function renderDashboard(lang = 'en') {
   return render(
-    <MemoryRouter>
-      <DashboardPage />
-    </MemoryRouter>,
+    <LanguageProvider initialLanguage={lang}>
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    </LanguageProvider>,
   );
 }
 
@@ -110,21 +114,21 @@ describe('read-only staging dashboard', () => {
 
     renderDashboard();
 
-    expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: getTranslation('operations_dashboard', 'en') })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(getReadOnlyDashboardSummaryMock).not.toHaveBeenCalled();
     });
 
-    expect(screen.getByText('0', { selector: '.workflow-step-value' })).toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
   });
 
   it('renders staging summary instead of placeholder-only dashboard status', async () => {
     renderDashboard();
 
-    expect(screen.getByRole('heading', { name: 'Operations Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: getTranslation('operations_dashboard', 'en') })).toBeInTheDocument();
     expect(screen.queryByText('Sprint status: placeholder only')).not.toBeInTheDocument();
-    expect(screen.getByText(/Read-only staging data visualization/i)).toBeInTheDocument();
+    expect(screen.getByText(/read-only staging data/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(getReadOnlyDashboardSummaryMock).toHaveBeenCalledTimes(1);

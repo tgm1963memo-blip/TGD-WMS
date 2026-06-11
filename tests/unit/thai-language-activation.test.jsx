@@ -92,8 +92,9 @@ describe('Thai language activation', () => {
       </LanguageProvider>
     );
 
-    expect(screen.getByLabelText('Current language')).toHaveTextContent('ไทย');
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current language')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thai' })).toHaveTextContent('TH');
+    expect(screen.getByRole('button', { name: /Toggle language/i })).toHaveTextContent('EN');
   });
 
   it('switches to English and back to Thai', () => {
@@ -107,11 +108,11 @@ describe('Thai language activation', () => {
 
     expect(screen.getByTestId('reports-label')).toHaveTextContent(getTranslation('reports', 'th'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle language' }));
+    fireEvent.click(screen.getByRole('button', { name: /Toggle language/i }));
     expect(screen.getByTestId('current-language')).toHaveTextContent('en');
     expect(screen.getByTestId('reports-label')).toHaveTextContent('Reports');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle language' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Thai' }));
     expect(screen.getByTestId('current-language')).toHaveTextContent('th');
     expect(screen.getByTestId('reports-label')).toHaveTextContent(getTranslation('reports', 'th'));
   });

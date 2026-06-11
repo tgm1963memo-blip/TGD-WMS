@@ -117,13 +117,13 @@ describe('LanguageToggle placement and function', () => {
   test('toggle appears in ReportsPage header and switches language', () => {
     setDemoUserRole('admin');
     renderWithLanguage(<ReportsPage />, { lang: 'th' });
-    const toggle = screen.getByRole('button', { name: /Toggle language/i });
-    expect(toggle).toBeInTheDocument();
-    // button shows English label when current language is Thai
-    expect(toggle).toHaveTextContent('English');
-    fireEvent.click(toggle);
-    // After click, language should be English; button now shows Thai label
-    expect(toggle).toHaveTextContent('ไทย');
+    const thaiButton = screen.getByRole('button', { name: 'Thai' });
+    const englishButton = screen.getByRole('button', { name: /Toggle language/i });
+    expect(thaiButton).toHaveAttribute('aria-pressed', 'true');
+    expect(englishButton).toHaveTextContent('EN');
+    fireEvent.click(englishButton);
+    expect(englishButton).toHaveAttribute('aria-pressed', 'true');
+    expect(thaiButton).toHaveAttribute('aria-pressed', 'false');
   });
 });
 

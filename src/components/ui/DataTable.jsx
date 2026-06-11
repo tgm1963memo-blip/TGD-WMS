@@ -19,7 +19,7 @@ export function DataTable({ columns, data = [], loading = false, error = null, e
   }
 
   return (
-    <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
+    <div className="table-responsive responsive-table">
       <table className="tgd-table">
         <thead>
           <tr>

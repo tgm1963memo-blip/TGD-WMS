@@ -85,7 +85,8 @@ describe('Sprint 12E warehouse operation UI polish', () => {
 
     renderWithProviders(<LanguageToggle />);
 
-    expect(screen.getByLabelText('Current language')).toHaveTextContent('ไทย');
+    expect(screen.getByRole('button', { name: 'Thai' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Toggle language/i })).toHaveTextContent('EN');
   });
 
   it('contains Thai and English operation translation keys', () => {

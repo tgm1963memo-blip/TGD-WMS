@@ -54,7 +54,7 @@ describe('Sprint 12G TGM brand UI integration', () => {
     expect(DEFAULT_LANGUAGE).toBe('th');
     renderWithProviders(<LanguageToggle />);
 
-    expect(screen.getByText(/Current language:/)).toHaveTextContent(getTranslation('thai', 'th'));
+    expect(screen.getByRole('button', { name: 'Thai' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('ReportsPage still renders', () => {

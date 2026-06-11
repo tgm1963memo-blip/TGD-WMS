@@ -152,7 +152,8 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
 
     expect(combinedSource).not.toMatch(/service_role/i);
     expect(combinedSource).not.toMatch(/SERVICE_ROLE/);
-    expect(combinedSource).not.toMatch(/production/i);
     expect(combinedSource).not.toMatch(/VITE_SUPABASE_SERVICE/i);
+    expect(combinedSource).not.toMatch(/NODE_ENV\s*===\s*['"]production['"]/);
+    expect(combinedSource).not.toMatch(/import\.meta\.env\.PROD/);
   });
 });

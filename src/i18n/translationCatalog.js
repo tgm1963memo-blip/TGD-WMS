@@ -462,6 +462,46 @@ Object.assign(TRANSLATION_CATALOG, {
   'reason': { th: 'เหตุผล', en: 'Reason' },
 });
 
+Object.assign(TRANSLATION_CATALOG, {
+  production_hold: { th: 'Production HOLD', en: 'Production HOLD' },
+  final_go_not_authorized: { th: 'FINAL GO is NOT AUTHORIZED', en: 'FINAL GO is NOT AUTHORIZED' },
+  uat_mode: { th: 'โหมด UAT', en: 'UAT Mode' },
+  uat_environment: { th: 'สภาพแวดล้อม UAT', en: 'UAT Environment' },
+  controlled_uat_only: { th: 'UAT ควบคุมเท่านั้น', en: 'Controlled UAT only' },
+  save_draft: { th: 'บันทึกแบบร่าง', en: 'Save Draft' },
+  add_line: { th: 'เพิ่มรายการ', en: 'Add Line' },
+  confirm: { th: 'ยืนยัน', en: 'Confirm' },
+  stock_balance: { th: 'ยอดคงเหลือ', en: 'Stock Balance' },
+  products: { th: 'สินค้า', en: 'Products' },
+  customers: { th: 'ลูกค้า', en: 'Customers' },
+  warehouses: { th: 'คลังสินค้า', en: 'Warehouses' },
+  locations: { th: 'ตำแหน่งจัดเก็บ', en: 'Locations' },
+  barcode_handheld: { th: 'บาร์โค้ด / Handheld', en: 'Barcode / Handheld' },
+  uat_not_operational: { th: 'UAT / ยังไม่เปิดใช้งานจริง', en: 'UAT / Not yet operational' },
+  open_receiving: { th: 'รับเข้าที่เปิดอยู่', en: 'Open Receiving' },
+  uat_status: { th: 'สถานะ UAT', en: 'UAT Status' },
+  production_gate: { th: 'ประตู Production', en: 'Production Gate' },
+  total_products: { th: 'สินค้าทั้งหมด', en: 'Total Products' },
+  status_draft: { th: 'แบบร่าง', en: 'DRAFT' },
+  status_open: { th: 'เปิด', en: 'OPEN' },
+  status_confirmed: { th: 'ยืนยันแล้ว', en: 'CONFIRMED' },
+  status_blocked: { th: 'บล็อก', en: 'BLOCKED' },
+  status_hold: { th: 'HOLD', en: 'HOLD' },
+  status_pass: { th: 'ผ่าน', en: 'PASS' },
+  status_fail: { th: 'ไม่ผ่าน', en: 'FAIL' },
+  status_uat: { th: 'UAT', en: 'UAT' },
+  operations_dashboard: { th: 'แดชบอร์ดปฏิบัติการ', en: 'Operations Dashboard' },
+  dashboard_description: { th: 'ภาพรวมปฏิบัติการคลังเย็น — ข้อมูลอ่านอย่างเดียวจาก Staging', en: 'Cold storage WMS overview — read-only staging data.' },
+  demo_uat_placeholder: { th: 'ตัวอย่าง UAT', en: 'UAT demo' },
+  uat_diagnostics: { th: 'UAT Diagnostics', en: 'UAT Diagnostics' },
+  developer_diagnostics_card: { th: 'Developer / UAT Diagnostics', en: 'Developer / UAT Diagnostics' },
+  controlled_receiving_draft_mode: { th: 'โหมดร่างรับเข้าแบบควบคุม', en: 'Controlled receiving draft mode' },
+  create_receiving_draft: { th: 'สร้างร่างรับเข้า', en: 'Create Receiving Draft' },
+  inventory_view: { th: 'มุมมองสินค้าคงคลัง', en: 'Inventory View' },
+  language_th: { th: 'TH', en: 'TH' },
+  language_en: { th: 'EN', en: 'EN' },
+});
+
 /** Retrieve a translation for a given key and language. */
 export function getTranslation(key, language) {
   const entry = TRANSLATION_CATALOG[key];

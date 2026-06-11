@@ -1,8 +1,11 @@
-export function PageHeader({ title, description }) {
+export function PageHeader({ title, description, actions }) {
   return (
-    <div className="page-header">
-      <h2>{title}</h2>
-      {description ? <p>{description}</p> : null}
-    </div>
+    <header className="page-header">
+      <div className="page-header-content">
+        <h2>{title}</h2>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {actions ? <div className="page-header-actions action-row">{actions}</div> : null}
+    </header>
   );
 }
