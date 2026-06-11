@@ -37,6 +37,24 @@ export function normalizeReceivingDocumentId(data) {
   return '';
 }
 
+function getReceivingRpcResponseType(data) {
+  if (data === null) return 'null';
+  if (typeof data === 'undefined') return 'undefined';
+  if (Array.isArray(data)) return 'array';
+  return typeof data;
+}
+
+function getReceivingRpcResponsePreview(data) {
+  if (data === null || typeof data === 'undefined') return 'None';
+
+  try {
+    const serialized = JSON.stringify(data);
+    return String(serialized ?? data).substring(0, 50);
+  } catch {
+    return String(data).substring(0, 50);
+  }
+}
+
 
 
 function sortByLabel(left, right) {
@@ -313,8 +331,8 @@ export async function createReceivingDocument(input) {
     };
   }
 
-  const rawResponseType = response.data === null ? 'null' : Array.isArray(response.data) ? 'array' : typeof response.data;
-  const rawResponsePreview = response.data ? JSON.stringify(response.data).substring(0, 50) : 'null';
+  const rawResponseType = getReceivingRpcResponseType(response.data);
+  const rawResponsePreview = getReceivingRpcResponsePreview(response.data);
 
   if (response.error) {
     return {

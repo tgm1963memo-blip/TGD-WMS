@@ -495,6 +495,7 @@ export function ReceivingCreatePage() {
           Warehouses error:
           Diagnostic version: 23I
           <span id="diagnostic-23t">Diagnostic version: 23T</span>
+          <span id="diagnostic-23u">Diagnostic version: 23U</span>
         </div>
 
         <section
@@ -507,10 +508,10 @@ export function ReceivingCreatePage() {
             marginBottom: 18,
             padding: 16,
           }}
-          id="diagnostic-23u"
+          id="diagnostic-23v"
           data-testid="receiving-create-diagnostics"
         >
-          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23U</h4>
+          <h4 style={{ marginTop: 0 }}>Diagnostic version: 23V</h4>
           <ul style={{ marginBottom: 0 }}>
             <li>Save draft clicked: {draftDiagnostics.saveDraftClicked ? 'true' : 'false'}</li>
             <li>Save draft validation passed: {draftDiagnostics.validationPassed ? 'true' : 'false'}</li>

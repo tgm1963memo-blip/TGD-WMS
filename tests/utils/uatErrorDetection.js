@@ -1,8 +1,20 @@
+const SAFE_DIAGNOSTIC_ERROR_LINES = [
+  /^Save draft RPC error:\s*None$/i,
+  /^RPC error:\s*None$/i,
+];
+
+export function sanitizeUatBodyText(bodyText) {
+  return String(bodyText ?? '')
+    .split(/\r?\n/)
+    .filter((line) => !SAFE_DIAGNOSTIC_ERROR_LINES.some((pattern) => pattern.test(line.trim())))
+    .join('\n');
+}
+
 export function detectUatErrors(textContent, currentUrl) {
   const errors = [];
   const warnings = [];
 
-  let cleanText = textContent;
+  let cleanText = sanitizeUatBodyText(textContent);
 
   const ignorePhrases = [
     'via RPC',
@@ -20,12 +32,6 @@ export function detectUatErrors(textContent, currentUrl) {
     const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     cleanText = cleanText.replace(regex, '');
   }
-
-  // Diagnostic labels with an explicit empty value are status, not failures.
-  cleanText = cleanText.replace(
-    /\b(?:save draft\s+)?rpc error:\s*(?:none|null|n\/a)\b/gi,
-    '',
-  );
 
   const errorPhrases = [
     'rpc failed',

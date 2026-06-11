@@ -309,6 +309,9 @@ test.describe('Transaction UAT Round 1', () => {
       try {
         const diagText = await page.locator('[data-testid="receiving-create-diagnostics"]').innerText({ timeout: 2000 });
         resultData.pageDiagnostics = diagText;
+        const diagnosticDetection = detectUatErrors(diagText, page.url());
+        diagnosticDetection.errors.forEach((error) => accumulatedErrors.add(error));
+        diagnosticDetection.warnings.forEach((warning) => accumulatedWarnings.add(warning));
       } catch (e) {
         const bodyText = await page.evaluate(() => document.body.innerText);
         resultData.pageDiagnostics = "Diagnostic panel not found";

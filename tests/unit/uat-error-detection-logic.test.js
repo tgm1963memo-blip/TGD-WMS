@@ -32,6 +32,18 @@ describe('UAT Error Detection Logic', () => {
     expect(errors[0]).toContain('table not found');
   });
 
+  it('ignores only complete safe RPC diagnostic lines', () => {
+    expect(detectUatErrors('Save draft RPC error: None', 'http://localhost').errors).toEqual([]);
+    expect(detectUatErrors('RPC error: None', 'http://localhost').errors).toEqual([]);
+
+    const realError = detectUatErrors(
+      'Save draft RPC error: permission denied',
+      'http://localhost',
+    );
+    expect(realError.errors.some((error) => error.includes('permission denied'))).toBe(true);
+    expect(realError.errors.some((error) => error.includes('error:'))).toBe(true);
+  });
+
   it('should catch PG and Auth errors', () => {
     const texts = [
       'violates row-level security policy',
