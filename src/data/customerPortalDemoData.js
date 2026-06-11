@@ -5,6 +5,90 @@ export const CUSTOMER_PORTAL_DASHBOARD_SUMMARY = {
   lastActivity: 'Withdrawal request CWR-20260611-0002 submitted (demo)',
 };
 
+export const CUSTOMER_DEPOSIT_STATUSES = [
+  'DRAFT',
+  'SUBMITTED_BY_CUSTOMER',
+  'ADMIN_REVIEWING',
+  'ADMIN_ACCEPTED',
+  'WAREHOUSE_RECEIVING',
+  'PALLETIZING',
+  'COUNT_VARIANCE_REVIEW',
+  'ADMIN_RECOUNT_REQUESTED',
+  'RECEIVED_CONFIRMED',
+  'CUSTOMER_NOTIFIED',
+];
+
+export const CUSTOMER_WITHDRAWAL_STATUSES = [
+  'WITHDRAWAL_DRAFT',
+  'SUBMITTED_BY_CUSTOMER',
+  'ADMIN_REVIEWING',
+  'ADMIN_ACCEPTED',
+  'WAREHOUSE_PICKING',
+  'PICKED',
+  'PACKING_LIST_RECORDED',
+  'LOADING',
+  'LOADED_CONFIRMED',
+  'CUSTOMER_NOTIFIED',
+];
+
+export const CUSTOMER_PORTAL_DEMO_DEPOSIT = {
+  request_no: 'CDR-20260612-0001',
+  customer_code: 'DEMO-CUST-01',
+  customer_product_code: 'CUS-CHICKEN-01',
+  internal_product_code: 'FRZ-CHKN-01',
+  product_name: 'Frozen Chicken Breast',
+  lot_no: 'LOT-20260612-A',
+  expected_qty: 120,
+  expected_boxes: 120,
+  expected_weight: 2400,
+  received_qty: 118,
+  received_boxes: 118,
+  received_weight: 2360,
+  status: 'COUNT_VARIANCE_REVIEW',
+  attachments: ['packing-list-demo.pdf', 'product-photo-demo.jpg', 'temperature-record-demo.xlsx'],
+};
+
+export const CUSTOMER_PORTAL_DEMO_PALLETS = [
+  {
+    pallet_code: 'PLT-DEMO-001',
+    storage_code: 'COLD-A-01-02',
+    customer_code: 'DEMO-CUST-01',
+    customer_product_code: 'CUS-CHICKEN-01',
+    internal_product_code: 'FRZ-CHKN-01',
+    lot_no: 'LOT-20260612-A',
+    box_count: 60,
+    total_weight: 1200,
+  },
+  {
+    pallet_code: 'PLT-DEMO-002',
+    storage_code: 'COLD-A-01-03',
+    customer_code: 'DEMO-CUST-01',
+    customer_product_code: 'CUS-CHICKEN-01',
+    internal_product_code: 'FRZ-CHKN-01',
+    lot_no: 'LOT-20260612-A',
+    box_count: 58,
+    total_weight: 1160,
+  },
+];
+
+export const CUSTOMER_PORTAL_DEMO_PACKING_LIST = [
+  { box_no: 'BOX-DEMO-001', box_weight: 20, pallet_code: 'PLT-DEMO-001', note: 'Sample box' },
+  { box_no: 'BOX-DEMO-002', box_weight: 20, pallet_code: 'PLT-DEMO-001', note: 'Sample box' },
+];
+
+export const CUSTOMER_PORTAL_DEMO_WITHDRAWAL = {
+  request_no: 'CWR-20260612-0001',
+  deposit_request_no: 'CDR-20260612-0001',
+  customer_product_code: 'CUS-CHICKEN-01',
+  internal_product_code: 'FRZ-CHKN-01',
+  lot_no: 'LOT-20260612-A',
+  requested_qty: 20,
+  requested_boxes: 20,
+  requested_weight: 400,
+  picking_rule: 'SPECIFIC_DEPOSIT',
+  status: 'WAREHOUSE_PICKING',
+};
+
 export const CUSTOMER_PORTAL_DEMO_STOCK_ROWS = [
   {
     product_code: 'FRZ-CHKN-01',

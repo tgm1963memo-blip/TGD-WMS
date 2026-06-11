@@ -112,6 +112,17 @@ export const navigationGroups = [
     ],
   },
   {
+    label: 'Customer Ops Demo',
+    key: 'customer_ops_demo',
+    items: [
+      { label: 'Admin Deposit Review', key: 'customer_admin_deposit_review', path: '/customer/admin/deposit-review' },
+      { label: 'Warehouse Deposit Receiving', key: 'customer_warehouse_receiving', path: '/customer/warehouse/receiving' },
+      { label: 'Admin Receiving Verification', key: 'customer_admin_receiving_verification', path: '/customer/admin/receiving-verification' },
+      { label: 'Admin Withdrawal Review', key: 'customer_admin_withdrawal_review', path: '/customer/admin/withdrawal-review' },
+      { label: 'Warehouse Picking / Loading', key: 'customer_warehouse_picking_loading', path: '/customer/warehouse/picking-loading' },
+    ],
+  },
+  {
     label: 'Reports',
     key: 'reports',
     items: [

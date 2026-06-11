@@ -41,6 +41,7 @@ test.describe('CUSTOMER-PORTAL-1 Customer Portal Demo', () => {
   test('Scenario 4: Deposit request page opens and demo submit shows success', async ({ page }) => {
     await page.goto(`${process.env.UAT_BASE_URL}/customer/deposit-request`);
     await expect(page.locator('[data-testid="customer-deposit-request-page"]')).toBeVisible();
+    await page.locator('[data-testid="customer-product-code-input"]').fill('CUS-CHKN-01');
     await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-15');
     await page.locator('[data-testid="customer-deposit-product-code"]').fill('FRZ-CHKN-01');
     await page.locator('[data-testid="customer-deposit-product-name"]').fill('Frozen Chicken');

@@ -1,30 +1,51 @@
 import { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
+import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
+import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const INITIAL_FORM = {
   expected_arrival_date: '',
+  customer_product_code: '',
   product_code: '',
   product_name: '',
   lot_no: '',
-  qty: '',
-  uom: 'CTN',
-  pallet_count: '',
+  expected_qty: '',
+  expected_boxes: '',
+  expected_weight: '',
   temperature_type: 'FROZEN',
   note: '',
   contact_name: '',
   contact_phone: '',
 };
 
+function formatFileSize(size) {
+  return `${(size / 1024).toFixed(1)} KB`;
+}
+
 export function CustomerDepositRequestPage() {
   const t = useTranslation();
   const [form, setForm] = useState(INITIAL_FORM);
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState('');
   const [success, setSuccess] = useState(false);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setSuccess(false);
+  }
+
+  function handleAttachments(event) {
+    const selected = Array.from(event.target.files ?? []);
+    const oversized = selected.find((file) => file.size > MAX_ATTACHMENT_SIZE);
+    setAttachmentError(oversized ? `${oversized.name} exceeds the 10MB demo preview limit.` : '');
+    setAttachments((current) => [
+      ...current,
+      ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
+    ]);
+    event.target.value = '';
   }
 
   function handleSubmit(event) {
@@ -35,23 +56,28 @@ export function CustomerDepositRequestPage() {
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-page">
       <PageHeader title={t('customer_deposit_title')} description={t('customer_deposit_description')} />
-
       <CustomerPortalDemoBanner />
+
+      <div className="customer-process-card">
+        <h3>Deposit status timeline</h3>
+        <CustomerProcessTimeline statuses={CUSTOMER_DEPOSIT_STATUSES} testId="customer-deposit-status-timeline" />
+      </div>
 
       {success ? (
         <div className="alert-success-panel" data-testid="customer-deposit-demo-success-alert" role="status">
           {t('customer_deposit_demo_success')}
+          {attachments.length ? <div>Attachments: {attachments.map((file) => file.name).join(', ')}</div> : null}
         </div>
       ) : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-deposit-request-form" onSubmit={handleSubmit}>
         <div className="form-grid">
           <label className="form-field">
-            <span>{t('customer_field_expected_arrival_date')}</span>
-            <input className="form-control" data-testid="customer-deposit-expected-arrival-date" onChange={(e) => updateField('expected_arrival_date', e.target.value)} required type="date" value={form.expected_arrival_date} />
+            <span>Customer product code</span>
+            <input className="form-control" data-testid="customer-product-code-input" onChange={(e) => updateField('customer_product_code', e.target.value)} required value={form.customer_product_code} />
           </label>
           <label className="form-field">
-            <span>{t('customer_field_product_code')}</span>
+            <span>Internal product code</span>
             <input className="form-control" data-testid="customer-deposit-product-code" onChange={(e) => updateField('product_code', e.target.value)} required value={form.product_code} />
           </label>
           <label className="form-field">
@@ -63,20 +89,20 @@ export function CustomerDepositRequestPage() {
             <input className="form-control" onChange={(e) => updateField('lot_no', e.target.value)} value={form.lot_no} />
           </label>
           <label className="form-field">
-            <span>{t('customer_field_qty')}</span>
-            <input className="form-control" data-testid="customer-deposit-qty" min="1" onChange={(e) => updateField('qty', e.target.value)} required type="number" value={form.qty} />
+            <span>Expected quantity</span>
+            <input className="form-control" data-testid="customer-deposit-qty" min="1" onChange={(e) => updateField('expected_qty', e.target.value)} required type="number" value={form.expected_qty} />
           </label>
           <label className="form-field">
-            <span>{t('customer_field_uom')}</span>
-            <select className="form-control" onChange={(e) => updateField('uom', e.target.value)} value={form.uom}>
-              <option value="CTN">CTN</option>
-              <option value="KG">KG</option>
-              <option value="PLT">PLT</option>
-            </select>
+            <span>Expected boxes</span>
+            <input className="form-control" min="0" onChange={(e) => updateField('expected_boxes', e.target.value)} type="number" value={form.expected_boxes} />
           </label>
           <label className="form-field">
-            <span>{t('customer_field_pallet_count')}</span>
-            <input className="form-control" min="0" onChange={(e) => updateField('pallet_count', e.target.value)} type="number" value={form.pallet_count} />
+            <span>Expected weight (kg)</span>
+            <input className="form-control" min="0" onChange={(e) => updateField('expected_weight', e.target.value)} step="0.01" type="number" value={form.expected_weight} />
+          </label>
+          <label className="form-field">
+            <span>{t('customer_field_expected_arrival_date')}</span>
+            <input className="form-control" data-testid="customer-deposit-expected-arrival-date" onChange={(e) => updateField('expected_arrival_date', e.target.value)} required type="date" value={form.expected_arrival_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_temperature_type')}</span>
@@ -99,8 +125,41 @@ export function CustomerDepositRequestPage() {
             <textarea className="form-control" onChange={(e) => updateField('note', e.target.value)} rows={3} value={form.note} />
           </label>
         </div>
+
+        <div className="customer-attachment-panel">
+          <label className="form-field">
+            <span>Supporting attachments</span>
+            <input
+              accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+              data-testid="customer-deposit-attachment-input"
+              multiple
+              onChange={handleAttachments}
+              type="file"
+            />
+          </label>
+          <p className="form-helper" data-testid="customer-deposit-attachment-demo-note">
+            Demo only - files are not uploaded to storage yet. Maximum preview size is 10MB per file.
+          </p>
+          {attachmentError ? <p className="field-error" role="alert">{attachmentError}</p> : null}
+          <ul className="customer-attachment-list" data-testid="customer-deposit-attachment-list">
+            {attachments.map((file, index) => (
+              <li key={`${file.name}-${file.lastModified}`}>
+                <span>{file.name} ({file.type || 'unknown'}, {formatFileSize(file.size)})</span>
+                <button
+                  className="btn btn-secondary"
+                  data-testid="customer-deposit-attachment-remove-button"
+                  onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  type="button"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="action-row customer-portal-form-actions">
-          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setSuccess(false); }} type="button">{t('close')}</button>
+          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setAttachments([]); setSuccess(false); }} type="button">{t('close')}</button>
           <button className="btn btn-primary" data-testid="customer-deposit-submit-button" type="submit">{t('customer_deposit_submit')}</button>
         </div>
       </form>

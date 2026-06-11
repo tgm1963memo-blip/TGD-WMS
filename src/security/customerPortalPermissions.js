@@ -14,3 +14,11 @@ export function isCustomerPortalNavigationVisible(role) {
   }
   return CUSTOMER_PORTAL_DEMO_ROLES.includes(normalized);
 }
+
+export function isCustomerOpsDemoNavigationVisible(role) {
+  const normalized = String(role ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+  return ['admin', 'accounting', 'viewer'].includes(normalized);
+}

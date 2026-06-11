@@ -158,8 +158,8 @@ describe('17B App Shell and Navigation UI', () => {
     const sidebar = screen.getByTestId('sidebar');
     const groupLabels = sidebar.querySelectorAll('.nav-group-label');
 
-    // 9 groups: Main Operation, Inbound, Inventory, Outbound, Barcode, Customer Portal, Billing, Reports, System Admin
-    expect(groupLabels.length).toBe(9);
+    // 10 groups, including Customer Portal and the meeting-only Customer Ops Demo group.
+    expect(groupLabels.length).toBe(10);
   });
 
   // ── Additional Menu Items ───────────────────────────────────

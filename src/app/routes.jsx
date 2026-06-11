@@ -64,6 +64,11 @@ import { CustomerDepositRequestPage } from '../features/customer/CustomerDeposit
 import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
 import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
+import { CustomerAdminDepositReviewPage } from '../features/customer/CustomerAdminDepositReviewPage.jsx';
+import { CustomerWarehouseReceivingDemoPage } from '../features/customer/CustomerWarehouseReceivingDemoPage.jsx';
+import { CustomerAdminReceivingVerificationPage } from '../features/customer/CustomerAdminReceivingVerificationPage.jsx';
+import { CustomerAdminWithdrawalReviewPage } from '../features/customer/CustomerAdminWithdrawalReviewPage.jsx';
+import { CustomerWarehousePickingLoadingDemoPage } from '../features/customer/CustomerWarehousePickingLoadingDemoPage.jsx';
 
 function LegacyPlaceholderPage({ title }) {
   return (
@@ -142,6 +147,11 @@ export function AppRoutes() {
           <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
           <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />
           <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
+          <Route path="/customer/admin/deposit-review" element={<CustomerAdminDepositReviewPage />} />
+          <Route path="/customer/warehouse/receiving" element={<CustomerWarehouseReceivingDemoPage />} />
+          <Route path="/customer/admin/receiving-verification" element={<CustomerAdminReceivingVerificationPage />} />
+          <Route path="/customer/admin/withdrawal-review" element={<CustomerAdminWithdrawalReviewPage />} />
+          <Route path="/customer/warehouse/picking-loading" element={<CustomerWarehousePickingLoadingDemoPage />} />
 
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/products" element={<ProductsPage />} />
@@ -159,4 +169,3 @@ export function AppRoutes() {
     </Routes>
   );
 }
-

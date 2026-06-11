@@ -6,7 +6,10 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 import { getCurrentUserRole } from '../../security/currentUserRole.js';
 import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
-import { isCustomerPortalNavigationVisible } from '../../security/customerPortalPermissions.js';
+import {
+  isCustomerOpsDemoNavigationVisible,
+  isCustomerPortalNavigationVisible,
+} from '../../security/customerPortalPermissions.js';
 
 /**
  * Professional Black & Gold sidebar navigation (approved mockup style).
@@ -27,6 +30,10 @@ export function Sidebar() {
 
       <nav className="sidebar-nav" aria-label="TGD WMS navigation">
         {navigationGroups.map((group) => {
+          if (group.key === 'customer_ops_demo' && !isCustomerOpsDemoNavigationVisible(userRole)) {
+            return null;
+          }
+
           const groupLabel = group.label;
           return (
             <div key={group.key} className="sidebar-nav-group">
