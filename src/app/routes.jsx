@@ -56,6 +56,9 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
 import { LoginPage } from '../features/auth/LoginPage.jsx';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
+import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.jsx';
 
 function LegacyPlaceholderPage({ title }) {
   return (
@@ -70,6 +73,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AuthGuard />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
@@ -126,6 +131,7 @@ export function AppRoutes() {
           <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/profile" element={<ProfileSettingsPage />} />
 
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/products" element={<ProductsPage />} />

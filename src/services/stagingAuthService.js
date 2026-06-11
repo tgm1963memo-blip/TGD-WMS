@@ -47,3 +47,39 @@ export function subscribeToStagingAuth(onChange) {
     unsubscribe: () => data?.subscription?.unsubscribe?.(),
   };
 }
+
+export function getPasswordResetRedirectUrl() {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return '/reset-password';
+  }
+  return `${window.location.origin}/reset-password`;
+}
+
+export async function requestPasswordReset(email) {
+  if (!supabase) {
+    return missingClientAuthResult();
+  }
+
+  const normalizedEmail = String(email ?? '').trim();
+  if (!normalizedEmail) {
+    return {
+      data: null,
+      error: new Error('Email is required.'),
+    };
+  }
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: getPasswordResetRedirectUrl(),
+  });
+
+  return { data, error };
+}
+
+export async function updateStagingPassword(password) {
+  if (!supabase) {
+    return missingClientAuthResult();
+  }
+
+  const { data, error } = await supabase.auth.updateUser({ password });
+  return { data: data?.user ?? null, error };
+}

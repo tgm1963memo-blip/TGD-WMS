@@ -92,7 +92,7 @@ export function InvoiceDraftListPage() {
         description={getTranslation('billing_invoice_drafts_description', language) || 'Review invoice draft headers created from billing movement weight rows.'}
       />
 
-      <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
+      <div className="section-card meeting-safety-panel warning-panel" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
         <strong>Gate 3B-4 Readiness Preview</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14 }}>
           Invoice drafts can be reviewed and approved from the detail page. Export to Bplus is not enabled yet.

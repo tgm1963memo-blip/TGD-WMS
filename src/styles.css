@@ -1054,3 +1054,170 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ─── UX-AUTH-1 Auth & Profile Polish ─────────────── */
+
+.auth-page-shell .auth-page-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.auth-page-card {
+  width: 100%;
+}
+
+.auth-text-link {
+  color: var(--tgd-accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-text-link:hover {
+  color: var(--tgd-accent-hover);
+  text-decoration: underline;
+}
+
+.login-form-forgot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.auth-success-banner {
+  margin-bottom: 12px;
+}
+
+.auth-muted-text {
+  color: var(--tgd-muted-text);
+  font-size: 13px;
+}
+
+.auth-back-link-wrap {
+  margin: 16px 0 0;
+  text-align: center;
+}
+
+.meeting-safety-footer {
+  border-top: 1px solid var(--tgd-border);
+  color: var(--tgd-muted-text);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+.user-session-menu {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.user-session-menu-identity {
+  display: grid;
+  gap: 4px;
+}
+
+.user-session-role-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #e2e8f0;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.user-session-profile-link {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.user-session-profile-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.profile-settings-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.profile-settings-card {
+  background: var(--tgd-surface);
+  border: 1px solid var(--tgd-border);
+  border-radius: 8px;
+  box-shadow: var(--tgd-shadow-card);
+  padding: 16px;
+}
+
+.section-card-title {
+  color: var(--tgd-navy);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.section-card-description {
+  color: var(--tgd-muted-text);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.profile-settings-dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.profile-settings-dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-settings-dl dt {
+  color: var(--tgd-muted-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.profile-settings-dl dd {
+  color: var(--tgd-navy);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.meeting-filter-card {
+  background: var(--tgd-surface);
+  border: 1px solid var(--tgd-border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.meeting-safety-panel {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 760px) {
+  .auth-page-shell.login-layout {
+    flex-direction: column;
+  }
+
+  .profile-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

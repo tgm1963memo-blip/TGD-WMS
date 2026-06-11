@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../../src/features/auth/AuthContext.jsx';
 import { LoginPage } from '../../src/features/auth/LoginPage.jsx';
 import { Sidebar } from '../../src/components/layout/Sidebar.jsx';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 const authMocks = vi.hoisted(() => ({
   signOutFromStaging: vi.fn(),
@@ -20,6 +21,13 @@ vi.mock('../../src/services/stagingAuthService.js', () => ({
   signOutFromStaging: authMocks.signOutFromStaging,
 }));
 
+vi.mock('../../src/services/userProfileService.js', () => ({
+  getCurrentUserProfile: vi.fn().mockResolvedValue({
+    data: { role: 'accounting', is_active: true },
+    error: null,
+  }),
+}));
+
 function renderWithSession(session) {
   authMocks.getStagingSession.mockResolvedValue({ data: session, error: null });
   authMocks.subscribeToStagingAuth.mockImplementation((onChange) => {
@@ -30,12 +38,14 @@ function renderWithSession(session) {
 
   return render(
     <MemoryRouter initialEntries={['/dashboard']}>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<Sidebar />} />
-        </Routes>
-      </AuthProvider>
+      <LanguageProvider initialLanguage="th">
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/dashboard" element={<Sidebar />} />
+          </Routes>
+        </AuthProvider>
+      </LanguageProvider>
     </MemoryRouter>,
   );
 }

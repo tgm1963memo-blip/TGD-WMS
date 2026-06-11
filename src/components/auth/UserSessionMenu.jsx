@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
 import { signOutFromStaging } from '../../services/stagingAuthService.js';
+import { getCurrentUserProfile } from '../../services/userProfileService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function UserSessionMenu() {
@@ -10,6 +11,20 @@ export function UserSessionMenu() {
   const t = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    getCurrentUserProfile().then((result) => {
+      if (!active) return;
+      setRole(result.data?.role ?? null);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
 
   if (!session?.user) {
     return null;
@@ -31,8 +46,20 @@ export function UserSessionMenu() {
   }
 
   return (
-    <div className="sidebar-user-session" data-testid="user-session-menu">
-      <span className="sidebar-user-email">{session.user.email}</span>
+    <div className="sidebar-user-session user-session-menu" data-testid="user-session-menu">
+      <div className="user-session-menu-identity">
+        <span className="sidebar-user-email" data-testid="user-session-email">{session.user.email}</span>
+        {role ? (
+          <span className="user-session-role-badge" data-testid="user-session-role">{role}</span>
+        ) : null}
+      </div>
+      <Link
+        className="user-session-profile-link"
+        data-testid="user-profile-settings-link"
+        to="/settings/profile"
+      >
+        {t('user_menu_profile')}
+      </Link>
       {error ? (
         <div className="banner banner-danger" role="alert">
           {error}

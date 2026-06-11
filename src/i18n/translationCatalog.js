@@ -511,6 +511,48 @@ Object.assign(TRANSLATION_CATALOG, {
   language_en: { th: 'EN', en: 'EN' },
 });
 
+Object.assign(TRANSLATION_CATALOG, {
+  login_title: { th: 'เข้าสู่ระบบ', en: 'Sign In' },
+  login_subtitle: { th: 'ระบบจัดการคลังเย็น', en: 'Cold Storage Management System' },
+  login_helper: { th: 'ใช้บัญชี Supabase Auth', en: 'Use your Supabase Auth account' },
+  login_email_label: { th: 'อีเมล', en: 'Email Address' },
+  login_password_label: { th: 'รหัสผ่าน', en: 'Password' },
+  login_submit: { th: 'เข้าสู่ระบบ', en: 'Sign In' },
+  login_failed: { th: 'เข้าสู่ระบบไม่สำเร็จ', en: 'Sign in failed' },
+  forgot_password_link: { th: 'ลืมรหัสผ่าน?', en: 'Forgot password?' },
+  forgot_password_title: { th: 'ลืมรหัสผ่าน', en: 'Forgot Password' },
+  forgot_password_description: { th: 'กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่', en: 'Enter your email to receive a password reset link.' },
+  forgot_password_submit: { th: 'ส่งลิงก์รีเซ็ตรหัสผ่าน', en: 'Send reset link' },
+  forgot_password_success: { th: 'หากอีเมลถูกต้อง ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านให้ทางอีเมล', en: 'If the email is registered, a reset link will be sent shortly.' },
+  forgot_password_invalid_email: { th: 'กรุณากรอกอีเมลที่ถูกต้อง', en: 'Please enter a valid email address.' },
+  back_to_login: { th: 'กลับไปหน้าเข้าสู่ระบบ', en: 'Back to sign in' },
+  reset_password_title: { th: 'ตั้งรหัสผ่านใหม่', en: 'Reset Password' },
+  reset_password_description: { th: 'ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ', en: 'Set a new password for your account.' },
+  reset_password_new_label: { th: 'รหัสผ่านใหม่', en: 'New password' },
+  reset_password_confirm_label: { th: 'ยืนยันรหัสผ่านใหม่', en: 'Confirm new password' },
+  reset_password_submit: { th: 'บันทึกรหัสผ่านใหม่', en: 'Save new password' },
+  reset_password_success: { th: 'ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบอีกครั้ง', en: 'Password updated. Please sign in again.' },
+  reset_password_invalid_session: { th: 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุ', en: 'Reset link is invalid or expired.' },
+  password_too_short: { th: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร', en: 'Password must be at least 8 characters.' },
+  password_mismatch: { th: 'รหัสผ่านยืนยันไม่ตรงกัน', en: 'Password confirmation does not match.' },
+  profile_settings_title: { th: 'โปรไฟล์และการตั้งค่า', en: 'Profile & Settings' },
+  profile_settings_description: { th: 'ข้อมูลบัญชีและสิทธิ์การใช้งาน', en: 'Account information and access role.' },
+  profile_email: { th: 'อีเมล', en: 'Email' },
+  profile_role: { th: 'บทบาท', en: 'Role' },
+  profile_active_status: { th: 'สถานะบัญชี', en: 'Account status' },
+  profile_customer_scope: { th: 'ขอบเขตลูกค้า', en: 'Customer scope' },
+  profile_display_name: { th: 'ชื่อที่แสดง', en: 'Display name' },
+  profile_global_scope: { th: 'ทั้งระบบ (ไม่จำกัดลูกค้า)', en: 'Global (no customer restriction)' },
+  profile_active_yes: { th: 'ใช้งาน', en: 'Active' },
+  profile_active_no: { th: 'ไม่ใช้งาน', en: 'Inactive' },
+  profile_not_linked: { th: 'ยังไม่ผูกโปรไฟล์ในระบบ', en: 'Profile not linked in WMS yet' },
+  change_password_title: { th: 'เปลี่ยนรหัสผ่าน', en: 'Change password' },
+  change_password_description: { th: 'ใช้ลิงก์รีเซ็ตรหัสผ่านทางอีเมลเพื่อความปลอดภัย', en: 'Use the email reset link for secure password changes.' },
+  change_password_action: { th: 'ขอรีเซ็ตรหัสผ่าน', en: 'Request password reset' },
+  user_menu_profile: { th: 'โปรไฟล์ / ตั้งค่า', en: 'Profile / Settings' },
+  auth_loading: { th: 'กำลังตรวจสอบสถานะการเข้าสู่ระบบ...', en: 'Checking authentication state...' },
+});
+
 /** Retrieve a translation for a given key and language. */
 export function getTranslation(key, language) {
   const entry = TRANSLATION_CATALOG[key];

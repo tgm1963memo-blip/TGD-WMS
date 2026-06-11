@@ -1,17 +1,18 @@
-import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext.jsx';
 import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
-import { brandConfig } from '../../config/brandConfig.js';
+import { AuthPageShell } from '../../components/auth/AuthPageShell.jsx';
+import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function LoginPage() {
   const { session, loading } = useAuth();
   const location = useLocation();
+  const t = useTranslation();
 
   if (loading) {
     return (
-      <div className="layout-auth login-layout">
-        <div className="login-loading">Loading authentication state...</div>
+      <div className="layout-auth login-layout auth-page-shell">
+        <div className="login-loading">{t('auth_loading')}</div>
       </div>
     );
   }
@@ -22,24 +23,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="layout-auth login-layout" data-testid="login-page">
-      <div className="login-brand-panel">
-        <div className="login-brand-content">
-          <img alt="TGM logo" className="login-brand-logo" src={brandConfig.logoPath} />
-          <h1 className="login-brand-title">{brandConfig.brandName}</h1>
-          <p className="login-subtitle">Cold Storage Management System</p>
+    <AuthPageShell
+      testId="login-page"
+      footer={(
+        <div className="login-footer login-safety-footer meeting-safety-footer" role="status">
+          <div>{t('controlled_uat_only')}</div>
+          <div>{t('production_hold')}</div>
+          <div>{t('final_go_not_authorized')}</div>
         </div>
-      </div>
-      <div className="login-form-panel">
-        <div className="login-card">
-          <StagingLoginPanel session={session} onSessionChange={() => {}} />
-          <div className="login-footer login-safety-footer" role="status">
-            <div>Controlled UAT only</div>
-            <div>Production remains HOLD</div>
-            <div>FINAL GO is NOT AUTHORIZED</div>
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    >
+      <StagingLoginPanel session={session} onSessionChange={() => {}} />
+    </AuthPageShell>
   );
 }
