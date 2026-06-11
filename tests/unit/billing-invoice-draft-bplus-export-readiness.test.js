@@ -6,6 +6,7 @@ import {
   buildInvoiceDraftBplusHeaderPreview,
   buildInvoiceDraftBplusLinePreview,
   evaluateInvoiceDraftBplusExportReadiness,
+  normalizeCustomerForBplusReadiness,
 } from '../../src/utils/billingInvoiceDraftBplusExportUtils.js';
 import { INVOICE_DRAFT_STATUS } from '../../src/utils/billingInvoiceDraftUtils.js';
 
@@ -76,7 +77,51 @@ describe('Gate 3B-4 billing invoice draft Bplus export readiness utils', () => {
     });
 
     expect(result.readiness_status).toBe(BPLUS_EXPORT_READINESS_STATUS.BLOCKED);
-    expect(result.blockers.some((item) => /customer code/i.test(item))).toBe(true);
+    expect(result.ready).toBe(false);
+    expect(result.blockers).toContain('Missing Bplus customer code.');
+    expect(result.warnings.some((item) => /Customer code mapping is not configured/i.test(item))).toBe(true);
+    expect(result.line_previews).toHaveLength(1);
+    expect(result.header_preview.customer_code).toBeNull();
+  });
+
+  it('normalizes UAT customer master row without customer_code column', () => {
+    const normalized = normalizeCustomerForBplusReadiness({
+      id: 'cust-1',
+      name: 'Demo Customer Alpha',
+      contact_email: 'alpha.demo@tgd-wms.local',
+    });
+
+    expect(normalized.customer_code).toBeNull();
+    expect(normalized.customer_name).toBe('Demo Customer Alpha');
+
+    const result = evaluateInvoiceDraftBplusExportReadiness({
+      draft: approvedDraft,
+      lines: [completeLine],
+      customer: normalized,
+    });
+
+    expect(result.readiness_status).toBe(BPLUS_EXPORT_READINESS_STATUS.BLOCKED);
+    expect(result.blockers).toContain('Missing Bplus customer code.');
+    expect(result.warnings.some((item) => /Customer code mapping is not configured/i.test(item))).toBe(true);
+  });
+
+  it('falls back to code field when customer_code is absent', () => {
+    const normalized = normalizeCustomerForBplusReadiness({
+      id: 'cust-1',
+      name: 'Alpha',
+      code: 'ALPHA-001',
+    });
+
+    expect(normalized.customer_code).toBe('ALPHA-001');
+
+    const result = evaluateInvoiceDraftBplusExportReadiness({
+      draft: approvedDraft,
+      lines: [completeLine],
+      customer: normalized,
+    });
+
+    expect(result.readiness_status).toBe(BPLUS_EXPORT_READINESS_STATUS.READY);
+    expect(result.header_preview.customer_code).toBe('ALPHA-001');
   });
 
   it('returns BLOCKED when chargeable_weight is missing', () => {

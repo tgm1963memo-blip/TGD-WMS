@@ -613,4 +613,114 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(result.data.header_preview.customer_code).toBe('ALPHA-001');
     expect(updateMock).not.toHaveBeenCalled();
   });
+
+  it('returns BLOCKED readiness when UAT customer master has no customer_code column', async () => {
+    const draft = {
+      id: 'draft-1',
+      customer_id: 'cust-1',
+      customer_name: 'Demo Customer Alpha',
+      status: 'APPROVED',
+      billing_period_start: '2026-06-01',
+      billing_period_end: '2026-06-30',
+      total_chargeable_weight: 250,
+      total_amount: 5000,
+      currency: 'THB',
+      updated_at: '2026-06-11T10:00:00.000Z',
+    };
+    let customerSelectArg = null;
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+        });
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({
+            data: [{
+              product_code: 'FSHR-001',
+              product_name: 'Frozen Shrimp',
+              movement_type: 'RECEIVE_CONFIRM',
+              chargeable_weight: 250,
+              rate: 20,
+              amount: 5000,
+              qty: 50,
+              uom: 'kg',
+            }],
+            error: null,
+          }),
+        });
+      }
+
+      if (tableName === 'tgd_customers') {
+        const chain = createTableChain(tableName, {
+          maybeSingle: async () => ({
+            data: {
+              id: 'cust-1',
+              name: 'Demo Customer Alpha',
+              contact_email: 'alpha.demo@tgd-wms.local',
+            },
+            error: null,
+          }),
+        });
+        chain.select = (columns) => {
+          customerSelectArg = columns;
+          return chain;
+        };
+        return chain;
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await getBillingInvoiceDraftBplusExportReadiness('draft-1');
+
+    expect(result.error).toBeNull();
+    expect(customerSelectArg).toBe('*');
+    expect(result.data.readiness_status).toBe('BLOCKED');
+    expect(result.data.ready).toBe(false);
+    expect(result.data.blockers).toContain('Missing Bplus customer code.');
+    expect(result.data.warnings.some((item) => /Customer code mapping is not configured/i.test(item))).toBe(true);
+    expect(result.data.line_previews).toHaveLength(1);
+    expect(result.data.header_preview.customer_code).toBeNull();
+  });
+
+  it('surfaces unexpected Supabase customer lookup errors', async () => {
+    const draft = {
+      id: 'draft-1',
+      customer_id: 'cust-1',
+      status: 'APPROVED',
+      total_chargeable_weight: 250,
+    };
+    const lookupError = { message: 'permission denied for table tgd_customers', code: '42501' };
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+        });
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({ data: [], error: null }),
+        });
+      }
+
+      if (tableName === 'tgd_customers') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: null, error: lookupError }),
+        });
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await getBillingInvoiceDraftBplusExportReadiness('draft-1');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toEqual(lookupError);
+  });
 });

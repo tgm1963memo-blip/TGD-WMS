@@ -17,7 +17,10 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
-import { evaluateInvoiceDraftBplusExportReadiness } from '../utils/billingInvoiceDraftBplusExportUtils.js';
+import {
+  evaluateInvoiceDraftBplusExportReadiness,
+  normalizeCustomerForBplusReadiness,
+} from '../utils/billingInvoiceDraftBplusExportUtils.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -409,7 +412,7 @@ export async function getBillingInvoiceDraftBplusExportReadiness(draftId) {
   if (customerId) {
     const customerResult = await supabase
       .from('tgd_customers')
-      .select('id, customer_code, customer_name')
+      .select('*')
       .eq('id', customerId)
       .maybeSingle();
 
@@ -417,7 +420,7 @@ export async function getBillingInvoiceDraftBplusExportReadiness(draftId) {
       return { data: null, error: customerResult.error };
     }
 
-    customer = customerResult.data;
+    customer = normalizeCustomerForBplusReadiness(customerResult.data);
   }
 
   return {

@@ -37,12 +37,28 @@ export function inferBplusServiceCode(movementType = '') {
   return MOVEMENT_TYPE_TO_BPLUS_SERVICE[movementType] ?? null;
 }
 
+export function normalizeCustomerForBplusReadiness(customerRow = null) {
+  if (!customerRow || typeof customerRow !== 'object') {
+    return null;
+  }
+
+  const rawCode = customerRow.customer_code ?? customerRow.code ?? null;
+  const customerCode = rawCode == null ? null : String(rawCode).trim() || null;
+
+  return {
+    id: customerRow.id ?? null,
+    customer_code: customerCode,
+    customer_name: customerRow.customer_name ?? customerRow.name ?? null,
+  };
+}
+
 export function buildInvoiceDraftBplusHeaderPreview(draft = {}, customer = null) {
+  const normalizedCustomer = normalizeCustomerForBplusReadiness(customer);
   const approvedAtFallback = draft.updated_at ?? null;
   return {
     draft_no: draft.draft_no ?? null,
-    customer_name: draft.customer_name ?? customer?.customer_name ?? customer?.name ?? null,
-    customer_code: customer?.customer_code ?? null,
+    customer_name: draft.customer_name ?? normalizedCustomer?.customer_name ?? null,
+    customer_code: normalizedCustomer?.customer_code ?? null,
     billing_period: deriveBplusBillingPeriod(draft),
     total_chargeable_weight: toNumber(draft.total_chargeable_weight),
     total_amount: draft.total_amount == null ? null : toNumber(draft.total_amount),
@@ -107,9 +123,11 @@ export function evaluateInvoiceDraftBplusExportReadiness({
     blockers.push('At least one invoice draft line is required.');
   }
 
-  const customerCode = customer?.customer_code ?? null;
+  const normalizedCustomer = normalizeCustomerForBplusReadiness(customer);
+  const customerCode = normalizedCustomer?.customer_code ?? null;
   if (!customerCode) {
-    blockers.push('Customer code could not be resolved from master data.');
+    blockers.push('Missing Bplus customer code.');
+    warnings.push('Customer code mapping is not configured in customer master data.');
   }
 
   if (toNumber(draft.total_chargeable_weight) <= 0) {
@@ -162,7 +180,7 @@ export function evaluateInvoiceDraftBplusExportReadiness({
     warnings.push('One or more lines are missing rate or amount; export preview remains weight-only until pricing is confirmed.');
   }
 
-  const headerPreview = buildInvoiceDraftBplusHeaderPreview(draft, customer);
+  const headerPreview = buildInvoiceDraftBplusHeaderPreview(draft, normalizedCustomer);
   const linePreviews = lines.map((line) => buildInvoiceDraftBplusLinePreview(line));
 
   let readinessStatus = BPLUS_EXPORT_READINESS_STATUS.READY;
