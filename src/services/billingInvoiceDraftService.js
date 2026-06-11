@@ -4,12 +4,14 @@ import {
   shapeBillingMovementWeightRow,
 } from './billingMovementWeightService.js';
 import {
+  APPROVABLE_INVOICE_DRAFT_STATUSES,
   CANCELLABLE_INVOICE_DRAFT_STATUSES,
   INVOICE_DRAFT_LINE_TABLE,
   INVOICE_DRAFT_STATUS,
   INVOICE_DRAFT_TABLE,
   buildBillingInvoiceDraftNo,
   buildInvoiceDraftCreatePayload,
+  canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   findDuplicateDraftLines,
   shapeBillingInvoiceDraftHeader,
@@ -298,6 +300,49 @@ export async function cancelBillingInvoiceDraft({
 
   return {
     data: shapeBillingInvoiceDraftHeader(headerUpdate.data),
+    error: null,
+  };
+}
+
+export async function approveBillingInvoiceDraft({
+  draftId,
+} = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!draftId) {
+    return { data: null, error: validationError('Invoice draft id is required.') };
+  }
+
+  const existing = await getBillingInvoiceDraftById(draftId);
+  if (existing.error) {
+    return { data: null, error: existing.error };
+  }
+
+  if (!canApproveBillingInvoiceDraft(existing.data.draft)) {
+    return {
+      data: null,
+      error: validationError('Only DRAFT or READY_TO_REVIEW invoice drafts can be approved.', {
+        status: existing.data.draft.status,
+      }),
+    };
+  }
+
+  const result = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .update({
+      status: INVOICE_DRAFT_STATUS.APPROVED,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', draftId)
+    .in('status', APPROVABLE_INVOICE_DRAFT_STATUSES)
+    .select('*')
+    .single();
+
+  if (result.error) {
+    return { data: null, error: result.error };
+  }
+
+  return {
+    data: shapeBillingInvoiceDraftHeader(result.data),
     error: null,
   };
 }

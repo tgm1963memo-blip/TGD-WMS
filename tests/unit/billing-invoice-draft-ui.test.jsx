@@ -9,6 +9,7 @@ const {
   listBillingInvoiceDraftsMock,
   getBillingInvoiceDraftByIdMock,
   createBillingInvoiceDraftFromMovementsMock,
+  approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraftMock,
   getBillingMovementWeightRowsMock,
   getCustomersMock,
@@ -17,6 +18,7 @@ const {
   listBillingInvoiceDraftsMock: vi.fn(),
   getBillingInvoiceDraftByIdMock: vi.fn(),
   createBillingInvoiceDraftFromMovementsMock: vi.fn(),
+  approveBillingInvoiceDraftMock: vi.fn(),
   cancelBillingInvoiceDraftMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
   getCustomersMock: vi.fn(),
@@ -27,6 +29,7 @@ vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
   listBillingInvoiceDrafts: listBillingInvoiceDraftsMock,
   getBillingInvoiceDraftById: getBillingInvoiceDraftByIdMock,
   createBillingInvoiceDraftFromMovements: createBillingInvoiceDraftFromMovementsMock,
+  approveBillingInvoiceDraft: approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraft: cancelBillingInvoiceDraftMock,
 }));
 
@@ -83,6 +86,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     listBillingInvoiceDraftsMock.mockReset();
     getBillingInvoiceDraftByIdMock.mockReset();
     createBillingInvoiceDraftFromMovementsMock.mockReset();
+    approveBillingInvoiceDraftMock.mockReset();
     cancelBillingInvoiceDraftMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
     getCustomersMock.mockReset();
@@ -156,7 +160,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     expect(screen.getByText('BID-20260608-0001')).toBeInTheDocument();
   });
 
-  it('renders invoice draft detail page with lines and cancel button', async () => {
+  it('renders invoice draft detail page with approve and cancel actions', async () => {
     render(
       <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
         <Routes>
@@ -167,10 +171,98 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
 
     expect(await screen.findByTestId('billing-invoice-draft-detail-page')).toBeInTheDocument();
     expect(screen.getByTestId('invoice-draft-lines-table')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-approve-button')).toBeInTheDocument();
     expect(screen.getByTestId('invoice-draft-cancel-button')).toBeInTheDocument();
-    expect(screen.queryByTestId('approve-invoice-draft-button')).not.toBeInTheDocument();
     expect(screen.queryByTestId('export-bplus-button')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mark-billed-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bplus-invoice-no-input')).not.toBeInTheDocument();
+  });
+
+  it('approves after confirmation, refreshes detail, and becomes read-only', async () => {
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    approveBillingInvoiceDraftMock.mockResolvedValue({
+      data: { id: 'draft-1', status: 'APPROVED' },
+      error: null,
+    });
+    getBillingInvoiceDraftByIdMock
+      .mockResolvedValueOnce({
+        data: {
+          draft: {
+            id: 'draft-1',
+            draft_no: 'BID-20260608-0001',
+            customer_name: 'Alpha',
+            status: 'DRAFT',
+            total_qty: 10,
+            total_chargeable_weight: 100,
+            currency: 'THB',
+          },
+          lines: [],
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          draft: {
+            id: 'draft-1',
+            draft_no: 'BID-20260608-0001',
+            customer_name: 'Alpha',
+            status: 'APPROVED',
+            total_qty: 10,
+            total_chargeable_weight: 100,
+            currency: 'THB',
+          },
+          lines: [],
+        },
+        error: null,
+      });
+
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('invoice-draft-approve-button'));
+
+    await waitFor(() => {
+      expect(approveBillingInvoiceDraftMock).toHaveBeenCalledWith({ draftId: 'draft-1' });
+    });
+    expect(confirmMock).toHaveBeenCalledWith('Approve invoice draft BID-20260608-0001?');
+    expect(await screen.findByTestId('invoice-draft-approve-success-alert')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-status-badge')).toHaveTextContent('APPROVED');
+    expect(screen.queryByTestId('invoice-draft-approve-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('invoice-draft-cancel-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('export-bplus-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mark-billed-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bplus-invoice-no-input')).not.toBeInTheDocument();
+
+    confirmMock.mockRestore();
+  });
+
+  it('shows approval error and keeps draft actions available', async () => {
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    approveBillingInvoiceDraftMock.mockResolvedValue({
+      data: null,
+      error: new Error('Approval failed'),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('invoice-draft-approve-button'));
+
+    expect(await screen.findByTestId('invoice-draft-approve-error-alert')).toHaveTextContent('Approval failed');
+    expect(screen.getByTestId('invoice-draft-approve-button')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-cancel-button')).toBeInTheDocument();
+
+    confirmMock.mockRestore();
   });
 
   it('keeps create draft button disabled when no selection', async () => {
@@ -263,8 +355,12 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
   it('cancel draft flow calls service from detail page source', () => {
     const detailSource = readProjectFile('src/features/billing/InvoiceDraftDetailPage.jsx');
     expect(detailSource).toContain('cancelBillingInvoiceDraft');
-    expect(detailSource).not.toContain('approve-invoice-draft-button');
+    expect(detailSource).toContain('approveBillingInvoiceDraft');
+    expect(detailSource).toContain('invoice-draft-approve-button');
+    expect(detailSource).toContain('invoice-draft-approve-success-alert');
+    expect(detailSource).toContain('invoice-draft-approve-error-alert');
     expect(detailSource).not.toContain('export-bplus-button');
     expect(detailSource).not.toContain('mark-billed-button');
+    expect(detailSource).not.toContain('bplus-invoice-no-input');
   });
 });

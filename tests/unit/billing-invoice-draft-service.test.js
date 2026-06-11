@@ -3,10 +3,12 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIVE_INVOICE_DRAFT_STATUSES,
+  APPROVABLE_INVOICE_DRAFT_STATUSES,
   INVOICE_DRAFT_STATUS,
   buildInvoiceDraftCreatePayload,
   buildInvoiceDraftLineFromMovement,
   calculateInvoiceDraftTotals,
+  canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   findDuplicateDraftLines,
   validateInvoiceDraftSourceRows,
@@ -35,6 +37,7 @@ const migrationPath = path.join(process.cwd(), 'database/migrations/037_tgd_wms_
 const utilsPath = path.join(process.cwd(), 'src/utils/billingInvoiceDraftUtils.js');
 
 const {
+  approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
   createBillingInvoiceDraftFromMovements,
   findActiveDuplicateDraftLines,
@@ -175,6 +178,7 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(source).toContain('getBillingInvoiceDraftById');
     expect(source).toContain('createBillingInvoiceDraftFromMovements');
     expect(source).toContain('cancelBillingInvoiceDraft');
+    expect(source).toContain('approveBillingInvoiceDraft');
     expect(source).not.toContain('receivingService');
     expect(source).not.toContain('dispatchService');
     expect(source).not.toMatch(/tgd_stock_movements|tgd_receiving_documents/);
@@ -277,6 +281,17 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(canCancelBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.BILLED })).toBe(false);
   });
 
+  it('allows approve only for DRAFT or READY_TO_REVIEW', () => {
+    expect(APPROVABLE_INVOICE_DRAFT_STATUSES).toEqual([
+      INVOICE_DRAFT_STATUS.DRAFT,
+      INVOICE_DRAFT_STATUS.READY_TO_REVIEW,
+    ]);
+    expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.DRAFT })).toBe(true);
+    expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.READY_TO_REVIEW })).toBe(true);
+    expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.APPROVED })).toBe(false);
+    expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.CANCELLED })).toBe(false);
+  });
+
   it('creates invoice draft from movements through service layer', async () => {
     const headerRow = {
       id: 'draft-1',
@@ -371,6 +386,97 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
 
     expect(result.error).toBeNull();
     expect(result.data.status).toBe('CANCELLED');
+  });
+
+  it('approve draft updates only the header status and keeps duplicate guards untouched', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260608-0001',
+      status: 'DRAFT',
+      customer_id: 'cust-1',
+    };
+    const headerOperations = [];
+    const lineOperations = [];
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        const chain = createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+          afterWrite: (state) => {
+            headerOperations.push({ operation: state.operation, payload: state.payload, filters: { ...state.filters } });
+            return { data: { ...draft, ...state.payload }, error: null };
+          },
+        });
+        return chain;
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        const chain = createTableChain(tableName, {
+          order: async (state) => {
+            lineOperations.push({ operation: state.operation, payload: state.payload });
+            return {
+              data: [{
+                id: 'line-1',
+                invoice_draft_id: 'draft-1',
+                source_movement_id: 'mv-1',
+                duplicate_guard_active: true,
+              }],
+              error: null,
+            };
+          },
+        });
+        return chain;
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await approveBillingInvoiceDraft({ draftId: 'draft-1' });
+
+    expect(result.error).toBeNull();
+    expect(result.data.status).toBe('APPROVED');
+    expect(headerOperations).toHaveLength(1);
+    expect(headerOperations[0].payload).toEqual({
+      status: 'APPROVED',
+      updated_at: expect.any(String),
+    });
+    expect(headerOperations[0].filters.id).toBe('draft-1');
+    expect(headerOperations[0].filters.status).toEqual(['DRAFT', 'READY_TO_REVIEW']);
+    expect(lineOperations).toEqual([{ operation: null, payload: null }]);
+  });
+
+  it('rejects approval from a non-approvable status without updating tables', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260608-0001',
+      status: 'APPROVED',
+      customer_id: 'cust-1',
+    };
+    const updateMock = vi.fn();
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        const chain = createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+        });
+        chain.update = updateMock;
+        return chain;
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({ data: [], error: null }),
+        });
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await approveBillingInvoiceDraft({ draftId: 'draft-1' });
+
+    expect(result.data).toBeNull();
+    expect(result.error.message).toMatch(/only DRAFT or READY_TO_REVIEW/i);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it('lists and reads invoice drafts without touching stock tables', async () => {

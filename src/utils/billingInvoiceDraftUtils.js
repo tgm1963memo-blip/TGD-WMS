@@ -25,6 +25,11 @@ export const CANCELLABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
   INVOICE_DRAFT_STATUS.READY_TO_REVIEW,
 ]);
 
+export const APPROVABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
+  INVOICE_DRAFT_STATUS.DRAFT,
+  INVOICE_DRAFT_STATUS.READY_TO_REVIEW,
+]);
+
 export const BILLABLE_SOURCE_BILLING_STATUSES = Object.freeze([
   BILLING_STATUS_FOUNDATION.READY_FOR_PREVIEW,
 ]);
@@ -237,6 +242,10 @@ export function findDuplicateDraftLines(movementIds = [], activeDraftLines = [])
 
 export function canCancelBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
+}
+
+export function canApproveBillingInvoiceDraft(draft = {}) {
+  return APPROVABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
 
 export function getMovementDraftSelectionState(row = {}) {

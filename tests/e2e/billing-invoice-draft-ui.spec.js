@@ -130,3 +130,46 @@ test.describe('Gate 3B-2 Billing Invoice Draft UI', () => {
     await expect(page.locator('[data-testid="bplus-invoice-no-input"]')).toHaveCount(0);
   });
 });
+
+test.describe('Gate 3B-3 Billing Invoice Draft Approval', () => {
+  test.skip(
+    process.env.RUN_INVOICE_DRAFT_APPROVAL_E2E !== 'true',
+    'Approval E2E is opt-in because it creates and approves a UAT draft',
+  );
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  test('Scenario 11: Created draft can be approved and becomes read-only', async ({ page }) => {
+    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    const table = page.locator('[data-testid="billing-movement-weight-table"]');
+    const emptyState = page.locator('[data-testid="billing-movement-weight-empty-state"]');
+    await Promise.race([
+      table.waitFor({ state: 'visible', timeout: 10000 }),
+      emptyState.waitFor({ state: 'visible', timeout: 10000 }),
+    ]);
+
+    test.skip(!(await table.isVisible()), 'No billing movement rows available for approval E2E');
+
+    const enabledCheckbox = page.locator('[data-testid="billing-movement-row-checkbox"]:enabled').first();
+    test.skip(!(await enabledCheckbox.count()), 'No selectable billable rows available for approval E2E');
+
+    await enabledCheckbox.click();
+    await page.locator('[data-testid="create-invoice-draft-button"]').click();
+    await expect(page.locator('[data-testid="billing-invoice-draft-detail-page"]')).toBeVisible({ timeout: 20000 });
+
+    const approveButton = page.locator('[data-testid="invoice-draft-approve-button"]');
+    await expect(approveButton).toBeVisible();
+    page.once('dialog', (dialog) => dialog.accept());
+    await approveButton.click();
+
+    await expect(page.locator('[data-testid="invoice-draft-approve-success-alert"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="invoice-draft-status-badge"]')).toContainText('APPROVED');
+    await expect(page.locator('[data-testid="invoice-draft-approve-button"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="invoice-draft-cancel-button"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="bplus-invoice-no-input"]')).toHaveCount(0);
+  });
+});

@@ -8,10 +8,12 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
+  approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
   getBillingInvoiceDraftById,
 } from '../../services/billingInvoiceDraftService.js';
 import {
+  canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   formatInvoiceDraftError,
 } from '../../utils/billingInvoiceDraftUtils.js';
@@ -33,6 +35,9 @@ export function InvoiceDraftDetailPage() {
   const [state, setState] = useState({ draft: null, lines: [], loading: true, error: null });
   const [cancelError, setCancelError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [approveError, setApproveError] = useState(null);
+  const [approveSuccess, setApproveSuccess] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   async function loadDraft() {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -102,6 +107,31 @@ export function InvoiceDraftDetailPage() {
     await loadDraft();
   }
 
+  async function handleApprove() {
+    if (!state.draft || !canApproveBillingInvoiceDraft(state.draft)) return;
+
+    const confirmed = window.confirm(`Approve invoice draft ${state.draft.draft_no}?`);
+    if (!confirmed) return;
+
+    setApproving(true);
+    setApproveError(null);
+    setApproveSuccess(false);
+
+    const result = await approveBillingInvoiceDraft({
+      draftId: state.draft.id,
+    });
+
+    setApproving(false);
+
+    if (result.error) {
+      setApproveError(result.error);
+      return;
+    }
+
+    await loadDraft();
+    setApproveSuccess(true);
+  }
+
   if (state.loading) {
     return (
       <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
@@ -124,6 +154,7 @@ export function InvoiceDraftDetailPage() {
 
   const { draft } = state;
   const canCancel = canCancelBillingInvoiceDraft(draft);
+  const canApprove = canApproveBillingInvoiceDraft(draft);
 
   return (
     <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
@@ -134,18 +165,51 @@ export function InvoiceDraftDetailPage() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Link className="btn btn-outline" to="/billing/invoice-drafts">Back to List</Link>
+        {canApprove ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleApprove}
+            disabled={approving || cancelling}
+            data-testid="invoice-draft-approve-button"
+          >
+            {approving ? 'Approving...' : 'Approve Draft'}
+          </button>
+        ) : null}
         {canCancel ? (
           <button
             type="button"
             className="btn btn-danger"
             onClick={handleCancel}
-            disabled={cancelling}
+            disabled={cancelling || approving}
             data-testid="invoice-draft-cancel-button"
           >
             {cancelling ? 'Cancelling...' : 'Cancel Draft'}
           </button>
         ) : null}
       </div>
+
+      {approveSuccess ? (
+        <div
+          className="section-card"
+          role="status"
+          data-testid="invoice-draft-approve-success-alert"
+          style={{ border: '1px solid #86efac', background: '#f0fdf4', padding: 16, marginBottom: 16 }}
+        >
+          Invoice draft approved.
+        </div>
+      ) : null}
+
+      {approveError ? (
+        <div
+          className="section-card"
+          role="alert"
+          data-testid="invoice-draft-approve-error-alert"
+          style={{ border: '1px solid var(--tgd-danger)', background: '#fff5f5', padding: 16, marginBottom: 16 }}
+        >
+          {formatInvoiceDraftError(approveError)}
+        </div>
+      ) : null}
 
       {cancelError ? (
         <div
@@ -184,9 +248,9 @@ export function InvoiceDraftDetailPage() {
       </DashboardSection>
 
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, marginTop: 16 }}>
-        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-2 boundary</h3>
+        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-3 boundary</h3>
         <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <li>No approve draft workflow</li>
+          <li>Review and approve invoice drafts only</li>
           <li>No Bplus export UI</li>
           <li>No Mark BILLED</li>
           <li>No tax invoice / AR module</li>
