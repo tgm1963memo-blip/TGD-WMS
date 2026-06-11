@@ -45,6 +45,7 @@ import { WarehouseOperationPerformanceReportPage } from '../features/reports/War
 import { MonthlyStorageBillingSummaryPage } from '../features/reports/MonthlyStorageBillingSummaryPage.jsx';
 import { AccountingChargeStagingPreviewPage } from '../features/reports/AccountingChargeStagingPreviewPage.jsx';
 import { AccountingChargeHandoffReviewPage } from '../features/reports/AccountingChargeHandoffReviewPage.jsx';
+import { BillingMovementWeightReportPage } from '../features/reports/BillingMovementWeightReportPage.jsx';
 import { SettingsPage } from '../features/settings/SettingsPage.jsx';
 import { DocumentBrandingPreviewPage } from '../features/admin/DocumentBrandingPreviewPage.jsx';
 import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
@@ -116,6 +117,7 @@ export function AppRoutes() {
           <Route path="/reports/monthly-storage-billing-summary" element={<MonthlyStorageBillingSummaryPage />} />
           <Route path="/reports/accounting-charge-staging-preview" element={<AccountingChargeStagingPreviewPage />} />
           <Route path="/reports/accounting-charge-handoff-review" element={<AccountingChargeHandoffReviewPage />} />
+          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
           <Route path="/admin/document-branding" element={<DocumentBrandingAdminPage />} />
           <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />

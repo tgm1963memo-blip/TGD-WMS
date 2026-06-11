@@ -52,7 +52,8 @@ describe('Sprint 6B movement ledger report foundation', () => {
   it('keeps the movement ledger report service read-only', () => {
     const source = readProjectFile(servicePath);
 
-    expect(source).toContain('.select(');
+    expect(source).toContain('unifiedMovementReadService.js');
+    expect(source).toContain('getUnifiedMovementRows');
     expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     expect(source).not.toContain('.rpc(');
 

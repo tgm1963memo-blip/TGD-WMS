@@ -1,48 +1,10 @@
-import { supabase } from './supabaseClient.js';
+import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
 
 function missingSupabaseClientResult() {
   return {
     data: null,
     error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
   };
-}
-
-function applyMovementFilters(query, filters = {}) {
-  let nextQuery = query;
-
-  if (filters.dateFrom) {
-    nextQuery = nextQuery.gte('created_at', filters.dateFrom);
-  }
-
-  if (filters.dateTo) {
-    nextQuery = nextQuery.lte('created_at', filters.dateTo);
-  }
-
-  if (filters.movementType) {
-    nextQuery = nextQuery.eq('movement_type', filters.movementType);
-  }
-
-  if (filters.productId) {
-    nextQuery = nextQuery.eq('product_id', filters.productId);
-  }
-
-  if (filters.customerId) {
-    nextQuery = nextQuery.eq('customer_id', filters.customerId);
-  }
-
-  if (filters.locationId) {
-    nextQuery = nextQuery.or(`from_location_id.eq.${filters.locationId},to_location_id.eq.${filters.locationId}`);
-  }
-
-  if (filters.warehouseId) {
-    nextQuery = nextQuery.or(`from_warehouse_id.eq.${filters.warehouseId},to_warehouse_id.eq.${filters.warehouseId}`);
-  }
-
-  if (filters.referenceType) {
-    nextQuery = nextQuery.eq('reference_type', filters.referenceType);
-  }
-
-  return nextQuery;
 }
 
 function movementDirection(row) {
@@ -112,19 +74,12 @@ function groupByMovementType(rows = []) {
 }
 
 export async function getMovementLedgerRows(filters = {}) {
-  if (!supabase) {
-    return missingSupabaseClientResult();
+  const result = await getUnifiedMovementRows(filters);
+  if (result.error) {
+    return { data: null, error: result.error };
   }
 
-  const query = applyMovementFilters(
-    supabase
-      .from('tgd_inventory_movements')
-      .select('id, movement_no, movement_type, movement_subtype, customer_id, product_id, lot_id, from_warehouse_id, from_location_id, from_pallet_id, to_warehouse_id, to_location_id, to_pallet_id, qty, uom, reference_type, reference_no, reference_id, reason_code, remark, created_by, created_at, is_reversed, reversed_by_movement_id')
-      .order('created_at', { ascending: false }),
-    filters,
-  );
-
-  return query;
+  return { data: result.data ?? [], error: null };
 }
 
 export async function getMovementLedgerSummary(filters = {}) {
@@ -148,26 +103,10 @@ export async function getMovementTypeBreakdown(filters = {}) {
 }
 
 export async function getMovementByReference(filters = {}) {
-  if (!supabase) {
-    return missingSupabaseClientResult();
+  const result = await getUnifiedMovementRows(filters);
+  if (result.error) {
+    return { data: null, error: result.error };
   }
 
-  let query = supabase
-    .from('tgd_inventory_movements')
-    .select('id, movement_no, movement_type, customer_id, product_id, lot_id, qty, uom, reference_type, reference_no, reference_id, created_by, created_at')
-    .order('created_at', { ascending: false });
-
-  if (filters.referenceType) {
-    query = query.eq('reference_type', filters.referenceType);
-  }
-
-  if (filters.referenceNo) {
-    query = query.eq('reference_no', filters.referenceNo);
-  }
-
-  if (filters.referenceId) {
-    query = query.eq('reference_id', filters.referenceId);
-  }
-
-  return query;
+  return { data: result.data ?? [], error: null };
 }

@@ -1,5 +1,5 @@
 import { OPERATION_CHARGE_TYPES } from '../constants/coldStorageBilling.js';
-import { supabase } from './supabaseClient.js';
+import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -8,29 +8,31 @@ function missingSupabaseClientResult() {
   };
 }
 
-function applyChargeFilters(query, filters = {}) {
-  let nextQuery = query;
-
-  if (filters.customerId) nextQuery = nextQuery.eq('customer_id', filters.customerId);
-  if (filters.warehouseId) nextQuery = nextQuery.eq('warehouse_id', filters.warehouseId);
-  if (filters.productId) nextQuery = nextQuery.eq('product_id', filters.productId);
-  if (filters.chargeType) nextQuery = nextQuery.eq('operation_type', filters.chargeType);
-  if (filters.dateFrom) nextQuery = nextQuery.gte('created_at', filters.dateFrom);
-  if (filters.dateTo) nextQuery = nextQuery.lte('created_at', filters.dateTo);
-
-  return nextQuery;
-}
-
 export async function getOperationChargeLogs(filters = {}) {
-  if (!supabase) return missingSupabaseClientResult();
+  const result = await getUnifiedMovementRows({
+    ...filters,
+    excludeDraft: true,
+  });
 
-  return applyChargeFilters(
-    supabase
-      .from('tgd_inventory_movements')
-      .select('id, customer_id, product_id, lot_id, from_warehouse_id, to_warehouse_id, qty, uom, movement_type, movement_subtype, reference_type, reference_no, remark, created_at')
-      .order('created_at', { ascending: false }),
-    filters,
-  );
+  if (result.error) {
+    return { data: null, error: result.error };
+  }
+
+  const rows = (result.data ?? []).map((row) => ({
+    ...row,
+    operation_type: row.movement_subtype ?? row.movement_type_canonical ?? row.movement_type,
+    warehouse_id: row.to_warehouse_id ?? row.from_warehouse_id ?? null,
+    charge_qty: row.qty,
+  }));
+
+  if (filters.chargeType) {
+    return {
+      data: rows.filter((row) => row.operation_type === filters.chargeType),
+      error: null,
+    };
+  }
+
+  return { data: rows, error: null };
 }
 
 export async function getOperationChargeSummary(filters = {}) {

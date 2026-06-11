@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { getReceivingConfirmedUnifiedMovements } from './unifiedMovementReadService.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -116,6 +117,10 @@ export async function getReceivingStockMovements(documentId) {
     .eq('source_module', 'RECEIVING')
     .eq('source_document_id', documentId)
     .order('created_at', { ascending: true });
+}
+
+export async function getReceivingConfirmedMovements(documentId) {
+  return getReceivingConfirmedUnifiedMovements(documentId);
 }
 
 export async function getReceivingCustomers() {

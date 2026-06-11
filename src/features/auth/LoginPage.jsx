@@ -22,7 +22,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="layout-auth login-layout">
+    <div className="layout-auth login-layout" data-testid="login-page">
       <div className="login-brand-panel">
         <div className="login-brand-content">
           <img alt="TGM logo" className="login-brand-logo" src={brandConfig.logoPath} />

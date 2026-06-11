@@ -56,6 +56,14 @@ const reportDefinitions = [
     minimumRole: 'viewer',
   },
   {
+    key: 'billing_movement_weight_report',
+    title: 'Billing Movement Weight Report',
+    description: 'Read-only preview of movement weight, billable flags, and exclusion reasons before billing approval.',
+    to: '/reports/billing-movement-weight',
+    permissionArea: 'reports',
+    minimumRole: 'viewer',
+  },
+  {
     key: 'accounting_charge_staging_preview',
     title: 'Accounting Charge Staging Preview',
     description: 'Read‑only staging area to review canonical charges and Bplus draft mappings.',

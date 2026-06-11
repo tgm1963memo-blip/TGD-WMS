@@ -58,6 +58,18 @@ export const navigationGroups = [
     ],
   },
   {
+    label: 'Billing',
+    key: 'billing',
+    items: [
+      {
+        label: 'Billing Movement Weight',
+        key: 'billing_movement_weight',
+        path: '/reports/billing-movement-weight',
+        testId: 'billing-menu-item',
+      },
+    ],
+  },
+  {
     label: 'Reports',
     key: 'reports',
     items: [

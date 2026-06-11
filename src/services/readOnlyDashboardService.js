@@ -32,13 +32,16 @@ async function getRowCount(tableName) {
 async function getStockQuantityTotal() {
   const { data, error } = await supabase
     .from('tgd_stock_balances')
-    .select('quantity');
+    .select('quantity, qty_on_hand, qty_available');
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []).reduce((total, row) => total + Number(row.quantity ?? 0), 0);
+  return (data ?? []).reduce((total, row) => {
+    const quantity = Number(row.qty_on_hand ?? row.qty_available ?? row.quantity ?? 0);
+    return total + (Number.isFinite(quantity) ? quantity : 0);
+  }, 0);
 }
 
 export async function getReadOnlyDashboardSummary() {

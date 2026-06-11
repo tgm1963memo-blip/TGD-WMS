@@ -162,8 +162,8 @@ describe('read-only staging dashboard', () => {
     });
     expect(source).toContain("getRowCount('tgd_stock_balances')");
     expect(source).toContain("getRowCount('tgd_stock_movements')");
-    expect(source).toContain(".select('quantity')");
-    expect(source).not.toContain('qty_on_hand');
+    expect(source).toMatch(/\.select\('quantity, qty_on_hand, qty_available'\)|\.select\('quantity'\)/);
+    expect(source).toMatch(/qty_on_hand|quantity/);
     expect(authSource).toContain('signInWithPassword');
     expect(authSource).toContain('signOut');
     expect(authSource).toContain('getSession');

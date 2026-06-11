@@ -57,6 +57,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/reports/storage-aging', route_name: 'StorageAgingReportPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: '' },
   { route_path: '/reports/warehouse-operation-performance', route_name: 'WarehouseOperationPerformanceReportPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: '' },
   { route_path: '/reports/monthly-storage-billing-summary', route_name: 'MonthlyStorageBillingSummaryPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: '' },
+  { route_path: '/reports/billing-movement-weight', route_name: 'BillingMovementWeightReportPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: 'Gate 3A read-only billing movement weight preview' },
   // Accounting Review (accounting)
   { route_path: '/reports/accounting-charge-staging-preview', route_name: 'AccountingChargeStagingPreviewPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },
   { route_path: '/reports/accounting-charge-handoff-review', route_name: 'AccountingChargeHandoffReviewPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },

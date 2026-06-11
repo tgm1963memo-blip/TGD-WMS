@@ -157,8 +157,8 @@ describe('17B App Shell and Navigation UI', () => {
     const sidebar = screen.getByTestId('sidebar');
     const groupLabels = sidebar.querySelectorAll('.nav-group-label');
 
-    // 7 groups: Main Operation, Inbound, Inventory, Outbound, Barcode, Reports, System Admin
-    expect(groupLabels.length).toBe(7);
+    // 8 groups: Main Operation, Inbound, Inventory, Outbound, Barcode, Billing, Reports, System Admin
+    expect(groupLabels.length).toBe(8);
   });
 
   // ── Additional Menu Items ───────────────────────────────────

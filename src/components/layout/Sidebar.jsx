@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { navigationGroups } from '../../app/navigation.js';
 import { brandConfig } from '../../config/brandConfig.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 
 /**
  * Professional Black & Gold sidebar navigation (approved mockup style).
@@ -49,6 +50,7 @@ export function Sidebar() {
                         isActive ? 'nav-link nav-item active' : 'nav-link nav-item'
                       }
                       to={item.path}
+                      data-testid={item.testId}
                     >
                       {itemLabel}
                     </NavLink>
@@ -59,6 +61,8 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <UserSessionMenu />
 
       <div
         className="production-hold-banner sidebar-hold-banner"
