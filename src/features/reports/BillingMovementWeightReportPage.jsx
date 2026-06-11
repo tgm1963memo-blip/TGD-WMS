@@ -19,6 +19,8 @@ import {
   getMovementDraftSelectionState,
   validateInvoiceDraftSourceRows,
 } from '../../utils/billingInvoiceDraftUtils.js';
+import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import {
   calculateBillingMovementWeightSummary,
   classifyBillingMovementWeightError,
@@ -35,6 +37,8 @@ const initialState = {
 export function BillingMovementWeightReportPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const userRole = getCurrentUserRole();
+  const canCreateDraft = canWriteBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
   const [customers, setCustomers] = useState([]);
@@ -76,22 +80,28 @@ export function BillingMovementWeightReportPage() {
       }
 
       const rows = result.data ?? [];
-      const movementIds = rows.map((row) => row.movement_id).filter(Boolean);
-      const duplicateResult = await findActiveDuplicateDraftLines(movementIds);
-      if (!isMounted) return;
+      let guardedRows = rows;
 
-      if (duplicateResult.error) {
-        setState({
-          rows: [],
-          loading: false,
-          error: duplicateResult.error,
-          source: result.source ?? null,
-        });
-        return;
+      if (canCreateDraft) {
+        const movementIds = rows.map((row) => row.movement_id).filter(Boolean);
+        const duplicateResult = await findActiveDuplicateDraftLines(movementIds);
+        if (!isMounted) return;
+
+        if (duplicateResult.error) {
+          setState({
+            rows: [],
+            loading: false,
+            error: duplicateResult.error,
+            source: result.source ?? null,
+          });
+          return;
+        }
+
+        guardedRows = applyActiveDuplicateDraftGuards(rows, duplicateResult.data ?? []);
       }
 
       setState({
-        rows: applyActiveDuplicateDraftGuards(rows, duplicateResult.data ?? []),
+        rows: guardedRows,
         loading: false,
         error: null,
         source: result.source ?? null,
@@ -101,7 +111,7 @@ export function BillingMovementWeightReportPage() {
     return () => {
       isMounted = false;
     };
-  }, [filters]);
+  }, [canCreateDraft, filters]);
 
   useEffect(() => {
     setSelectedMovementIds(new Set());
@@ -215,15 +225,17 @@ export function BillingMovementWeightReportPage() {
           Selected rows: {selectedMovementIds.size}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleCreateDraft}
-            disabled={state.loading || creatingDraft || selectedMovementIds.size === 0}
-            data-testid="create-invoice-draft-button"
-          >
-            {creatingDraft ? 'Creating Draft...' : 'Create Draft'}
-          </button>
+          {canCreateDraft ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleCreateDraft}
+              disabled={state.loading || creatingDraft || selectedMovementIds.size === 0}
+              data-testid="create-invoice-draft-button"
+            >
+              {creatingDraft ? 'Creating Draft...' : 'Create Draft'}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-outline"
@@ -304,9 +316,9 @@ export function BillingMovementWeightReportPage() {
           loading={state.loading}
           error={state.error}
           selectedMovementIds={selectedMovementIds}
-          onToggleRow={toggleRowSelection}
-          onToggleAllSelectable={toggleAllSelectable}
-          getSelectionState={getMovementDraftSelectionState}
+          onToggleRow={canCreateDraft ? toggleRowSelection : null}
+          onToggleAllSelectable={canCreateDraft ? toggleAllSelectable : null}
+          getSelectionState={canCreateDraft ? getMovementDraftSelectionState : null}
           emptyState={(
             <div
               className="section-card"

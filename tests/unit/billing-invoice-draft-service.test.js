@@ -687,6 +687,21 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(result.data.header_preview.customer_code).toBeNull();
   });
 
+  it('maps billing invoice draft RLS errors to a user-friendly permission message', async () => {
+    fromMock.mockImplementation(() => createTableChain('tgd_billing_invoice_drafts', {
+      order: async () => ({
+        data: null,
+        error: { message: 'new row violates row-level security policy', code: '42501' },
+      }),
+    }));
+
+    const result = await listBillingInvoiceDrafts();
+
+    expect(result.data).toBeNull();
+    expect(result.error?.code).toBe('INVOICE_DRAFT_PERMISSION_DENIED');
+    expect(result.error?.message).toBe('You do not have permission to access billing invoice drafts.');
+  });
+
   it('surfaces unexpected Supabase customer lookup errors', async () => {
     const draft = {
       id: 'draft-1',
@@ -694,7 +709,7 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
       status: 'APPROVED',
       total_chargeable_weight: 250,
     };
-    const lookupError = { message: 'permission denied for table tgd_customers', code: '42501' };
+    const lookupError = { message: 'connection timeout while reading tgd_customers', code: 'PGRST000' };
 
     fromMock.mockImplementation((tableName) => {
       if (tableName === 'tgd_billing_invoice_drafts') {

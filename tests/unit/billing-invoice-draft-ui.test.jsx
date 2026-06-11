@@ -54,6 +54,15 @@ vi.mock('../../src/i18n/languageProvider.jsx', () => ({
   useLanguage: () => ({ language: 'en' }),
 }));
 
+const { getCurrentUserRoleMock } = vi.hoisted(() => ({
+  getCurrentUserRoleMock: vi.fn(() => 'admin'),
+}));
+
+vi.mock('../../src/security/currentUserRole.js', () => ({
+  getCurrentUserRole: getCurrentUserRoleMock,
+  normalizeUserRole: (role) => String(role ?? 'admin').trim().toLowerCase(),
+}));
+
 const { InvoiceDraftListPage } = await import('../../src/features/billing/InvoiceDraftListPage.jsx');
 const { InvoiceDraftDetailPage } = await import('../../src/features/billing/InvoiceDraftDetailPage.jsx');
 const { BillingMovementWeightReportPage } = await import('../../src/features/reports/BillingMovementWeightReportPage.jsx');
@@ -89,6 +98,7 @@ function readProjectFile(relativePath) {
 
 describe('Gate 3B-2 billing invoice draft UI', () => {
   beforeEach(() => {
+    getCurrentUserRoleMock.mockReturnValue('admin');
     listBillingInvoiceDraftsMock.mockReset();
     getBillingInvoiceDraftByIdMock.mockReset();
     createBillingInvoiceDraftFromMovementsMock.mockReset();
@@ -555,5 +565,119 @@ describe('Gate 3B-4 billing invoice draft Bplus readiness UI', () => {
   it('updates list page guidance copy for Gate 3B-4', async () => {
     render(<MemoryRouter><InvoiceDraftListPage /></MemoryRouter>);
     expect(await screen.findByText(/Export to Bplus is not enabled yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
+  beforeEach(() => {
+    getCurrentUserRoleMock.mockReturnValue('admin');
+    listBillingInvoiceDraftsMock.mockReset();
+    getBillingInvoiceDraftByIdMock.mockReset();
+    getBillingMovementWeightRowsMock.mockReset();
+    findActiveDuplicateDraftLinesMock.mockReset();
+    getCustomersMock.mockReset();
+    getProductsMock.mockReset();
+
+    listBillingInvoiceDraftsMock.mockResolvedValue({ data: [], error: null });
+    getBillingInvoiceDraftByIdMock.mockResolvedValue({
+      data: {
+        draft: {
+          id: 'draft-1',
+          draft_no: 'BID-20260608-0001',
+          customer_name: 'Alpha',
+          status: 'DRAFT',
+          total_qty: 10,
+          total_chargeable_weight: 100,
+          currency: 'THB',
+        },
+        lines: [],
+      },
+      error: null,
+    });
+    getCustomersMock.mockResolvedValue({ data: [], error: null });
+    getProductsMock.mockResolvedValue({ data: [], error: null });
+    getBillingMovementWeightRowsMock.mockResolvedValue({
+      data: [validMovement],
+      error: null,
+      source: 'billing_database_view',
+    });
+    findActiveDuplicateDraftLinesMock.mockResolvedValue({ data: [], error: null });
+  });
+
+  it('hides create draft controls for viewer role', async () => {
+    getCurrentUserRoleMock.mockReturnValue('viewer');
+
+    render(
+      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
+        <Routes>
+          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('billing-movement-weight-report-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-invoice-draft-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('billing-movement-row-checkbox')).not.toBeInTheDocument();
+    expect(findActiveDuplicateDraftLinesMock).not.toHaveBeenCalled();
+  });
+
+  it('shows create draft controls for accounting role', async () => {
+    getCurrentUserRoleMock.mockReturnValue('accounting');
+
+    render(
+      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
+        <Routes>
+          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('create-invoice-draft-button')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('billing-movement-row-checkbox')).toHaveLength(1);
+  });
+
+  it('hides approve and cancel buttons for warehouse_manager read-only role', async () => {
+    getCurrentUserRoleMock.mockReturnValue('warehouse_manager');
+
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('billing-invoice-draft-detail-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('invoice-draft-approve-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('invoice-draft-cancel-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('export-bplus-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mark-billed-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bplus-invoice-no-input')).not.toBeInTheDocument();
+  });
+
+  it('shows approve and cancel buttons for accounting role', async () => {
+    getCurrentUserRoleMock.mockReturnValue('accounting');
+
+    render(
+      <MemoryRouter initialEntries={['/billing/invoice-drafts/draft-1']}>
+        <Routes>
+          <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('invoice-draft-approve-button')).toBeInTheDocument();
+    expect(screen.getByTestId('invoice-draft-cancel-button')).toBeInTheDocument();
+  });
+
+  it('shows permission denied on invoice draft list for viewer role', async () => {
+    getCurrentUserRoleMock.mockReturnValue('viewer');
+
+    render(<MemoryRouter><InvoiceDraftListPage /></MemoryRouter>);
+
+    expect(await screen.findByTestId('billing-invoice-draft-permission-denied')).toHaveTextContent(
+      'You do not have permission to access billing invoice drafts.',
+    );
+    expect(listBillingInvoiceDraftsMock).not.toHaveBeenCalled();
   });
 });

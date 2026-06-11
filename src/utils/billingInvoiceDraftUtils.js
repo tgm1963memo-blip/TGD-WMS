@@ -293,8 +293,20 @@ export function getMovementDraftSelectionState(row = {}) {
   return { selectable: true, reason: null };
 }
 
+export function isBillingInvoiceDraftPermissionError(error) {
+  if (!error) return false;
+  const code = String(error.code ?? '');
+  const message = String(error.message ?? error.details ?? '');
+  return code === '42501'
+    || code === 'INVOICE_DRAFT_PERMISSION_DENIED'
+    || /permission denied|row-level security|violates row-level security|not authorized/i.test(message);
+}
+
 export function formatInvoiceDraftError(error) {
   if (!error) return 'Unknown invoice draft error.';
+  if (isBillingInvoiceDraftPermissionError(error)) {
+    return 'You do not have permission to access billing invoice drafts.';
+  }
   if (error.code === 'INVOICE_DRAFT_VALIDATION') {
     if (Array.isArray(error.details?.errors) && error.details.errors.length) {
       return error.details.errors.join(' ');

@@ -19,6 +19,11 @@ import {
   canCancelBillingInvoiceDraft,
   formatInvoiceDraftError,
 } from '../../utils/billingInvoiceDraftUtils.js';
+import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import {
+  canReadBillingInvoiceDrafts,
+  canWriteBillingInvoiceDrafts,
+} from '../../security/billingInvoiceDraftPermissions.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -34,6 +39,9 @@ function formatNumber(value) {
 export function InvoiceDraftDetailPage() {
   const { draftId } = useParams();
   const { language } = useLanguage();
+  const userRole = getCurrentUserRole();
+  const canRead = canReadBillingInvoiceDrafts(userRole);
+  const canWrite = canWriteBillingInvoiceDrafts(userRole);
   const [state, setState] = useState({ draft: null, lines: [], loading: true, error: null });
   const [cancelError, setCancelError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
@@ -60,7 +68,7 @@ export function InvoiceDraftDetailPage() {
   }
 
   useEffect(() => {
-    if (!draftId) return undefined;
+    if (!draftId || !canRead) return undefined;
     let isMounted = true;
 
     getBillingInvoiceDraftById(draftId).then((result) => {
@@ -80,7 +88,24 @@ export function InvoiceDraftDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [draftId]);
+  }, [canRead, draftId]);
+
+  if (!canRead) {
+    return (
+      <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
+        <PageHeader title="Invoice Draft Detail" description="Access restricted." />
+        <div
+          className="section-card"
+          role="alert"
+          data-testid="billing-invoice-draft-permission-denied"
+          style={{ border: '1px solid var(--tgd-danger)', background: '#fff5f5', padding: 16 }}
+        >
+          {formatInvoiceDraftError({ code: 'INVOICE_DRAFT_PERMISSION_DENIED' })}
+        </div>
+        <Link className="btn btn-outline" to="/reports/billing-movement-weight">Back to Billing Report</Link>
+      </section>
+    );
+  }
 
   async function handleCancel() {
     if (!state.draft || !canCancelBillingInvoiceDraft(state.draft)) return;
@@ -178,8 +203,8 @@ export function InvoiceDraftDetailPage() {
   }
 
   const { draft } = state;
-  const canCancel = canCancelBillingInvoiceDraft(draft);
-  const canApprove = canApproveBillingInvoiceDraft(draft);
+  const canCancel = canWrite && canCancelBillingInvoiceDraft(draft);
+  const canApprove = canWrite && canApproveBillingInvoiceDraft(draft);
 
   return (
     <section className="page-shell" data-testid="billing-invoice-draft-detail-page">

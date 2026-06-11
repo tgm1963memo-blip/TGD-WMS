@@ -1,4 +1,4 @@
-import { INVOICE_DRAFT_STATUS } from '../../utils/billingInvoiceDraftUtils.js';
+import { INVOICE_DRAFT_STATUS, formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
 import { BPLUS_EXPORT_READINESS_STATUS } from '../../utils/billingInvoiceDraftBplusExportUtils.js';
 
 function formatDate(value) {
@@ -61,7 +61,7 @@ export function InvoiceDraftBplusReadinessPanel({
 
       {error ? (
         <div role="alert" style={{ marginTop: 16, color: 'var(--tgd-danger)' }}>
-          {error.message || String(error)}
+          {formatInvoiceDraftError(error)}
         </div>
       ) : null}
 

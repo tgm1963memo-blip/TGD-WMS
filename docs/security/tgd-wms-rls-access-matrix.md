@@ -34,6 +34,15 @@
 | tgd_monthly_storage_snapshots | READ_WRITE | READ | READ | READ_WRITE | READ |
 | tgd_accounting_charge_staging | READ_WRITE | READ | NONE | READ_WRITE | READ |
 | tgd_customer_owned_inventory | READ_WRITE | READ_WRITE | READ_WRITE | READ | READ |
+| tgd_billing_invoice_drafts | READ_WRITE | READ | NONE | READ_WRITE | NONE |
+| tgd_billing_invoice_draft_lines | READ_WRITE | READ | NONE | READ_WRITE | NONE |
+
+**Gate 3B-RLS billing invoice draft notes (migration 039)**
+- `warehouse_manager`: SELECT only on draft header/lines (read-only UAT review).
+- `warehouse_staff` / `viewer`: no billing invoice draft table access.
+- `admin` / `accounting`: SELECT, INSERT, UPDATE (no DELETE; status lifecycle remains service-validated).
+- Customer-scoped profiles: rows limited to matching `customer_id`; internal users with null `customer_id` see global scope.
+- `tgd_next_billing_invoice_draft_no()` remains executable by `authenticated`; unauthorized inserts are blocked by RLS.
 
 **Access Labels**
 - **NONE** – No access.

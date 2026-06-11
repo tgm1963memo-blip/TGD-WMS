@@ -21,6 +21,9 @@ import {
   evaluateInvoiceDraftBplusExportReadiness,
   normalizeCustomerForBplusReadiness,
 } from '../utils/billingInvoiceDraftBplusExportUtils.js';
+import {
+  isBillingInvoiceDraftPermissionError,
+} from '../utils/billingInvoiceDraftUtils.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -34,6 +37,16 @@ function validationError(message, details = {}) {
   error.code = 'INVOICE_DRAFT_VALIDATION';
   error.details = details;
   return error;
+}
+
+function normalizeServiceError(error) {
+  if (!error || !isBillingInvoiceDraftPermissionError(error)) {
+    return error;
+  }
+
+  const normalized = new Error('You do not have permission to access billing invoice drafts.');
+  normalized.code = 'INVOICE_DRAFT_PERMISSION_DENIED';
+  return normalized;
 }
 
 async function resolveDraftNo() {
@@ -91,7 +104,7 @@ export async function findActiveDuplicateDraftLines(movementIds = []) {
     .in('source_movement_id', normalizedIds);
 
   if (result.error) {
-    return { data: null, error: result.error };
+    return { data: null, error: normalizeServiceError(result.error) };
   }
 
   return {
@@ -116,7 +129,7 @@ export async function listBillingInvoiceDrafts(filters = {}) {
 
   const result = await query;
   if (result.error) {
-    return { data: null, error: result.error };
+    return { data: null, error: normalizeServiceError(result.error) };
   }
 
   return {
@@ -138,7 +151,7 @@ export async function getBillingInvoiceDraftById(id) {
     .maybeSingle();
 
   if (headerResult.error) {
-    return { data: null, error: headerResult.error };
+    return { data: null, error: normalizeServiceError(headerResult.error) };
   }
 
   if (!headerResult.data) {
@@ -152,7 +165,7 @@ export async function getBillingInvoiceDraftById(id) {
     .order('created_at', { ascending: true });
 
   if (linesResult.error) {
-    return { data: null, error: linesResult.error };
+    return { data: null, error: normalizeServiceError(linesResult.error) };
   }
 
   return {
@@ -223,7 +236,7 @@ export async function createBillingInvoiceDraftFromMovements({
     .single();
 
   if (headerInsert.error) {
-    return { data: null, error: headerInsert.error };
+    return { data: null, error: normalizeServiceError(headerInsert.error) };
   }
 
   const draftId = headerInsert.data.id;
@@ -238,7 +251,7 @@ export async function createBillingInvoiceDraftFromMovements({
     .select('*');
 
   if (linesInsert.error) {
-    return { data: null, error: linesInsert.error };
+    return { data: null, error: normalizeServiceError(linesInsert.error) };
   }
 
   return {
@@ -289,7 +302,7 @@ export async function cancelBillingInvoiceDraft({
     .single();
 
   if (headerUpdate.error) {
-    return { data: null, error: headerUpdate.error };
+    return { data: null, error: normalizeServiceError(headerUpdate.error) };
   }
 
   const linesUpdate = await supabase
@@ -299,7 +312,7 @@ export async function cancelBillingInvoiceDraft({
     .eq('duplicate_guard_active', true);
 
   if (linesUpdate.error) {
-    return { data: null, error: linesUpdate.error };
+    return { data: null, error: normalizeServiceError(linesUpdate.error) };
   }
 
   return {
@@ -342,7 +355,7 @@ export async function approveBillingInvoiceDraft({
     .single();
 
   if (result.error) {
-    return { data: null, error: result.error };
+    return { data: null, error: normalizeServiceError(result.error) };
   }
 
   return {
@@ -387,7 +400,7 @@ export async function updateBillingInvoiceDraftMeta({
     .single();
 
   if (result.error) {
-    return { data: null, error: result.error };
+    return { data: null, error: normalizeServiceError(result.error) };
   }
 
   return {
@@ -417,7 +430,7 @@ export async function getBillingInvoiceDraftBplusExportReadiness(draftId) {
       .maybeSingle();
 
     if (customerResult.error) {
-      return { data: null, error: customerResult.error };
+      return { data: null, error: normalizeServiceError(customerResult.error) };
     }
 
     customer = normalizeCustomerForBplusReadiness(customerResult.data);
