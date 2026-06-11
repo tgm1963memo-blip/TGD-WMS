@@ -58,6 +58,42 @@ export const navigationGroups = [
     ],
   },
   {
+    label: 'Customer Portal',
+    key: 'customer_portal',
+    items: [
+      {
+        label: 'Portal Overview',
+        key: 'customer_portal_home',
+        path: '/customer',
+        testId: 'customer-portal-menu-item',
+      },
+      {
+        label: 'Customer Deposit',
+        key: 'customer_deposit_request',
+        path: '/customer/deposit-request',
+        testId: 'customer-deposit-request-menu-item',
+      },
+      {
+        label: 'Customer Stock',
+        key: 'customer_stock_balance',
+        path: '/customer/stock-balance',
+        testId: 'customer-stock-balance-menu-item',
+      },
+      {
+        label: 'Customer Withdrawal',
+        key: 'customer_withdrawal_request',
+        path: '/customer/withdrawal-request',
+        testId: 'customer-withdrawal-request-menu-item',
+      },
+      {
+        label: 'Customer Requests',
+        key: 'customer_request_history',
+        path: '/customer/requests',
+        testId: 'customer-request-history-menu-item',
+      },
+    ],
+  },
+  {
     label: 'Billing',
     key: 'billing',
     items: [

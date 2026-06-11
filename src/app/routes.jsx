@@ -59,6 +59,11 @@ import { LoginPage } from '../features/auth/LoginPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.jsx';
+import { CustomerPortalDashboardPage } from '../features/customer/CustomerPortalDashboardPage.jsx';
+import { CustomerDepositRequestPage } from '../features/customer/CustomerDepositRequestPage.jsx';
+import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
+import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
+import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
 
 function LegacyPlaceholderPage({ title }) {
   return (
@@ -132,6 +137,11 @@ export function AppRoutes() {
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+          <Route path="/customer" element={<CustomerPortalDashboardPage />} />
+          <Route path="/customer/deposit-request" element={<CustomerDepositRequestPage />} />
+          <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
+          <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />
+          <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
 
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/products" element={<ProductsPage />} />

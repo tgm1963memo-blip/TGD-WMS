@@ -6,6 +6,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 import { getCurrentUserRole } from '../../security/currentUserRole.js';
 import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
+import { isCustomerPortalNavigationVisible } from '../../security/customerPortalPermissions.js';
 
 /**
  * Professional Black & Gold sidebar navigation (approved mockup style).
@@ -32,6 +33,10 @@ export function Sidebar() {
               <p className="nav-group-label">{groupLabel}</p>
               <div className="nav-list">
                 {group.items.map((item) => {
+                  if (group.key === 'customer_portal' && !isCustomerPortalNavigationVisible(userRole)) {
+                    return null;
+                  }
+
                   if (!isBillingNavigationItemVisible(item.key, userRole)) {
                     return null;
                   }

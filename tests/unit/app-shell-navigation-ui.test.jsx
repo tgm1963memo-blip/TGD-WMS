@@ -72,6 +72,7 @@ describe('17B App Shell and Navigation UI', () => {
       'Inventory Control',
       'Outbound Management',
       'Barcode / Handheld',
+      'Customer Portal',
       'Reports',
       'System Administration',
     ];
@@ -157,8 +158,8 @@ describe('17B App Shell and Navigation UI', () => {
     const sidebar = screen.getByTestId('sidebar');
     const groupLabels = sidebar.querySelectorAll('.nav-group-label');
 
-    // 8 groups: Main Operation, Inbound, Inventory, Outbound, Barcode, Billing, Reports, System Admin
-    expect(groupLabels.length).toBe(8);
+    // 9 groups: Main Operation, Inbound, Inventory, Outbound, Barcode, Customer Portal, Billing, Reports, System Admin
+    expect(groupLabels.length).toBe(9);
   });
 
   // ── Additional Menu Items ───────────────────────────────────
@@ -175,6 +176,9 @@ describe('17B App Shell and Navigation UI', () => {
       'Master Data',
       'Handheld Receiving',
       'Scan Center',
+      'Customer Deposit',
+      'Customer Requests',
+      'Portal Overview',
     ];
 
     it.each(additionalItems)('contains item: %s', (item) => {
