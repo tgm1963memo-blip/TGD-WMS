@@ -47,17 +47,25 @@ timeline insert. Execute is revoked from `PUBLIC`/`anon` and granted only to
 | Deposit | ADMIN_REVIEWING | ACCEPT | ADMIN_ACCEPTED |
 | Deposit | ADMIN_REVIEWING | REJECT | ADMIN_REJECTED |
 | Deposit | DRAFT, SUBMITTED_BY_CUSTOMER | customer CANCEL | CANCELLED |
-| Deposit | non-terminal | admin/accounting CANCEL | CANCELLED |
+| Deposit | non-terminal except listed terminal statuses | admin/accounting CANCEL | CANCELLED |
 | Withdrawal | WITHDRAWAL_DRAFT | SUBMIT | SUBMITTED_BY_CUSTOMER |
 | Withdrawal | SUBMITTED_BY_CUSTOMER | REVIEWING | ADMIN_REVIEWING |
 | Withdrawal | ADMIN_REVIEWING | ACCEPT | ADMIN_ACCEPTED |
 | Withdrawal | ADMIN_REVIEWING | REJECT | ADMIN_REJECTED |
 | Withdrawal | WITHDRAWAL_DRAFT, SUBMITTED_BY_CUSTOMER | customer CANCEL | CANCELLED |
-| Withdrawal | non-terminal | admin/accounting CANCEL | CANCELLED |
+| Withdrawal | non-terminal except listed terminal statuses | admin/accounting CANCEL | CANCELLED |
 
-For this gate, terminal cancellation states are `ADMIN_REJECTED`, `CLOSED`, and
-`CANCELLED`. Later business gates should confirm whether operational completion
-statuses need an additional cancellation prohibition.
+Terminal cancellation guards are complete in the patched migration:
+
+- Deposit terminal statuses: `ADMIN_REJECTED`, `RECEIVED_CONFIRMED`,
+  `CUSTOMER_NOTIFIED`, `CLOSED`, `CANCELLED`
+- Withdrawal terminal statuses: `ADMIN_REJECTED`, `LOADED_CONFIRMED`,
+  `CUSTOMER_NOTIFIED`, `CLOSED`, `CANCELLED`
+
+Customer cancellation remains limited to `DRAFT` / `SUBMITTED_BY_CUSTOMER` for
+deposits and `WITHDRAWAL_DRAFT` / `SUBMITTED_BY_CUSTOMER` for withdrawals.
+Admin/accounting cancellation rejects every terminal status listed above, so a
+completed or customer-notified document cannot be changed to `CANCELLED`.
 
 ## 5. Role and scope matrix
 

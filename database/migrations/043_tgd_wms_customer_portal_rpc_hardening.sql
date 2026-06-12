@@ -352,7 +352,13 @@ begin
     if v_document.status not in ('DRAFT', 'SUBMITTED_BY_CUSTOMER') then
       raise exception 'Customer cannot cancel deposit request from status %', v_document.status;
     end if;
-  elsif v_document.status in ('ADMIN_REJECTED', 'CLOSED', 'CANCELLED') then
+  elsif v_document.status in (
+    'ADMIN_REJECTED',
+    'RECEIVED_CONFIRMED',
+    'CUSTOMER_NOTIFIED',
+    'CLOSED',
+    'CANCELLED'
+  ) then
     raise exception 'Deposit request is terminal and cannot be cancelled';
   end if;
 
@@ -588,7 +594,13 @@ begin
     if v_document.status not in ('WITHDRAWAL_DRAFT', 'SUBMITTED_BY_CUSTOMER') then
       raise exception 'Customer cannot cancel withdrawal request from status %', v_document.status;
     end if;
-  elsif v_document.status in ('ADMIN_REJECTED', 'CLOSED', 'CANCELLED') then
+  elsif v_document.status in (
+    'ADMIN_REJECTED',
+    'LOADED_CONFIRMED',
+    'CUSTOMER_NOTIFIED',
+    'CLOSED',
+    'CANCELLED'
+  ) then
     raise exception 'Withdrawal request is terminal and cannot be cancelled';
   end if;
 

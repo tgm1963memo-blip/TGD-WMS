@@ -46,6 +46,23 @@ describe('CUSTOMER-PORTAL-2E RPC hardening draft', () => {
     expect(migration).toContain("v_decision not in ('ACCEPT', 'REJECT', 'REVIEWING')");
   });
 
+  it('blocks admin and accounting cancellation from all terminal statuses', () => {
+    const migration = readMigration();
+
+    expect(migration).toMatch(
+      /v_document\.status in \(\s*'ADMIN_REJECTED',\s*'RECEIVED_CONFIRMED',\s*'CUSTOMER_NOTIFIED',\s*'CLOSED',\s*'CANCELLED'\s*\)/,
+    );
+    expect(migration).toMatch(
+      /v_document\.status in \(\s*'ADMIN_REJECTED',\s*'LOADED_CONFIRMED',\s*'CUSTOMER_NOTIFIED',\s*'CLOSED',\s*'CANCELLED'\s*\)/,
+    );
+    expect(migration).toContain(
+      "v_document.status not in ('DRAFT', 'SUBMITTED_BY_CUSTOMER')",
+    );
+    expect(migration).toContain(
+      "v_document.status not in ('WITHDRAWAL_DRAFT', 'SUBMITTED_BY_CUSTOMER')",
+    );
+  });
+
   it('checks active profiles, roles, and customer scope', () => {
     const migration = readMigration();
 
