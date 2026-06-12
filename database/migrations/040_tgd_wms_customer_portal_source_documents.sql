@@ -598,6 +598,13 @@ for insert
 to authenticated
 with check (
   public.tgd_current_user_is_active()
+  and (
+    public.tgd_current_user_role() in ('admin', 'accounting', 'warehouse_manager', 'warehouse_staff')
+    or (
+      public.tgd_current_user_role() in ('customer_admin', 'customer_user')
+      and public.tgd_current_user_customer_id() = customer_id
+    )
+  )
 );
 
 revoke delete on public.tgd_customer_deposit_requests from anon, authenticated;
