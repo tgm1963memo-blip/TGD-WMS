@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { describe, expect, it, vi } from 'vitest';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
@@ -34,21 +35,26 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
 
     expect(source).not.toContain('createHref="/operations/receiving/new"');
     expect(source).toContain('createHref={canWrite ? "/operations/receiving/create" : null}');
-    expect(source).toContain('createLabel={canWrite ? "Create Receiving Draft" : null}');
-    // Confirm/Post is no longer locked – message must reflect RPC availability
-    expect(source).toContain('Confirm/Post is available on draft page via RPC');
-    expect(source).not.toContain('Confirm/Post remains locked');
+    expect(source).toContain("createLabel={canWrite ? t('receiving_create_internal_draft') : null}");
+    expect(source).toContain('receiving-source-document-guidance');
+    expect(source).toContain('receiving-customer-deposit-demo-link');
   });
 
   it('Receiving list renders controlled draft navigation with RPC status', async () => {
     render(
       <MemoryRouter>
-        <ReceivingListPage />
+        <LanguageProvider initialLanguage="en">
+          <ReceivingListPage />
+        </LanguageProvider>
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
+    expect(screen.getByTestId('receiving-source-document-guidance')).toBeInTheDocument();
+    expect(screen.getByTestId('receiving-customer-deposit-demo-link')).toHaveAttribute(
+      'href',
+      '/customer/warehouse/receiving',
+    );
+    expect(screen.getByRole('link', { name: 'Create Internal Receiving Draft' })).toHaveAttribute(
       'href',
       '/operations/receiving/create',
     );

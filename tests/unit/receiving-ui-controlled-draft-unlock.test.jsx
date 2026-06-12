@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from '../../src/app/routes.jsx';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 const {
   createReceivingDocument,
@@ -85,6 +86,14 @@ vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
   useAuth: vi.fn(() => ({ session: { user: { id: 'test-user' } }, loading: false, isAuthenticated: true })),
   AuthProvider: ({ children }) => children,
 }));
+
+vi.mock('../../src/security/currentUserRole.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getCurrentUserRole: vi.fn(() => 'warehouse_staff'),
+  };
+});
 
 function renderPage() {
   return render(
@@ -393,12 +402,14 @@ describe('Sprint 13J-AG receiving UI controlled draft unlock', () => {
   it('ReceivingListPage links to the controlled receiving draft page', () => {
     render(
       <MemoryRouter>
-        <ReceivingListPage />
+        <LanguageProvider initialLanguage="en">
+          <ReceivingListPage />
+        </LanguageProvider>
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create Receiving Draft' })).toHaveAttribute(
+    expect(screen.getByTestId('receiving-source-document-guidance')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create Internal Receiving Draft' })).toHaveAttribute(
       'href',
       '/operations/receiving/create',
     );

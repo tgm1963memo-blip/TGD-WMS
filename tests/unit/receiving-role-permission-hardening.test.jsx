@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReceivingCreatePage } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import { ReceivingDetailPage } from '../../src/features/operations/receiving/ReceivingDetailPage.jsx';
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import * as receivingService from '../../src/services/receivingService.js';
 import * as currentUserRole from '../../src/security/currentUserRole.js';
 
@@ -31,25 +32,29 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
   });
 
   describe('ReceivingListPage', () => {
-    it('shows Create Receiving Draft button to authorized role', async () => {
+    it('shows Create Internal Receiving Draft button to authorized role', async () => {
       currentUserRole.getCurrentUserRole.mockReturnValue('warehouse_staff');
       render(
         <MemoryRouter>
-          <ReceivingListPage />
+          <LanguageProvider initialLanguage="en">
+            <ReceivingListPage />
+          </LanguageProvider>
         </MemoryRouter>
       );
-      expect(await screen.findByRole('link', { name: 'Create Receiving Draft' })).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'Create Internal Receiving Draft' })).toBeInTheDocument();
     });
 
-    it('hides Create Receiving Draft button from viewer', async () => {
+    it('hides Create Internal Receiving Draft button from viewer', async () => {
       currentUserRole.getCurrentUserRole.mockReturnValue('viewer');
       render(
         <MemoryRouter>
-          <ReceivingListPage />
+          <LanguageProvider initialLanguage="en">
+            <ReceivingListPage />
+          </LanguageProvider>
         </MemoryRouter>
       );
       await screen.findByText('Receiving Documents');
-      expect(screen.queryByRole('link', { name: 'Create Receiving Draft' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Create Internal Receiving Draft' })).not.toBeInTheDocument();
     });
   });
 

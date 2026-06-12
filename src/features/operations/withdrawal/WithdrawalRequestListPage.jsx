@@ -6,6 +6,7 @@ import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getWithdrawalRequests } from '../../../services/withdrawalRequestService.js';
+import { useTranslation } from '../../../i18n/languageProvider.jsx';
 
 const columns = [
   { key: 'withdrawal_no', header: 'Withdrawal No', render: (row) => <Link to={`/operations/withdrawal-requests/${row.id}`}>{row.withdrawal_no}</Link> },
@@ -18,6 +19,7 @@ const columns = [
 ];
 
 export function WithdrawalRequestListPage() {
+  const t = useTranslation();
   const [state, setState] = useState({ data: [], loading: true, error: null });
 
   useEffect(() => {
@@ -38,6 +40,14 @@ export function WithdrawalRequestListPage() {
     <section className="page-shell">
       <PageHeader title="Withdrawal Requests" description="Customer withdrawal request list." />
       <p className="sprint-status">Sprint status: placeholder only</p>
+      <section className="warning-panel meeting-safety-panel" data-testid="withdrawal-source-document-guidance" role="status">
+        <p>{t('withdrawal_source_document_guidance')}</p>
+      </section>
+      <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
+        <Link className="auth-text-link" data-testid="withdrawal-customer-request-demo-link" to="/customer/warehouse/picking-loading">
+          {t('withdrawal_customer_request_demo_link')}
+        </Link>
+      </section>
       <DocumentToolbar title="Withdrawal Requests" createHref="/operations/withdrawal-requests/new" onRefresh={() => window.location.reload()} />
       <DocumentFilterBar onChange={() => {}} />
       <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No withdrawal requests found." />

@@ -8,8 +8,9 @@ describe('22G Receiving RPC UAT Defect Diagnosis', () => {
     const content = fs.readFileSync(filePath, 'utf-8');
     
     // Verify the static warning panel text exists
-    expect(content).toContain('Confirm/Post is available on draft page via RPC.');
-    expect(content).toContain('className="warning-panel"');
+    expect(content).toContain('receiving-source-document-guidance');
+    expect(content).toContain('receiving_internal_draft_note');
+    expect(content).toContain('className="warning-panel meeting-safety-panel"');
   });
 
   it('should list receiving RPCs used by service but not on list page load', () => {

@@ -628,6 +628,24 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_col_note: { th: 'หมายเหตุ', en: 'Note' },
 });
 
+Object.assign(TRANSLATION_CATALOG, {
+  receiving_source_document_guidance: {
+    th: 'สำหรับการฝากจากลูกค้า การรับเข้าควรสร้างจากใบแจ้งฝากที่ลูกค้าส่งและผ่านการตรวจสอบแล้ว',
+    en: 'For customer deposits, receiving should be created from an approved customer deposit request.',
+  },
+  receiving_internal_draft_note: {
+    th: 'ร่างรับเข้าภายใน (Internal) ใช้สำหรับกรณีพิเศษหรือทดสอบระบบ — Confirm/Post ทำได้ที่หน้ารายละเอียดผ่าน RPC',
+    en: 'Internal receiving draft is for exceptional/manual cases — Confirm/Post is available on the detail page via RPC.',
+  },
+  receiving_create_internal_draft: { th: 'สร้างร่างรับเข้าภายใน', en: 'Create Internal Receiving Draft' },
+  receiving_customer_deposit_demo_link: { th: 'รับเข้าจากใบแจ้งฝากลูกค้า (Demo)', en: 'Receive from customer deposit request (Demo)' },
+  withdrawal_source_document_guidance: {
+    th: 'สำหรับการเบิกของลูกค้า การหยิบ/จ่ายควรเริ่มจากใบแจ้งเบิกที่ลูกค้าส่งและผ่านการตรวจสอบแล้ว',
+    en: 'For customer withdrawals, warehouse picking should start from an approved customer withdrawal request.',
+  },
+  withdrawal_customer_request_demo_link: { th: 'หยิบ/โหลดจากใบแจ้งเบิกลูกค้า (Demo)', en: 'Pick/load from customer withdrawal request (Demo)' },
+});
+
 /** Retrieve a translation for a given key and language. */
 export function getTranslation(key, language) {
   const entry = TRANSLATION_CATALOG[key];

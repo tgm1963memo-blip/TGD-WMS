@@ -8,6 +8,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
 import { hasRoleAccess } from '../../../security/permissionGuard.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
+import { useTranslation } from '../../../i18n/languageProvider.jsx';
 
 const columns = [
   {
@@ -29,6 +30,7 @@ const columns = [
 ];
 
 export function ReceivingListPage() {
+  const t = useTranslation();
   const [state, setState] = useState({ data: [], loading: true, error: null });
   const userRole = getCurrentUserRole();
   const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
@@ -51,24 +53,19 @@ export function ReceivingListPage() {
     <section className="page-shell">
       <PageHeader title="Receiving" description="Inbound receiving document list." />
       <p className="sprint-status">Sprint status: controlled draft only</p>
-      <section
-        className="warning-panel"
-        role="status"
-        style={{
-          background: '#fffbeb',
-          border: '1px solid #fde68a',
-          borderRadius: 8,
-          color: '#92400e',
-          marginBottom: 16,
-          padding: 14,
-        }}
-      >
-        Receiving creation is controlled draft mode only. Confirm/Post is available on draft page via RPC.
+      <section className="warning-panel meeting-safety-panel" data-testid="receiving-source-document-guidance" role="status">
+        <p>{t('receiving_source_document_guidance')}</p>
+        <p style={{ margin: '8px 0 0' }}>{t('receiving_internal_draft_note')}</p>
+      </section>
+      <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
+        <Link className="auth-text-link" data-testid="receiving-customer-deposit-demo-link" to="/customer/warehouse/receiving">
+          {t('receiving_customer_deposit_demo_link')}
+        </Link>
       </section>
       <DocumentToolbar
         title="Receiving Documents"
         createHref={canWrite ? "/operations/receiving/create" : null}
-        createLabel={canWrite ? "Create Receiving Draft" : null}
+        createLabel={canWrite ? t('receiving_create_internal_draft') : null}
         onRefresh={() => window.location.reload()}
       />
       <DocumentFilterBar onChange={() => {}} />
