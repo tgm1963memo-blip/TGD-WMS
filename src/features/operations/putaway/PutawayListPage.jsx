@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
+import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getPutawayDocuments } from '../../../services/putawayService.js';
 
 const columns = [
-  { key: 'putaway_no', header: 'Putaway No', render: (row) => <Link to={`/operations/putaway/${row.id}`}>{row.putaway_no}</Link> },
+  { key: 'putaway_no', header: 'Putaway No', render: (row) => documentLink(`/operations/putaway/${row.id}`, row.putaway_no) },
   { key: 'source_id', header: 'Receiving Ref' },
   { key: 'warehouse_id', header: 'Warehouse' },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+  { key: 'status', header: 'Status', render: renderStatusBadge },
   { key: 'source_type', header: 'Type' },
   { key: 'created_at', header: 'Created At' },
 ];

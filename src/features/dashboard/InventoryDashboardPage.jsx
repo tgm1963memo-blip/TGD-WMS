@@ -6,6 +6,7 @@ import { DocumentFilterBar } from '../../components/operations/DocumentFilterBar
 import { QuantitySummaryCard } from '../../components/operations/QuantitySummaryCard.jsx';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import {
   getExpiringLots,
   getInventoryByCustomer,
@@ -24,10 +25,8 @@ const stockColumns = [
   { key: 'qty_allocated', header: 'Reserved', render: (row) => <span style={{ color: 'var(--tgd-warning)', fontWeight: 600 }}>{row.qty_allocated}</span> },
   { key: 'qty_available', header: 'Available', render: (row) => <span style={{ color: 'var(--tgd-info)', fontWeight: 600 }}>{row.qty_available}</span> },
   { key: 'status', header: 'Status', render: (row) => (
-      <span style={{ padding: '4px 8px', borderRadius: 4, background: row.qty_allocated > 0 ? '#fef3c7' : '#dcfce7', color: row.qty_allocated > 0 ? '#b45309' : '#166534', fontSize: 12, fontWeight: 600 }}>
-        {row.qty_allocated > 0 ? 'Reserved' : 'Available'}
-      </span>
-  )},
+      <StatusBadge value={row.qty_allocated > 0 ? 'Reserved' : 'Available'} />
+    )},
 ];
 
 const lotColumns = [
@@ -104,11 +103,11 @@ export function InventoryDashboardPage() {
         title="Inventory Control" 
         description="Available stock, reservations, lot, location, and movement visibility." 
       />
-      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
-         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+      <div className="dashboard-header-actions operations-page-actions">
+         <span className="production-hold-badge">Production HOLD</span>
       </div>
 
-      <div style={{ background: 'var(--tgd-surface)', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid var(--tgd-border)' }}>
+      <div className="operations-filter-card">
         <DocumentFilterBar onChange={setFilters} />
       </div>
 

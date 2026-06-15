@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
+import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
 import { hasRoleAccess } from '../../../security/permissionGuard.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
@@ -14,18 +14,18 @@ const columns = [
   {
     key: 'receiving_no',
     header: 'Receiving No',
-    render: (row) => <Link to={`/operations/receiving/${row.id}`}>{row.receiving_no || row.document_no}</Link>,
+    render: (row) => documentLink(`/operations/receiving/${row.id}`, row.receiving_no || row.document_no),
   },
   { key: 'customer_id', header: 'Customer' },
   { key: 'warehouse_id', header: 'Warehouse' },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+  { key: 'status', header: 'Status', render: renderStatusBadge },
   { key: 'receiving_type', header: 'Type' },
   { key: 'expected_receive_date', header: 'Date' },
   { key: 'created_at', header: 'Created At' },
   {
     key: 'actions',
     header: 'Actions',
-    render: (row) => <Link to={`/operations/receiving/${row.id}`}>View detail</Link>,
+    render: (row) => <Link className="document-link" to={`/operations/receiving/${row.id}`}>View detail</Link>,
   },
 ];
 
@@ -52,7 +52,7 @@ export function ReceivingListPage() {
   return (
     <section className="page-shell">
       <PageHeader title="Receiving" description="Inbound receiving document list." />
-      <p className="sprint-status">Sprint status: controlled draft only</p>
+      <p className="sprint-status sprint-status--compact">Sprint status: controlled draft only</p>
       <section className="warning-panel meeting-safety-panel" data-testid="receiving-source-document-guidance" role="status">
         <p>{t('receiving_source_document_guidance')}</p>
         <p style={{ margin: '8px 0 0' }}>{t('receiving_internal_draft_note')}</p>

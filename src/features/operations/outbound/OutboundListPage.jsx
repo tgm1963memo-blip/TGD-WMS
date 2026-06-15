@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { DeliverySlipTemplate } from '../../../components/reports/DeliverySlipTemplate.jsx';
 import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
 import { getTranslation } from '../../../i18n/translationCatalog.js';
 import { useLanguage } from '../../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../../utils/documentDisplayUtils.js';
 import {
   getOutboundDocumentDetail,
   listOutboundDocuments,
@@ -12,46 +14,6 @@ import {
 import { mapOutboundDetailToDeliverySlipData } from '../../../services/operationalReportMapper.js';
 
 const safetyNote = 'Read-only outbound list/detail. No post outbound. No stock movement OUT. No stock balance update.';
-
-function StatusPill({ value }) {
-  let bg = '#eff6ff';
-  let border = '#bfdbfe';
-  let color = '#1d4ed8';
-
-  if (value === 'DRAFT') {
-    bg = '#f3f4f6';
-    border = '#e5e7eb';
-    color = '#4b5563';
-  } else if (value === 'RESERVED') {
-    bg = '#fffbeb';
-    border = '#fef08a';
-    color = '#b45309';
-  } else if (value === 'PICKED') {
-    bg = '#f0fdf4';
-    border = '#bbf7d0';
-    color = '#15803d';
-  } else if (value === 'POSTED') {
-    bg = '#ecfdf5';
-    border = '#a7f3d0';
-    color = '#047857';
-  }
-
-  return (
-    <span style={{
-      background: bg,
-      border: `1px solid ${border}`,
-      borderRadius: 999,
-      color: color,
-      display: 'inline-block',
-      fontSize: 12,
-      fontWeight: 700,
-      padding: '4px 10px',
-      textTransform: 'uppercase',
-    }}>
-      {value || '-'}
-    </span>
-  );
-}
 
 function EmptyRow({ colSpan, label }) {
   return (
@@ -120,8 +82,8 @@ export function OutboundListPage() {
         title="Outbound Operations" 
         description="Withdrawal, reservation, picking, and post outbound flow." 
       />
-      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 24 }}>
-         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+      <div className="dashboard-header-actions operations-page-actions" style={{ gap: 12 }}>
+         <span className="production-hold-badge">Production HOLD</span>
          <Link className="btn-primary-gold" to="/operations/outbound-draft" style={{ padding: '8px 12px', background: 'var(--tgd-primary-gold)', color: '#000', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Open Draft Smoke UI</Link>
       </div>
 
@@ -212,9 +174,9 @@ export function OutboundListPage() {
                 {!loadingList && documents.map((document) => (
                   <tr key={document.id} style={{ borderBottom: '1px solid var(--tgd-border)', background: selectedDocumentId === document.id ? 'var(--tgd-main-bg)' : 'transparent' }}>
                     <td style={{ padding: '12px 8px', fontWeight: 500 }}>{document.document_no}</td>
-                    <td style={{ padding: '12px 8px' }}><StatusPill value={document.status} /></td>
-                    <td style={{ padding: '12px 8px' }}>{document.customer_id || '-'}</td>
-                    <td style={{ padding: '12px 8px' }}>{document.requested_ship_date || '-'}</td>
+                    <td style={{ padding: '12px 8px' }}><StatusBadge value={document.status} /></td>
+                    <td style={{ padding: '12px 8px' }}><span className="table-meta-text">{document.customer_id || '-'}</span></td>
+                    <td style={{ padding: '12px 8px' }}><span className="table-meta-text">{formatDocumentDate(document.requested_ship_date, { dateOnly: true })}</span></td>
                     <td style={{ padding: '12px 8px', textAlign: 'right' }}>
                       <button 
                         type="button" 
@@ -257,7 +219,7 @@ export function OutboundListPage() {
                     <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Document No</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--tgd-main-text)' }}>{detail.document?.document_no || '-'}</div>
                   </div>
-                  <StatusPill value={detail.document?.status} />
+                  <StatusBadge value={detail.document?.status} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
@@ -266,7 +228,7 @@ export function OutboundListPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>Ship Date</div>
-                    <div style={{ fontWeight: 500 }}>{detail.document?.requested_ship_date || '-'}</div>
+                    <div style={{ fontWeight: 500 }}><span className="table-meta-text">{formatDocumentDate(detail.document?.requested_ship_date, { dateOnly: true })}</span></div>
                   </div>
                 </div>
               </div>
@@ -291,7 +253,7 @@ export function OutboundListPage() {
                         <td style={{ padding: '8px 4px' }}>{line.lot_id || '-'}</td>
                         <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600 }}>{line.requested_quantity}</td>
                         <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-info)' }}>{line.picked_quantity}</td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusPill value={line.status} /></td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusBadge value={line.status} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -316,7 +278,7 @@ export function OutboundListPage() {
                         <td style={{ padding: '8px 4px' }}>{reservation.id}</td>
                         <td style={{ padding: '8px 4px' }}>{reservation.location_id}</td>
                         <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-warning)' }}>{reservation.reserved_quantity}</td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusPill value={reservation.status} /></td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center' }}><StatusBadge value={reservation.status} /></td>
                       </tr>
                     ))}
                   </tbody>

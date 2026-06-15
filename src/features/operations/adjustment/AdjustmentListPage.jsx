@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
+import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getAdjustmentDocuments } from '../../../services/adjustmentService.js';
 
 const columns = [
-  { key: 'adjustment_no', header: 'Adjustment No', render: (row) => <Link to={`/operations/adjustment/${row.id}`} style={{ fontWeight: 600, color: 'var(--tgd-primary-gold)', textDecoration: 'none' }}>{row.adjustment_no}</Link> },
+  { key: 'adjustment_no', header: 'Adjustment No', render: (row) => documentLink(`/operations/adjustment/${row.id}`, row.adjustment_no) },
   { key: 'warehouse_id', header: 'Warehouse' },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-  { key: 'adjustment_type', header: 'Type', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{row.adjustment_type}</span> },
-  { key: 'created_at', header: 'Created At', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{row.created_at}</span> },
+  { key: 'status', header: 'Status', render: renderStatusBadge },
+  { key: 'adjustment_type', header: 'Type' },
+  { key: 'created_at', header: 'Created At' },
 ];
 
 export function AdjustmentListPage() {
@@ -34,24 +33,24 @@ export function AdjustmentListPage() {
 
   return (
     <section className="page-shell">
-      <PageHeader 
-        title="Inventory Adjustment" 
-        description="Warehouse stock adjustment and manual override control." 
+      <PageHeader
+        title="Inventory Adjustment"
+        description="Warehouse stock adjustment and manual override control."
       />
-      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
-         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+      <div className="dashboard-header-actions operations-page-actions">
+        <span className="production-hold-badge">Production HOLD</span>
       </div>
 
-      <div style={{ background: 'var(--tgd-surface)', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid var(--tgd-border)' }}>
+      <div className="operations-filter-card">
         <DocumentFilterBar onChange={() => {}} />
       </div>
 
-      <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
-          <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Adjustment Documents</h3>
+      <div className="operations-table-card">
+        <div className="operations-table-card-header">
+          <h3 className="operations-table-card-title">Adjustment Documents</h3>
           <DocumentToolbar title="" createHref="/operations/adjustment/new" onRefresh={() => window.location.reload()} />
         </div>
-        <div style={{ padding: 20, overflowX: 'auto' }}>
+        <div className="operations-table-card-body">
           <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No adjustment documents found." />
         </div>
       </div>

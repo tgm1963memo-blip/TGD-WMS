@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
+import { documentLink, renderStatusBadge, renderTableMeta } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getTransferDocuments } from '../../../services/transferService.js';
 
 const columns = [
-  { key: 'transfer_no', header: 'Transfer No', render: (row) => <Link to={`/operations/transfer/${row.id}`} style={{ fontWeight: 600, color: 'var(--tgd-primary-gold)', textDecoration: 'none' }}>{row.transfer_no}</Link> },
+  { key: 'transfer_no', header: 'Transfer No', render: (row) => documentLink(`/operations/transfer/${row.id}`, row.transfer_no) },
   { key: 'from_warehouse_id', header: 'From Warehouse' },
   { key: 'to_warehouse_id', header: 'To Warehouse' },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-  { key: 'transfer_type', header: 'Type', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{row.transfer_type}</span> },
-  { key: 'created_at', header: 'Created At', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{row.created_at}</span> },
+  { key: 'status', header: 'Status', render: renderStatusBadge },
+  { key: 'transfer_type', header: 'Type', render: (row) => <span className="table-meta-text">{row.transfer_type}</span> },
+  { key: 'created_at', header: 'Created At', render: (row) => renderTableMeta(row.created_at) },
 ];
 
 export function TransferListPage() {
@@ -35,24 +34,24 @@ export function TransferListPage() {
 
   return (
     <section className="page-shell">
-      <PageHeader 
-        title="Internal Transfer" 
-        description="Warehouse transfer and movement control." 
+      <PageHeader
+        title="Internal Transfer"
+        description="Warehouse transfer and movement control."
       />
-      <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
-         <span className="production-hold-badge" style={{ padding: '8px 12px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 8, fontWeight: 600 }}>Production HOLD</span>
+      <div className="dashboard-header-actions operations-page-actions">
+        <span className="production-hold-badge">Production HOLD</span>
       </div>
 
-      <div style={{ background: 'var(--tgd-surface)', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid var(--tgd-border)' }}>
+      <div className="operations-filter-card">
         <DocumentFilterBar onChange={() => {}} />
       </div>
 
-      <div style={{ background: 'var(--tgd-surface)', borderRadius: 8, border: '1px solid var(--tgd-border)', overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--tgd-border)', background: '#fafafa' }}>
-          <h3 style={{ margin: 0, fontSize: 16, color: 'var(--tgd-main-text)' }}>Transfer Documents</h3>
+      <div className="operations-table-card">
+        <div className="operations-table-card-header">
+          <h3 className="operations-table-card-title">Transfer Documents</h3>
           <DocumentToolbar title="" createHref="/operations/transfer/new" onRefresh={() => window.location.reload()} />
         </div>
-        <div style={{ padding: 20, overflowX: 'auto' }}>
+        <div className="operations-table-card-body">
           <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No transfer documents found." />
         </div>
       </div>

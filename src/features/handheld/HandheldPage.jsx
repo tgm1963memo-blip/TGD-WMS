@@ -17,8 +17,8 @@ export function HandheldPage() {
         title="Handheld Scan Operations" 
         description="Warehouse scan workflow." 
         actions={
-          <div className="dashboard-header-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-             <span className="production-hold-badge" style={{ padding: '6px 10px', background: 'var(--tgd-danger)', color: '#fff', borderRadius: 6, fontWeight: 600, fontSize: 13 }}>Production HOLD</span>
+          <div className="dashboard-header-actions">
+             <span className="production-hold-badge">Production HOLD</span>
           </div>
         }
       />

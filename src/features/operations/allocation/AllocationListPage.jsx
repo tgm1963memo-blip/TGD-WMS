@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
+import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getWithdrawalAllocations } from '../../../services/withdrawalAllocationService.js';
 
 const columns = [
-  { key: 'allocation_no', header: 'Allocation No', render: (row) => <Link to={`/operations/allocations/${row.id}`}>{row.allocation_no}</Link> },
+  { key: 'allocation_no', header: 'Allocation No', render: (row) => documentLink(`/operations/allocations/${row.id}`, row.allocation_no) },
   { key: 'withdrawal_request_id', header: 'Withdrawal Request' },
   { key: 'customer_id', header: 'Customer' },
   { key: 'warehouse_id', header: 'Warehouse' },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+  { key: 'status', header: 'Status', render: renderStatusBadge },
   { key: 'allocation_method', header: 'Method' },
   { key: 'created_at', header: 'Created At' },
 ];
@@ -37,7 +36,6 @@ export function AllocationListPage() {
   return (
     <section className="page-shell">
       <PageHeader title="Allocations" description="Withdrawal allocation list." />
-      <p className="sprint-status">Sprint status: placeholder only</p>
       <DocumentToolbar title="Allocation Documents" createHref="/operations/allocations/new" onRefresh={() => window.location.reload()} />
       <DocumentFilterBar onChange={() => {}} />
       <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No allocations found." />
