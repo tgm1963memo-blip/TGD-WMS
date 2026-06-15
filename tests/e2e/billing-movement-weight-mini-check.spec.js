@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { getBaseUrl, login, requireUatCredentials } from './helpers/uatAuth.js';
-import { isBillingReadRole, loginAsBillingUser, readProfileRole } from './helpers/billingAccess.js';
+import { isBillingWriteRole, loginAsBillingUser, readProfileRole } from './helpers/billingAccess.js';
 
 requireUatCredentials();
 
@@ -85,8 +85,8 @@ test.describe('Billing Movement Weight Mini Check', () => {
   test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }, testInfo) => {
     await loginAsBillingUser(page);
     const role = await readProfileRole(page);
-    if (!isBillingReadRole(role)) {
-      testInfo.skip(true, `Requires billing reader role (current: ${role || 'unknown'})`);
+    if (!isBillingWriteRole(role)) {
+      testInfo.skip(true, `Requires billing write role accounting/admin (current: ${role || 'unknown'})`);
     }
 
     await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);

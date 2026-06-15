@@ -4,6 +4,11 @@ import { getBaseUrl, login, requireUatCredentials } from './uatAuth.js';
 requireUatCredentials();
 
 const BILLING_READ_ROLES = new Set(['accounting', 'admin', 'warehouse_manager']);
+const BILLING_WRITE_ROLES = new Set(['accounting', 'admin']);
+
+export function isBillingWriteRole(role) {
+  return BILLING_WRITE_ROLES.has(String(role ?? '').trim().toLowerCase());
+}
 
 export function getBillingCredentials() {
   return {
