@@ -14,6 +14,8 @@ const KNOWN_ROLES = [
   "warehouse_staff",
   "accounting",
   "viewer",
+  "customer_admin",
+  "customer_user",
 ];
 
 /**

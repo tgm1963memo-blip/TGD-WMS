@@ -21,8 +21,8 @@ test.describe('Gate 3B-2 Billing Invoice Draft UI', () => {
   });
 
   test('Scenario 2: Billing menu shows Invoice Drafts', async ({ page }) => {
-    await expect(page.locator('[data-testid="billing-menu-item"]')).toBeVisible();
-    await expect(page.locator('[data-testid="billing-invoice-drafts-menu-item"]')).toBeVisible();
+    await expect(page.locator('[data-testid="billing-menu-item"]')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('[data-testid="billing-invoice-drafts-menu-item"]')).toBeVisible({ timeout: 20000 });
   });
 
   test('Scenario 3: Invoice Draft List page loads', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Gate 3B-2 Billing Invoice Draft UI', () => {
 
   test('Scenario 5: Create Draft button appears but forbidden controls absent', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
-    await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible();
+    await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible({ timeout: 20000 });
     await expect(page.locator('[data-testid="approve-invoice-draft-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);

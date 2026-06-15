@@ -13,6 +13,15 @@ export const DEFAULT_DEMO_ROLE = 'admin';
 export const PRODUCTION_FALLBACK_ROLE = 'viewer';
 
 let _demoRole = DEFAULT_DEMO_ROLE;
+let _authenticatedRole = null;
+
+export function setAuthenticatedUserRole(role) {
+  _authenticatedRole = role ? normalizeUserRole(role) : null;
+}
+
+export function clearAuthenticatedUserRole() {
+  _authenticatedRole = null;
+}
 
 /**
  * Get the current demo user role.
@@ -22,6 +31,10 @@ export function getCurrentUserRole() {
   const uatOverride = getUatRoleOverride();
   if (uatOverride) {
     return uatOverride;
+  }
+
+  if (_authenticatedRole) {
+    return _authenticatedRole;
   }
 
   if (!isDemoRoleSelectorAllowed(getAppRuntimeConfig())) {

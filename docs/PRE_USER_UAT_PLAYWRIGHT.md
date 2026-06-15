@@ -2,17 +2,18 @@
 
 Playwright smoke suite ก่อนให้ผู้ใช้งานจริงทดสอบ UAT
 
+**Checklist สำหรับผู้ใช้จริง (ภาษาไทย):** [BUSINESS_USER_UAT_CHECKLIST_TH.md](./uat/BUSINESS_USER_UAT_CHECKLIST_TH.md)
+
 ## Prerequisites
 
 - `.env.local` ต้องมีอย่างน้อย:
+  - `UAT_BASE_URL` — URL Vercel UAT
   - `UAT_EMAIL` / `UAT_PASSWORD` (เช่น `accounting.demo`)
   - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` ชี้ UAT
-- ทดสอบกับโค้ดล่าสุดบนเครื่อง: ตั้ง `PLAYWRIGHT_BASE_URL=http://localhost:5173` (ค่าเริ่มต้น) — config จะสตาร์ท `npm run dev` ให้อัตโนมัติ
-- ทดสอบกับ deployment ที่ deploy แล้ว: ตั้ง `PLAYWRIGHT_BASE_URL` หรือ `UAT_BASE_URL` เป็น URL Vercel และ `PLAYWRIGHT_SKIP_WEBSERVER=1`
+- ทดสอบกับโค้ดล่าสุดบนเครื่อง: ตั้ง `PLAYWRIGHT_BASE_URL=http://localhost:5173` — config จะสตาร์ท `npm run dev` ให้อัตโนมัติ
+- ทดสอบกับ Vercel หลัง deploy: ตั้ง `PLAYWRIGHT_SKIP_WEBSERVER=1` และใช้ `UAT_BASE_URL` จาก `.env.local`
 
 ## Optional customer write credentials
-
-ถ้าต้องการทดสอบการบันทึก draft จริง (ไม่ใช่แค่ scope guard):
 
 ```env
 UAT_CUSTOMER_EMAIL=admin.demo@...
@@ -26,9 +27,15 @@ UAT_CUSTOMER_PASSWORD=...
 ```bash
 npm test
 npm run build
-npm run test:e2e:system
-npm run test:e2e:customer
-npm run test:e2e
+
+# Local (สตาร์ท dev server อัตโนมัติ)
+$env:PLAYWRIGHT_BASE_URL='http://localhost:5173'
+npm run test:e2e:pre-uat
+
+# Vercel (หลัง deploy แล้ว)
+$env:PLAYWRIGHT_SKIP_WEBSERVER='1'
+Remove-Item Env:PLAYWRIGHT_BASE_URL -ErrorAction SilentlyContinue
+npm run test:e2e:vercel
 ```
 
 ## Evidence
@@ -38,6 +45,6 @@ npm run test:e2e
 
 ## Scope
 
-- **ครอบคลุม:** ทุก route หลักจาก navigation, customer portal live data, billing regression, forbidden execution buttons
-- **ยังเป็น demo:** warehouse receiving/picking-loading, admin receiving verification
-- **ไม่รัน:** Gate 3B-5 Bplus export execute, stock movement execution จาก portal
+- **ครอบคลุม:** ทุก route หลัก, customer portal live data, billing regression, forbidden execution buttons
+- **ยังเป็น demo:** warehouse receiving/picking-loading
+- **ไม่รัน:** Gate 3B-5 Bplus export execute

@@ -4,7 +4,7 @@ import { navigationGroups } from '../../app/navigation.js';
 import { brandConfig } from '../../config/brandConfig.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
 import {
   isCustomerOpsDemoNavigationVisible,
@@ -16,7 +16,7 @@ import {
  */
 export function Sidebar() {
   const t = useTranslation();
-  const userRole = getCurrentUserRole();
+  const { role: userRole } = useUserRole();
 
   const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
   const getNavKey = (key) => `nav.${toCamelCase(key)}`;

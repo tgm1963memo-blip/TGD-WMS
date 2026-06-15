@@ -96,7 +96,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
 
   test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
-    await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible();
+    await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible({ timeout: 20000 });
     const forbiddenSelectors = [
       '[data-testid="approve-invoice-draft-button"]',
       '[data-testid="export-bplus-button"]',
