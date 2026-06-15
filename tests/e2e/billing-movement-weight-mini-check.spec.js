@@ -1,25 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, login, requireUatCredentials } from './helpers/uatAuth.js';
+import { isBillingReadRole, loginAsBillingUser, readProfileRole } from './helpers/billingAccess.js';
 
 requireUatCredentials();
-
-async function login(page) {
-  await page.goto(`${getBaseUrl()}/login`);
-  // Attempt to locate login form fields using common selectors
-  const emailInput = page.locator('input[name="email"], input[type="email"]');
-  const passwordInput = page.locator('input[name="password"], input[type="password"]');
-  await emailInput.fill(process.env.UAT_EMAIL);
-  await passwordInput.fill(process.env.UAT_PASSWORD);
-  const submitBtn = page.locator('button[type="submit"], button:has-text("Login"), button:has-text("เข้าสู่ระบบ")');
-  await submitBtn.click();
-  // Verify app shell appears after login
-  await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 15000 });
-}
 
 test.describe('Billing Movement Weight Mini Check', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await expect(page.locator('nav')).toBeVisible();
+    await expect(page.locator('[data-testid="sidebar"]')).toBeVisible({ timeout: 20000 });
   });
 
   test('Scenario 1: UI loads and login works', async ({ page }) => {
@@ -94,7 +82,13 @@ test.describe('Billing Movement Weight Mini Check', () => {
     }
   });
 
-  test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }) => {
+  test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }, testInfo) => {
+    await loginAsBillingUser(page);
+    const role = await readProfileRole(page);
+    if (!isBillingReadRole(role)) {
+      testInfo.skip(true, `Requires billing reader role (current: ${role || 'unknown'})`);
+    }
+
     await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible({ timeout: 20000 });
     const forbiddenSelectors = [

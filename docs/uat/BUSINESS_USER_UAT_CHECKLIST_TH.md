@@ -20,10 +20,11 @@
 
 | บทบาท | ใช้ทดสอบอะไร |
 |--------|----------------|
-| `accounting` | รายงาน Billing, Invoice Drafts (อ่าน/สร้าง draft) |
-| `customer_admin` + `customer_id` | ฝาก/เบิกสินค้าใน Customer Portal (บันทึก draft จริง) |
+| `accounting` | รายงาน Billing, Invoice Drafts (อ่าน/สร้าง draft) — ตั้ง `UAT_BILLING_EMAIL` สำหรับ Playwright Billing |
+| `customer_admin` + `customer_id` | ฝาก/เบิกสินค้าใน Customer Portal (บันทึก draft จริง) — ตั้ง `UAT_CUSTOMER_EMAIL` |
 | `warehouse_staff` / `warehouse_manager` | หน้าปฏิบัติการคลัง |
 | `admin` | ทุกเมนู + Admin review |
+| บัญชีทั่วไป (เช่น email องค์กร) | ทดสอบ login, portal อ่าน, รายงานทั่วไป — **ไม่** ทดสอบ Invoice Draft write |
 
 ---
 

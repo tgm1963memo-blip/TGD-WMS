@@ -35,8 +35,20 @@ npm run test:e2e:pre-uat
 # Vercel (หลัง deploy แล้ว)
 $env:PLAYWRIGHT_SKIP_WEBSERVER='1'
 Remove-Item Env:PLAYWRIGHT_BASE_URL -ErrorAction SilentlyContinue
+npm run test:e2e:vercel:core
+
+# รวม Billing (ต้องมีบัญชี accounting)
 npm run test:e2e:vercel
 ```
+
+### บัญชีสำหรับ Billing E2E
+
+```env
+UAT_BILLING_EMAIL=accounting.demo@...
+UAT_BILLING_PASSWORD=...
+```
+
+ถ้าไม่มี `UAT_BILLING_*` และบัญชีหลักไม่ใช่ `accounting` / `admin` / `warehouse_manager` — ชุด Billing จะ skip อัตโนมัติ
 
 ## Evidence
 

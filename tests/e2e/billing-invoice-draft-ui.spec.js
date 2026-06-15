@@ -1,19 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
+import { loginAsBillingUser, skipUnlessBillingReader } from './helpers/billingAccess.js';
 
 requireUatCredentials();
 
-async function loginFromRoot(page) {
-  await page.goto(`${getBaseUrl()}/login`);
-  await page.locator('[data-testid="login-email-input"], input[name="email"], input[type="email"]').fill(process.env.UAT_EMAIL);
-  await page.locator('[data-testid="login-password-input"], input[name="password"], input[type="password"]').fill(process.env.UAT_PASSWORD);
-  await page.locator('[data-testid="login-submit-button"], button[type="submit"], button:has-text("Login"), button:has-text("เข้าสู่ระบบ")').click();
-  await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 15000 });
-}
-
 test.describe('Gate 3B-2 Billing Invoice Draft UI', () => {
-  test.beforeEach(async ({ page }) => {
-    await loginFromRoot(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await skipUnlessBillingReader(testInfo, page);
   });
 
   test('Scenario 1: Login works', async ({ page }) => {
@@ -133,8 +126,8 @@ test.describe('Gate 3B-3 Billing Invoice Draft Approval', () => {
     'Approval E2E is opt-in because it creates and approves a UAT draft',
   );
 
-  test.beforeEach(async ({ page }) => {
-    await loginFromRoot(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await skipUnlessBillingReader(testInfo, page);
   });
 
   test('Scenario 11: Created draft can be approved and becomes read-only', async ({ page }) => {
