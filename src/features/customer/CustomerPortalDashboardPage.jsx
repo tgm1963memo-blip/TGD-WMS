@@ -1,43 +1,92 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
-import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
-import { CUSTOMER_PORTAL_DASHBOARD_SUMMARY } from '../../data/customerPortalDemoData.js';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
+import { getCustomerPortalDashboardSummary } from '../../services/customerPortalDashboardService.js';
+import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerPortalDashboardPage() {
   const t = useTranslation();
-  const summary = CUSTOMER_PORTAL_DASHBOARD_SUMMARY;
+  const { customerId, loading: profileLoading, error: profileError } = useCustomerPortalProfile();
+  const [state, setState] = useState({ summary: null, loading: true, error: null });
+
+  useEffect(() => {
+    let active = true;
+
+    if (profileLoading) return undefined;
+
+    if (!customerId) {
+      setState({ summary: null, loading: false, error: null });
+      return undefined;
+    }
+
+    setState((current) => ({ ...current, loading: true, error: null }));
+
+    getCustomerPortalDashboardSummary(customerId).then((result) => {
+      if (!active) return;
+      setState({
+        summary: result.data,
+        loading: false,
+        error: result.error ?? null,
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [customerId, profileLoading]);
+
+  if (profileLoading || state.loading) {
+    return (
+      <section className="page-shell customer-portal-page" data-testid="customer-portal-page">
+        <LoadingState message={t('customer_portal_loading')} />
+      </section>
+    );
+  }
+
+  const summary = state.summary ?? {
+    pendingDepositRequests: 0,
+    pendingWithdrawalRequests: 0,
+    availableStockLots: 0,
+    lastActivity: '-',
+  };
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-portal-page">
       <PageHeader
         title={t('customer_portal_title')}
         description={t('customer_portal_description')}
-        actions={<span className="status-badge status-badge--uat">{t('customer_portal_demo_badge')}</span>}
+        actions={<span className="status-badge status-badge--open">{t('customer_portal_live_badge')}</span>}
       />
 
-      <CustomerPortalDemoBanner />
+      <CustomerPortalLiveBanner />
+
+      {profileError || state.error ? (
+        <div className="banner banner-danger" role="alert">{profileError?.message ?? state.error?.message ?? t('customer_portal_load_error')}</div>
+      ) : null}
+
+      {!customerId ? (
+        <div className="banner banner-warning" role="status">{t('customer_portal_no_customer_scope')}</div>
+      ) : null}
 
       <div className="kpi-grid customer-portal-kpi-grid">
         <div className="card kpi-card info">
           <p className="kpi-label">{t('customer_portal_pending_deposits')}</p>
           <p className="kpi-value">{summary.pendingDepositRequests}</p>
-          <p className="kpi-demo-tag">{t('demo_uat_placeholder')}</p>
         </div>
         <div className="card kpi-card success">
           <p className="kpi-label">{t('customer_portal_available_lots')}</p>
           <p className="kpi-value">{summary.availableStockLots}</p>
-          <p className="kpi-demo-tag">{t('demo_uat_placeholder')}</p>
         </div>
         <div className="card kpi-card warning">
           <p className="kpi-label">{t('customer_portal_pending_withdrawals')}</p>
           <p className="kpi-value">{summary.pendingWithdrawalRequests}</p>
-          <p className="kpi-demo-tag">{t('demo_uat_placeholder')}</p>
         </div>
         <div className="card kpi-card navy">
           <p className="kpi-label">{t('customer_portal_last_activity')}</p>
           <p className="kpi-value customer-portal-activity-text">{summary.lastActivity}</p>
-          <p className="kpi-demo-tag">{t('demo_uat_placeholder')}</p>
         </div>
       </div>
 

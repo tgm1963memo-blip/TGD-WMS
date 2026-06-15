@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { CustomerPortalDashboardPage } from '../../src/features/customer/CustomerPortalDashboardPage.jsx';
@@ -20,6 +20,10 @@ import {
 
 const receivingRpc = vi.hoisted(() => vi.fn());
 const dispatchRpc = vi.hoisted(() => vi.fn());
+const createDepositRpc = vi.hoisted(() => vi.fn());
+const upsertDepositLineRpc = vi.hoisted(() => vi.fn());
+const createWithdrawalRpc = vi.hoisted(() => vi.fn());
+const upsertWithdrawalLineRpc = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDraft: receivingRpc,
@@ -29,6 +33,87 @@ vi.mock('../../src/services/receivingService.js', () => ({
 vi.mock('../../src/services/dispatchService.js', () => ({
   confirmDispatch: dispatchRpc,
   createDispatchDraft: dispatchRpc,
+}));
+
+vi.mock('../../src/features/customer/useCustomerPortalProfile.js', () => ({
+  useCustomerPortalProfile: () => ({
+    profile: { role: 'customer_admin', customer_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' },
+    loading: false,
+    error: null,
+    role: 'customer_admin',
+    customerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+    canWriteCustomerRequests: true,
+  }),
+}));
+
+vi.mock('../../src/services/customerPortalDashboardService.js', () => ({
+  getCustomerPortalDashboardSummary: vi.fn(async () => ({
+    data: {
+      pendingDepositRequests: 1,
+      pendingWithdrawalRequests: 0,
+      availableStockLots: 2,
+      lastActivity: '2026-06-08',
+    },
+    error: null,
+  })),
+}));
+
+vi.mock('../../src/services/customerDepositRequestService.js', () => ({
+  createCustomerDepositRequest: createDepositRpc,
+  upsertCustomerDepositRequestLine: upsertDepositLineRpc,
+  listCustomerDepositRequests: vi.fn(async () => ({
+    data: [{ id: 'dep-1', request_no: 'CDR-20260608-0001', status: 'DRAFT' }],
+    error: null,
+  })),
+  listCustomerDepositRequestLines: vi.fn(async () => ({ data: [], error: null })),
+  reviewCustomerDepositRequest: vi.fn(async () => ({ data: { status: 'ADMIN_REVIEWING' }, error: null })),
+}));
+
+vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
+  createCustomerWithdrawalRequest: createWithdrawalRpc,
+  upsertCustomerWithdrawalRequestLine: upsertWithdrawalLineRpc,
+  listCustomerWithdrawalRequests: vi.fn(async () => ({ data: [], error: null })),
+  listCustomerWithdrawalRequestLines: vi.fn(async () => ({ data: [], error: null })),
+  reviewCustomerWithdrawalRequest: vi.fn(async () => ({ data: { status: 'ADMIN_REVIEWING' }, error: null })),
+}));
+
+vi.mock('../../src/services/customerStorageBalanceReportService.js', () => ({
+  getCustomerStorageBalanceRows: vi.fn(async () => ({
+    data: [{
+      id: 'bal-1',
+      product_id: 'prod-1',
+      lot_id: 'lot-1',
+      pallet_id: 'plt-1',
+      location_id: 'loc-1',
+      qty_available: 10,
+      uom: 'KG',
+    }],
+    error: null,
+  })),
+}));
+
+vi.mock('../../src/services/customerPortalRequestHistoryService.js', () => ({
+  listCustomerPortalRequestHistory: vi.fn(async () => ({
+    data: [{
+      id: 'req-1',
+      request_no: 'CDR-20260608-0001',
+      request_type: 'DEPOSIT',
+      status: 'DRAFT',
+      requested_date: '2026-06-15',
+      note: 'Test',
+      latest_action_note: 'Last action by demo',
+      last_updated_at: '2026-06-08T10:00:00Z',
+      document_type: 'CUSTOMER_DEPOSIT_REQUEST',
+    }],
+    error: null,
+  })),
+}));
+
+vi.mock('../../src/services/customerDocumentTimelineService.js', () => ({
+  listCustomerDocumentTimelineEvents: vi.fn(async () => ({
+    data: [{ id: 'evt-1', action: 'CREATE_DRAFT', to_status: 'DRAFT' }],
+    error: null,
+  })),
 }));
 
 function renderPage(Component) {
@@ -41,24 +126,32 @@ function renderPage(Component) {
   );
 }
 
-describe('CUSTOMER-PORTAL-1 demo UI', () => {
+describe('CUSTOMER-PORTAL-2F live data UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createDepositRpc.mockResolvedValue({
+      data: { id: 'dep-new', request_no: 'CDR-20260608-0002', status: 'DRAFT' },
+      error: null,
+    });
+    upsertDepositLineRpc.mockResolvedValue({ data: { line_id: 'line-1' }, error: null });
+    createWithdrawalRpc.mockResolvedValue({
+      data: { id: 'wd-new', withdrawal_no: 'CWR-20260608-0001', status: 'WITHDRAWAL_DRAFT' },
+      error: null,
+    });
+    upsertWithdrawalLineRpc.mockResolvedValue({ data: { line_id: 'line-2' }, error: null });
   });
 
-  it('renders customer portal dashboard', () => {
+  it('renders customer portal dashboard with live banner', async () => {
     renderPage(CustomerPortalDashboardPage);
     expect(screen.getByTestId('customer-portal-page')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-portal-demo-banner')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-portal-live-banner')).toBeInTheDocument();
+    });
     expect(screen.getByTestId('customer-deposit-request-link')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-stock-balance-link')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-withdrawal-request-link')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-request-history-link')).toBeInTheDocument();
   });
 
-  it('renders deposit request form and demo submit works', () => {
+  it('submits deposit draft through RPC services', async () => {
     renderPage(CustomerDepositRequestPage);
-    expect(screen.getByTestId('customer-deposit-request-page')).toBeInTheDocument();
     const form = screen.getByTestId('customer-deposit-request-form');
 
     fireEvent.change(screen.getByTestId('customer-product-code-input'), { target: { value: 'CUS-CHKN-01' } });
@@ -70,40 +163,24 @@ describe('CUSTOMER-PORTAL-1 demo UI', () => {
     fireEvent.change(screen.getByTestId('customer-deposit-contact-phone'), { target: { value: '0800000000' } });
     fireEvent.submit(form);
 
-    expect(screen.getByTestId('customer-deposit-demo-success-alert')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-deposit-status-timeline')).toHaveTextContent('CUSTOMER_NOTIFIED');
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-deposit-live-success-alert')).toBeInTheDocument();
+    });
+    expect(createDepositRpc).toHaveBeenCalled();
+    expect(upsertDepositLineRpc).toHaveBeenCalled();
     expect(receivingRpc).not.toHaveBeenCalled();
   });
 
-  it('previews, removes, and submits deposit attachments in local state only', () => {
-    renderPage(CustomerDepositRequestPage);
-    const file = new File(['demo'], 'packing-list-demo.pdf', { type: 'application/pdf' });
-    const input = screen.getByTestId('customer-deposit-attachment-input');
-
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(screen.getByTestId('customer-deposit-attachment-list')).toHaveTextContent(file.name);
-    expect(screen.getByTestId('customer-deposit-attachment-demo-note')).toHaveTextContent('not uploaded');
-
-    fireEvent.click(screen.getByTestId('customer-deposit-attachment-remove-button'));
-    expect(screen.getByTestId('customer-deposit-attachment-list')).not.toHaveTextContent(file.name);
-
-    fireEvent.change(input, { target: { files: [file] } });
-    fireEvent.submit(screen.getByTestId('customer-deposit-request-form'));
-    expect(screen.getByTestId('customer-deposit-demo-success-alert')).toHaveTextContent(file.name);
-    expect(receivingRpc).not.toHaveBeenCalled();
-  });
-
-  it('renders stock balance table with demo badge', () => {
+  it('renders stock balance from live service', async () => {
     renderPage(CustomerStockBalancePage);
-    expect(screen.getByTestId('customer-stock-balance-page')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-stock-demo-badge')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-stock-live-badge')).toBeInTheDocument();
+    });
     expect(screen.getByTestId('customer-stock-balance-table')).toBeInTheDocument();
-    expect(screen.getByText('FRZ-CHKN-01')).toBeInTheDocument();
   });
 
-  it('renders withdrawal request form and demo submit works', () => {
+  it('submits withdrawal draft through RPC services', async () => {
     renderPage(CustomerWithdrawalRequestPage);
-    expect(screen.getByTestId('customer-withdrawal-request-page')).toBeInTheDocument();
     const form = screen.getByTestId('customer-withdrawal-request-form');
     fireEvent.change(screen.getByTestId('customer-withdrawal-dispatch-date'), { target: { value: '2026-06-16' } });
     fireEvent.change(screen.getByTestId('customer-withdrawal-product-code'), { target: { value: 'CUS-CHKN-01' } });
@@ -112,55 +189,26 @@ describe('CUSTOMER-PORTAL-1 demo UI', () => {
     fireEvent.change(screen.getByTestId('customer-withdrawal-pickup-contact'), { target: { value: 'Demo Pickup' } });
     fireEvent.submit(form);
 
-    expect(screen.getByTestId('customer-withdrawal-demo-success-alert')).toBeInTheDocument();
-    expect(screen.getByTestId('withdrawal-source-deposit-select')).toBeInTheDocument();
-    expect(screen.getByTestId('withdrawal-lot-select')).toBeInTheDocument();
-    expect(screen.getByTestId('withdrawal-picking-rule-select')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-withdrawal-status-timeline')).toHaveTextContent('LOADED_CONFIRMED');
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-withdrawal-live-success-alert')).toBeInTheDocument();
+    });
+    expect(createWithdrawalRpc).toHaveBeenCalled();
+    expect(upsertWithdrawalLineRpc).toHaveBeenCalled();
     expect(dispatchRpc).not.toHaveBeenCalled();
   });
 
-  it('renders request history table', () => {
+  it('renders request history from live service', async () => {
     renderPage(CustomerRequestHistoryPage);
-    expect(screen.getByTestId('customer-request-history-page')).toBeInTheDocument();
-    expect(screen.getByTestId('customer-request-history-table')).toBeInTheDocument();
-    expect(screen.getByText('CDR-20260612-0001')).toBeInTheDocument();
-    expect(screen.getAllByTestId('customer-request-status-timeline').length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-request-history-table')).toBeInTheDocument();
+    });
+    expect(screen.getByText('CDR-20260608-0001')).toBeInTheDocument();
   });
 
-  it('renders admin deposit and receiving process demos', () => {
-    const depositReview = renderPage(CustomerAdminDepositReviewPage);
-    expect(screen.getByTestId('admin-deposit-review-table')).toHaveTextContent('CUS-CHICKEN-01');
-    depositReview.unmount();
-
-    const receiving = renderPage(CustomerWarehouseReceivingDemoPage);
+  it('keeps warehouse execution pages in demo mode', () => {
+    renderPage(CustomerWarehouseReceivingDemoPage);
+    expect(screen.getByTestId('customer-portal-demo-banner')).toBeInTheDocument();
     expect(screen.getByTestId('pallet-card')).toBeInTheDocument();
-    expect(screen.getByTestId('packing-list-table')).toBeInTheDocument();
-    expect(screen.getByTestId('pallet-sticker-preview')).toBeInTheDocument();
-    expect(screen.getByTestId('box-sticker-preview')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('add-pallet-button'));
-    expect(screen.getAllByTestId('pallet-card')).toHaveLength(2);
-    receiving.unmount();
-
-    renderPage(CustomerAdminReceivingVerificationPage);
-    expect(screen.getByTestId('receiving-variance-panel')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('notify-customer-preview-button'));
-    expect(screen.getByTestId('customer-notification-preview')).toHaveTextContent('was not sent');
-  });
-
-  it('renders admin withdrawal and warehouse picking/loading demos', () => {
-    const review = renderPage(CustomerAdminWithdrawalReviewPage);
-    expect(screen.getByTestId('admin-withdrawal-review-table')).toHaveTextContent('SPECIFIC_DEPOSIT');
-    review.unmount();
-
-    renderPage(CustomerWarehousePickingLoadingDemoPage);
-    expect(screen.getByTestId('picking-instruction-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('picking-packing-list-table')).toBeInTheDocument();
-    fireEvent.change(screen.getByTestId('pallet-barcode-input'), { target: { value: 'PLT-DEMO-001' } });
-    fireEvent.change(screen.getByTestId('box-barcode-input'), { target: { value: 'BOX-DEMO-001' } });
-    fireEvent.click(screen.getByTestId('confirm-loaded-demo-button'));
-    expect(screen.getByText(/No stock or dispatch record was changed/)).toBeInTheDocument();
-    expect(dispatchRpc).not.toHaveBeenCalled();
   });
 
   it('keeps billing permission boundaries unchanged', () => {

@@ -1,21 +1,10 @@
 import { test, expect } from '@playwright/test';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
 
-// Validate required environment variables
-if (!process.env.UAT_BASE_URL) {
-  throw new Error('Missing UAT_BASE_URL in environment variables');
-}
-if (!process.env.UAT_EMAIL) {
-  throw new Error('Missing UAT_EMAIL in environment variables');
-}
-if (!process.env.UAT_PASSWORD) {
-  throw new Error('Missing UAT_PASSWORD in environment variables');
-}
+requireUatCredentials();
 
-// Helper to perform login using environment variables or existing auth helper
 async function login(page) {
-  await page.goto(process.env.UAT_BASE_URL);
+  await page.goto(`${getBaseUrl()}/login`);
   // Attempt to locate login form fields using common selectors
   const emailInput = page.locator('input[name="email"], input[type="email"]');
   const passwordInput = page.locator('input[name="password"], input[type="password"]');
@@ -44,13 +33,13 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 3: Report page loads', async ({ page }) => {
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     const reportPage = page.locator('[data-testid="billing-movement-weight-report-page"]');
     await expect(reportPage).toBeVisible();
   });
 
   test('Scenario 4: Frontend reads billing view', async ({ page }) => {
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     const table = page.locator('[data-testid="billing-movement-weight-table"]');
     const emptyState = page.locator('[data-testid="billing-movement-weight-empty-state"]');
     const errorAlert = page.locator('[data-testid="billing-movement-weight-error-alert"]');
@@ -74,7 +63,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 5: Filter form works', async ({ page }) => {
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     const filterForm = page.locator('[data-testid="billing-movement-weight-filter-form"]');
     await expect(filterForm).toBeVisible();
     // If there are any input/select controls, interact safely
@@ -90,7 +79,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 6: CSV export button present', async ({ page }) => {
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     const exportBtn = page.locator('[data-testid="billing-movement-weight-export-button"]');
     await expect(exportBtn).toBeVisible();
     if (await exportBtn.isEnabled()) {
@@ -106,7 +95,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 7: Gate 3B forbidden controls must not exist', async ({ page }) => {
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible();
     const forbiddenSelectors = [
       '[data-testid="approve-invoice-draft-button"]',
@@ -129,7 +118,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
     await expect(page.locator('[data-testid="login-page"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="app-shell"]')).not.toBeVisible();
 
-    await page.goto(`${process.env.UAT_BASE_URL}/reports/billing-movement-weight`);
+    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="login-page"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="billing-movement-weight-report-page"]')).not.toBeVisible();
   });

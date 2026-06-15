@@ -8,6 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run",
+    "test:e2e": "playwright test",
+    "test:e2e:system": "playwright test tests/e2e/system-pre-user-uat.spec.js",
+    "test:e2e:customer": "playwright test tests/e2e/customer-portal-demo.spec.js tests/e2e/customer-portal-process-demo.spec.js",
+    "test:e2e:pre-uat": "playwright test tests/e2e/system-pre-user-uat.spec.js tests/e2e/customer-portal-demo.spec.js tests/e2e/customer-portal-process-demo.spec.js tests/e2e/auth-user-settings.spec.js tests/e2e/billing-invoice-draft-ui.spec.js tests/e2e/billing-movement-weight-mini-check.spec.js",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },
   "dependencies": {

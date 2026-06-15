@@ -5,6 +5,8 @@ export const CUSTOMER_PORTAL_DEMO_ROLES = Object.freeze([
   'warehouse_staff',
   'viewer',
   'customer',
+  'customer_admin',
+  'customer_user',
 ]);
 
 export function isCustomerPortalNavigationVisible(role) {

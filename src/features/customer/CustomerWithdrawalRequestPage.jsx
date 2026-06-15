@@ -1,20 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
-import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
+import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
+import { CUSTOMER_WITHDRAWAL_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
-  CUSTOMER_PORTAL_DEMO_DEPOSIT,
-  CUSTOMER_WITHDRAWAL_STATUSES,
-} from '../../data/customerPortalDemoData.js';
+  createCustomerWithdrawalRequest,
+  upsertCustomerWithdrawalRequestLine,
+} from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
+import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const INITIAL_FORM = {
   requested_dispatch_date: '',
-  deposit_request_no: CUSTOMER_PORTAL_DEMO_DEPOSIT.request_no,
-  lot_no: CUSTOMER_PORTAL_DEMO_DEPOSIT.lot_no,
-  customer_product_code: CUSTOMER_PORTAL_DEMO_DEPOSIT.customer_product_code,
-  internal_product_code: CUSTOMER_PORTAL_DEMO_DEPOSIT.internal_product_code,
-  product_name: CUSTOMER_PORTAL_DEMO_DEPOSIT.product_name,
+  source_deposit_request_id: '',
+  lot_no: '',
+  customer_product_code: '',
+  internal_product_code: '',
+  product_name: '',
   requested_qty: '',
   requested_boxes: '',
   requested_weight: '',
@@ -27,39 +30,125 @@ const INITIAL_FORM = {
 
 export function CustomerWithdrawalRequestPage() {
   const t = useTranslation();
+  const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [form, setForm] = useState(INITIAL_FORM);
-  const [success, setSuccess] = useState(false);
+  const [depositOptions, setDepositOptions] = useState([]);
+  const [success, setSuccess] = useState(null);
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!customerId) {
+      setDepositOptions([]);
+      return undefined;
+    }
+
+    listCustomerDepositRequests({ customerId }).then((result) => {
+      if (!active) return;
+      setDepositOptions(result.data ?? []);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [customerId]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
-    setSuccess(false);
+    setSuccess(null);
+    setSubmitError('');
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSubmitError('');
+    setSuccess(null);
+
+    if (!canWriteCustomerRequests) {
+      setSubmitError(t('customer_portal_no_customer_scope'));
+      return;
+    }
+
+    setSubmitting(true);
+
+    const createResult = await createCustomerWithdrawalRequest({
+      requestedDispatchDate: form.requested_dispatch_date,
+      deliveryType: form.delivery_type,
+      pickupContact: form.pickup_contact,
+      destination: form.destination,
+      note: form.note,
+    });
+
+    if (createResult.error) {
+      setSubmitting(false);
+      setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
+    const requestId = createResult.data?.id;
+    const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
+      sourceDepositRequestId: form.source_deposit_request_id || null,
+      sourceLotNo: form.lot_no,
+      customerProductCode: form.customer_product_code,
+      internalProductCode: form.internal_product_code,
+      productName: form.product_name,
+      requestedQty: form.requested_qty,
+      requestedBoxes: form.requested_boxes,
+      requestedWeight: form.requested_weight,
+      pickingRule: form.picking_rule,
+      note: form.note,
+    });
+
+    setSubmitting(false);
+
+    if (lineResult.error) {
+      setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
+    setSuccess({
+      requestNo: createResult.data?.withdrawal_no ?? requestId,
+    });
   }
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-page">
       <PageHeader title={t('customer_withdrawal_title')} description={t('customer_withdrawal_description')} />
-      <CustomerPortalDemoBanner />
+      <CustomerPortalLiveBanner />
 
       <div className="customer-process-card">
         <h3>Withdrawal status timeline</h3>
         <CustomerProcessTimeline statuses={CUSTOMER_WITHDRAWAL_STATUSES} testId="customer-withdrawal-status-timeline" />
       </div>
 
-      {success ? <div className="alert-success-panel" data-testid="customer-withdrawal-demo-success-alert" role="status">{t('customer_withdrawal_demo_success')}</div> : null}
+      {success ? (
+        <div className="alert-success-panel" data-testid="customer-withdrawal-live-success-alert" role="status">
+          {t('customer_withdrawal_live_success')} ({success.requestNo})
+        </div>
+      ) : null}
 
-      <form className="form-card customer-portal-form" data-testid="customer-withdrawal-request-form" onSubmit={(event) => { event.preventDefault(); setSuccess(true); }}>
+      {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
+
+      <form className="form-card customer-portal-form" data-testid="customer-withdrawal-request-form" onSubmit={handleSubmit}>
         <div className="form-grid">
           <label className="form-field">
             <span>Source deposit request</span>
-            <select className="form-control" data-testid="withdrawal-source-deposit-select" onChange={(e) => updateField('deposit_request_no', e.target.value)} value={form.deposit_request_no}>
-              <option value={CUSTOMER_PORTAL_DEMO_DEPOSIT.request_no}>{CUSTOMER_PORTAL_DEMO_DEPOSIT.request_no}</option>
+            <select
+              className="form-control"
+              data-testid="withdrawal-source-deposit-select"
+              onChange={(e) => updateField('source_deposit_request_id', e.target.value)}
+              value={form.source_deposit_request_id}
+            >
+              <option value="">Optional source deposit</option>
+              {depositOptions.map((row) => (
+                <option key={row.id} value={row.id}>{row.request_no} ({row.status})</option>
+              ))}
             </select>
           </label>
           <label className="form-field">
             <span>Source lot</span>
-            <select className="form-control" data-testid="withdrawal-lot-select" onChange={(e) => updateField('lot_no', e.target.value)} value={form.lot_no}>
-              <option value={CUSTOMER_PORTAL_DEMO_DEPOSIT.lot_no}>{CUSTOMER_PORTAL_DEMO_DEPOSIT.lot_no}</option>
-            </select>
+            <input className="form-control" data-testid="withdrawal-lot-select" onChange={(e) => updateField('lot_no', e.target.value)} value={form.lot_no} />
           </label>
           <label className="form-field">
             <span>Picking rule</span>
@@ -118,8 +207,10 @@ export function CustomerWithdrawalRequestPage() {
           </label>
         </div>
         <div className="action-row customer-portal-form-actions">
-          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setSuccess(false); }} type="button">{t('close')}</button>
-          <button className="btn btn-primary" data-testid="customer-withdrawal-submit-button" type="submit">{t('customer_withdrawal_submit')}</button>
+          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setSuccess(null); setSubmitError(''); }} type="button">{t('close')}</button>
+          <button className="btn btn-primary" data-testid="customer-withdrawal-submit-button" disabled={submitting} type="submit">
+            {submitting ? t('customer_withdrawal_submitting') : t('customer_withdrawal_submit')}
+          </button>
         </div>
       </form>
     </section>

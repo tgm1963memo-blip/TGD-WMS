@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import { detectUatErrors } from '../utils/uatErrorDetection.js';
+import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
 
-const BASE_URL = (process.env.UAT_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
-const EMAIL = process.env.UAT_EMAIL || 'test_admin@test.com';
-const PASSWORD = process.env.UAT_PASSWORD || 'password';
+requireUatCredentials();
+
+const BASE_URL = getBaseUrl();
+const EMAIL = process.env.UAT_EMAIL;
+const PASSWORD = process.env.UAT_PASSWORD;
 
 test('UAT Round 1 Browser Execution', async ({ page }) => {
   test.setTimeout(90000);

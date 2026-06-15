@@ -1,0 +1,36 @@
+/**
+ * Routable paths for pre-user UAT smoke (non-disabled navigation + settings).
+ * Keep in sync with src/app/navigation.js and src/app/routes.jsx.
+ */
+export const systemRouteExpectations = [
+  { path: '/dashboard', testId: null },
+  { path: '/operations/receiving', testId: null },
+  { path: '/operations/putaway', testId: null },
+  { path: '/handheld', testId: null },
+  { path: '/stock-count', testId: null },
+  { path: '/operations/transfer', testId: null },
+  { path: '/operations/adjustment', testId: null },
+  { path: '/operations/withdrawal-requests', testId: null },
+  { path: '/operations/allocations', testId: null },
+  { path: '/operations/picking', testId: null },
+  { path: '/operations/outbound', testId: null },
+  { path: '/operations/dispatch', testId: null },
+  { path: '/customer', testId: 'customer-portal-page' },
+  { path: '/customer/deposit-request', testId: 'customer-deposit-request-page' },
+  { path: '/customer/stock-balance', testId: 'customer-stock-balance-page' },
+  { path: '/customer/withdrawal-request', testId: 'customer-withdrawal-request-page' },
+  { path: '/customer/requests', testId: 'customer-request-history-page' },
+  { path: '/customer/admin/deposit-review', testId: 'customer-admin-deposit-review-page' },
+  { path: '/customer/warehouse/receiving', testId: 'customer-warehouse-receiving-page' },
+  { path: '/customer/admin/receiving-verification', testId: 'customer-admin-receiving-verification-page' },
+  { path: '/customer/admin/withdrawal-review', testId: 'customer-admin-withdrawal-review-page' },
+  { path: '/customer/warehouse/picking-loading', testId: 'customer-warehouse-picking-loading-page' },
+  { path: '/reports/billing-movement-weight', testId: 'billing-movement-weight-report-page' },
+  { path: '/billing/invoice-drafts', testId: 'billing-invoice-drafts-page' },
+  { path: '/reports/movement-ledger', testId: null },
+  { path: '/reports/storage-aging', testId: null },
+  { path: '/reports', testId: null },
+  { path: '/master/customers', testId: null },
+  { path: '/admin/auth-readiness', testId: null },
+  { path: '/settings/profile', testId: 'profile-settings-page' },
+];

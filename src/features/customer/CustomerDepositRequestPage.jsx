@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
-import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
+import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
+import {
+  createCustomerDepositRequest,
+  upsertCustomerDepositRequestLine,
+} from '../../services/customerDepositRequestService.js';
+import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
@@ -27,20 +32,24 @@ function formatFileSize(size) {
 
 export function CustomerDepositRequestPage() {
   const t = useTranslation();
+  const { canWriteCustomerRequests } = useCustomerPortalProfile();
   const [form, setForm] = useState(INITIAL_FORM);
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(null);
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
-    setSuccess(false);
+    setSuccess(null);
+    setSubmitError('');
   }
 
   function handleAttachments(event) {
     const selected = Array.from(event.target.files ?? []);
     const oversized = selected.find((file) => file.size > MAX_ATTACHMENT_SIZE);
-    setAttachmentError(oversized ? `${oversized.name} exceeds the 10MB demo preview limit.` : '');
+    setAttachmentError(oversized ? `${oversized.name} exceeds the 10MB preview limit.` : '');
     setAttachments((current) => [
       ...current,
       ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
@@ -48,15 +57,60 @@ export function CustomerDepositRequestPage() {
     event.target.value = '';
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setSuccess(true);
+    setSubmitError('');
+    setSuccess(null);
+
+    if (!canWriteCustomerRequests) {
+      setSubmitError(t('customer_portal_no_customer_scope'));
+      return;
+    }
+
+    setSubmitting(true);
+
+    const createResult = await createCustomerDepositRequest({
+      expectedArrivalDate: form.expected_arrival_date,
+      contactName: form.contact_name,
+      contactPhone: form.contact_phone,
+      note: form.note,
+    });
+
+    if (createResult.error) {
+      setSubmitting(false);
+      setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
+    const requestId = createResult.data?.id;
+    const lineResult = await upsertCustomerDepositRequestLine(requestId, {
+      customerProductCode: form.customer_product_code,
+      internalProductCode: form.product_code,
+      productName: form.product_name,
+      lotNo: form.lot_no,
+      expectedQty: form.expected_qty,
+      expectedBoxes: form.expected_boxes,
+      expectedWeight: form.expected_weight,
+      temperatureType: form.temperature_type,
+      note: form.note,
+    });
+
+    setSubmitting(false);
+
+    if (lineResult.error) {
+      setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
+    setSuccess({
+      requestNo: createResult.data?.request_no ?? requestId,
+    });
   }
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-page">
       <PageHeader title={t('customer_deposit_title')} description={t('customer_deposit_description')} />
-      <CustomerPortalDemoBanner />
+      <CustomerPortalLiveBanner />
 
       <div className="customer-process-card">
         <h3>Deposit status timeline</h3>
@@ -64,11 +118,12 @@ export function CustomerDepositRequestPage() {
       </div>
 
       {success ? (
-        <div className="alert-success-panel" data-testid="customer-deposit-demo-success-alert" role="status">
-          {t('customer_deposit_demo_success')}
-          {attachments.length ? <div>Attachments: {attachments.map((file) => file.name).join(', ')}</div> : null}
+        <div className="alert-success-panel" data-testid="customer-deposit-live-success-alert" role="status">
+          {t('customer_deposit_live_success')} ({success.requestNo})
         </div>
       ) : null}
+
+      {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-deposit-request-form" onSubmit={handleSubmit}>
         <div className="form-grid">
@@ -138,7 +193,7 @@ export function CustomerDepositRequestPage() {
             />
           </label>
           <p className="form-helper" data-testid="customer-deposit-attachment-demo-note">
-            Demo only - files are not uploaded to storage yet. Maximum preview size is 10MB per file.
+            Storage upload is deferred — files stay in browser preview only until Gate 2G.
           </p>
           {attachmentError ? <p className="field-error" role="alert">{attachmentError}</p> : null}
           <ul className="customer-attachment-list" data-testid="customer-deposit-attachment-list">
@@ -159,8 +214,10 @@ export function CustomerDepositRequestPage() {
         </div>
 
         <div className="action-row customer-portal-form-actions">
-          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setAttachments([]); setSuccess(false); }} type="button">{t('close')}</button>
-          <button className="btn btn-primary" data-testid="customer-deposit-submit-button" type="submit">{t('customer_deposit_submit')}</button>
+          <button className="btn btn-secondary" onClick={() => { setForm(INITIAL_FORM); setAttachments([]); setSuccess(null); setSubmitError(''); }} type="button">{t('close')}</button>
+          <button className="btn btn-primary" data-testid="customer-deposit-submit-button" disabled={submitting} type="submit">
+            {submitting ? t('customer_deposit_submitting') : t('customer_deposit_submit')}
+          </button>
         </div>
       </form>
     </section>

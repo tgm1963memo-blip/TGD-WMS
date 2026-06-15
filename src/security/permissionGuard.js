@@ -6,6 +6,8 @@
  * No side effects, no network, no storage.
  */
 
+import { getRoutePermission } from './routePermissionCatalog.js';
+
 export const ROLE_HIERARCHY = {
   viewer: 1,
   warehouse_staff: 2,
@@ -34,9 +36,6 @@ export function hasRoleAccess(userRole, requiredRole) {
  * @returns {{allowed:boolean, required_role:string, permission_area:string, access_level:string, reason:string}}
  */
 export function canAccessRoute(userRole, routePath) {
-  // Import inside function to avoid circular dependencies.
-  // eslint-disable-next-line global-require
-  const { getRoutePermission } = require('./routePermissionCatalog');
   const entry = getRoutePermission(routePath);
   if (!entry) {
     return {
