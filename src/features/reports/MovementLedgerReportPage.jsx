@@ -7,6 +7,7 @@ import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.js
 import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
 import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
@@ -26,6 +27,7 @@ const initialState = {
 
 export function MovementLedgerReportPage() {
   const { language } = useLanguage();
+  const goLive = isGoLivePresentationEnabled();
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
 
@@ -57,8 +59,15 @@ export function MovementLedgerReportPage() {
   }, [filters]);
 
   return (
-    <section className="page-shell">
-      <PageHeader title="Customer Stock Movement Ledger" description="Read-only cold storage movement report for operations and audit preparation." />
+    <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
+      <PageHeader
+        title={getTranslation('movement_ledger_report', language) || 'Customer Stock Movement Ledger'}
+        description={goLive
+          ? (language === 'th'
+            ? 'รายงานการเคลื่อนไหวสินค้าคลังเย็น — ข้อมูลจริงสำหรับการตรวจสอบและทดสอบ'
+            : 'Cold storage movement report — live data for operations review and business testing.')
+          : 'Read-only cold storage movement report for operations and audit preparation.'}
+      />
       <div className="section-card operational-report-actions-card">
         <ReportPrintActions
           title={getTranslation('entry_delivery_inventory_report', language) || 'Entry-Delivery Inventory Report'}
@@ -97,15 +106,17 @@ export function MovementLedgerReportPage() {
         <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
       </DashboardSection>
 
-      <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
-        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
-        <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <li>No Production migration applied</li>
-          <li>UI polish does not change stock movement behavior</li>
-          <li>UI polish does not change stock balance calculation</li>
-          <li>Existing services and RPC calls are unchanged</li>
-        </ul>
-      </section>
+      {!goLive ? (
+        <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+          <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
+          <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li>No Production migration applied</li>
+            <li>UI polish does not change stock movement behavior</li>
+            <li>UI polish does not change stock balance calculation</li>
+            <li>Existing services and RPC calls are unchanged</li>
+          </ul>
+        </section>
+      ) : null}
     </section>
   );
 }

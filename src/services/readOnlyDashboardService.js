@@ -1,3 +1,4 @@
+import { resolveQuantity } from '../utils/stockFieldAliases.js';
 import { supabase } from './supabaseClient.js';
 
 const emptySummary = {
@@ -8,6 +9,10 @@ const emptySummary = {
   productRows: 0,
   lotRows: 0,
   locationRows: 0,
+  openReceivingRows: 0,
+  openPutawayRows: 0,
+  openPickingRows: 0,
+  openDispatchRows: 0,
 };
 
 function missingClientResult() {
@@ -30,18 +35,36 @@ async function getRowCount(tableName) {
 }
 
 async function getStockQuantityTotal() {
-  const { data, error } = await supabase
+  const quantityResult = await supabase
     .from('tgd_stock_balances')
-    .select('quantity, qty_on_hand, qty_available');
+    .select('quantity');
 
-  if (error) {
-    throw error;
+  if (!quantityResult.error) {
+    return (quantityResult.data ?? []).reduce((total, row) => total + resolveQuantity(row), 0);
   }
 
-  return (data ?? []).reduce((total, row) => {
-    const quantity = Number(row.qty_on_hand ?? row.qty_available ?? row.quantity ?? 0);
-    return total + (Number.isFinite(quantity) ? quantity : 0);
-  }, 0);
+  const legacyResult = await supabase
+    .from('tgd_stock_balances')
+    .select('qty_on_hand, qty_available');
+
+  if (legacyResult.error) {
+    throw legacyResult.error;
+  }
+
+  return (legacyResult.data ?? []).reduce((total, row) => total + resolveQuantity(row), 0);
+}
+
+async function getOpenDocumentCount(tableName) {
+  const { count, error } = await supabase
+    .from(tableName)
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['OPEN', 'DRAFT']);
+
+  if (error) {
+    return 0;
+  }
+
+  return count ?? 0;
 }
 
 export async function getReadOnlyDashboardSummary() {
@@ -58,6 +81,10 @@ export async function getReadOnlyDashboardSummary() {
       productRows,
       lotRows,
       locationRows,
+      openReceivingRows,
+      openPutawayRows,
+      openPickingRows,
+      openDispatchRows,
     ] = await Promise.all([
       getRowCount('tgd_stock_balances'),
       getRowCount('tgd_stock_movements'),
@@ -66,6 +93,10 @@ export async function getReadOnlyDashboardSummary() {
       getRowCount('tgd_products'),
       getRowCount('tgd_lots'),
       getRowCount('tgd_locations'),
+      getOpenDocumentCount('tgd_receiving_documents'),
+      getOpenDocumentCount('tgd_putaway_documents'),
+      getOpenDocumentCount('tgd_picking_documents'),
+      getOpenDocumentCount('tgd_dispatch_documents'),
     ]);
 
     return {
@@ -77,6 +108,10 @@ export async function getReadOnlyDashboardSummary() {
         productRows,
         lotRows,
         locationRows,
+        openReceivingRows,
+        openPutawayRows,
+        openPickingRows,
+        openDispatchRows,
       },
       error: null,
     };

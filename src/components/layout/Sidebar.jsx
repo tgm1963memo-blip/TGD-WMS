@@ -5,6 +5,7 @@ import { brandConfig } from '../../config/brandConfig.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
 import {
   isCustomerOpsDemoNavigationVisible,
@@ -17,6 +18,7 @@ import {
 export function Sidebar() {
   const t = useTranslation();
   const { role: userRole } = useUserRole();
+  const goLive = isGoLivePresentationEnabled();
 
   const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
   const getNavKey = (key) => `nav.${toCamelCase(key)}`;
@@ -83,14 +85,16 @@ export function Sidebar() {
 
       <UserSessionMenu />
 
-      <div
-        className="production-hold-banner sidebar-hold-banner"
-        data-testid="production-hold-indicator"
-        role="status"
-        aria-label="Production status"
-      >
-        Production HOLD
-      </div>
+      {!goLive ? (
+        <div
+          className="production-hold-banner sidebar-hold-banner"
+          data-testid="production-hold-indicator"
+          role="status"
+          aria-label="Production status"
+        >
+          Production HOLD
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -1,31 +1,98 @@
-import { DataTable } from '../ui/DataTable.jsx';
+import { StatusBadge } from '../ui/StatusBadge.jsx';
+import { CompactExpandableTable } from '../ui/CompactExpandableTable.jsx';
+import { formatCompactText, formatDetailValue, formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
-const columns = [
-  { key: 'created_at', header: 'Movement Date', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>{row.created_at}</span> },
-  { key: 'movement_type', header: 'Movement Type', render: (row) => (
-      <span style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--tgd-main-bg)', color: 'var(--tgd-info)', fontWeight: 600, fontSize: 12, border: '1px solid var(--tgd-border)' }}>
-        {row.movement_type}
+function DetailField({ label, value }) {
+  return (
+    <div className="compact-detail-field">
+      <span className="compact-detail-label">{label}</span>
+      <span className="compact-detail-value">{formatDetailValue(value)}</span>
+    </div>
+  );
+}
+
+const summaryColumns = [
+  {
+    key: 'created_at',
+    header: 'Date',
+    render: (row) => (
+      <span className="table-meta-text">
+        {formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false })}
       </span>
-  )},
-  { key: 'product_id', header: 'Product', render: (row) => <span style={{ fontWeight: 600, color: 'var(--tgd-main-text)' }}>{row.product_id}</span> },
-  { key: 'customer_id', header: 'Customer' },
-  { key: 'lot_id', header: 'Lot' },
-  { key: 'from_location_id', header: 'Source Location', render: (row) => <span style={{ color: 'var(--tgd-warning)', fontWeight: 500 }}>{row.from_location_id || '-'}</span> },
-  { key: 'to_location_id', header: 'Target Location', render: (row) => <span style={{ color: 'var(--tgd-success)', fontWeight: 500 }}>{row.to_location_id || '-'}</span> },
-  { key: 'qty', header: 'Qty', render: (row) => <span style={{ fontWeight: 700, fontSize: 14 }}>{row.qty > 0 ? `+${row.qty}` : row.qty}</span> },
-  { key: 'uom', header: 'UOM', render: (row) => <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>{row.uom}</span> },
-  { key: 'reference_type', header: 'Ref Type' },
-  { key: 'reference_id', header: 'Document No', render: (row) => <span style={{ fontWeight: 600, color: 'var(--tgd-primary-gold)', cursor: 'pointer' }}>{row.reference_id}</span> },
+    ),
+  },
+  {
+    key: 'movement_type',
+    header: 'Type',
+    render: (row) => <StatusBadge value={row.movement_type} />,
+  },
+  {
+    key: 'product_id',
+    header: 'Product',
+    render: (row) => (
+      <span className="compact-cell-text">
+        {formatCompactText(row.source_document_no ?? row.product_id, 20)}
+      </span>
+    ),
+    title: (row) => row.product_id,
+  },
+  {
+    key: 'customer_id',
+    header: 'Customer',
+    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_id, 16)}</span>,
+    title: (row) => row.customer_id,
+  },
+  {
+    key: 'qty',
+    header: 'Qty',
+    render: (row) => {
+      const qty = Number(row.qty ?? 0);
+      return <span className="compact-cell-qty">{qty > 0 ? `+${qty}` : qty}</span>;
+    },
+  },
+  {
+    key: 'reference_no',
+    header: 'Ref',
+    render: (row) => (
+      <span className="compact-cell-text">
+        {formatCompactText(row.reference_no ?? row.reference_id, 16)}
+      </span>
+    ),
+    title: (row) => row.reference_no ?? row.reference_id,
+  },
 ];
+
+function renderMovementDetail(row) {
+  return (
+    <>
+      <DetailField label="Movement Date" value={formatDocumentDate(row.movement_date ?? row.created_at)} />
+      <DetailField label="Movement Type" value={row.movement_type} />
+      <DetailField label="Product ID" value={row.product_id} />
+      <DetailField label="Customer ID" value={row.customer_id} />
+      <DetailField label="Lot ID" value={row.lot_id} />
+      <DetailField label="Source Location" value={row.from_location_id} />
+      <DetailField label="Target Location" value={row.to_location_id} />
+      <DetailField label="Qty" value={row.qty} />
+      <DetailField label="UOM" value={row.uom} />
+      <DetailField label="Reference Type" value={row.reference_type} />
+      <DetailField label="Reference No" value={row.reference_no} />
+      <DetailField label="Document ID" value={row.reference_id} />
+      <DetailField label="Created At" value={formatDocumentDate(row.created_at)} />
+    </>
+  );
+}
 
 export function MovementLedgerTable({ data = [], loading = false, error = null }) {
   return (
-    <DataTable
-      columns={columns}
-      data={data}
+    <CompactExpandableTable
+      rows={data}
+      rowKey={(row) => row.id ?? `${row.movement_type}-${row.created_at}-${row.reference_id}`}
+      summaryColumns={summaryColumns}
+      renderDetail={renderMovementDetail}
       loading={loading}
       error={error}
       emptyMessage="No movement ledger rows found."
+      tableTestId="movement-ledger-table"
     />
   );
 }

@@ -5,6 +5,7 @@ import { DashboardSection } from '../../components/dashboard/DashboardSection.js
 import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
 import { BillingMovementWeightFilterPanel } from '../../components/reports/BillingMovementWeightFilterPanel.jsx';
 import { BillingMovementWeightTable } from '../../components/reports/BillingMovementWeightTable.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { getBillingMovementWeightRows } from '../../services/billingMovementWeightService.js';
@@ -37,6 +38,7 @@ const initialState = {
 export function BillingMovementWeightReportPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const goLive = isGoLivePresentationEnabled();
   const userRole = getCurrentUserRole();
   const canCreateDraft = canWriteBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
@@ -198,20 +200,25 @@ export function BillingMovementWeightReportPage() {
   }
 
   return (
-    <section className="page-shell" data-testid="billing-movement-weight-report-page">
+    <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`} data-testid="billing-movement-weight-report-page">
       <PageHeader
         title={getTranslation('billing_movement_weight_report', language) || 'Billing Movement Weight Report'}
-        description={getTranslation('billing_movement_weight_report_description', language) || 'Read-only preview of movement weight and billable status before billing approval.'}
+        description={goLive
+          ? (getTranslation('billing_movement_weight_report_description_golive', language)
+            || 'Movement weight and billable status for billing review and invoice draft preparation.')
+          : (getTranslation('billing_movement_weight_report_description', language) || 'Read-only preview of movement weight and billable status before billing approval.')}
       />
 
-      <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
-        <strong>Gate 3B-2 Billing Preview</strong>
-        <p style={{ margin: '8px 0 0', fontSize: 14 }}>
-          Select READY_FOR_PREVIEW billable rows to create invoice drafts.
-          No approve, no Bplus export, no Mark BILLED.
-          NEEDS_WEIGHT_REVIEW rows remain review-only and cannot be selected.
-        </p>
-      </div>
+      {!goLive ? (
+        <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
+          <strong>Gate 3B-2 Billing Preview</strong>
+          <p style={{ margin: '8px 0 0', fontSize: 14 }}>
+            Select READY_FOR_PREVIEW billable rows to create invoice drafts.
+            No approve, no Bplus export, no Mark BILLED.
+            NEEDS_WEIGHT_REVIEW rows remain review-only and cannot be selected.
+          </p>
+        </div>
+      ) : null}
 
       <BillingMovementWeightFilterPanel
         value={filters}
@@ -326,7 +333,7 @@ export function BillingMovementWeightReportPage() {
               data-testid="billing-movement-weight-empty-state"
             >
               <strong>{emptyMessage ?? 'Loading billing movement weight report...'}</strong>
-              {!state.loading && !state.error && state.source === 'billing_database_view' ? (
+              {!state.loading && !state.error && state.source === 'billing_database_view' && !goLive ? (
                 <p style={{ marginTop: 8, fontSize: 13, color: 'var(--tgd-muted-text)' }}>
                   Data source: UAT billing movement weight view.
                 </p>
@@ -336,15 +343,17 @@ export function BillingMovementWeightReportPage() {
         />
       </DashboardSection>
 
-      <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
-        <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
-        <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <li>Gate 3B-2 supports create/list/cancel invoice drafts only</li>
-          <li>No approve / Bplus export / Mark BILLED</li>
-          <li>No billing amount calculation when weight is incomplete</li>
-          <li>FINAL GO is NOT AUTHORIZED</li>
-        </ul>
-      </section>
+      {!goLive ? (
+        <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+          <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
+          <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li>Gate 3B-2 supports create/list/cancel invoice drafts only</li>
+            <li>No approve / Bplus export / Mark BILLED</li>
+            <li>No billing amount calculation when weight is incomplete</li>
+            <li>FINAL GO is NOT AUTHORIZED</li>
+          </ul>
+        </section>
+      ) : null}
     </section>
   );
 }

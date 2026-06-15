@@ -56,3 +56,24 @@ export function isMetaColumnKey(key) {
   if (META_COLUMN_KEYS.has(key)) return true;
   return key.endsWith('_type') || key.endsWith('_method');
 }
+
+export function formatCompactText(value, maxLength = 18) {
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+
+  const text = String(value);
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, 8)}…${text.slice(-4)}`;
+}
+
+export function formatDetailValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+
+  return String(value);
+}
