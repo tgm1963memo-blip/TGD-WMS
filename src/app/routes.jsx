@@ -52,6 +52,8 @@ import { SettingsPage } from '../features/settings/SettingsPage.jsx';
 import { DocumentBrandingPreviewPage } from '../features/admin/DocumentBrandingPreviewPage.jsx';
 import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdminPage.jsx';
+import { UserManagementPage } from '../features/admin/UserManagementPage.jsx';
+import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProductCatalogAdminPage.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
@@ -64,6 +66,7 @@ import { CustomerDepositRequestPage } from '../features/customer/CustomerDeposit
 import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
 import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
+import { CustomerProductCatalogPage } from '../features/customer/CustomerProductCatalogPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../features/customer/CustomerAdminDepositReviewPage.jsx';
 import { CustomerWarehouseReceivingDemoPage } from '../features/customer/CustomerWarehouseReceivingDemoPage.jsx';
 import { CustomerAdminReceivingVerificationPage } from '../features/customer/CustomerAdminReceivingVerificationPage.jsx';
@@ -140,6 +143,8 @@ export function AppRoutes() {
           <Route path="/admin/document-branding" element={<DocumentBrandingAdminPage />} />
           <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
+          <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/admin/customer-products" element={<CustomerProductCatalogAdminPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
           <Route path="/customer" element={<CustomerPortalDashboardPage />} />
@@ -147,6 +152,7 @@ export function AppRoutes() {
           <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
           <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />
           <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
+          <Route path="/customer/products" element={<CustomerProductCatalogPage />} />
           <Route path="/customer/admin/deposit-review" element={<CustomerAdminDepositReviewPage />} />
           <Route path="/customer/warehouse/receiving" element={<CustomerWarehouseReceivingDemoPage />} />
           <Route path="/customer/admin/receiving-verification" element={<CustomerAdminReceivingVerificationPage />} />

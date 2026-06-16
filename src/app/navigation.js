@@ -86,6 +86,12 @@ export const navigationGroups = [
         testId: 'customer-withdrawal-request-menu-item',
       },
       {
+        label: 'Customer Products',
+        key: 'customer_product_catalog',
+        path: '/customer/products',
+        testId: 'customer-product-catalog-menu-item',
+      },
+      {
         label: 'Customer Requests',
         key: 'customer_request_history',
         path: '/customer/requests',
@@ -136,6 +142,8 @@ export const navigationGroups = [
     key: 'system_administration',
     items: [
       { label: 'Master Data', key: 'master_data', path: '/master/customers' },
+      { label: 'User Management', key: 'user_management', path: '/admin/users', testId: 'user-management-menu-item' },
+      { label: 'Customer Product Catalog', key: 'customer_product_catalog_admin', path: '/admin/customer-products', testId: 'customer-product-catalog-admin-menu-item' },
       { label: 'Users and Roles', key: 'users_and_roles', path: '/admin/auth-readiness' },
       { label: 'Audit Log', key: 'audit_log', disabled: true },
     ],

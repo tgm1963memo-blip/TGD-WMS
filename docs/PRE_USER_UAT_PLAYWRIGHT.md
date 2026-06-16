@@ -39,7 +39,33 @@ npm run test:e2e:vercel:core
 
 # รวม Billing (ต้องมีบัญชี accounting)
 npm run test:e2e:vercel
+
+# Full business flow: ฝาก → จัดเก็บ → เบิก → จ่ายออก (ต้องมี UAT credentials + master data ใน .env.local)
+npm run test:e2e:full-flow
 ```
+
+### ตัวแปรสำหรับ Full Flow (`test:e2e:full-flow`)
+
+```env
+UAT_BASE_URL=https://tgd-wms.vercel.app
+UAT_EMAIL=...
+UAT_PASSWORD=...
+
+# แนะนำ — ถ้าไม่ตั้ง Playwright จะเลือก option แรกจาก dropdown อัตโนมัติ
+UAT_CUSTOMER_CODE=
+UAT_WAREHOUSE_CODE=
+UAT_PRODUCT_CODE=
+UAT_LOT_NO=
+UAT_PALLET_NO=
+UAT_QTY=1
+UAT_RECEIVING_LOCATION=
+
+# Optional — ขั้นตอน customer deposit
+UAT_CUSTOMER_EMAIL=
+UAT_CUSTOMER_PASSWORD=
+```
+
+Evidence: `uat-evidence/full-deposit-to-dispatch-flow/result.json` + screenshots ต่อ step
 
 ### บัญชีสำหรับ Billing E2E
 

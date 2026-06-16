@@ -65,6 +65,9 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/reports/accounting-charge-handoff-review', route_name: 'AccountingChargeHandoffReviewPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },
   // Admin
   { route_path: '/settings', route_name: 'SettingsPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
+  { route_path: '/admin/users', route_name: 'UserManagementPage', permission_area: 'user_management', minimum_role: 'admin', access_level: 'admin', notes: 'USER-MGMT-045: profile metadata via RPC; auth.users created separately in Supabase' },
+  { route_path: '/admin/customer-products', route_name: 'CustomerProductCatalogAdminPage', permission_area: 'customer_catalog', minimum_role: 'admin', access_level: 'write', notes: 'CUSTOMER-CATALOG-046: admin manages catalog for any customer' },
+  { route_path: '/customer/products', route_name: 'CustomerProductCatalogPage', permission_area: 'customer_catalog', minimum_role: 'customer_user', access_level: 'write', notes: 'CUSTOMER-CATALOG-046: customer_admin/customer_user manage own catalog' },
   // Legacy/Placeholder routes – unknown area
   { route_path: '/inventory', route_name: 'LegacyPlaceholderPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
   { route_path: '/movement-ledger', route_name: 'LegacyPlaceholderPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
@@ -104,7 +107,7 @@ export function validateRoutePermissionCatalog(routes) {
   const knownAreas = [
     'master_data', 'receiving', 'putaway', 'transfer', 'adjustment', 'stock_count',
     'withdrawal', 'allocation', 'picking', 'dispatch', 'reports',
-    'accounting_review', 'admin', 'unknown',
+    'accounting_review', 'admin', 'user_management', 'customer_catalog', 'unknown',
   ];
   const seen = new Set();
   for (const entry of ROUTE_PERMISSION_CATALOG) {

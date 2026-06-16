@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { CustomerProductPicker } from '../../components/customer/CustomerProductPicker.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
@@ -12,6 +13,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const INITIAL_FORM = {
+  catalog_product_id: '',
   expected_arrival_date: '',
   customer_product_code: '',
   product_code: '',
@@ -32,7 +34,8 @@ function formatFileSize(size) {
 
 export function CustomerDepositRequestPage() {
   const t = useTranslation();
-  const { canWriteCustomerRequests } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
+  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [form, setForm] = useState(INITIAL_FORM);
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
@@ -127,17 +130,43 @@ export function CustomerDepositRequestPage() {
 
       <form className="form-card customer-portal-form" data-testid="customer-deposit-request-form" onSubmit={handleSubmit}>
         <div className="form-grid">
+          <div className="form-field form-field-span-2">
+            <CustomerProductPicker
+              customerId={customerId}
+              manualLabel={t('catalog_manual_entry')}
+              onChange={(selection) => {
+                setForm((current) => ({
+                  ...current,
+                  catalog_product_id: selection.catalogProductId,
+                  customer_product_code: selection.customerProductCode,
+                  product_code: selection.internalProductCode,
+                  product_name: selection.productName,
+                  temperature_type: selection.temperatureType || current.temperature_type,
+                }));
+                setSuccess(null);
+                setSubmitError('');
+              }}
+              testId="customer-deposit-product-picker"
+              value={{
+                catalogProductId: form.catalog_product_id,
+                customerProductCode: form.customer_product_code,
+                internalProductCode: form.product_code,
+                productName: form.product_name,
+                temperatureType: form.temperature_type,
+              }}
+            />
+          </div>
           <label className="form-field">
             <span>Customer product code</span>
-            <input className="form-control" data-testid="customer-product-code-input" onChange={(e) => updateField('customer_product_code', e.target.value)} required value={form.customer_product_code} />
+            <input className="form-control" data-testid="customer-product-code-input" disabled={catalogLocked} onChange={(e) => updateField('customer_product_code', e.target.value)} required value={form.customer_product_code} />
           </label>
           <label className="form-field">
             <span>Internal product code</span>
-            <input className="form-control" data-testid="customer-deposit-product-code" onChange={(e) => updateField('product_code', e.target.value)} required value={form.product_code} />
+            <input className="form-control" data-testid="customer-deposit-product-code" disabled={catalogLocked} onChange={(e) => updateField('product_code', e.target.value)} required={!catalogLocked} value={form.product_code} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_product_name')}</span>
-            <input className="form-control" data-testid="customer-deposit-product-name" onChange={(e) => updateField('product_name', e.target.value)} required value={form.product_name} />
+            <input className="form-control" data-testid="customer-deposit-product-name" disabled={catalogLocked} onChange={(e) => updateField('product_name', e.target.value)} required value={form.product_name} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_lot_no')}</span>

@@ -109,6 +109,10 @@ export function CustomerPortalDashboardPage() {
             <strong>{t('customer_portal_request_history')}</strong>
             <p>{t('customer_portal_request_history_hint')}</p>
           </Link>
+          <Link className="card customer-portal-action-card" data-testid="customer-product-catalog-link" to="/customer/products">
+            <strong>{t('customer_portal_product_catalog')}</strong>
+            <p>{t('customer_portal_product_catalog_hint')}</p>
+          </Link>
         </div>
       </div>
     </section>
