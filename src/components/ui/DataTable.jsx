@@ -30,7 +30,7 @@ function renderDefaultCell(column, row) {
   return value;
 }
 
-export function DataTable({ columns, data = [], loading = false, error = null, emptyMessage = 'No records found.' }) {
+export function DataTable({ columns, data = [], loading = false, error = null, emptyMessage = 'No records found.', testId }) {
   const t = useTranslation();
 
   if (loading) {
@@ -46,7 +46,7 @@ export function DataTable({ columns, data = [], loading = false, error = null, e
   }
 
   return (
-    <div className="table-responsive responsive-table">
+    <div className="table-responsive responsive-table" data-testid={testId}>
       <table className="tgd-table">
         <thead>
           <tr>

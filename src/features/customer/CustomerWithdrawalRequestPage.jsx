@@ -33,8 +33,8 @@ const INITIAL_FORM = {
 export function CustomerWithdrawalRequestPage() {
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
-  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [form, setForm] = useState(INITIAL_FORM);
+  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [depositOptions, setDepositOptions] = useState([]);
   const [success, setSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');

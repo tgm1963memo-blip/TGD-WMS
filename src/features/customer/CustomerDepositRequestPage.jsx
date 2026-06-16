@@ -35,8 +35,8 @@ function formatFileSize(size) {
 export function CustomerDepositRequestPage() {
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
-  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [form, setForm] = useState(INITIAL_FORM);
+  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
   const [success, setSuccess] = useState(null);

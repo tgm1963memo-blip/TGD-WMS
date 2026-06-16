@@ -16,11 +16,17 @@ Playwright smoke suite ก่อนให้ผู้ใช้งานจริ
 ## Optional customer write credentials
 
 ```env
-UAT_CUSTOMER_EMAIL=admin.demo@...
-UAT_CUSTOMER_PASSWORD=...
+UAT_CUSTOMER_EMAIL=customer.demo@tgd-wms.local
+UAT_CUSTOMER_PASSWORD=... # same as UAT_PASSWORD unless overridden
 ```
 
 บัญชีต้องเป็น `customer_admin` หรือ `customer_user` ที่มี `customer_id`
+
+สร้างบัญชีตัวอย่างบน UAT:
+
+```bash
+node scripts/uat-bootstrap-customer-demo.mjs
+```
 
 ## Commands
 
@@ -39,6 +45,9 @@ npm run test:e2e:vercel:core
 
 # รวม Billing (ต้องมีบัญชี accounting)
 npm run test:e2e:vercel
+
+# Customer demo user flow (catalog + deposit)
+npm run test:e2e:customer-demo
 
 # Full business flow: ฝาก → จัดเก็บ → เบิก → จ่ายออก (ต้องมี UAT credentials + master data ใน .env.local)
 npm run test:e2e:full-flow
