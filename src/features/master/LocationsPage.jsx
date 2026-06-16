@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { getLocations } from '../../services/masterDataService.js';
 
@@ -30,9 +32,9 @@ export function LocationsPage() {
   }, []);
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader title="Locations" description="Read-only location master list." />
-      <p className="sprint-status">Sprint status: placeholder only</p>
+      <UatOnly><p className="sprint-status">Sprint status: placeholder only</p></UatOnly>
       <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No locations found." />
     </section>
   );

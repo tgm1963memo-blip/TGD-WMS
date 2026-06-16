@@ -1,12 +1,18 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import {
   CUSTOMER_PORTAL_DEMO_PACKING_LIST,
   CUSTOMER_PORTAL_DEMO_WITHDRAWAL,
 } from '../../data/customerPortalDemoData.js';
 
 export function CustomerWarehousePickingLoadingDemoPage() {
+  if (isGoLivePresentationEnabled()) {
+    return <Navigate to="/customer/admin/withdrawal-review" replace />;
+  }
+
   const [palletBarcode, setPalletBarcode] = useState('');
   const [boxBarcode, setBoxBarcode] = useState('');
   const [status, setStatus] = useState('');

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { isGoLivePresentationEnabled } from '../../../config/goLivePresentation.js';
 import {
   addOutboundLine,
   createOutboundDraft,
@@ -52,6 +53,10 @@ function stringifyResult(result) {
 }
 
 export function OutboundDraftPage() {
+  if (isGoLivePresentationEnabled()) {
+    return <Navigate to="/operations/outbound" replace />;
+  }
+
   const [draftForm, setDraftForm] = useState({
     document_no: '',
     customer_id: '',

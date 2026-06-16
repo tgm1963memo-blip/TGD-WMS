@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { UatOnly } from '../../../components/common/UatOnly.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { DeliverySlipTemplate } from '../../../components/reports/DeliverySlipTemplate.jsx';
 import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
+import { getPageShellClassName, isProductionPresentationActive } from '../../../config/pageShellPresentation.js';
 import { getTranslation } from '../../../i18n/translationCatalog.js';
 import { useLanguage } from '../../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../../utils/documentDisplayUtils.js';
@@ -15,6 +17,11 @@ import { mapOutboundDetailToDeliverySlipData } from '../../../services/operation
 
 const safetyNote = 'Read-only outbound list/detail. No post outbound. No stock movement OUT. No stock balance update.';
 
+function countDocumentsByStatus(documents, statuses) {
+  const normalizedStatuses = new Set(statuses.map((status) => status.toUpperCase()));
+  return documents.filter((document) => normalizedStatuses.has(String(document.status ?? '').toUpperCase())).length;
+}
+
 function EmptyRow({ colSpan, label }) {
   return (
     <tr>
@@ -25,6 +32,7 @@ function EmptyRow({ colSpan, label }) {
 
 export function OutboundListPage() {
   const { language } = useLanguage();
+  const goLive = isProductionPresentationActive();
   const [documents, setDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
   const [detail, setDetail] = useState(null);
@@ -76,16 +84,34 @@ export function OutboundListPage() {
     loadDetail(selectedDocumentId);
   }, [selectedDocumentId]);
 
+  const statusCounts = useMemo(() => ({
+    draft: countDocumentsByStatus(documents, ['DRAFT', 'NEW']),
+    reserved: countDocumentsByStatus(documents, ['RESERVED', 'RESERVE']),
+    picked: countDocumentsByStatus(documents, ['PICKED', 'PICKING']),
+    posted: countDocumentsByStatus(documents, ['POSTED', 'DISPATCHED', 'COMPLETED']),
+  }), [documents]);
+
   return (
-    <section className="page-shell outbound-page">
-      <PageHeader 
-        title="Outbound Operations" 
-        description="Withdrawal, reservation, picking, and post outbound flow." 
+    <section className={getPageShellClassName('page-shell outbound-page')}>
+      <PageHeader
+        title={getTranslation('post_outbound', language) || 'Outbound Operations'}
+        description={goLive
+          ? (getTranslation('outbound_list_description_golive', language) || 'Withdrawal, reservation, picking, and dispatch document visibility.')
+          : 'Withdrawal, reservation, picking, and post outbound flow.'}
       />
-      <div className="dashboard-header-actions operations-page-actions" style={{ gap: 12 }}>
-         <span className="production-hold-badge">Production HOLD</span>
-         <Link className="btn-primary-gold" to="/operations/outbound-draft" style={{ padding: '8px 12px', background: 'var(--tgd-primary-gold)', color: '#000', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Open Draft Smoke UI</Link>
-      </div>
+      <UatOnly>
+        <div className="dashboard-header-actions operations-page-actions" style={{ gap: 12 }}>
+          <span className="production-hold-badge">Production HOLD</span>
+          <Link
+            className="btn-primary-gold uat-only-action"
+            data-testid="outbound-draft-smoke-ui-link"
+            to="/operations/outbound-draft"
+            style={{ padding: '8px 12px', background: 'var(--tgd-primary-gold)', color: '#000', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}
+          >
+            Open Draft Smoke UI
+          </Link>
+        </div>
+      </UatOnly>
 
       {error ? (
         <section className="alert-panel alert-danger" role="alert">
@@ -93,26 +119,25 @@ export function OutboundListPage() {
         </section>
       ) : null}
 
-      {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
         <div className="kpi-card info">
           <h3 className="kpi-label">Draft</h3>
-          <div className="kpi-value">14</div>
+          <div className="kpi-value">{goLive ? statusCounts.draft : 14}</div>
           <div className="kpi-helper">New requests</div>
         </div>
         <div className="kpi-card warning">
           <h3 className="kpi-label">Reserved</h3>
-          <div className="kpi-value">6</div>
+          <div className="kpi-value">{goLive ? statusCounts.reserved : 6}</div>
           <div className="kpi-helper">Awaiting picking</div>
         </div>
         <div className="kpi-card success">
           <h3 className="kpi-label">Picked</h3>
-          <div className="kpi-value">8</div>
+          <div className="kpi-value">{goLive ? statusCounts.picked : 8}</div>
           <div className="kpi-helper">Ready to dispatch</div>
         </div>
         <div className="kpi-card danger">
           <h3 className="kpi-label">Posted</h3>
-          <div className="kpi-value">3</div>
+          <div className="kpi-value">{goLive ? statusCounts.posted : 3}</div>
           <div className="kpi-helper">Dispatched today</div>
         </div>
       </div>
@@ -285,30 +310,33 @@ export function OutboundListPage() {
                 </table>
               </div>
 
-              <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                 <button className="btn-primary-gold" style={{ flex: 1 }}>Confirm Reserve</button>
-                 <button className="btn-primary-gold" style={{ flex: 1, background: 'var(--tgd-success)', color: '#fff' }}>Confirm Pick</button>
-              </div>
+              <UatOnly>
+                <div className="uat-only-action" style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                  <button type="button" className="btn-primary-gold" style={{ flex: 1 }}>Confirm Reserve</button>
+                  <button type="button" className="btn-primary-gold" style={{ flex: 1, background: 'var(--tgd-success)', color: '#fff' }}>Confirm Pick</button>
+                </div>
+              </UatOnly>
 
             </div>
           ) : null}
         </section>
       </div>
 
-      {/* Production Safety Panel */}
-      <section className="safety-panel" style={{ marginTop: 24 }}>
-        <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0 }}>Production remains HOLD</h3>
-        <p>Post Outbound feature gate remains OFF by default.</p>
-        <p>{safetyNote}</p>
-        <div className="safety-actions">
-          <div className="safety-action-box">
-            <strong>FINAL GO: Apply Outbound migrations 025-030 to Production</strong>
+      <UatOnly>
+        <section className="safety-panel" style={{ marginTop: 24 }}>
+          <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0 }}>Production remains HOLD</h3>
+          <p>Post Outbound feature gate remains OFF by default.</p>
+          <p>{safetyNote}</p>
+          <div className="safety-actions">
+            <div className="safety-action-box">
+              <strong>FINAL GO: Apply Outbound migrations 025-030 to Production</strong>
+            </div>
+            <div className="safety-action-box">
+              <strong>APPROVE CONTROLLED WRITE SMOKE: Outbound qty 1</strong>
+            </div>
           </div>
-          <div className="safety-action-box">
-            <strong>APPROVE CONTROLLED WRITE SMOKE: Outbound qty 1</strong>
-          </div>
-        </div>
-      </section>
+        </section>
+      </UatOnly>
 
     </section>
   );

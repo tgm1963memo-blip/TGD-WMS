@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { ReportPreviewModal } from './ReportPreviewModal.jsx';
 
 export function ReportPrintActions({
@@ -9,8 +10,11 @@ export function ReportPrintActions({
   disabled = false,
 }) {
   const { language } = useLanguage();
+  const goLive = isGoLivePresentationEnabled();
   const [open, setOpen] = useState(false);
-  const previewLabel = getTranslation('preview_report', language) || getTranslation('preview', language) || 'Preview Report';
+  const previewLabel = goLive
+    ? (getTranslation('view_report', language) || getTranslation('print_report', language) || 'View Report')
+    : (getTranslation('preview_report', language) || getTranslation('preview', language) || 'Preview Report');
   const printLabel = getTranslation('print_report', language) || getTranslation('print', language) || 'Print Report';
 
   return (

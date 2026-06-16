@@ -55,6 +55,8 @@ import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdm
 import { UserManagementPage } from '../features/admin/UserManagementPage.jsx';
 import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProductCatalogAdminPage.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { getPageShellClassName } from '../config/pageShellPresentation.js';
+import { UatOnly } from '../components/common/UatOnly.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
 import { LoginPage } from '../features/auth/LoginPage.jsx';
@@ -75,9 +77,9 @@ import { CustomerWarehousePickingLoadingDemoPage } from '../features/customer/Cu
 
 function LegacyPlaceholderPage({ title }) {
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader title={title} description="Read-only operational placeholder for the UI foundation." />
-      <p className="sprint-status">Sprint status: placeholder only</p>
+      <UatOnly><p className="sprint-status">Sprint status: placeholder only</p></UatOnly>
     </section>
   );
 }

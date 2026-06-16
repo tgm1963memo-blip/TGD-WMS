@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { InvoiceDraftStatusBadge } from '../../components/billing/InvoiceDraftStatusBadge.jsx';
 import { InvoiceDraftLinesTable } from '../../components/billing/InvoiceDraftLinesTable.jsx';
@@ -92,7 +94,7 @@ export function InvoiceDraftDetailPage() {
 
   if (!canRead) {
     return (
-      <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-draft-detail-page">
         <PageHeader title="Invoice Draft Detail" description="Access restricted." />
         <div
           className="section-card"
@@ -184,7 +186,7 @@ export function InvoiceDraftDetailPage() {
 
   if (state.loading) {
     return (
-      <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-draft-detail-page">
         <LoadingState />
       </section>
     );
@@ -192,7 +194,7 @@ export function InvoiceDraftDetailPage() {
 
   if (state.error || !state.draft) {
     return (
-      <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-draft-detail-page">
         <PageHeader title="Invoice Draft Detail" description="Draft not found or unavailable." />
         <div className="section-card" role="alert" style={{ padding: 16, border: '1px solid var(--tgd-danger)' }}>
           {formatInvoiceDraftError(state.error) || 'Invoice draft not found.'}
@@ -207,7 +209,7 @@ export function InvoiceDraftDetailPage() {
   const canApprove = canWrite && canApproveBillingInvoiceDraft(draft);
 
   return (
-    <section className="page-shell" data-testid="billing-invoice-draft-detail-page">
+    <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-draft-detail-page">
       <PageHeader
         title={getTranslation('billing_invoice_draft_detail', language) || 'Invoice Draft Detail'}
         description={draft.draft_no}
@@ -305,6 +307,7 @@ export function InvoiceDraftDetailPage() {
         onPreview={handlePreviewBplusReadiness}
       />
 
+      <UatOnly>
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, marginTop: 16 }}>
         <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-4 boundary</h3>
         <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -314,6 +317,7 @@ export function InvoiceDraftDetailPage() {
           <li>No tax invoice / AR module</li>
         </ul>
       </section>
+      </UatOnly>
     </section>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import {
   CUSTOMER_PORTAL_DEMO_DEPOSIT,
   CUSTOMER_PORTAL_DEMO_PACKING_LIST,
@@ -8,6 +10,10 @@ import {
 } from '../../data/customerPortalDemoData.js';
 
 export function CustomerWarehouseReceivingDemoPage() {
+  if (isGoLivePresentationEnabled()) {
+    return <Navigate to="/customer/admin/deposit-review" replace />;
+  }
+
   const [pallets, setPallets] = useState([CUSTOMER_PORTAL_DEMO_PALLETS[0]]);
   const [varianceComment, setVarianceComment] = useState('');
   const [confirmed, setConfirmed] = useState(false);

@@ -1,9 +1,15 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { CustomerPortalDemoBanner } from '../../components/customer/CustomerPortalDemoBanner.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { CUSTOMER_PORTAL_DEMO_DEPOSIT } from '../../data/customerPortalDemoData.js';
 
 export function CustomerAdminReceivingVerificationPage() {
+  if (isGoLivePresentationEnabled()) {
+    return <Navigate to="/customer/admin/deposit-review" replace />;
+  }
+
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState('');
   const row = CUSTOMER_PORTAL_DEMO_DEPOSIT;

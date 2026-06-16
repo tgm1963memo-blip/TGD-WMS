@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { InvoiceDraftFilterPanel } from '../../components/billing/InvoiceDraftFilterPanel.jsx';
 import { InvoiceDraftListTable } from '../../components/billing/InvoiceDraftListTable.jsx';
@@ -68,7 +71,7 @@ export function InvoiceDraftListPage() {
 
   if (!canRead) {
     return (
-      <section className="page-shell" data-testid="billing-invoice-drafts-page">
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-drafts-page">
         <PageHeader
           title={getTranslation('billing_invoice_drafts', language) || 'Billing Invoice Drafts'}
           description={getTranslation('billing_invoice_drafts_description', language) || 'Review invoice draft headers created from billing movement weight rows.'}
@@ -86,18 +89,20 @@ export function InvoiceDraftListPage() {
   }
 
   return (
-    <section className="page-shell" data-testid="billing-invoice-drafts-page">
+    <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-drafts-page">
       <PageHeader
         title={getTranslation('billing_invoice_drafts', language) || 'Billing Invoice Drafts'}
         description={getTranslation('billing_invoice_drafts_description', language) || 'Review invoice draft headers created from billing movement weight rows.'}
       />
 
-      <div className="section-card meeting-safety-panel warning-panel" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
+      <UatOnly>
+      <div className="section-card meeting-safety-panel warning-panel gate-readiness-panel" style={{ marginBottom: 16, padding: 12, background: '#fff8e8', border: '1px solid var(--tgd-primary-gold)' }}>
         <strong>Gate 3B-4 Readiness Preview</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14 }}>
           Invoice drafts can be reviewed and approved from the detail page. Export to Bplus is not enabled yet.
         </p>
       </div>
+      </UatOnly>
 
       <InvoiceDraftFilterPanel value={filters} onChange={setFilters} customers={customers} />
 

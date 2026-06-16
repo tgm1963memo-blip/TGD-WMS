@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { getWarehouses } from '../../services/masterDataService.js';
 
@@ -29,9 +31,9 @@ export function WarehousesPage() {
   }, []);
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader title="Warehouses" description="Read-only warehouse master list." />
-      <p className="sprint-status">Sprint status: placeholder only</p>
+      <UatOnly><p className="sprint-status">Sprint status: placeholder only</p></UatOnly>
       <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No warehouses found." />
     </section>
   );

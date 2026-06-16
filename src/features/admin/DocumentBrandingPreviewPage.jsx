@@ -1,22 +1,32 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
 import { PageHeader } from '../../components/layout/PageHeader.jsx';
 import { SectionCard } from '../../components/layout/SectionCard.jsx';
 import { DocumentHeader } from '../../components/documents/DocumentHeader.jsx';
 import { DocumentFooter } from '../../components/documents/DocumentFooter.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { previewDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
 export function DocumentBrandingPreviewPage() {
+  if (isGoLivePresentationEnabled()) {
+    return <Navigate to="/admin/document-branding" replace />;
+  }
+
   const { branding, summary } = previewDocumentBrandingConfig();
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader
         title={getTranslation('document_branding_preview', 'en') || 'Document Branding Preview'}
         description="Preview/foundation only. No save, file action, or persistence action is available in Sprint 10A."
       />
 
-      <p className="sprint-status tgm-status-pill">{getTranslation('preview_only', 'en') || 'Preview only'}</p>
+      <UatOnly>
+        <p className="sprint-status tgm-status-pill">{getTranslation('preview_only', 'en') || 'Preview only'}</p>
+      </UatOnly>
       <p>Status: {summary.status}</p>
 
       <SectionCard title="Thai Preview">

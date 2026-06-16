@@ -5,5 +5,6 @@ export function isProductionPresentationActive() {
 }
 
 export function getPageShellClassName(base = 'page-shell') {
-  return isGoLivePresentationEnabled() ? `${base} page-shell--golive` : base;
+  const normalized = String(base).trim();
+  return isGoLivePresentationEnabled() ? `${normalized} page-shell--golive` : normalized;
 }

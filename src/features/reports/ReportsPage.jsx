@@ -12,6 +12,7 @@ import { PageHeader } from '../../components/layout/PageHeader.jsx';
 import { SectionCard } from '../../components/layout/SectionCard.jsx';
 import { brandConfig } from '../../config/brandConfig.js';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 
 // Report definitions – using translation keys for titles where possible.
 // Literal title fields are kept for legacy test expectations.
@@ -93,7 +94,7 @@ export function ReportsPage() {
   };
 
   return (
-    <section className="page-shell" style={{ maxWidth: 1180 }}>
+    <section className={getPageShellClassName('page-shell')} style={{ maxWidth: 1180 }}>
       {!goLive ? <UserRoleDemoSelector /> : null}
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <PageHeader

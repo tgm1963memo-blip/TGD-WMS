@@ -426,7 +426,18 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .app-shell--golive [data-testid="receiving-source-document-guidance"],
 .page-shell--golive [data-testid="receiving-source-document-guidance"],
 .app-shell--golive [data-testid="withdrawal-source-document-guidance"],
-.page-shell--golive [data-testid="withdrawal-source-document-guidance"] { display: none !important; }
+.page-shell--golive [data-testid="withdrawal-source-document-guidance"],
+.app-shell--golive .uat-only-action,
+.page-shell--golive .uat-only-action,
+.app-shell--golive .uat-placeholder-data,
+.page-shell--golive .uat-placeholder-data,
+.app-shell--golive .gate-readiness-panel,
+.page-shell--golive .gate-readiness-panel,
+.app-shell--golive .customer-portal-demo-banner,
+.page-shell--golive .customer-portal-demo-banner,
+.app-shell--golive .sidebar-hold-banner,
+.app-shell--golive .production-hold-banner,
+.app-shell--golive [data-testid="outbound-draft-smoke-ui-link"] { display: none !important; }
 .operations-live-action-card .auth-text-link {
   color: var(--tgd-primary-gold);
   font-weight: 600;

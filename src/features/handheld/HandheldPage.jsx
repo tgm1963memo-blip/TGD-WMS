@@ -1,7 +1,11 @@
 import { useState } from 'react';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
 
 export function HandheldPage() {
+  const goLive = isGoLivePresentationEnabled();
   const [scanInput, setScanInput] = useState('');
 
   const handleScan = (e) => {
@@ -12,15 +16,17 @@ export function HandheldPage() {
   };
 
   return (
-    <section className="page-shell handheld-page" style={{ maxWidth: 600, margin: '0 auto', padding: '16px 12px' }}>
-      <PageHeader 
-        title="Handheld Scan Operations" 
-        description="Warehouse scan workflow." 
-        actions={
-          <div className="dashboard-header-actions">
-             <span className="production-hold-badge">Production HOLD</span>
-          </div>
-        }
+    <section className={getPageShellClassName('page-shell handheld-page')} style={{ maxWidth: 600, margin: '0 auto', padding: '16px 12px' }}>
+      <PageHeader
+        title="Handheld Scan Operations"
+        description={goLive ? 'Warehouse barcode scan workflow.' : 'Warehouse scan workflow.'}
+        actions={(
+          <UatOnly>
+            <div className="dashboard-header-actions">
+              <span className="production-hold-badge">Production HOLD</span>
+            </div>
+          </UatOnly>
+        )}
       />
 
       {/* Scan Input Area */}
@@ -51,7 +57,13 @@ export function HandheldPage() {
       </section>
 
       {/* Last Scan Card */}
-      <section className="section-card" style={{ marginBottom: 16, padding: 20, borderLeft: '4px solid var(--tgd-info)' }}>
+      {goLive ? (
+        <section className="section-card" style={{ marginBottom: 16, padding: 20 }}>
+          <h3 style={{ marginTop: 0, color: 'var(--tgd-main-text)', fontSize: 16, marginBottom: 8 }}>Last Scan</h3>
+          <p style={{ margin: 0, color: 'var(--tgd-muted-text)', fontSize: 14 }}>No scans recorded in this session yet.</p>
+        </section>
+      ) : (
+      <section className="section-card uat-placeholder-data" style={{ marginBottom: 16, padding: 20, borderLeft: '4px solid var(--tgd-info)' }}>
         <h3 style={{ marginTop: 0, color: 'var(--tgd-main-text)', fontSize: 16, marginBottom: 16 }}>Last Scan</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: 14 }}>
           <div>
@@ -76,9 +88,11 @@ export function HandheldPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Session Summary Card */}
-      <section className="section-card" style={{ marginBottom: 24, padding: 20 }}>
+      {goLive ? null : (
+      <section className="section-card uat-placeholder-data" style={{ marginBottom: 24, padding: 20 }}>
         <h3 style={{ marginTop: 0, color: 'var(--tgd-main-text)', fontSize: 16, marginBottom: 16 }}>Session Summary</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--tgd-border)' }}>
           <div>
@@ -111,8 +125,9 @@ export function HandheldPage() {
           <button type="button" style={{ padding: '14px', background: 'var(--tgd-success)', border: 'none', color: '#fff', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Complete Session</button>
         </div>
       </section>
+      )}
 
-      {/* Production Safety Panel */}
+      <UatOnly>
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
         <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -121,6 +136,7 @@ export function HandheldPage() {
           <li>Complete Session uses existing business logic only</li>
         </ul>
       </section>
+      </UatOnly>
     </section>
   );
 }

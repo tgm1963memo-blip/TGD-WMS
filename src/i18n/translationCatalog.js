@@ -718,6 +718,9 @@ Object.assign(TRANSLATION_CATALOG, {
   withdrawal_empty_message_golive: { th: 'ยังไม่มีใบขอเบิก — สร้างแบบร่างใหม่เพื่อเริ่มงาน', en: 'No withdrawal requests yet — create a new draft to begin.' },
   adjustment_list_description_golive: { th: 'ปรับปรุงยอดสต็อกตามกระบวนการคลังที่ควบคุมแล้ว', en: 'Controlled warehouse stock adjustment documents.' },
   adjustment_empty_message_golive: { th: 'ยังไม่มีเอกสารปรับปรุงสต็อก', en: 'No adjustment documents yet.' },
+  post_outbound: { th: 'ใบขอเบิก', en: 'Post Outbound' },
+  outbound_list_description_golive: { th: 'รายการเอกสารเบิกและจ่ายสำหรับปฏิบัติการคลัง', en: 'Outbound documents for warehouse dispatch operations.' },
+  view_report: { th: 'ดูรายงาน', en: 'View Report' },
   withdrawal_source_document_guidance: {
     th: 'สำหรับการเบิกของลูกค้า การหยิบ/จ่ายควรเริ่มจากใบแจ้งเบิกที่ลูกค้าส่งและผ่านการตรวจสอบแล้ว',
     en: 'For customer withdrawals, warehouse picking should start from an approved customer withdrawal request.',

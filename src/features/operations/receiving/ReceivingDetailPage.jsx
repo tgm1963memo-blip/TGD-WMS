@@ -8,6 +8,7 @@ import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { ErrorState } from '../../../components/ui/ErrorState.jsx';
 import { LoadingState } from '../../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { getPageShellClassName } from '../../../config/pageShellPresentation.js';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { useUserRole } from '../../../features/auth/UserRoleProvider.jsx';
 import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
@@ -140,7 +141,7 @@ export function ReceivingDetailPage() {
   };
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader
         title="Receiving Detail"
         description="Receiving document detail with controlled Confirm/Post."

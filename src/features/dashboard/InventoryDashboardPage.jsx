@@ -6,6 +6,8 @@ import { DocumentFilterBar } from '../../components/operations/DocumentFilterBar
 import { QuantitySummaryCard } from '../../components/operations/QuantitySummaryCard.jsx';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { UatOnly } from '../../components/common/UatOnly.jsx';
+import { getPageShellClassName, isProductionPresentationActive } from '../../config/pageShellPresentation.js';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import {
   getExpiringLots,
@@ -48,6 +50,7 @@ const initialState = {
 };
 
 export function InventoryDashboardPage() {
+  const goLive = isProductionPresentationActive();
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
 
@@ -98,14 +101,18 @@ export function InventoryDashboardPage() {
   }, [filters]);
 
   return (
-    <section className="page-shell inventory-page" style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      <PageHeader 
-        title="Inventory Control" 
-        description="Available stock, reservations, lot, location, and movement visibility." 
+    <section className={getPageShellClassName('page-shell inventory-page')} style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+      <PageHeader
+        title="Inventory Control"
+        description={goLive
+          ? 'Available stock, reservations, lot, location, and movement visibility.'
+          : 'Available stock, reservations, lot, location, and movement visibility.'}
       />
-      <div className="dashboard-header-actions operations-page-actions">
-         <span className="production-hold-badge">Production HOLD</span>
-      </div>
+      <UatOnly>
+        <div className="dashboard-header-actions operations-page-actions">
+          <span className="production-hold-badge">Production HOLD</span>
+        </div>
+      </UatOnly>
 
       <div className="operations-filter-card">
         <DocumentFilterBar onChange={setFilters} />
@@ -182,6 +189,7 @@ export function InventoryDashboardPage() {
           </div>
         </div>
       </div>
+      <UatOnly>
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
         <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -191,6 +199,7 @@ export function InventoryDashboardPage() {
           <li>Existing services and RPC calls are unchanged</li>
         </ul>
       </section>
+      </UatOnly>
     </section>
   );
 }
