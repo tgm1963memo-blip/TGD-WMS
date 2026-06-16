@@ -5,7 +5,7 @@ import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.
 import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { useUserRole } from '../../../features/auth/UserRoleProvider.jsx';
 import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 import { useTranslation } from '../../../i18n/languageProvider.jsx';
@@ -32,7 +32,7 @@ const columns = [
 export function ReceivingListPage() {
   const t = useTranslation();
   const [state, setState] = useState({ data: [], loading: true, error: null });
-  const userRole = getCurrentUserRole();
+  const { role: userRole } = useUserRole();
   const canWrite = canPerformReceivingWrite(userRole);
 
   useEffect(() => {

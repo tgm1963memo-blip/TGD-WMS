@@ -68,6 +68,7 @@ export async function switchUser(page, credentials = {}) {
 export async function loginAsWarehouseOperator(page) {
   const email = process.env.UAT_WAREHOUSE_EMAIL
     || process.env.UAT_OPERATOR_EMAIL
+    || process.env.UAT_EMAIL
     || 'staff.demo@tgd-wms.local';
   const password = process.env.UAT_WAREHOUSE_PASSWORD
     || process.env.UAT_OPERATOR_PASSWORD

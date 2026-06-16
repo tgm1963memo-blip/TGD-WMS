@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
-import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { useUserRole } from '../../../features/auth/UserRoleProvider.jsx';
 import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { supabase } from '../../../services/supabaseClient.js';
 import { getUatRoleOverride } from '../../../security/uatRoleOverride.js';
@@ -62,7 +62,7 @@ function isValidUUID(uuid) {
 }
 
 export function ReceivingCreatePage() {
-  const userRole = getCurrentUserRole();
+  const { role: userRole, ready: roleReady } = useUserRole();
   const canWrite = canPerformReceivingWrite(userRole);
   const goLive = isGoLivePresentationEnabled();
   
@@ -482,7 +482,9 @@ export function ReceivingCreatePage() {
         </div>
       ) : null}
 
-      {!canWrite ? (
+      {!roleReady ? (
+        <section className="info-panel" role="status">Loading user permissions...</section>
+      ) : !canWrite ? (
         <section className="alert-error-panel" role="alert">
           Permission denied: Your role ({userRole}) does not have permission to create receiving drafts.
         </section>

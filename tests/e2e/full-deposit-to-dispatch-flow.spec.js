@@ -150,6 +150,12 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
         await safeGoto(page, '/operations/receiving/create');
         await waitForReceivingMasterPickers(page);
 
+        const permissionDenied = await page.locator('.alert-error-panel').filter({ hasText: /Permission denied/i }).isVisible().catch(() => false);
+        if (permissionDenied) {
+          const roleText = await page.locator('.alert-error-panel').first().textContent();
+          throw new Error(`FAIL: ${roleText?.trim() || 'Permission denied on receiving create'}`);
+        }
+
         FLOW_CONTEXT.receivingDocNo = buildReceivingDocNo();
         FLOW_CONTEXT.customerId = await selectFirstOrMatch(
           page,

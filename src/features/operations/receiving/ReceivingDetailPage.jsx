@@ -9,7 +9,7 @@ import { ErrorState } from '../../../components/ui/ErrorState.jsx';
 import { LoadingState } from '../../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
-import { getCurrentUserRole } from '../../../security/currentUserRole.js';
+import { useUserRole } from '../../../features/auth/UserRoleProvider.jsx';
 import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { ReceivingReportTemplate } from '../../../components/reports/ReceivingReportTemplate.jsx';
 import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
@@ -104,7 +104,7 @@ export function ReceivingDetailPage() {
   const isConfirmed = status === 'CONFIRMED';
   const lineCount = document?.tgd_receiving_lines?.length ?? 0;
 
-  const userRole = getCurrentUserRole();
+  const { role: userRole } = useUserRole();
   const canWrite = canPerformReceivingWrite(userRole);
 
   const showPostButton = isDraft && !postSucceeded && canWrite;

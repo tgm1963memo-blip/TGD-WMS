@@ -70,6 +70,10 @@ export async function waitForSelectOptions(page, selectors, minOptions = 2) {
 
 export async function waitForReceivingMasterPickers(page) {
   await page.waitForFunction(() => {
+    const denied = document.querySelector('.alert-error-panel')?.textContent || '';
+    if (/Permission denied/i.test(denied)) {
+      return true;
+    }
     const helperText = Array.from(document.querySelectorAll('.form-helper'))
       .map((node) => node.textContent || '')
       .join(' ');
