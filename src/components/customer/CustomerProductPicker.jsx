@@ -66,7 +66,7 @@ export function CustomerProductPicker({
     onChange({
       catalogProductId: product.id,
       customerProductCode: product.customer_product_code ?? '',
-      internalProductCode: product.internal_product_code ?? '',
+      internalProductCode: product.internal_product_code || product.customer_product_code || '',
       productName: product.product_name ?? '',
       temperatureType: product.temperature_type ?? 'FROZEN',
       uom: product.uom ?? '',

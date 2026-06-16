@@ -27,14 +27,20 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
   });
 
   test('Scenario 4: Deposit request page opens and submit returns live success or scope guard', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
-    await expect(page.locator('[data-testid="customer-deposit-request-page"]')).toBeVisible();
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
+    await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible();
     await expect(page.locator('[data-testid="customer-portal-live-banner"]')).toBeVisible();
-    await page.locator('[data-testid="customer-product-code-input"]').fill('CUS-CHKN-01');
-    await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-15');
-    await page.locator('[data-testid="customer-deposit-product-code"]').fill('FRZ-CHKN-01');
-    await page.locator('[data-testid="customer-deposit-product-name"]').fill('Frozen Chicken');
+
+    const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
+    if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await picker.selectOption({ index: 1 });
+    } else {
+      await page.locator('[data-testid="customer-product-code-input"]').fill('CUS-CHKN-01');
+      await page.locator('[data-testid="customer-deposit-product-code"]').fill('FRZ-CHKN-01');
+      await page.locator('[data-testid="customer-deposit-product-name"]').fill('Frozen Chicken');
+    }
     await page.locator('[data-testid="customer-deposit-qty"]').fill('10');
+    await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-15');
     await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Demo Contact');
     await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000000');
     await page.locator('[data-testid="customer-deposit-submit-button"]').click();
@@ -51,8 +57,8 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
   });
 
   test('Scenario 6: Withdrawal request page opens and submit returns live success or scope guard', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/withdrawal-request`);
-    await expect(page.locator('[data-testid="customer-withdrawal-request-page"]')).toBeVisible();
+    await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
+    await expect(page.locator('[data-testid="customer-withdrawal-request-create-page"]')).toBeVisible();
     await page.locator('[data-testid="customer-withdrawal-dispatch-date"]').fill('2026-06-16');
     await page.locator('[data-testid="customer-withdrawal-product-code"]').fill('FRZ-SFOD-02');
     await page.locator('[data-testid="customer-withdrawal-product-name"]').fill('Frozen Seafood');

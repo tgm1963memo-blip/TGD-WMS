@@ -66,8 +66,10 @@ import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.jsx';
 import { CustomerPortalDashboardPage } from '../features/customer/CustomerPortalDashboardPage.jsx';
 import { CustomerDepositRequestPage } from '../features/customer/CustomerDepositRequestPage.jsx';
+import { CustomerDepositRequestCreatePage } from '../features/customer/CustomerDepositRequestCreatePage.jsx';
 import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
+import { CustomerWithdrawalRequestCreatePage } from '../features/customer/CustomerWithdrawalRequestCreatePage.jsx';
 import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
 import { CustomerProductCatalogPage } from '../features/customer/CustomerProductCatalogPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../features/customer/CustomerAdminDepositReviewPage.jsx';
@@ -152,11 +154,14 @@ export function AppRoutes() {
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
           <Route path="/customer" element={<CustomerPortalDashboardPage />} />
           <Route path="/customer/deposit-request" element={<CustomerDepositRequestPage />} />
+          <Route path="/customer/deposit-request/new" element={<CustomerDepositRequestCreatePage />} />
           <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
           <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />
+          <Route path="/customer/withdrawal-request/new" element={<CustomerWithdrawalRequestCreatePage />} />
           <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
           <Route path="/customer/products" element={<CustomerProductCatalogPage />} />
           <Route path="/customer/admin/deposit-review" element={<CustomerAdminDepositReviewPage />} />
+          <Route path="/customer/admin/deposit-review/:requestId" element={<CustomerAdminDepositReviewPage />} />
           <Route path="/customer/warehouse/receiving" element={<CustomerWarehouseReceivingDemoPage />} />
           <Route path="/customer/admin/receiving-verification" element={<CustomerAdminReceivingVerificationPage />} />
           <Route path="/customer/admin/withdrawal-review" element={<CustomerAdminWithdrawalReviewPage />} />

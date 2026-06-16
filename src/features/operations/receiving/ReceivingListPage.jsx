@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CustomerDepositNotificationsSection } from '../../../components/customer/CustomerDepositNotificationsSection.jsx';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
 import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
@@ -65,19 +66,10 @@ export function ReceivingListPage() {
             <p>{t('receiving_source_document_guidance')}</p>
             <p style={{ margin: '8px 0 0' }}>{t('receiving_internal_draft_note')}</p>
           </section>
-          <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
-            <Link className="auth-text-link" data-testid="receiving-customer-deposit-demo-link" to="/customer/warehouse/receiving">
-              {t('receiving_customer_deposit_demo_link')}
-            </Link>
-          </section>
         </>
-      ) : (
-        <section className="card customer-portal-action-card operations-live-action-card" style={{ marginBottom: 16, maxWidth: 480 }}>
-          <Link className="auth-text-link" data-testid="receiving-customer-deposit-live-link" to="/customer/admin/deposit-review">
-            {t('receiving_customer_deposit_live_link')}
-          </Link>
-        </section>
-      )}
+      ) : null}
+
+      <CustomerDepositNotificationsSection />
 
       <DocumentToolbar
         title="Receiving Documents"

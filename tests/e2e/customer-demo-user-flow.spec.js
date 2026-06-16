@@ -31,8 +31,8 @@ test.describe('Customer demo user UAT flow', () => {
   });
 
   test('submits deposit request using catalog product', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
-    await expect(page.locator('[data-testid="customer-deposit-request-page"]')).toBeVisible({ timeout: 15000 });
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
+    await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
     await page.locator('[data-testid="customer-deposit-product-picker-select"]').selectOption({ index: 1 });
     await page.locator('[data-testid="customer-deposit-qty"]').fill('5');

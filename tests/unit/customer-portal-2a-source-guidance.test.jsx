@@ -15,6 +15,14 @@ vi.mock('../../src/services/receivingService.js', () => ({
   postReceivingDocument: receivingRpc,
 }));
 
+vi.mock('../../src/services/customerDepositRequestService.js', () => ({
+  listCustomerDepositRequests: vi.fn(async () => ({ data: [], error: null })),
+}));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'warehouse_staff', ready: true }),
+}));
+
 vi.mock('../../src/services/withdrawalRequestService.js', () => ({
   getWithdrawalRequests: withdrawalRpc.mockResolvedValue({ data: [], error: null }),
   createWithdrawalRequest: withdrawalRpc,
@@ -32,16 +40,14 @@ function renderPage(Component) {
 }
 
 describe('CUSTOMER-PORTAL-2A source document guidance', () => {
-  it('receiving page renders customer deposit source guidance and demo link', async () => {
+  it('receiving page renders customer deposit source guidance and notification table', async () => {
     renderPage(ReceivingListPage);
 
     await waitFor(() => {
       expect(screen.getByTestId('receiving-source-document-guidance')).toBeInTheDocument();
       expect(screen.getByText(/approved customer deposit request/i)).toBeInTheDocument();
-      expect(screen.getByTestId('receiving-customer-deposit-demo-link')).toHaveAttribute(
-        'href',
-        '/customer/warehouse/receiving',
-      );
+      expect(screen.getByTestId('receiving-customer-deposit-section')).toBeInTheDocument();
+      expect(screen.getByTestId('receiving-customer-deposit-table')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Create Internal Receiving Draft' })).toBeInTheDocument();
     });
   });

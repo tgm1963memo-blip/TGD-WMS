@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,14 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null })),
 }));
 
+vi.mock('../../src/services/customerDepositRequestService.js', () => ({
+  listCustomerDepositRequests: vi.fn(async () => ({ data: [], error: null })),
+}));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'warehouse_staff', ready: true }),
+}));
+
 const projectRoot = resolve(__dirname, '../..');
 const listPagePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingListPage.jsx');
 const createPagePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
@@ -34,13 +42,13 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     const source = readSource(listPagePath);
 
     expect(source).not.toContain('createHref="/operations/receiving/new"');
-    expect(source).toContain('createHref={canWrite ? "/operations/receiving/create" : null}');
+    expect(source).toContain("createHref={canWrite ? '/operations/receiving/create' : null}");
     expect(source).toContain("createLabel={canWrite ? t('receiving_create_internal_draft') : null}");
     expect(source).toContain('receiving-source-document-guidance');
-    expect(source).toContain('receiving-customer-deposit-demo-link');
+    expect(source).toContain('CustomerDepositNotificationsSection');
   });
 
-  it('Receiving list renders controlled draft navigation with RPC status', async () => {
+  it('Receiving list renders controlled draft navigation with customer deposit section', async () => {
     render(
       <MemoryRouter>
         <LanguageProvider initialLanguage="en">
@@ -50,10 +58,10 @@ describe('Sprint 13J-AI receiving operational write gate', () => {
     );
 
     expect(screen.getByTestId('receiving-source-document-guidance')).toBeInTheDocument();
-    expect(screen.getByTestId('receiving-customer-deposit-demo-link')).toHaveAttribute(
-      'href',
-      '/customer/warehouse/receiving',
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('receiving-customer-deposit-section')).toBeInTheDocument();
+      expect(screen.getByTestId('receiving-customer-deposit-table')).toBeInTheDocument();
+    });
     expect(screen.getByRole('link', { name: 'Create Internal Receiving Draft' })).toHaveAttribute(
       'href',
       '/operations/receiving/create',

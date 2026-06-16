@@ -5,8 +5,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { CustomerPortalDashboardPage } from '../../src/features/customer/CustomerPortalDashboardPage.jsx';
 import { CustomerDepositRequestPage } from '../../src/features/customer/CustomerDepositRequestPage.jsx';
+import { CustomerDepositRequestCreatePage } from '../../src/features/customer/CustomerDepositRequestCreatePage.jsx';
 import { CustomerStockBalancePage } from '../../src/features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../../src/features/customer/CustomerWithdrawalRequestPage.jsx';
+import { CustomerWithdrawalRequestCreatePage } from '../../src/features/customer/CustomerWithdrawalRequestCreatePage.jsx';
 import { CustomerRequestHistoryPage } from '../../src/features/customer/CustomerRequestHistoryPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../../src/features/customer/CustomerAdminDepositReviewPage.jsx';
 import { CustomerWarehouseReceivingDemoPage } from '../../src/features/customer/CustomerWarehouseReceivingDemoPage.jsx';
@@ -165,7 +167,7 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
   });
 
   it('submits deposit draft through RPC services', async () => {
-    renderPage(CustomerDepositRequestPage);
+    renderPage(CustomerDepositRequestCreatePage);
     const form = screen.getByTestId('customer-deposit-request-form');
 
     await waitFor(() => {
@@ -198,7 +200,7 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
   });
 
   it('submits withdrawal draft through RPC services', async () => {
-    renderPage(CustomerWithdrawalRequestPage);
+    renderPage(CustomerWithdrawalRequestCreatePage);
     const form = screen.getByTestId('customer-withdrawal-request-form');
     fireEvent.change(screen.getByTestId('customer-withdrawal-dispatch-date'), { target: { value: '2026-06-16' } });
     fireEvent.change(screen.getByTestId('customer-withdrawal-product-code'), { target: { value: 'CUS-CHKN-01' } });

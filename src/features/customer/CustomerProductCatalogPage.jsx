@@ -4,11 +4,20 @@ import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
+import { CsvImportExportToolbar } from '../../components/customer/CsvImportExportToolbar.jsx';
 import {
   deactivateCustomerProduct,
   listCustomerProducts,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import {
+  downloadCustomerProductTemplate,
+  exportCustomerProductsCsv,
+  normalizeCatalogBarcode,
+  parseCustomerProductImportRows,
+  resolveBarcodeCode,
+} from '../../utils/customerProductCsvUtils.js';
+import { readCsvFile } from '../../utils/csvFileUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -16,11 +25,21 @@ const EMPTY_FORM = {
   productId: '',
   customerProductCode: '',
   productName: '',
-  internalProductCode: '',
+  barcodeCode: '',
   uom: '',
   temperatureType: 'FROZEN',
   note: '',
 };
+
+function RequiredLabel({ children }) {
+  return (
+    <span>
+      {children}
+      {' '}
+      <span aria-hidden="true" className="field-required">*</span>
+    </span>
+  );
+}
 
 export function CustomerProductCatalogPage() {
   const t = useTranslation();
@@ -29,13 +48,18 @@ export function CustomerProductCatalogPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const columns = [
     { key: 'customer_product_code', header: t('catalog_col_customer_code') },
     { key: 'product_name', header: t('catalog_col_product_name') },
-    { key: 'internal_product_code', header: t('catalog_col_internal_code') },
+    {
+      key: 'barcode_code',
+      header: t('catalog_col_barcode'),
+      render: (row) => normalizeCatalogBarcode(row),
+    },
     { key: 'uom', header: t('catalog_col_uom') },
     { key: 'temperature_type', header: t('catalog_col_temperature') },
     { key: 'is_active', header: t('catalog_col_status'), render: (row) => <StatusBadge value={row.is_active} /> },
@@ -91,7 +115,7 @@ export function CustomerProductCatalogPage() {
       productId: row.id,
       customerProductCode: row.customer_product_code ?? '',
       productName: row.product_name ?? '',
-      internalProductCode: row.internal_product_code ?? '',
+      barcodeCode: row.internal_product_code ?? '',
       uom: row.uom ?? '',
       temperatureType: row.temperature_type ?? 'FROZEN',
       note: row.note ?? '',
@@ -114,15 +138,20 @@ export function CustomerProductCatalogPage() {
       return;
     }
 
+    if (!form.customerProductCode.trim() || !form.productName.trim()) {
+      setError(t('catalog_required_fields_error'));
+      return;
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
 
     const result = await upsertCustomerProduct({
       productId: form.productId || null,
-      customerProductCode: form.customerProductCode,
-      productName: form.productName,
-      internalProductCode: form.internalProductCode,
+      customerProductCode: form.customerProductCode.trim(),
+      productName: form.productName.trim(),
+      internalProductCode: resolveBarcodeCode(form.customerProductCode, form.barcodeCode),
       uom: form.uom,
       temperatureType: form.temperatureType,
       note: form.note,
@@ -163,6 +192,60 @@ export function CustomerProductCatalogPage() {
     await loadProducts();
   }
 
+  async function handleImportFile(file) {
+    if (!canWriteCustomerRequests) {
+      setError(t('customer_portal_no_customer_scope'));
+      return;
+    }
+
+    setImporting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const text = await readCsvFile(file);
+      const { rows, errors } = parseCustomerProductImportRows(text);
+
+      if (errors.length) {
+        setError(errors.join(' '));
+        return;
+      }
+
+      if (!rows.length) {
+        setError(t('csv_import_empty'));
+        return;
+      }
+
+      let imported = 0;
+      for (const row of rows) {
+        const result = await upsertCustomerProduct({
+          customerProductCode: row.customerProductCode,
+          productName: row.productName,
+          internalProductCode: row.internalProductCode,
+          uom: row.uom,
+          temperatureType: row.temperatureType,
+          note: row.note,
+          isActive: true,
+        });
+
+        if (result.error) {
+          setError(result.error.message ?? t('catalog_save_error'));
+          await loadProducts();
+          return;
+        }
+
+        imported += 1;
+      }
+
+      setSuccess(`${imported} ${t('csv_import_success')}`);
+      await loadProducts();
+    } catch (importError) {
+      setError(importError.message ?? t('csv_import_error'));
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-product-catalog-page">
       <PageHeader
@@ -179,12 +262,36 @@ export function CustomerProductCatalogPage() {
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
       {success ? <div className="alert-success-panel" role="status">{success}</div> : null}
 
+      <div className="table-card">
+        <div className="table-card-header">
+          <h3>{t('catalog_customer_list_title')}</h3>
+          <CsvImportExportToolbar
+            disabled={!canWriteCustomerRequests || importing}
+            exportTestId="catalog-export-button"
+            importTestId="catalog-import-input"
+            onExport={() => exportCustomerProductsCsv(products)}
+            onImportFile={handleImportFile}
+            onTemplate={downloadCustomerProductTemplate}
+            templateTestId="catalog-template-button"
+          />
+        </div>
+        <DataTable
+          columns={columns}
+          data={products}
+          emptyMessage={t('catalog_empty')}
+          error={null}
+          loading={loading}
+          testId="catalog-customer-table"
+        />
+      </div>
+
       {canWriteCustomerRequests ? (
         <form className="form-card customer-portal-form" data-testid="catalog-customer-form" onSubmit={handleSubmit}>
           <h3>{form.productId ? t('catalog_edit_title') : t('catalog_create_title')}</h3>
+          <p className="form-helper">{t('catalog_required_fields_hint')}</p>
           <div className="form-grid">
             <label className="form-field">
-              <span>{t('catalog_col_customer_code')}</span>
+              <span><RequiredLabel>{t('catalog_col_customer_code')}</RequiredLabel></span>
               <input
                 className="form-control"
                 data-testid="catalog-customer-product-code"
@@ -194,7 +301,7 @@ export function CustomerProductCatalogPage() {
               />
             </label>
             <label className="form-field">
-              <span>{t('catalog_col_product_name')}</span>
+              <span><RequiredLabel>{t('catalog_col_product_name')}</RequiredLabel></span>
               <input
                 className="form-control"
                 data-testid="catalog-customer-product-name"
@@ -204,16 +311,22 @@ export function CustomerProductCatalogPage() {
               />
             </label>
             <label className="form-field">
-              <span>{t('catalog_col_internal_code')}</span>
-              <input className="form-control" onChange={(e) => updateField('internalProductCode', e.target.value)} value={form.internalProductCode} />
+              <span>{t('catalog_col_barcode')}</span>
+              <input
+                className="form-control"
+                data-testid="catalog-customer-barcode"
+                onChange={(e) => updateField('barcodeCode', e.target.value)}
+                placeholder={t('catalog_barcode_placeholder')}
+                value={form.barcodeCode}
+              />
             </label>
             <label className="form-field">
               <span>{t('catalog_col_uom')}</span>
               <input className="form-control" onChange={(e) => updateField('uom', e.target.value)} value={form.uom} />
             </label>
             <label className="form-field">
-              <span>{t('catalog_col_temperature')}</span>
-              <select className="form-control" onChange={(e) => updateField('temperatureType', e.target.value)} value={form.temperatureType}>
+              <span><RequiredLabel>{t('catalog_col_temperature')}</RequiredLabel></span>
+              <select className="form-control" onChange={(e) => updateField('temperatureType', e.target.value)} required value={form.temperatureType}>
                 <option value="FROZEN">FROZEN</option>
                 <option value="CHILLED">CHILLED</option>
                 <option value="AMBIENT">AMBIENT</option>
@@ -226,21 +339,12 @@ export function CustomerProductCatalogPage() {
           </div>
           <div className="action-row customer-portal-form-actions">
             <button className="btn btn-secondary" onClick={startCreate} type="button">{t('close')}</button>
-            <button className="btn btn-primary" data-testid="catalog-customer-save-button" disabled={saving} type="submit">
+            <button className="btn btn-primary" data-testid="catalog-customer-save-button" disabled={saving || importing} type="submit">
               {saving ? t('catalog_saving') : t('save')}
             </button>
           </div>
         </form>
       ) : null}
-
-      <DataTable
-        columns={columns}
-        data={products}
-        emptyMessage={t('catalog_empty')}
-        error={null}
-        loading={loading}
-        testId="catalog-customer-table"
-      />
     </section>
   );
 }

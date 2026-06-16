@@ -87,8 +87,8 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           throw new Error('SKIPPED_WITH_REASON: Customer portal credentials unavailable');
         }
 
-        await safeGoto(page, '/customer/deposit-request');
-        await expect(page.locator('[data-testid="customer-deposit-request-page"]')).toBeVisible({ timeout: 15000 });
+        await safeGoto(page, '/customer/deposit-request/new');
+        await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
         const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
         if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {

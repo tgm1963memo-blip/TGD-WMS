@@ -11,13 +11,13 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
   });
 
   test('Scenario 2: Deposit page shows customer product code and timeline', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await expect(page.locator('[data-testid="customer-product-code-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="customer-deposit-status-timeline"]')).toContainText('CUSTOMER_NOTIFIED');
   });
 
   test('Scenario 3: Deposit attachment can be selected', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await page.locator('[data-testid="customer-deposit-attachment-input"]').setInputFiles({
       name: 'packing-list-demo.pdf',
       mimeType: 'application/pdf',
@@ -27,7 +27,7 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
   });
 
   test('Scenario 4: Attachment file appears and can be removed', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await page.locator('[data-testid="customer-deposit-attachment-input"]').setInputFiles({
       name: 'product-photo-demo.jpg',
       mimeType: 'image/jpeg',
@@ -39,7 +39,7 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
   });
 
   test('Scenario 5: Deposit with attachment submits in live mode or shows scope guard', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/deposit-request`);
+    await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await page.locator('[data-testid="customer-product-code-input"]').fill('CUS-CHICKEN-01');
     await page.locator('[data-testid="customer-deposit-product-code"]').fill('FRZ-CHKN-01');
     await page.locator('[data-testid="customer-deposit-product-name"]').fill('Frozen Chicken');
@@ -90,7 +90,7 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
   });
 
   test('Scenario 11: Withdrawal source and picking rule are selectable', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/customer/withdrawal-request`);
+    await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
     await expect(page.locator('[data-testid="withdrawal-source-deposit-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-lot-select"]')).toBeVisible();
     await page.locator('[data-testid="withdrawal-picking-rule-select"]').selectOption('SPECIFIC_LOT');

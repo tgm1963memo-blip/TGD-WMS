@@ -91,11 +91,11 @@ describe('User management + catalog frontend wiring', () => {
   });
 
   it('wires catalog picker into deposit and withdrawal forms', () => {
-    const deposit = read(path.join(process.cwd(), 'src/features/customer/CustomerDepositRequestPage.jsx'));
-    const withdrawal = read(path.join(process.cwd(), 'src/features/customer/CustomerWithdrawalRequestPage.jsx'));
+    const deposit = read(path.join(process.cwd(), 'src/features/customer/CustomerDepositRequestCreatePage.jsx'));
+    const withdrawal = read(path.join(process.cwd(), 'src/features/customer/CustomerWithdrawalRequestCreatePage.jsx'));
 
-    expect(deposit).toContain('CustomerProductPicker');
-    expect(deposit).toContain('catalogOnly');
+    expect(deposit).toContain('CustomerDepositLinesTable');
+    expect(deposit).toContain('CsvImportExportToolbar');
     expect(withdrawal).toContain('CustomerProductPicker');
   });
 });
