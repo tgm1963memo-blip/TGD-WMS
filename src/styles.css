@@ -308,9 +308,10 @@ a:hover { text-decoration: underline; }
 }
 .sidebar .sidebar-logout-button {
   width: 100%;
-  color: #f8f8f8;
-  border-color: rgba(212, 175, 55, 0.7);
-  background: rgba(255, 255, 255, 0.06);
+  color: #fff8e8;
+  border: 1px solid var(--tgd-primary-gold);
+  background: rgba(212, 175, 55, 0.18);
+  font-weight: 600;
 }
 .sidebar .sidebar-logout-button:hover:not(:disabled) {
   color: #111111;
@@ -407,11 +408,29 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .compact-cell-text { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .compact-cell-qty { font-size: 12px; font-weight: 700; white-space: nowrap; }
 .app-shell--golive .main-content { padding-top: 0; }
+.app-shell--golive .sprint-status,
+.page-shell--golive .sprint-status,
+.app-shell--golive .production-hold-badge,
+.page-shell--golive .production-hold-badge,
 .page-shell--golive .safety-panel,
 .page-shell--golive .uat-banner,
 .page-shell--golive .uat-diagnostics-card,
-.app-shell--golive .uat-safety-banner { display: none; }
-.barcode-placeholder { display: flex; margin-top: 16px; width: fit-content; }
+.page-shell--golive .meeting-safety-panel,
+.app-shell--golive .meeting-safety-panel,
+.app-shell--golive .safety-panel,
+.app-shell--golive .uat-safety-banner,
+.app-shell--golive .document-toolbar-preview-only,
+.page-shell--golive .document-toolbar-preview-only,
+.app-shell--golive [data-testid$="-demo-link"],
+.page-shell--golive [data-testid$="-demo-link"],
+.app-shell--golive [data-testid="receiving-source-document-guidance"],
+.page-shell--golive [data-testid="receiving-source-document-guidance"],
+.app-shell--golive [data-testid="withdrawal-source-document-guidance"],
+.page-shell--golive [data-testid="withdrawal-source-document-guidance"] { display: none !important; }
+.operations-live-action-card .auth-text-link {
+  color: var(--tgd-primary-gold);
+  font-weight: 600;
+}
 
 .card, .section-card { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--tgd-border); border-radius: 8px; box-shadow: none; position: relative; margin-bottom: 24px; padding: 12px; }
 .section-card { padding: 12px; }

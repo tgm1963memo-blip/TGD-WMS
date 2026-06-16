@@ -4,6 +4,7 @@ import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.
 import { documentLink, renderStatusBadge, renderTableMeta } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { getPageShellClassName, isProductionPresentationActive } from '../../../config/pageShellPresentation.js';
 import { getTransferDocuments } from '../../../services/transferService.js';
 
 const columns = [
@@ -16,6 +17,7 @@ const columns = [
 ];
 
 export function TransferListPage() {
+  const goLive = isProductionPresentationActive();
   const [state, setState] = useState({ data: [], loading: true, error: null });
 
   useEffect(() => {
@@ -33,14 +35,16 @@ export function TransferListPage() {
   }, []);
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader
         title="Internal Transfer"
         description="Warehouse transfer and movement control."
       />
-      <div className="dashboard-header-actions operations-page-actions">
-        <span className="production-hold-badge">Production HOLD</span>
-      </div>
+      {!goLive ? (
+        <div className="dashboard-header-actions operations-page-actions">
+          <span className="production-hold-badge">Production HOLD</span>
+        </div>
+      ) : null}
 
       <div className="operations-filter-card">
         <DocumentFilterBar onChange={() => {}} />
@@ -56,6 +60,7 @@ export function TransferListPage() {
         </div>
       </div>
 
+      {!goLive ? (
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, marginTop: 24 }}>
         <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -65,6 +70,7 @@ export function TransferListPage() {
           <li>Existing services and RPC calls are unchanged</li>
         </ul>
       </section>
+      ) : null}
     </section>
   );
 }

@@ -20,6 +20,7 @@
     "uat:bootstrap-customer": "node scripts/uat-bootstrap-customer-demo.mjs",
     "uat:bootstrap-warehouse": "node scripts/uat-bootstrap-warehouse-demo.mjs",
     "uat:set-warehouse-user": "node scripts/uat-set-real-warehouse-user.mjs",
+    "uat:bootstrap-all-roles": "node scripts/uat-bootstrap-all-role-users.mjs",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },
   "dependencies": {

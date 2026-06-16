@@ -4,7 +4,9 @@ import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.
 import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
+import { getPageShellClassName, isProductionPresentationActive } from '../../../config/pageShellPresentation.js';
 import { getAdjustmentDocuments } from '../../../services/adjustmentService.js';
+import { useTranslation } from '../../../i18n/languageProvider.jsx';
 
 const columns = [
   { key: 'adjustment_no', header: 'Adjustment No', render: (row) => documentLink(`/operations/adjustment/${row.id}`, row.adjustment_no) },
@@ -15,6 +17,8 @@ const columns = [
 ];
 
 export function AdjustmentListPage() {
+  const t = useTranslation();
+  const goLive = isProductionPresentationActive();
   const [state, setState] = useState({ data: [], loading: true, error: null });
 
   useEffect(() => {
@@ -32,14 +36,16 @@ export function AdjustmentListPage() {
   }, []);
 
   return (
-    <section className="page-shell">
+    <section className={getPageShellClassName()}>
       <PageHeader
-        title="Inventory Adjustment"
-        description="Warehouse stock adjustment and manual override control."
+        title={t('stock_adjustment') || 'Inventory Adjustment'}
+        description={goLive ? t('adjustment_list_description_golive') : 'Warehouse stock adjustment and manual override control.'}
       />
-      <div className="dashboard-header-actions operations-page-actions">
-        <span className="production-hold-badge">Production HOLD</span>
-      </div>
+      {!goLive ? (
+        <div className="dashboard-header-actions operations-page-actions">
+          <span className="production-hold-badge">Production HOLD</span>
+        </div>
+      ) : null}
 
       <div className="operations-filter-card">
         <DocumentFilterBar onChange={() => {}} />
@@ -51,10 +57,11 @@ export function AdjustmentListPage() {
           <DocumentToolbar title="" createHref="/operations/adjustment/new" onRefresh={() => window.location.reload()} />
         </div>
         <div className="operations-table-card-body">
-          <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage="No adjustment documents found." />
+          <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage={goLive ? t('adjustment_empty_message_golive') : 'No adjustment documents found.'} />
         </div>
       </div>
 
+      {!goLive ? (
       <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, marginTop: 24 }}>
         <h3 style={{ color: 'var(--tgd-danger)', marginTop: 0, fontSize: 16 }}>Production remains HOLD</h3>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -64,6 +71,7 @@ export function AdjustmentListPage() {
           <li>Existing services and RPC calls are unchanged</li>
         </ul>
       </section>
+      ) : null}
     </section>
   );
 }

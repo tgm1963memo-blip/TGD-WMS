@@ -6,6 +6,7 @@ import { documentLink, renderStatusBadge } from '../../../components/operations/
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { useUserRole } from '../../../features/auth/UserRoleProvider.jsx';
+import { getPageShellClassName, isProductionPresentationActive } from '../../../config/pageShellPresentation.js';
 import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 import { useTranslation } from '../../../i18n/languageProvider.jsx';
@@ -31,6 +32,7 @@ const columns = [
 
 export function ReceivingListPage() {
   const t = useTranslation();
+  const goLive = isProductionPresentationActive();
   const [state, setState] = useState({ data: [], loading: true, error: null });
   const { role: userRole } = useUserRole();
   const canWrite = canPerformReceivingWrite(userRole);
@@ -50,21 +52,36 @@ export function ReceivingListPage() {
   }, []);
 
   return (
-    <section className="page-shell">
-      <PageHeader title="Receiving" description="Inbound receiving document list." />
-      <p className="sprint-status sprint-status--compact">Sprint status: controlled draft only</p>
-      <section className="warning-panel meeting-safety-panel" data-testid="receiving-source-document-guidance" role="status">
-        <p>{t('receiving_source_document_guidance')}</p>
-        <p style={{ margin: '8px 0 0' }}>{t('receiving_internal_draft_note')}</p>
-      </section>
-      <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
-        <Link className="auth-text-link" data-testid="receiving-customer-deposit-demo-link" to="/customer/warehouse/receiving">
-          {t('receiving_customer_deposit_demo_link')}
-        </Link>
-      </section>
+    <section className={getPageShellClassName()}>
+      <PageHeader
+        title={t('receiving') || 'Receiving'}
+        description={goLive ? t('receiving_list_description_golive') : 'Inbound receiving document list.'}
+      />
+
+      {!goLive ? (
+        <>
+          <p className="sprint-status sprint-status--compact">Sprint status: controlled draft only</p>
+          <section className="warning-panel meeting-safety-panel" data-testid="receiving-source-document-guidance" role="status">
+            <p>{t('receiving_source_document_guidance')}</p>
+            <p style={{ margin: '8px 0 0' }}>{t('receiving_internal_draft_note')}</p>
+          </section>
+          <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
+            <Link className="auth-text-link" data-testid="receiving-customer-deposit-demo-link" to="/customer/warehouse/receiving">
+              {t('receiving_customer_deposit_demo_link')}
+            </Link>
+          </section>
+        </>
+      ) : (
+        <section className="card customer-portal-action-card operations-live-action-card" style={{ marginBottom: 16, maxWidth: 480 }}>
+          <Link className="auth-text-link" data-testid="receiving-customer-deposit-live-link" to="/customer/admin/deposit-review">
+            {t('receiving_customer_deposit_live_link')}
+          </Link>
+        </section>
+      )}
+
       <DocumentToolbar
         title="Receiving Documents"
-        createHref={canWrite ? "/operations/receiving/create" : null}
+        createHref={canWrite ? '/operations/receiving/create' : null}
         createLabel={canWrite ? t('receiving_create_internal_draft') : null}
         onRefresh={() => window.location.reload()}
       />
@@ -74,7 +91,7 @@ export function ReceivingListPage() {
         data={state.data}
         loading={state.loading}
         error={state.error}
-        emptyMessage="No receiving documents found."
+        emptyMessage={goLive ? t('receiving_empty_message_golive') : 'No receiving documents found.'}
       />
     </section>
   );
