@@ -13,6 +13,7 @@ function readProjectFile(path) {
 describe('Sprint 6A inventory dashboard foundation', () => {
   const dashboardFiles = [
     'src/features/dashboard/DashboardPage.jsx',
+    'src/features/dashboard/DashboardInventorySection.jsx',
     'src/features/dashboard/InventoryDashboardPage.jsx',
     'src/components/dashboard/DashboardCard.jsx',
     'src/components/dashboard/DashboardSection.jsx',
@@ -68,6 +69,7 @@ describe('Sprint 6A inventory dashboard foundation', () => {
 
   it('creates dashboard page and dashboard components', () => {
     [
+      'src/features/dashboard/DashboardInventorySection.jsx',
       'src/features/dashboard/InventoryDashboardPage.jsx',
       'src/features/dashboard/DashboardPage.jsx',
       'src/components/dashboard/DashboardCard.jsx',
@@ -87,17 +89,16 @@ describe('Sprint 6A inventory dashboard foundation', () => {
   });
 
   it('renders dashboard filters, summaries, stock table, low stock, and expiring lot sections', () => {
-    const source = readProjectFile('src/features/dashboard/InventoryDashboardPage.jsx');
+    const source = readProjectFile('src/features/dashboard/DashboardInventorySection.jsx');
 
     [
       'DocumentFilterBar',
-      'DashboardCard',
-      'QuantitySummaryCard',
       'Stock Balances',
       'Low Stock',
       'Expiring Lots',
       'Inventory By Warehouse',
       'Inventory By Customer',
+      'dashboard-inventory-section',
     ].forEach((term) => {
       expect(source).toContain(term);
     });

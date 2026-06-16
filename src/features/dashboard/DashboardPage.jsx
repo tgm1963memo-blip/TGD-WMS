@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { DashboardInventorySection } from './DashboardInventorySection.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { useLanguage, useTranslation } from '../../i18n/languageProvider.jsx';
 import {
@@ -55,21 +56,16 @@ export function DashboardPage() {
   const loadingLabel = state.loading ? '...' : '—';
 
   return (
-    <section className={`page-shell dashboard-page${goLive ? ' dashboard-page--golive' : ''}`}>
+    <section className={getPageShellClassName(`page-shell dashboard-page${goLive ? ' dashboard-page--golive' : ''}`)}>
       <PageHeader
         title={t('operations_dashboard')}
         description={goLive ? t('dashboard_description_golive') : t('dashboard_description')}
-        actions={(
+        actions={!goLive ? (
           <div className="dashboard-header-actions action-row">
-            {!goLive ? (
-              <>
-                <span className="production-hold-badge">{t('production_hold')}</span>
-                <span className="status-badge status-badge--uat">{t('uat_mode')}</span>
-              </>
-            ) : null}
-            <Link className="btn-primary-gold" to="/dashboard/inventory">{t('inventory_view')}</Link>
+            <span className="production-hold-badge">{t('production_hold')}</span>
+            <span className="status-badge status-badge--uat">{t('uat_mode')}</span>
           </div>
-        )}
+        ) : null}
       />
 
       {!goLive ? (
@@ -188,9 +184,9 @@ export function DashboardPage() {
           <ul className="alert-list">
             {goLive ? (
               <>
-                <li className="alert-item info">{language === 'th' ? 'ข้อมูลอ่านอย่างเดียวจากระบบจริง' : 'Read-only data from live system'}</li>
-                <li className="alert-item info">{language === 'th' ? 'พร้อมสำหรับการทดสอบผู้ใช้งาน' : 'Ready for business user walkthrough'}</li>
-                <li className="alert-item success">{language === 'th' ? 'ยอดคงเหลือและการเคลื่อนไหวอัปเดตตามข้อมูลล่าสุด' : 'Balances and movements reflect latest data'}</li>
+                <li className="alert-item info">{t('dashboard_alert_live_data')}</li>
+                <li className="alert-item info">{t('dashboard_ready_for_use')}</li>
+                <li className="alert-item success">{t('dashboard_alert_balances_updated')}</li>
               </>
             ) : (
               <>
@@ -222,6 +218,8 @@ export function DashboardPage() {
           </div>
         </DashboardSection>
       ) : null}
+
+      <DashboardInventorySection />
     </section>
   );
 }

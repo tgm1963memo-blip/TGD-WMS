@@ -63,9 +63,10 @@ export function MovementLedgerReportPage() {
       <PageHeader
         title={getTranslation('movement_ledger_report', language) || 'Customer Stock Movement Ledger'}
         description={goLive
-          ? (language === 'th'
-            ? 'รายงานการเคลื่อนไหวสินค้าคลังเย็น — ข้อมูลจริงสำหรับการตรวจสอบและทดสอบ'
-            : 'Cold storage movement report — live data for operations review and business testing.')
+          ? (getTranslation('movement_ledger_report_description_golive', language)
+            || (language === 'th'
+              ? 'รายงานการเคลื่อนไหวสินค้าคลังเย็น — ข้อมูลจริงสำหรับการตรวจสอบปฏิบัติการ'
+              : 'Cold storage movement report — live data for operations review.'))
           : 'Read-only cold storage movement report for operations and audit preparation.'}
       />
       <div className="section-card operational-report-actions-card">

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { InventoryDashboardPage } from '../../src/features/dashboard/InventoryDashboardPage.jsx';
+import { DashboardInventorySection } from '../../src/features/dashboard/DashboardInventorySection.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 vi.mock('../../src/services/inventoryDashboardService.js', () => ({
@@ -17,7 +17,7 @@ function renderPage() {
   return render(
     <MemoryRouter>
       <LanguageProvider initialLanguage="en">
-        <InventoryDashboardPage />
+        <DashboardInventorySection />
       </LanguageProvider>
     </MemoryRouter>
   );
@@ -27,19 +27,19 @@ describe('17F Stock / Inventory UI Polish', () => {
   it('Inventory/stock UI renders without crashing', async () => {
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Inventory Control')).toBeInTheDocument();
+      expect(screen.getByTestId('dashboard-inventory-section')).toBeInTheDocument();
     });
   });
 
   it('UI includes Stock Balance or Inventory Control', async () => {
     renderPage();
-    expect(await screen.findByText('Inventory Control')).toBeInTheDocument();
+    expect(await screen.findByText('Inventory Overview')).toBeInTheDocument();
     expect(screen.getByText('Stock Balances')).toBeInTheDocument();
   });
 
   it('UI includes Total Quantity or Total Qty', async () => {
     renderPage();
-    expect(await screen.findByText('Total Quantity')).toBeInTheDocument();
+    expect(await screen.findByText(/Total stock qty/i)).toBeInTheDocument();
   });
 
   it('UI includes Total Weight', async () => {
@@ -64,16 +64,7 @@ describe('17F Stock / Inventory UI Polish', () => {
 
   it('UI includes Available and Reserved', async () => {
     renderPage();
-    // In columns
     expect(await screen.findAllByText('Available')).not.toHaveLength(0);
     expect(await screen.findAllByText('Reserved')).not.toHaveLength(0);
-  });
-
-  it('UI includes safety panel elements', async () => {
-    renderPage();
-    expect(await screen.findAllByText('Production remains HOLD')).not.toHaveLength(0);
-    expect(screen.getByText('No Production migration applied')).toBeInTheDocument();
-    expect(screen.getByText('UI polish does not change stock movement behavior')).toBeInTheDocument();
-    expect(screen.getByText('UI polish does not change stock balance calculation')).toBeInTheDocument();
   });
 });

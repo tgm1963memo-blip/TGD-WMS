@@ -47,6 +47,15 @@ vi.mock('../../src/services/supabaseConnectionReadinessService.js', () => ({
   }),
 }));
 
+vi.mock('../../src/services/inventoryDashboardService.js', () => ({
+  getInventorySummary: vi.fn().mockResolvedValue({ data: { totalStockQty: 0, totalAllocatedQty: 0, lotCount: 0 }, error: null }),
+  getStockBalanceRows: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getLowStockItems: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getExpiringLots: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getInventoryByWarehouse: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getInventoryByCustomer: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
+
 vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
   useAuth: () => authMock,
   AuthProvider: ({ children }) => children,

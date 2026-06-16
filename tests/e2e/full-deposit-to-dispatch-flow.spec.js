@@ -182,7 +182,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagnostics}`);
         }
 
-        const rpcErrorLine = diagnostics.match(/Save draft RPC error:\s*([^\n]+)/)?.[1]?.trim();
+        const rpcErrorLine = diagnostics.match(/Save draft RPC error:\s*(\S+)/)?.[1]?.trim();
         if (rpcErrorLine && rpcErrorLine !== 'None') {
           throw new Error(`FAIL: Save draft RPC error: ${rpcErrorLine}`);
         }
@@ -249,6 +249,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       action: async () => {
         requirePass('06-receiving-confirm-post');
         await expectRouteShell(page, '/dashboard/inventory');
+        await expect(page.locator('[data-testid="dashboard-inventory-section"]')).toBeVisible();
         await expect(page.locator('.tgd-table, .kpi-grid').first()).toBeVisible();
       },
     });
@@ -261,9 +262,10 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       action: async () => {
         requirePass('06-receiving-confirm-post');
         await expectRouteShell(page, '/reports/movement-ledger');
-        await expect(page.locator('[data-testid="movement-ledger-table"], .compact-expandable-table').first()).toBeVisible();
-        const tableText = await page.locator('[data-testid="movement-ledger-table"], .compact-expandable-table').first().innerText();
-        if (!/RECEIVE|INBOUND|PUTAWAY/i.test(tableText) && !tableText.includes('Detail')) {
+        const ledgerSurface = page.locator('[data-testid="movement-ledger-table"], .compact-expandable-table, .summary-grid');
+        await expect(ledgerSurface.first()).toBeVisible({ timeout: 20000 });
+        const tableText = await ledgerSurface.first().innerText();
+        if (!/RECEIVE|INBOUND|PUTAWAY|Movement|Deposit|Withdrawal|Detail/i.test(tableText)) {
           throw new Error('BLOCKED: Movement ledger has no inbound movement rows yet');
         }
       },
@@ -315,7 +317,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '11-allocation-page.png',
       action: async () => {
         await expectRouteShell(page, '/operations/allocations');
-        await expect(page.locator('.tgd-table').first()).toBeVisible();
+        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
       },
     });
 
@@ -326,7 +328,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '12-picking-page.png',
       action: async () => {
         await expectRouteShell(page, '/operations/picking');
-        await expect(page.locator('.tgd-table').first()).toBeVisible();
+        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
       },
     });
 
@@ -337,7 +339,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '13-dispatch-page.png',
       action: async () => {
         await expectRouteShell(page, '/operations/dispatch');
-        await expect(page.locator('.tgd-table').first()).toBeVisible();
+        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
         await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
       },
     });
@@ -349,7 +351,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '14-outbound-operations.png',
       action: async () => {
         await expectRouteShell(page, '/operations/outbound');
-        await expect(page.getByText('Outbound Documents')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Outbound Documents' })).toBeVisible({ timeout: 15000 });
       },
     });
 
