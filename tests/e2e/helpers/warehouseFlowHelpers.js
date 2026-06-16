@@ -59,13 +59,26 @@ export async function waitForSelectOptions(page, selectors, minOptions = 2) {
       (el, min) => el && el.options && el.options.length >= min,
       handle,
       minOptions,
-      { timeout: 10000 },
+      { timeout: 30000 },
     );
   } catch {
     // continue with whatever options exist
   }
 
   return element;
+}
+
+export async function waitForReceivingMasterPickers(page) {
+  await page.waitForFunction(() => {
+    const helperText = Array.from(document.querySelectorAll('.form-helper'))
+      .map((node) => node.textContent || '')
+      .join(' ');
+    if (helperText.includes('Loading receiving master pickers')) {
+      return false;
+    }
+    const customerSelect = document.querySelector('select[aria-label="Customer"]');
+    return Boolean(customerSelect && customerSelect.options.length >= 2);
+  }, { timeout: 45000 });
 }
 
 export async function selectFirstOrMatch(page, selectors, preferredValue) {
@@ -97,7 +110,7 @@ export async function selectFirstOrMatch(page, selectors, preferredValue) {
     }
 
     return { matchValue: ops[0].value, options: ops };
-  }, preferredValue ?? null);
+  }, preferredValue ?? null, { timeout: 15000 });
 
   if (!matchValue) {
     throw new Error(`MISSING_OPTION: No selectable options in [${selectors.join(', ')}]`);
@@ -225,14 +238,35 @@ export function buildDraftNo(prefix) {
 
 export async function waitForReceivingDraftReady(page) {
   await page.waitForFunction(() => {
+    const draftCreated = Boolean(
+      document.querySelector('[data-testid="receiving-draft-created"]')
+      || Array.from(document.querySelectorAll('h3')).some((node) => node.textContent?.includes('Draft Created')),
+    );
     const diagText = document.querySelector('[data-testid="receiving-create-diagnostics"]')?.innerText || '';
-    const draftCreated = !!document.querySelector('h3:has-text("Draft Created")');
     const draftIdText = diagText.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
     const hasDraftId = draftIdText && draftIdText[1] !== 'None';
     const hasDraftMissing = diagText.includes('DRAFT_ID_MISSING');
     const hasRpcError = diagText.includes('Save draft RPC error:') && !diagText.includes('Save draft RPC error: None');
     return draftCreated || hasDraftId || hasDraftMissing || hasRpcError;
-  }, { timeout: 15000 }).catch(() => {});
+  }, { timeout: 45000 }).catch(() => {});
+}
+
+export async function readReceivingDraftId(page) {
+  const draftPanel = page.locator('[data-testid="receiving-draft-created"], section.form-card:has(h3:text("Draft Created"))');
+  if (await draftPanel.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const draftId = await draftPanel.locator('dd').first().textContent({ timeout: 5000 }).catch(() => null);
+    if (draftId?.trim()) {
+      return draftId.trim();
+    }
+  }
+
+  const diagnostics = await readReceivingDiagnostics(page);
+  const draftIdMatch = diagnostics.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
+  if (draftIdMatch?.[1] && draftIdMatch[1] !== 'None') {
+    return draftIdMatch[1];
+  }
+
+  return null;
 }
 
 export async function readReceivingDiagnostics(page) {

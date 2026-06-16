@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, loginAsCustomerAdmin, requireUatCredentials } from './helpers/uatAuth.js';
+import { login, loginAsCustomerAdmin, requireUatCredentials, switchUser } from './helpers/uatAuth.js';
 import {
   assertNoFatalPageErrors,
   buildDraftNo,
@@ -12,9 +12,11 @@ import {
   firstVisible,
   hasCustomerPortalCredentials,
   readReceivingDiagnostics,
+  readReceivingDraftId,
   safeGoto,
   selectFirstOrMatch,
   waitForReceivingDraftReady,
+  waitForReceivingMasterPickers,
   waitForSelectOptions,
   writeFlowResult,
 } from './helpers/warehouseFlowHelpers.js';
@@ -86,9 +88,16 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
         }
 
         await safeGoto(page, '/customer/deposit-request');
-        await page.locator('[data-testid="customer-product-code-input"]').fill(process.env.UAT_CUSTOMER_PRODUCT_CODE || 'CUS-FLOW-01');
-        await page.locator('[data-testid="customer-deposit-product-code"]').fill(process.env.UAT_PRODUCT_CODE || 'FRZ-FLOW-01');
-        await page.locator('[data-testid="customer-deposit-product-name"]').fill(process.env.UAT_PRODUCT_NAME || 'Flow Test Product');
+        await expect(page.locator('[data-testid="customer-deposit-request-page"]')).toBeVisible({ timeout: 15000 });
+
+        const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
+        if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await picker.selectOption({ index: 1 });
+        } else {
+          await page.locator('[data-testid="customer-product-code-input"]').fill(process.env.UAT_CUSTOMER_PRODUCT_CODE || 'CUS-FLOW-01');
+          await page.locator('[data-testid="customer-deposit-product-code"]').fill(process.env.UAT_PRODUCT_CODE || 'FRZ-FLOW-01');
+          await page.locator('[data-testid="customer-deposit-product-name"]').fill(process.env.UAT_PRODUCT_NAME || 'Flow Test Product');
+        }
         await page.locator('[data-testid="customer-deposit-qty"]').fill(process.env.UAT_QTY || '10');
         await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill(process.env.UAT_EXPECTED_ARRIVAL_DATE || '2026-12-31');
         await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Flow Test Contact');
@@ -99,7 +108,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
         ).toBeVisible({ timeout: 20000 });
 
-        await login(page);
+        await switchUser(page);
       },
     });
 
@@ -134,12 +143,13 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '04-receiving-create-draft.png',
       action: async () => {
         await safeGoto(page, '/operations/receiving/create');
+        await waitForReceivingMasterPickers(page);
 
         FLOW_CONTEXT.receivingDocNo = buildReceivingDocNo();
         FLOW_CONTEXT.customerId = await selectFirstOrMatch(
           page,
           ['select[aria-label="Customer"]'],
-          process.env.UAT_CUSTOMER_CODE,
+          process.env.UAT_CUSTOMER_NAME || process.env.UAT_CUSTOMER_CODE || 'Demo Customer Alpha',
         );
         FLOW_CONTEXT.warehouseId = await selectFirstOrMatch(
           page,
@@ -151,7 +161,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
         await waitForReceivingDraftReady(page);
 
         const diagnostics = await readReceivingDiagnostics(page);
-        const draftCreated = await firstVisible(page, ['h3:has-text("Draft Created")']);
+        const draftCreated = await firstVisible(page, ['[data-testid="receiving-draft-created"]', 'h3:has-text("Draft Created")']);
         if (!draftCreated) {
           if (diagnostics.includes('DRAFT_ID_MISSING')) {
             throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagnostics}`);
@@ -163,10 +173,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           throw new Error(`BLOCKED: Receiving draft was not created\n${diagnostics}`);
         }
 
-        const draftIdMatch = diagnostics.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
-        FLOW_CONTEXT.receivingDraftId = draftIdMatch?.[1] && draftIdMatch[1] !== 'None'
-          ? draftIdMatch[1]
-          : null;
+        FLOW_CONTEXT.receivingDraftId = await readReceivingDraftId(page);
       },
     });
 

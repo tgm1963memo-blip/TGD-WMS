@@ -285,6 +285,38 @@ a:hover { text-decoration: underline; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar .user-session-profile-link {
+  color: rgba(212, 175, 55, 0.95);
+  font-size: 12px;
+  text-decoration: none;
+}
+.sidebar .user-session-profile-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+.sidebar .user-session-role-badge {
+  align-self: flex-start;
+  background: rgba(212, 175, 55, 0.18);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 999px;
+  color: #f6e7b2;
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+.sidebar .sidebar-logout-button {
+  width: 100%;
+  color: #f8f8f8;
+  border-color: rgba(212, 175, 55, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+.sidebar .sidebar-logout-button:hover:not(:disabled) {
+  color: #111111;
+  background: var(--tgd-primary-gold);
+  border-color: var(--tgd-primary-gold);
+}
 .sidebar-logout-button { width: 100%; }
 .login-form-grid { display: grid; gap: 0; }
 .login-form-actions { margin-top: 8px; }
@@ -375,7 +407,10 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .compact-cell-text { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .compact-cell-qty { font-size: 12px; font-weight: 700; white-space: nowrap; }
 .app-shell--golive .main-content { padding-top: 0; }
-.page-shell--golive .safety-panel { display: none; }
+.page-shell--golive .safety-panel,
+.page-shell--golive .uat-banner,
+.page-shell--golive .uat-diagnostics-card,
+.app-shell--golive .uat-safety-banner { display: none; }
 .barcode-placeholder { display: flex; margin-top: 16px; width: fit-content; }
 
 .card, .section-card { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--tgd-border); border-radius: 8px; box-shadow: none; position: relative; margin-bottom: 24px; padding: 12px; }

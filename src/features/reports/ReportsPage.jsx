@@ -11,6 +11,7 @@ import LanguageToggle from '../../components/common/LanguageToggle.jsx';
 import { PageHeader } from '../../components/layout/PageHeader.jsx';
 import { SectionCard } from '../../components/layout/SectionCard.jsx';
 import { brandConfig } from '../../config/brandConfig.js';
+import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 
 // Report definitions – using translation keys for titles where possible.
 // Literal title fields are kept for legacy test expectations.
@@ -84,6 +85,7 @@ const reportDefinitions = [
 export function ReportsPage() {
   const { language } = useLanguage();
   const currentRole = getCurrentUserRole();
+  const goLive = isGoLivePresentationEnabled();
 
   const canShow = (def) => {
     const decision = canAccessRoute(currentRole, def.to);
@@ -92,7 +94,7 @@ export function ReportsPage() {
 
   return (
     <section className="page-shell" style={{ maxWidth: 1180 }}>
-      <UserRoleDemoSelector />
+      {!goLive ? <UserRoleDemoSelector /> : null}
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <PageHeader
           title={getTranslation('reports', language) || 'Reports'}

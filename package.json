@@ -16,6 +16,8 @@
     "test:e2e:vercel:core": "playwright test tests/e2e/system-pre-user-uat.spec.js tests/e2e/customer-portal-demo.spec.js tests/e2e/customer-portal-process-demo.spec.js tests/e2e/auth-user-settings.spec.js",
     "test:e2e:full-flow": "playwright test tests/e2e/full-deposit-to-dispatch-flow.spec.js",
     "test:e2e:customer-demo": "playwright test tests/e2e/customer-demo-user-flow.spec.js",
+    "uat:purge-transactional": "node scripts/uat-purge-transactional-data.mjs",
+    "uat:bootstrap-customer": "node scripts/uat-bootstrap-customer-demo.mjs",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },
   "dependencies": {

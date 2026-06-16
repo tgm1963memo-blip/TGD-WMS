@@ -578,6 +578,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_portal_demo_safety_message: { th: 'ตัวอย่างสำหรับประชุมเท่านั้น — ไม่มีการโพสต์ความเคลื่อนไหวสินค้า อีเมล อัปโหลดไฟล์ หรือปรับยอดสต็อก', en: 'Demo preview only — no inventory movement, email, file upload, or stock update has been posted.' },
   customer_portal_live_badge: { th: 'ข้อมูลจริง UAT', en: 'Live UAT Data' },
   customer_portal_live_safety_message: { th: 'เขียนผ่าน RPC ที่ควบคุมแล้ว — ไม่มีการโพสต์สต็อก อีเมล อัปโหลดไฟล์ หรือ export บัญชี', en: 'Writes go through controlled RPCs only — no stock movement, email, file upload, or accounting export.' },
+  customer_portal_golive_message: { th: 'ข้อมูลจริงสำหรับการทดสอบผู้ใช้งาน — บันทึกผ่านระบบที่ควบคุมแล้ว', en: 'Live data for business user walkthrough — writes go through controlled system paths.' },
   customer_portal_loading: { th: 'กำลังโหลดข้อมูลพอร์ทัลลูกค้า...', en: 'Loading customer portal data...' },
   customer_portal_load_error: { th: 'ไม่สามารถโหลดข้อมูลพอร์ทัลลูกค้าได้', en: 'Unable to load customer portal data.' },
   customer_portal_no_customer_scope: { th: 'บัญชีนี้ยังไม่ได้เชื่อมกับลูกค้า — ใช้บัญชี customer_admin/customer_user ที่มี customer_id', en: 'This account is not linked to a customer. Use a customer_admin/customer_user profile with customer_id.' },

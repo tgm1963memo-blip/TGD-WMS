@@ -6,6 +6,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
+import { isNavigationGroupVisible, isNavigationItemVisible } from '../../config/navigationPresentation.js';
 import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
 import {
   isCustomerOpsDemoNavigationVisible,
@@ -32,6 +33,10 @@ export function Sidebar() {
 
       <nav className="sidebar-nav" aria-label="TGD WMS navigation">
         {navigationGroups.map((group) => {
+          if (!isNavigationGroupVisible(group.key)) {
+            return null;
+          }
+
           if (group.key === 'customer_ops_demo' && !isCustomerOpsDemoNavigationVisible(userRole)) {
             return null;
           }
@@ -42,6 +47,10 @@ export function Sidebar() {
               <p className="nav-group-label">{groupLabel}</p>
               <div className="nav-list">
                 {group.items.map((item) => {
+                  if (!isNavigationItemVisible(item.key)) {
+                    return null;
+                  }
+
                   if (group.key === 'customer_portal' && !isCustomerPortalNavigationVisible(userRole)) {
                     return null;
                   }

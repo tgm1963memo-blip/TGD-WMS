@@ -16,6 +16,7 @@ import {
   postReceivingDocument,
   resolveLotForReceiving,
 } from '../../../services/receivingService.js';
+import { isGoLivePresentationEnabled } from '../../../config/goLivePresentation.js';
 
 let supabaseHost = 'Unknown';
 try {
@@ -63,6 +64,7 @@ function isValidUUID(uuid) {
 export function ReceivingCreatePage() {
   const userRole = getCurrentUserRole();
   const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+  const goLive = isGoLivePresentationEnabled();
   
   const [masterState, setMasterState] = useState({
     customers: [],
@@ -467,16 +469,18 @@ export function ReceivingCreatePage() {
   const uomDisplay = selectedProduct?.unit || '';
 
   return (
-    <div className="page-shell">
+    <div className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
       <PageHeader
         title="Create Receiving Draft"
-        description="Controlled receiving draft creation."
-        actions={<span className="status-badge status-badge--uat">UAT Mode</span>}
+        description={goLive ? 'สร้างเอกสารรับเข้าแบบร่าง' : 'Controlled receiving draft creation.'}
+        actions={goLive ? null : <span className="status-badge status-badge--uat">UAT Mode</span>}
       />
 
-      <div className="uat-banner" role="status">
-        Controlled UAT only · Production remains HOLD · FINAL GO is NOT AUTHORIZED
-      </div>
+      {!goLive ? (
+        <div className="uat-banner" role="status">
+          Controlled UAT only · Production remains HOLD · FINAL GO is NOT AUTHORIZED
+        </div>
+      ) : null}
 
       {!canWrite ? (
         <section className="alert-error-panel" role="alert">
@@ -485,13 +489,13 @@ export function ReceivingCreatePage() {
       ) : (
         <>
           <section className="warning-panel" role="status">
-        <h3>Controlled receiving draft mode</h3>
+        <h3>{goLive ? 'โหมดสร้างเอกสารรับเข้า' : 'Controlled receiving draft mode'}</h3>
         <ul style={{ marginBottom: 0 }}>
-          <li>Staging controlled unlock only</li>
+          <li>{goLive ? 'บันทึกร่างผ่าน RPC ที่ควบคุมแล้ว' : 'Staging controlled unlock only'}</li>
           <li>Save Draft uses receiving RPC only</li>
           <li>Add Line uses receiving RPC only</li>
           <li>Confirm/Post uses receiving RPC only after draft creation</li>
-          <li>No stock movement or stock balance update is triggered from this page</li>
+          {!goLive ? <li>No stock movement or stock balance update is triggered from this page</li> : null}
         </ul>
       </section>
 
@@ -534,6 +538,7 @@ export function ReceivingCreatePage() {
           className="diagnostic-panel uat-diagnostics-card"
           id="diagnostic-23v"
           data-testid="receiving-create-diagnostics"
+          style={goLive ? { display: 'none' } : undefined}
         >
           <h4>Developer / UAT Diagnostics</h4>
           <ul>
@@ -561,7 +566,7 @@ export function ReceivingCreatePage() {
             {masterState.warehousesError && <li>Warehouses error message: {masterState.warehousesError.message || String(masterState.warehousesError)}</li>}
           </ul>
         </section>
-        <label style={{ alignItems: 'center', display: 'inline-flex', gap: 8 }}>
+        <label style={{ alignItems: 'center', display: goLive ? 'none' : 'inline-flex', gap: 8 }}>
           <input
             aria-label="Use manual UUID entry"
             checked={useManualEntry}
@@ -639,7 +644,7 @@ export function ReceivingCreatePage() {
       </form>
 
       {draft ? (
-        <section className="form-card">
+        <section className="form-card" data-testid="receiving-draft-created">
           <h3 style={{ marginTop: 0 }}>Draft Created</h3>
           <dl
             style={{

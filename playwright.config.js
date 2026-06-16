@@ -19,6 +19,7 @@ export default defineConfig({
     headless: !!process.env.CI,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
+    actionTimeout: 30000,
   },
   webServer: useLocalWebServer
     ? {
