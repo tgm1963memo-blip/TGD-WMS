@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
-import { hasRoleAccess } from '../../../security/permissionGuard.js';
+import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { supabase } from '../../../services/supabaseClient.js';
 import { getUatRoleOverride } from '../../../security/uatRoleOverride.js';
 import {
@@ -63,7 +63,7 @@ function isValidUUID(uuid) {
 
 export function ReceivingCreatePage() {
   const userRole = getCurrentUserRole();
-  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+  const canWrite = canPerformReceivingWrite(userRole);
   const goLive = isGoLivePresentationEnabled();
   
   const [masterState, setMasterState] = useState({

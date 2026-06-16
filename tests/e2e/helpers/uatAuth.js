@@ -65,6 +65,22 @@ export async function switchUser(page, credentials = {}) {
   await login(page, credentials);
 }
 
+export async function loginAsWarehouseOperator(page) {
+  const email = process.env.UAT_WAREHOUSE_EMAIL
+    || process.env.UAT_OPERATOR_EMAIL
+    || 'staff.demo@tgd-wms.local';
+  const password = process.env.UAT_WAREHOUSE_PASSWORD
+    || process.env.UAT_OPERATOR_PASSWORD
+    || process.env.UAT_PASSWORD;
+
+  if (!password) {
+    return false;
+  }
+
+  await switchUser(page, { email, password });
+  return true;
+}
+
 export async function loginAsCustomerAdmin(page) {
   if (!process.env.UAT_CUSTOMER_EMAIL || !process.env.UAT_CUSTOMER_PASSWORD) {
     return false;

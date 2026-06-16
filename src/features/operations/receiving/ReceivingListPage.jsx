@@ -6,7 +6,7 @@ import { documentLink, renderStatusBadge } from '../../../components/operations/
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
-import { hasRoleAccess } from '../../../security/permissionGuard.js';
+import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 import { useTranslation } from '../../../i18n/languageProvider.jsx';
 
@@ -33,7 +33,7 @@ export function ReceivingListPage() {
   const t = useTranslation();
   const [state, setState] = useState({ data: [], loading: true, error: null });
   const userRole = getCurrentUserRole();
-  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+  const canWrite = canPerformReceivingWrite(userRole);
 
   useEffect(() => {
     let isMounted = true;

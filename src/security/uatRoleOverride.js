@@ -1,3 +1,5 @@
+import { isGoLivePresentationEnabled } from '../config/goLivePresentation.js';
+
 export const ALLOWED_UAT_ROLES = Object.freeze(['warehouse_staff', 'supervisor', 'admin']);
 
 /**
@@ -9,6 +11,10 @@ export const ALLOWED_UAT_ROLES = Object.freeze(['warehouse_staff', 'supervisor',
  */
 export function getUatRoleOverride(env = import.meta.env) {
   if (!env) return null;
+
+  if (isGoLivePresentationEnabled()) {
+    return null;
+  }
 
   // 1. App must be in controlled UAT mode
   const isUatMode = String(env.VITE_UAT_MODE).toLowerCase() === 'true' || String(env.VITE_APP_ENV).toLowerCase() === 'uat';

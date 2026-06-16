@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, loginAsCustomerAdmin, requireUatCredentials, switchUser } from './helpers/uatAuth.js';
+import { login, loginAsCustomerAdmin, loginAsWarehouseOperator, requireUatCredentials, switchUser } from './helpers/uatAuth.js';
 import {
   assertNoFatalPageErrors,
   buildDraftNo,
@@ -142,6 +142,11 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       name: 'Create internal receiving draft',
       evidence: '04-receiving-create-draft.png',
       action: async () => {
+        const switched = await loginAsWarehouseOperator(page);
+        if (!switched) {
+          throw new Error('BLOCKED: warehouse operator credentials required for receiving draft creation');
+        }
+
         await safeGoto(page, '/operations/receiving/create');
         await waitForReceivingMasterPickers(page);
 
@@ -160,20 +165,28 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
         await clickIfVisible(page, ['button:has-text("Save Draft")']);
         await waitForReceivingDraftReady(page);
 
-        const diagnostics = await readReceivingDiagnostics(page);
         const draftCreated = await firstVisible(page, ['[data-testid="receiving-draft-created"]', 'h3:has-text("Draft Created")']);
-        if (!draftCreated) {
-          if (diagnostics.includes('DRAFT_ID_MISSING')) {
-            throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagnostics}`);
-          }
-          const rpcError = diagnostics.match(/Save draft RPC error:\s*(.*)/);
-          if (rpcError?.[1] && rpcError[1] !== 'None') {
-            throw new Error(`FAIL: Save draft RPC error: ${rpcError[1]}`);
-          }
-          throw new Error(`BLOCKED: Receiving draft was not created\n${diagnostics}`);
+        if (draftCreated) {
+          FLOW_CONTEXT.receivingDraftId = await readReceivingDraftId(page);
+          return;
         }
 
-        FLOW_CONTEXT.receivingDraftId = await readReceivingDraftId(page);
+        const diagnostics = await readReceivingDiagnostics(page);
+        if (diagnostics.includes('DRAFT_ID_MISSING')) {
+          throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagnostics}`);
+        }
+
+        const rpcErrorLine = diagnostics.match(/Save draft RPC error:\s*([^\n]+)/)?.[1]?.trim();
+        if (rpcErrorLine && rpcErrorLine !== 'None') {
+          throw new Error(`FAIL: Save draft RPC error: ${rpcErrorLine}`);
+        }
+
+        const pageError = await page.locator('.alert-error-panel').first().textContent().catch(() => '');
+        if (pageError?.trim()) {
+          throw new Error(`FAIL: ${pageError.trim()}`);
+        }
+
+        throw new Error(`BLOCKED: Receiving draft was not created\n${diagnostics}`);
       },
     });
 

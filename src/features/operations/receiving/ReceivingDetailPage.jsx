@@ -10,7 +10,7 @@ import { LoadingState } from '../../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 import { getCurrentUserRole } from '../../../security/currentUserRole.js';
-import { hasRoleAccess } from '../../../security/permissionGuard.js';
+import { canPerformReceivingWrite } from '../../../security/receivingWritePermissions.js';
 import { ReceivingReportTemplate } from '../../../components/reports/ReceivingReportTemplate.jsx';
 import { ReportPrintActions } from '../../../components/reports/ReportPrintActions.jsx';
 import { getTranslation } from '../../../i18n/translationCatalog.js';
@@ -105,7 +105,7 @@ export function ReceivingDetailPage() {
   const lineCount = document?.tgd_receiving_lines?.length ?? 0;
 
   const userRole = getCurrentUserRole();
-  const canWrite = hasRoleAccess(userRole, 'warehouse_staff');
+  const canWrite = canPerformReceivingWrite(userRole);
 
   const showPostButton = isDraft && !postSucceeded && canWrite;
   const postButtonDisabled = !document?.id || isPosting || !isDraft || !canWrite;

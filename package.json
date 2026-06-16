@@ -18,6 +18,7 @@
     "test:e2e:customer-demo": "playwright test tests/e2e/customer-demo-user-flow.spec.js",
     "uat:purge-transactional": "node scripts/uat-purge-transactional-data.mjs",
     "uat:bootstrap-customer": "node scripts/uat-bootstrap-customer-demo.mjs",
+    "uat:bootstrap-warehouse": "node scripts/uat-bootstrap-warehouse-demo.mjs",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },
   "dependencies": {
