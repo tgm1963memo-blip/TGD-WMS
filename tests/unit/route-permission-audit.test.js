@@ -81,9 +81,9 @@ const APP_ROUTES = [
 const VALID_AREAS = [
   'master_data', 'receiving', 'putaway', 'transfer', 'adjustment', 'stock_count',
   'withdrawal', 'allocation', 'picking', 'dispatch', 'reports',
-  'accounting_review', 'admin', 'unknown',
+  'accounting_review', 'admin', 'user_management', 'customer_catalog', 'customer_portal', 'unknown',
 ];
-const VALID_ROLES = ['admin', 'warehouse_manager', 'warehouse_staff', 'accounting', 'viewer'];
+const VALID_ROLES = ['admin', 'warehouse_manager', 'warehouse_staff', 'accounting', 'viewer', 'customer_admin', 'customer_user'];
 const VALID_ACCESS = ['read', 'write', 'review', 'admin'];
 
 test('ROUTE_PERMISSION_CATALOG is defined and non‑empty', () => {

@@ -12,9 +12,9 @@ export const CUSTOMER_PORTAL_DEMO_ROLES = Object.freeze([
 export function isCustomerPortalNavigationVisible(role) {
   const normalized = String(role ?? '').trim().toLowerCase();
   if (!normalized) {
-    return true;
+    return false;
   }
-  return CUSTOMER_PORTAL_DEMO_ROLES.includes(normalized);
+  return ['admin', 'customer_admin', 'customer_user'].includes(normalized);
 }
 
 export function isCustomerOpsDemoNavigationVisible(role) {

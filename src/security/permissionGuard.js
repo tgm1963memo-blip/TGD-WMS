@@ -8,6 +8,8 @@
 
 import { getRoutePermission } from './routePermissionCatalog.js';
 
+const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
+
 export const ROLE_HIERARCHY = {
   viewer: 1,
   warehouse_staff: 2,
@@ -16,6 +18,10 @@ export const ROLE_HIERARCHY = {
   admin: 5,
 };
 
+function normalizeRole(role) {
+  return String(role ?? '').trim().toLowerCase();
+}
+
 /**
  * Check if a user role meets or exceeds a required role.
  * @param {string} userRole - role of the current user.
@@ -23,8 +29,29 @@ export const ROLE_HIERARCHY = {
  * @returns {boolean}
  */
 export function hasRoleAccess(userRole, requiredRole) {
-  const userLevel = ROLE_HIERARCHY[userRole] ?? 0;
-  const requiredLevel = ROLE_HIERARCHY[requiredRole] ?? 0;
+  const user = normalizeRole(userRole);
+  const required = normalizeRole(requiredRole);
+
+  if (user === 'admin') {
+    return true;
+  }
+
+  if (CUSTOMER_ROLES.includes(required)) {
+    if (required === 'customer_user') {
+      return user === 'customer_user' || user === 'customer_admin';
+    }
+    if (required === 'customer_admin') {
+      return user === 'customer_admin';
+    }
+    return false;
+  }
+
+  if (CUSTOMER_ROLES.includes(user)) {
+    return false;
+  }
+
+  const userLevel = ROLE_HIERARCHY[user] ?? 0;
+  const requiredLevel = ROLE_HIERARCHY[required] ?? 0;
   return userLevel >= requiredLevel;
 }
 

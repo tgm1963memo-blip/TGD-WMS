@@ -7,11 +7,9 @@ import { UserSessionMenu } from '../auth/UserSessionMenu.jsx';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { isNavigationGroupVisible, isNavigationItemVisible } from '../../config/navigationPresentation.js';
-import { isBillingNavigationItemVisible } from '../../security/billingInvoiceDraftPermissions.js';
 import {
-  isCustomerOpsDemoNavigationVisible,
-  isCustomerPortalNavigationVisible,
-} from '../../security/customerPortalPermissions.js';
+  filterNavigationGroupsForRole,
+} from '../../security/navigationPermissions.js';
 
 /**
  * Professional Black & Gold sidebar navigation (approved mockup style).
@@ -24,6 +22,14 @@ export function Sidebar() {
   const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
   const getNavKey = (key) => `nav.${toCamelCase(key)}`;
 
+  const visibleGroups = filterNavigationGroupsForRole(
+    navigationGroups.filter((group) => isNavigationGroupVisible(group.key)),
+    userRole,
+  ).map((group) => ({
+    ...group,
+    items: group.items.filter((item) => isNavigationItemVisible(item.key)),
+  })).filter((group) => group.items.length > 0);
+
   return (
     <aside className="sidebar app-sidebar" aria-label="Primary navigation" data-testid="sidebar">
       <div className="sidebar-header tgm-sidebar-brand">
@@ -32,33 +38,11 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label="TGD WMS navigation">
-        {navigationGroups.map((group) => {
-          if (!isNavigationGroupVisible(group.key)) {
-            return null;
-          }
-
-          if (group.key === 'customer_ops_demo' && !isCustomerOpsDemoNavigationVisible(userRole)) {
-            return null;
-          }
-
-          const groupLabel = group.label;
-          return (
+        {visibleGroups.map((group) => (
             <div key={group.key} className="sidebar-nav-group">
-              <p className="nav-group-label">{groupLabel}</p>
+              <p className="nav-group-label">{group.label}</p>
               <div className="nav-list">
                 {group.items.map((item) => {
-                  if (!isNavigationItemVisible(item.key)) {
-                    return null;
-                  }
-
-                  if (group.key === 'customer_portal' && !isCustomerPortalNavigationVisible(userRole)) {
-                    return null;
-                  }
-
-                  if (!isBillingNavigationItemVisible(item.key, userRole)) {
-                    return null;
-                  }
-
                   const itemLabel = t(getNavKey(item.key)) || item.label;
                   if (item.disabled) {
                     return (
@@ -88,8 +72,7 @@ export function Sidebar() {
                 })}
               </div>
             </div>
-          );
-        })}
+        ))}
       </nav>
 
       <UserSessionMenu />

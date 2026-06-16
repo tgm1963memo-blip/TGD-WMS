@@ -68,6 +68,23 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/admin/users', route_name: 'UserManagementPage', permission_area: 'user_management', minimum_role: 'admin', access_level: 'admin', notes: 'USER-MGMT-045: profile metadata via RPC; auth.users created separately in Supabase' },
   { route_path: '/admin/customer-products', route_name: 'CustomerProductCatalogAdminPage', permission_area: 'customer_catalog', minimum_role: 'admin', access_level: 'write', notes: 'CUSTOMER-CATALOG-046: admin manages catalog for any customer' },
   { route_path: '/customer/products', route_name: 'CustomerProductCatalogPage', permission_area: 'customer_catalog', minimum_role: 'customer_user', access_level: 'write', notes: 'CUSTOMER-CATALOG-046: customer_admin/customer_user manage own catalog' },
+  { route_path: '/dashboard', route_name: 'DashboardPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: 'Operations dashboard for authenticated users' },
+  { route_path: '/dashboard/inventory', route_name: 'InventoryDashboardPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: 'Redirects to dashboard inventory section' },
+  { route_path: '/handheld', route_name: 'HandheldPage', permission_area: 'receiving', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'Handheld scan workflow for warehouse staff' },
+  { route_path: '/customer', route_name: 'CustomerPortalDashboardPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: 'Customer portal home' },
+  { route_path: '/customer/deposit-request', route_name: 'CustomerDepositRequestPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'write', notes: '' },
+  { route_path: '/customer/stock-balance', route_name: 'CustomerStockBalancePage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: '' },
+  { route_path: '/customer/withdrawal-request', route_name: 'CustomerWithdrawalRequestPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'write', notes: '' },
+  { route_path: '/customer/requests', route_name: 'CustomerRequestHistoryPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: '' },
+  { route_path: '/customer/admin/deposit-review', route_name: 'CustomerAdminDepositReviewPage', permission_area: 'customer_portal', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'Warehouse review of customer deposit requests' },
+  { route_path: '/customer/admin/withdrawal-review', route_name: 'CustomerAdminWithdrawalReviewPage', permission_area: 'customer_portal', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'Warehouse review of customer withdrawal requests' },
+  { route_path: '/customer/admin/receiving-verification', route_name: 'CustomerAdminReceivingVerificationPage', permission_area: 'customer_portal', minimum_role: 'warehouse_manager', access_level: 'read', notes: 'Warehouse manager receiving verification' },
+  { route_path: '/customer/warehouse/receiving', route_name: 'CustomerWarehouseReceivingDemoPage', permission_area: 'customer_portal', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'UAT demo route' },
+  { route_path: '/customer/warehouse/picking-loading', route_name: 'CustomerWarehousePickingLoadingDemoPage', permission_area: 'customer_portal', minimum_role: 'warehouse_staff', access_level: 'read', notes: 'UAT demo route' },
+  { route_path: '/settings/profile', route_name: 'ProfileSettingsPage', permission_area: 'admin', minimum_role: 'viewer', access_level: 'read', notes: 'Authenticated profile settings' },
+  { route_path: '/admin/auth-readiness', route_name: 'AuthReadinessPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
+  { route_path: '/admin/document-branding', route_name: 'DocumentBrandingAdminPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
+  { route_path: '/admin/document-branding-preview', route_name: 'DocumentBrandingPreviewPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'read', notes: '' },
   // Legacy/Placeholder routes – unknown area
   { route_path: '/inventory', route_name: 'LegacyPlaceholderPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
   { route_path: '/movement-ledger', route_name: 'LegacyPlaceholderPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
@@ -79,9 +96,6 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/picking', route_name: 'PickingPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
   { route_path: '/transfer', route_name: 'TransferPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
   { route_path: '/adjustment', route_name: 'AdjustmentPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
-  { route_path: '/dashboard', route_name: 'DashboardPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
-  { route_path: '/dashboard/inventory', route_name: 'InventoryDashboardPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
-  { route_path: '/handheld', route_name: 'HandheldPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
 ];
 
 /** Retrieve permission entry for a specific route path */
@@ -107,7 +121,7 @@ export function validateRoutePermissionCatalog(routes) {
   const knownAreas = [
     'master_data', 'receiving', 'putaway', 'transfer', 'adjustment', 'stock_count',
     'withdrawal', 'allocation', 'picking', 'dispatch', 'reports',
-    'accounting_review', 'admin', 'user_management', 'customer_catalog', 'unknown',
+    'accounting_review', 'admin', 'user_management', 'customer_catalog', 'customer_portal', 'unknown',
   ];
   const seen = new Set();
   for (const entry of ROUTE_PERMISSION_CATALOG) {
