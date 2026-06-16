@@ -63,9 +63,10 @@ test.describe('System pre-user UAT smoke', () => {
     }
 
     await page.goto(`${baseUrl}/customer`);
-    await expect(page.locator('[data-testid="customer-portal-live-banner"]')).toBeVisible();
+    await expect(page.locator('[data-testid="customer-portal-page"]')).toBeVisible();
 
     await page.goto(`${baseUrl}/operations/receiving`);
+    await expect(page.locator('[data-testid="receiving-customer-deposit-section"]')).toBeVisible();
     await expect(page.locator('[data-testid="receiving-post-button"]')).toHaveCount(0);
 
     await page.goto(`${baseUrl}/operations/dispatch`);

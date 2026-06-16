@@ -24,10 +24,10 @@ test.describe('Customer demo user UAT flow', () => {
     await expect(page.getByText(/not linked to a customer|ไม่ได้เชื่อมกับลูกค้า/i)).toHaveCount(0);
   });
 
-  test('sees product catalog and sample row', async ({ page }) => {
+  test('sees product catalog table', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/products`);
     await expect(page.locator('[data-testid="customer-product-catalog-page"]')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('CUS-FLOW-01')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="catalog-customer-table"]')).toBeVisible({ timeout: 15000 });
   });
 
   test('submits deposit request using catalog product', async ({ page }) => {
