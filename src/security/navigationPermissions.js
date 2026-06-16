@@ -48,13 +48,7 @@ export function resolveNavigationItemPath(item) {
 export function isNavigationPathVisibleForRole(role, path) {
   if (!path) return true;
 
-  const normalized = normalizeUserRole(role);
-
-  if ((path === '/dashboard' || path === '/dashboard/inventory') && isCustomerRole(normalized)) {
-    return true;
-  }
-
-  const decision = canAccessRoute(normalized, path);
+  const decision = canAccessRoute(normalizeUserRole(role), path);
   return decision.allowed;
 }
 
@@ -66,7 +60,7 @@ export function isNavigationGroupVisibleForRole(groupKey, role) {
   }
 
   if (isCustomerRole(normalized)) {
-    return groupKey === 'main_operation' || groupKey === CUSTOMER_PORTAL_GROUP;
+    return groupKey === CUSTOMER_PORTAL_GROUP;
   }
 
   if (groupKey === CUSTOMER_PORTAL_GROUP) {
@@ -82,6 +76,12 @@ export function isNavigationGroupVisibleForRole(groupKey, role) {
 
 export function isNavigationItemVisibleForRole(item, groupKey, role) {
   if (!item) return false;
+
+  const normalized = normalizeUserRole(role);
+
+  if (item.key === 'dashboard') {
+    return normalized === 'admin';
+  }
 
   if (!isNavigationGroupVisibleForRole(groupKey, role)) {
     return false;

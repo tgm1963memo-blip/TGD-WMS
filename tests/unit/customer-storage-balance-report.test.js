@@ -48,7 +48,7 @@ describe('Sprint 6C customer storage balance report foundation', () => {
       expect(source).toContain(functionName);
     });
 
-    expect(source).toContain('.select(');
+    expect(source).toContain('queryStockBalanceRows');
     expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     expect(source).not.toContain('.rpc(');
     forbiddenPostingTerms.forEach((term) => {

@@ -17,3 +17,4 @@ database/seeds/.temp_*.sql
 test-results/
 playwright-report/
 uat-evidence/
+.vercel

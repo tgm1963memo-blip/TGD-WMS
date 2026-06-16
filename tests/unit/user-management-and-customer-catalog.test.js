@@ -95,6 +95,7 @@ describe('User management + catalog frontend wiring', () => {
     const withdrawal = read(path.join(process.cwd(), 'src/features/customer/CustomerWithdrawalRequestPage.jsx'));
 
     expect(deposit).toContain('CustomerProductPicker');
+    expect(deposit).toContain('catalogOnly');
     expect(withdrawal).toContain('CustomerProductPicker');
   });
 });

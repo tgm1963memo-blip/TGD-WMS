@@ -242,17 +242,27 @@ export function buildDraftNo(prefix) {
 
 export async function waitForReceivingDraftReady(page) {
   await page.waitForFunction(() => {
+    const savingDraft = Array.from(document.querySelectorAll('button'))
+      .some((button) => /Saving draft/i.test(button.textContent || ''));
+    return !savingDraft;
+  }, { timeout: 60000 }).catch(() => {});
+
+  await page.waitForFunction(() => {
     const draftCreated = Boolean(
       document.querySelector('[data-testid="receiving-draft-created"]')
       || Array.from(document.querySelectorAll('h3')).some((node) => node.textContent?.includes('Draft Created')),
     );
+    const errorPanel = document.querySelector('.alert-error-panel')?.textContent || '';
+    if (/DRAFT_ID_MISSING|Save draft|Authentication required|not allowed/i.test(errorPanel)) {
+      return true;
+    }
     const diagText = document.querySelector('[data-testid="receiving-create-diagnostics"]')?.innerText || '';
     const draftIdText = diagText.match(/Draft id:\s*([a-zA-Z0-9-]+)/);
     const hasDraftId = draftIdText && draftIdText[1] !== 'None';
     const hasDraftMissing = diagText.includes('DRAFT_ID_MISSING');
     const hasRpcError = diagText.includes('Save draft RPC error:') && !diagText.includes('Save draft RPC error: None');
     return draftCreated || hasDraftId || hasDraftMissing || hasRpcError;
-  }, { timeout: 45000 }).catch(() => {});
+  }, { timeout: 90000 }).catch(() => {});
 }
 
 export async function readReceivingDraftId(page) {

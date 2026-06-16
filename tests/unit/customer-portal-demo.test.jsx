@@ -46,6 +46,20 @@ vi.mock('../../src/features/customer/useCustomerPortalProfile.js', () => ({
   }),
 }));
 
+vi.mock('../../src/services/customerProductCatalogService.js', () => ({
+  listCustomerProducts: vi.fn(async () => ({
+    data: [{
+      id: 'cat-prod-1',
+      customer_product_code: 'CUS-CHKN-01',
+      internal_product_code: 'FRZ-CHKN-01',
+      product_name: 'Frozen Chicken Breast',
+      temperature_type: 'FROZEN',
+      uom: 'KG',
+    }],
+    error: null,
+  })),
+}));
+
 vi.mock('../../src/services/customerPortalDashboardService.js', () => ({
   getCustomerPortalDashboardSummary: vi.fn(async () => ({
     data: {
@@ -154,9 +168,13 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     renderPage(CustomerDepositRequestPage);
     const form = screen.getByTestId('customer-deposit-request-form');
 
-    fireEvent.change(screen.getByTestId('customer-product-code-input'), { target: { value: 'CUS-CHKN-01' } });
-    fireEvent.change(screen.getByTestId('customer-deposit-product-code'), { target: { value: 'FRZ-CHKN-01' } });
-    fireEvent.change(screen.getByTestId('customer-deposit-product-name'), { target: { value: 'Frozen Chicken Breast' } });
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-deposit-product-picker-select')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('customer-deposit-product-picker-select'), {
+      target: { value: 'cat-prod-1' },
+    });
     fireEvent.change(screen.getByTestId('customer-deposit-qty'), { target: { value: '10' } });
     fireEvent.change(screen.getByTestId('customer-deposit-expected-arrival-date'), { target: { value: '2026-06-15' } });
     fireEvent.change(screen.getByTestId('customer-deposit-contact-name'), { target: { value: 'Demo User' } });

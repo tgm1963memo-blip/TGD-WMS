@@ -21,10 +21,10 @@ describe('navigation role permissions', () => {
     expect(hasRoleAccess('admin', 'customer_user')).toBe(true);
   });
 
-  it('warehouse_staff sees operations but not adjustment, master data, billing drafts, or customer portal', () => {
+  it('warehouse_staff sees operations but not adjustment, master data, billing drafts, dashboard, or customer portal', () => {
     const labels = visibleLabelsForRole('warehouse_staff');
 
-    expect(labels).toContain('Dashboard');
+    expect(labels).not.toContain('Dashboard');
     expect(labels).toContain('Receiving');
     expect(labels).toContain('Post Outbound');
     expect(labels).not.toContain('Adjustment');
@@ -43,10 +43,10 @@ describe('navigation role permissions', () => {
     expect(labels).toContain('Invoice Drafts');
   });
 
-  it('accounting sees billing and reports but not warehouse operations', () => {
+  it('accounting sees billing and reports but not warehouse operations or dashboard', () => {
     const labels = visibleLabelsForRole('accounting');
 
-    expect(labels).toContain('Dashboard');
+    expect(labels).not.toContain('Dashboard');
     expect(labels).toContain('Billing Movement Weight');
     expect(labels).toContain('Invoice Drafts');
     expect(labels).toContain('Movement Ledger');
@@ -55,10 +55,10 @@ describe('navigation role permissions', () => {
     expect(labels).not.toContain('Portal Overview');
   });
 
-  it('viewer sees dashboard and reports only', () => {
+  it('viewer sees reports only', () => {
     const labels = visibleLabelsForRole('viewer');
 
-    expect(labels).toContain('Dashboard');
+    expect(labels).not.toContain('Dashboard');
     expect(labels).toContain('Movement Ledger');
     expect(labels).not.toContain('Receiving');
     expect(labels).not.toContain('Master Data');
@@ -66,10 +66,10 @@ describe('navigation role permissions', () => {
     expect(labels).not.toContain('Portal Overview');
   });
 
-  it('customer_admin sees dashboard and customer portal only', () => {
+  it('customer_admin sees customer portal only', () => {
     const labels = visibleLabelsForRole('customer_admin');
 
-    expect(labels).toContain('Dashboard');
+    expect(labels).not.toContain('Dashboard');
     expect(labels).toContain('Portal Overview');
     expect(labels).toContain('Customer Deposit');
     expect(labels).toContain('Customer Products');
@@ -78,9 +78,10 @@ describe('navigation role permissions', () => {
     expect(labels).not.toContain('Master Data');
   });
 
-  it('admin sees administration and warehouse menus', () => {
+  it('admin sees administration, warehouse menus, and dashboard', () => {
     const labels = visibleLabelsForRole('admin');
 
+    expect(labels).toContain('Dashboard');
     expect(labels).toContain('Receiving');
     expect(labels).toContain('User Management');
     expect(labels).toContain('Portal Overview');

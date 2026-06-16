@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { queryStockBalanceRows } from './stockBalanceRowQuery.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -79,13 +80,7 @@ function groupBalanceRows(rows = [], key) {
 export async function getCustomerStorageBalanceRows(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
-  return applyBalanceFilters(
-    supabase
-      .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, qty_available, uom, created_at')
-      .order('created_at', { ascending: false }),
-    filters,
-  );
+  return queryStockBalanceRows(supabase, filters, applyBalanceFilters);
 }
 
 export async function getCustomerStorageBalanceSummary(filters = {}) {

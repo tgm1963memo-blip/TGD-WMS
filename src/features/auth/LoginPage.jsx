@@ -4,6 +4,8 @@ import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.
 import { AuthPageShell } from '../../components/auth/AuthPageShell.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
+import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { resolveDefaultHomePath } from '../../security/defaultHomePath.js';
 
 export function LoginPage() {
   const { session, loading } = useAuth();
@@ -20,7 +22,7 @@ export function LoginPage() {
   }
 
   if (session?.user) {
-    const from = location.state?.from?.pathname || '/dashboard';
+    const from = location.state?.from?.pathname || resolveDefaultHomePath(getCurrentUserRole());
     return <Navigate to={from} replace />;
   }
 

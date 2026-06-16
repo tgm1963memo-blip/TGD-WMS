@@ -60,6 +60,7 @@ import { UatOnly } from '../components/common/UatOnly.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
 import { LoginPage } from '../features/auth/LoginPage.jsx';
+import { DefaultHomeRedirect } from '../features/auth/DefaultHomeRedirect.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.jsx';
@@ -92,7 +93,7 @@ export function AppRoutes() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AuthGuard />}>
         <Route element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<DefaultHomeRedirect />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/dashboard/inventory" element={<InventoryDashboardPage />} />
           <Route path="/master/customers" element={<CustomersPage />} />
@@ -173,7 +174,7 @@ export function AppRoutes() {
           <Route path="/audit" element={<LegacyPlaceholderPage title="Audit" />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<DefaultHomeRedirect />} />
     </Routes>
   );
 }
