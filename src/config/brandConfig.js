@@ -1,8 +1,8 @@
 export const brandConfig = {
-  brandName: 'TGM Cold Storage WMS',
-  companyNameTh: 'บริษัท ไทย-เยอรมัน มีท โปรดักท์ จำกัด',
-  companyNameEn: 'Thai-German Meat Product Co., Ltd.',
-  logoPath: '/brand/tgm-logo.png',
+  brandName: 'TGC Cold Storage WMS',
+  companyNameTh: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด',
+  companyNameEn: 'TG Cold Storage Co., Ltd.',
+  logoPath: '/brand/tgc-logo.svg',
   colors: {
     black: '#09090b',
     gold: '#d6a11f',

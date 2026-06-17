@@ -55,7 +55,8 @@ export async function listCustomerWithdrawalRequests(filters = {}) {
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
     .select(WITHDRAWAL_HEADER_SELECT)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
   if (filters.status) query = query.eq('status', filters.status);

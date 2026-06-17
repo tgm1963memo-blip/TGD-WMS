@@ -55,13 +55,13 @@ describe('document branding components', () => {
   test('header renders Thai company name', () => {
     render(<DocumentHeader language="th" documentTitle="เอกสารทดสอบ" />);
 
-    expect(screen.getByText('บริษัท ทีจีดี โคลด์สโตเรจ จำกัด')).toBeInTheDocument();
+    expect(screen.getByText('บริษัท ทีจี โคลด์ สตอเรจ จำกัด')).toBeInTheDocument();
   });
 
   test('header renders English company name', () => {
     render(<DocumentHeader language="en" documentTitle="Test Document" />);
 
-    expect(screen.getByText('TGD Coldstorage Co., Ltd.')).toBeInTheDocument();
+    expect(screen.getByText('TG Cold Storage Co., Ltd.')).toBeInTheDocument();
   });
 
   test('header handles missing logo safely', () => {

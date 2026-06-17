@@ -1533,3 +1533,8 @@ table .status-badge,
     grid-template-columns: 1fr;
   }
 }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.summary-grid--4col { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .summary-grid--4col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .summary-grid--4col { grid-template-columns: 1fr; } }

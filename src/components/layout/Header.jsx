@@ -3,7 +3,7 @@ export function Header() {
     <header className="header">
       <div>
         <p className="eyebrow">New Build WMS</p>
-        <h1>TGD WMS</h1>
+        <h1>TGC WMS</h1>
       </div>
     </header>
   );

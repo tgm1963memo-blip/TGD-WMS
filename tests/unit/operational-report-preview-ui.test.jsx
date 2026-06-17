@@ -40,6 +40,16 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
   getMovementLedgerRows: (...args) => ledgerMocks.getMovementLedgerRows(...args),
   getMovementLedgerSummary: (...args) => ledgerMocks.getMovementLedgerSummary(...args),
   getMovementTypeBreakdown: (...args) => ledgerMocks.getMovementTypeBreakdown(...args),
+  summarizeMovements: (rows) => ({
+    totalMovementRows: rows.length,
+    totalInboundQty: 0,
+    totalOutboundQty: 0,
+    netMovementQty: 0,
+    uniqueCustomers: 0,
+    uniqueLots: 0,
+    uniquePallets: 0,
+  }),
+  groupByMovementType: () => [],
 }));
 
 vi.mock('react-router-dom', async () => {

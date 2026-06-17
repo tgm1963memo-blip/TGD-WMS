@@ -61,7 +61,7 @@ describe('App', () => {
   it('renders without crashing', () => {
     window.history.pushState({}, '', '/');
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'TGD WMS' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'TGC WMS' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: getTranslation('operations_dashboard', 'th') })).toBeInTheDocument();
   });
 

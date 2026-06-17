@@ -15,7 +15,7 @@ export function AuthPageShell({
     <div className="layout-auth login-layout auth-page-shell" data-testid={testId}>
       <div className="login-brand-panel">
         <div className="login-brand-content">
-          <img alt="TGM logo" className="login-brand-logo" src={brandConfig.logoPath} />
+          <img alt="TGC logo" className="login-brand-logo" src={brandConfig.logoPath} />
           <h1 className="login-brand-title">{brandConfig.brandName}</h1>
           <p className="login-subtitle">{t('login_subtitle')}</p>
         </div>

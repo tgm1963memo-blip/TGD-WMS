@@ -54,7 +54,8 @@ export async function listCustomerDepositRequests(filters = {}) {
   let query = supabase
     .from('tgd_customer_deposit_requests')
     .select(DEPOSIT_HEADER_SELECT)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
   if (filters.status) query = query.eq('status', filters.status);
@@ -195,4 +196,18 @@ export async function cancelCustomerDepositRequest(requestId, comment = null) {
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+export async function enqueueCustomerDepositNotification(requestId, customerId, documentNo, submitterEmail = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_enqueue_customer_request_notifications', {
+    p_document_type: 'DEPOSIT',
+    p_document_id: requestId,
+    p_customer_id: customerId,
+    p_document_no: documentNo,
+    p_submitter_email: submitterEmail ?? null,
+  });
+
+  return { data, error };
 }

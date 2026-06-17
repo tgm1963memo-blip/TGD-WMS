@@ -13,7 +13,7 @@ function movementDirection(row) {
   return 'NEUTRAL';
 }
 
-function summarizeMovements(rows = []) {
+export function summarizeMovements(rows = []) {
   const customerIds = new Set();
   const lotIds = new Set();
   const palletIds = new Set();
@@ -53,7 +53,7 @@ function summarizeMovements(rows = []) {
   };
 }
 
-function groupByMovementType(rows = []) {
+export function groupByMovementType(rows = []) {
   const groups = new Map();
 
   rows.forEach((row) => {

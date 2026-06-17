@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -38,6 +38,7 @@ const INITIAL_HEADER = {
 
 export function CustomerWithdrawalRequestCreatePage() {
   const t = useTranslation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copyFromId = searchParams.get('copyFrom');
   const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
@@ -47,7 +48,6 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [lines, setLines] = useState(() => createInitialWithdrawalLines());
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
   const [depositOptions, setDepositOptions] = useState([]);
-  const [success, setSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
@@ -135,14 +135,14 @@ export function CustomerWithdrawalRequestCreatePage() {
 
   function updateHeaderField(field, value) {
     setHeader((current) => ({ ...current, [field]: value }));
-    setSuccess(null);
+
     setSubmitError('');
   }
 
   function addLine() {
     setLines((current) => [...current, createEmptyWithdrawalLine(nextLineKey)]);
     setNextLineKey((current) => current + 1);
-    setSuccess(null);
+
     setSubmitError('');
   }
 
@@ -151,14 +151,14 @@ export function CustomerWithdrawalRequestCreatePage() {
       if (current.length <= 1) return current;
       return current.filter((line) => line.key !== lineKey);
     });
-    setSuccess(null);
+
     setSubmitError('');
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitError('');
-    setSuccess(null);
+
 
     if (!canWriteCustomerRequests) {
       setSubmitError(t('customer_portal_no_customer_scope'));
@@ -222,11 +222,7 @@ export function CustomerWithdrawalRequestCreatePage() {
     }
 
     setSubmitting(false);
-
-    setSuccess({
-      requestNo: createResult.data?.withdrawal_no ?? requestId,
-      lineCount: activeLines.length,
-    });
+    navigate('/customer/withdrawal-request');
   }
 
   return (
@@ -258,15 +254,6 @@ export function CustomerWithdrawalRequestCreatePage() {
         <h3>Withdrawal status timeline</h3>
         <CustomerProcessTimeline statuses={CUSTOMER_WITHDRAWAL_STATUSES} testId="customer-withdrawal-status-timeline" />
       </div>
-
-      {success ? (
-        <div className="alert-success-panel" data-testid="customer-withdrawal-live-success-alert" role="status">
-          {t('customer_withdrawal_live_success')} — {t('customer_request_copy_success_number')}: {success.requestNo}
-          {success.lineCount ? ` (${success.lineCount} ${t('customer_deposit_line_count_label')})` : ''}
-          {' '}
-          <Link to="/customer/withdrawal-request">{t('customer_withdrawal_back_to_list')}</Link>
-        </div>
-      ) : null}
 
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 

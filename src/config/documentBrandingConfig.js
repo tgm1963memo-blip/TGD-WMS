@@ -34,8 +34,8 @@ export const DOCUMENT_BRANDING_LOGO_RULES = Object.freeze({
 });
 
 export const DEFAULT_DOCUMENT_BRANDING = {
-  company_name_th: 'บริษัท ทีจีดี โคลด์สโตเรจ จำกัด',
-  company_name_en: 'TGD Coldstorage Co., Ltd.',
+  company_name_th: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด',
+  company_name_en: 'TG Cold Storage Co., Ltd.',
   company_address_th: 'ที่อยู่บริษัทสำหรับเอกสารคลังเย็น',
   company_address_en: 'Company address for cold storage documents',
   tax_id: '',
@@ -43,8 +43,8 @@ export const DEFAULT_DOCUMENT_BRANDING = {
   email: '',
   website: '',
   logo_url: '',
-  document_footer_note_th: 'เอกสารนี้จัดทำจากระบบ TGD WMS เพื่อการปฏิบัติงานคลังเย็น',
-  document_footer_note_en: 'This document is prepared from TGD WMS for cold storage operations.',
+  document_footer_note_th: 'เอกสารนี้จัดทำจากระบบ TGC WMS เพื่อการปฏิบัติงานคลังเย็น',
+  document_footer_note_en: 'This document is prepared from TGC WMS for cold storage operations.',
   prepared_by_label_th: 'จัดทำโดย',
   prepared_by_label_en: 'Prepared by',
   approved_by_label_th: 'อนุมัติโดย',

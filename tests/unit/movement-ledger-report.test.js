@@ -94,11 +94,11 @@ describe('Sprint 6B movement ledger report foundation', () => {
       'Customer Stock Movement Ledger',
       'Deposit / Inbound Qty',
       'Withdrawal / Outbound Qty',
-      'Net Stock Movement',
-      'Total Movement Rows',
-      'Unique Customers',
-      'Unique Lots',
-      'Unique Pallets',
+      'Net Movement',
+      'Total Rows',
+      'Customers',
+      'Lots',
+      'Pallets',
     ].forEach((term) => {
       expect(source).toContain(term);
     });

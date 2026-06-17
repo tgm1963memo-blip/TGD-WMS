@@ -25,7 +25,7 @@ function renderWithProviders(ui) {
 
 describe('Sprint 12G TGM brand UI integration', () => {
   it('brandConfig exports logo path and colors', () => {
-    expect(brandConfig.logoPath).toBe('/brand/tgm-logo.png');
+    expect(brandConfig.logoPath).toBe('/brand/tgc-logo.svg');
     expect(brandConfig.colors.black).toBeTruthy();
     expect(brandConfig.colors.gold).toBeTruthy();
     expect(brandConfig.colors.red).toBeTruthy();
@@ -34,7 +34,7 @@ describe('Sprint 12G TGM brand UI integration', () => {
   it('Sidebar renders logo', () => {
     renderWithProviders(<Sidebar />);
 
-    expect(screen.getByAltText('TGM logo')).toHaveAttribute('src', brandConfig.logoPath);
+    expect(screen.getByAltText('TGC logo')).toHaveAttribute('src', brandConfig.logoPath);
   });
 
   it('Topbar renders app title', () => {

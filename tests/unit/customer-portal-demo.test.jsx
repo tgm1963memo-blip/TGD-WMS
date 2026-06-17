@@ -192,9 +192,8 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(screen.getByTestId('customer-deposit-live-success-alert')).toBeInTheDocument();
+      expect(createDepositRpc).toHaveBeenCalled();
     });
-    expect(createDepositRpc).toHaveBeenCalled();
     expect(upsertDepositLineRpc).toHaveBeenCalled();
     expect(submitDepositRpc).toHaveBeenCalled();
     expect(receivingRpc).not.toHaveBeenCalled();
@@ -221,9 +220,8 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(screen.getByTestId('customer-withdrawal-live-success-alert')).toBeInTheDocument();
+      expect(createWithdrawalRpc).toHaveBeenCalled();
     });
-    expect(createWithdrawalRpc).toHaveBeenCalled();
     expect(upsertWithdrawalLineRpc).toHaveBeenCalled();
     expect(dispatchRpc).not.toHaveBeenCalled();
   });

@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
+import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
@@ -55,14 +56,6 @@ export function CustomerDepositRequestListPage() {
     };
   }, [customerId, profileLoading, isRequestProxy]);
 
-  if (profileLoading || state.loading) {
-    return (
-      <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-page">
-        <LoadingState message={t('customer_portal_loading')} />
-      </section>
-    );
-  }
-
   const columnCount = isRequestProxy ? 9 : 8;
 
   return (
@@ -94,6 +87,7 @@ export function CustomerDepositRequestListPage() {
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
         </div>
+        {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
           <table className="data-table" data-testid="customer-deposit-list-table">
             <thead>
@@ -116,7 +110,7 @@ export function CustomerDepositRequestListPage() {
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
-                      {row.status}
+                      {getDepositStatusLabel(row.status, t)}
                     </span>
                   </td>
                   <td>{row.expected_arrival_date ?? '-'}</td>

@@ -33,11 +33,11 @@ export function Sidebar() {
   return (
     <aside className="sidebar app-sidebar" aria-label="Primary navigation" data-testid="sidebar">
       <div className="sidebar-header tgm-sidebar-brand">
-        <img alt="TGM logo" className="tgm-sidebar-logo" src={brandConfig.logoPath} />
-        <span className="sidebar-header-title">TGD WMS</span>
+        <img alt="TGC logo" className="tgm-sidebar-logo" src={brandConfig.logoPath} />
+        <span className="sidebar-header-title">TGC WMS</span>
       </div>
 
-      <nav className="sidebar-nav" aria-label="TGD WMS navigation">
+      <nav className="sidebar-nav" aria-label="TGC WMS navigation">
         {visibleGroups.map((group) => (
             <div key={group.key} className="sidebar-nav-group">
               <p className="nav-group-label">{group.label}</p>

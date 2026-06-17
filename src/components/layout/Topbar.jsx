@@ -15,7 +15,7 @@ export function Topbar({ currentSection }) {
         <h1 className="header-page-title">
           {getTranslation('tgm_cold_storage_wms', language)}
         </h1>
-        <h2 className="sr-only">TGD WMS</h2>
+        <h2 className="sr-only">TGC WMS</h2>
       </div>
       <div className="header-actions">
         {!goLive ? (

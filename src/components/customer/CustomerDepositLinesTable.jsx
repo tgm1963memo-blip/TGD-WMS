@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import {
   applyPackFieldChange,
@@ -7,31 +5,13 @@ import {
 } from '../../utils/customerDepositPackCalcUtils.js';
 
 export function CustomerDepositLinesTable({
-  customerId,
+  catalogProducts = [],
   lines,
   onChange,
   onRemoveLine,
   testId = 'customer-deposit-lines-table',
 }) {
   const t = useTranslation();
-  const [catalogProducts, setCatalogProducts] = useState([]);
-
-  useEffect(() => {
-    let active = true;
-    if (!customerId) {
-      setCatalogProducts([]);
-      return undefined;
-    }
-
-    listCustomerProducts({ customerId, activeOnly: true }).then((result) => {
-      if (!active) return;
-      setCatalogProducts(result.data ?? []);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [customerId]);
 
   function updateLine(lineKey, patch) {
     onChange(lines.map((line) => (line.key === lineKey ? { ...line, ...patch } : line)));
@@ -59,17 +39,20 @@ export function CustomerDepositLinesTable({
         product_name: '',
         temperature_type: 'FROZEN',
         weight_per_box: '',
+        weight_from_master: false,
       });
       return;
     }
 
+    const hasPackWeight = product.pack_weight_kg != null && product.pack_weight_kg !== '';
     updateLine(lineKey, {
       catalog_product_id: product.id,
       customer_product_code: product.customer_product_code ?? '',
       product_code: product.internal_product_code ?? product.customer_product_code ?? '',
       product_name: product.product_name ?? '',
       temperature_type: product.temperature_type ?? 'FROZEN',
-      weight_per_box: product.pack_weight_kg ? String(product.pack_weight_kg) : '',
+      weight_per_box: hasPackWeight ? String(product.pack_weight_kg) : '',
+      weight_from_master: hasPackWeight,
     });
   }
 
@@ -93,6 +76,7 @@ export function CustomerDepositLinesTable({
           {lines.map((line, index) => {
             const rowTestId = index === 0 ? 'customer-deposit-line-0' : `customer-deposit-line-${line.key}`;
             const packMode = line.pack_entry_mode ?? PACK_ENTRY_MODES.BOXES;
+            const weightReadonly = Boolean(line.weight_from_master);
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td>{index + 1}</td>
@@ -124,9 +108,12 @@ export function CustomerDepositLinesTable({
                   <input
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-weight-per-box' : `${rowTestId}-weight-per-box`}
+                    disabled={weightReadonly}
                     min="0"
-                    onChange={(event) => updatePackField(line, 'weight_per_box', event.target.value)}
+                    onChange={weightReadonly ? undefined : (event) => updatePackField(line, 'weight_per_box', event.target.value)}
+                    readOnly={weightReadonly}
                     step="0.01"
+                    title={weightReadonly ? t('weight_from_master_readonly') : undefined}
                     type="number"
                     value={line.weight_per_box}
                   />

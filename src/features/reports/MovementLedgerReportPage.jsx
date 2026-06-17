@@ -12,8 +12,8 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
   getMovementLedgerRows,
-  getMovementLedgerSummary,
-  getMovementTypeBreakdown,
+  summarizeMovements,
+  groupByMovementType,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
 
@@ -35,43 +35,35 @@ export function MovementLedgerReportPage() {
     let isMounted = true;
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    Promise.all([
-      getMovementLedgerRows(filters),
-      getMovementLedgerSummary(filters),
-      getMovementTypeBreakdown(filters),
-    ]).then(([rowsResult, summaryResult, breakdownResult]) => {
+    getMovementLedgerRows(filters).then((result) => {
       if (!isMounted) return;
 
-      const error = rowsResult.error ?? summaryResult.error ?? breakdownResult.error ?? null;
-
+      const rows = result.data ?? [];
       setState({
-        rows: rowsResult.data ?? [],
-        summary: summaryResult.data,
-        breakdown: breakdownResult.data ?? [],
+        rows,
+        summary: summarizeMovements(rows),
+        breakdown: groupByMovementType(rows),
         loading: false,
-        error,
+        error: result.error ?? null,
       });
     });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [filters]);
+
+  const t = (key) => getTranslation(key, language);
 
   return (
     <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
       <PageHeader
-        title={getTranslation('movement_ledger_report', language) || 'Customer Stock Movement Ledger'}
+        title={t('movement_ledger_report') || 'Customer Stock Movement Ledger'}
         description={goLive
-          ? (getTranslation('movement_ledger_report_description_golive', language)
-            || (language === 'th'
-              ? 'รายงานการเคลื่อนไหวสินค้าคลังเย็น — ข้อมูลจริงสำหรับการตรวจสอบปฏิบัติการ'
-              : 'Cold storage movement report — live data for operations review.'))
-          : 'Read-only cold storage movement report for operations and audit preparation.'}
+          ? (t('movement_ledger_report_description_golive') || 'Cold storage movement report — live data for operations review.')
+          : (t('movement_ledger_report_description') || 'Read-only cold storage movement report for operations and audit preparation.')}
       />
       <div className="section-card operational-report-actions-card">
         <ReportPrintActions
-          title={getTranslation('entry_delivery_inventory_report', language) || 'Entry-Delivery Inventory Report'}
+          title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
           disabled={state.loading || !state.rows.length}
           renderReport={(reportLanguage) => (
             <InventoryMovementReportTemplate
@@ -87,23 +79,23 @@ export function MovementLedgerReportPage() {
       </div>
       <ReportFilterPanel onChange={setFilters} />
 
-      <DashboardSection title="Customer Stock Movement Summary">
-        <div className="summary-grid">
-          <ReportSummaryCard label="Deposit / Inbound Qty" value={state.summary?.totalInboundQty} />
-          <ReportSummaryCard label="Withdrawal / Outbound Qty" value={state.summary?.totalOutboundQty} />
-          <ReportSummaryCard label="Net Stock Movement" value={state.summary?.netMovementQty} />
-          <ReportSummaryCard label="Total Movement Rows" value={state.summary?.totalMovementRows} />
-          <ReportSummaryCard label="Unique Customers" value={state.summary?.uniqueCustomers} />
-          <ReportSummaryCard label="Unique Lots" value={state.summary?.uniqueLots} />
-          <ReportSummaryCard label="Unique Pallets" value={state.summary?.uniquePallets} />
+      <DashboardSection title={t('movement_stock_summary') || 'Stock Movement Summary'}>
+        <div className="summary-grid summary-grid--4col">
+          <ReportSummaryCard label={t('movement_inbound_qty') || 'Deposit / Inbound Qty'} value={state.summary?.totalInboundQty} />
+          <ReportSummaryCard label={t('movement_outbound_qty') || 'Withdrawal / Outbound Qty'} value={state.summary?.totalOutboundQty} />
+          <ReportSummaryCard label={t('movement_net_qty') || 'Net Movement'} value={state.summary?.netMovementQty} />
+          <ReportSummaryCard label={t('movement_total_rows') || 'Total Rows'} value={state.summary?.totalMovementRows} />
+          <ReportSummaryCard label={t('movement_unique_customers') || 'Customers'} value={state.summary?.uniqueCustomers} />
+          <ReportSummaryCard label={t('movement_unique_lots') || 'Lots'} value={state.summary?.uniqueLots} />
+          <ReportSummaryCard label={t('movement_unique_pallets') || 'Pallets'} value={state.summary?.uniquePallets} />
         </div>
       </DashboardSection>
 
-      <DashboardSection title="Movement Type Breakdown">
+      <DashboardSection title={t('movement_type_breakdown') || 'Movement Type Breakdown'}>
         <MovementTypeBreakdown data={state.breakdown} loading={state.loading} error={state.error} />
       </DashboardSection>
 
-      <DashboardSection title="Movement Ledger">
+      <DashboardSection title={t('movement_ledger') || 'Movement Ledger'}>
         <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
       </DashboardSection>
 

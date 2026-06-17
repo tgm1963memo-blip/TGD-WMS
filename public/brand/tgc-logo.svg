@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 110" width="250" height="110">
+  <!-- Border box -->
+  <rect x="2" y="2" width="246" height="68" rx="8" ry="8" fill="white" stroke="#2a2a2a" stroke-width="2.2"/>
+
+  <!-- TG — large bold left section -->
+  <text x="14" y="54"
+        font-family="Arial Black, Impact, 'Helvetica Neue', sans-serif"
+        font-size="46"
+        font-weight="900"
+        fill="#111111">TG</text>
+
+  <!-- Vertical divider -->
+  <line x1="112" y1="10" x2="112" y2="62" stroke="#2a2a2a" stroke-width="1.5"/>
+
+  <!-- COLD with snowflake -->
+  <text x="120" y="34"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="20"
+        font-weight="800"
+        fill="#111111"
+        letter-spacing="0.5">COLD&#x2744;</text>
+
+  <!-- STORAGE -->
+  <text x="120" y="57"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="20"
+        font-weight="800"
+        fill="#111111"
+        letter-spacing="0.5">STORAGE</text>
+
+  <!-- Thai company name -->
+  <text x="125" y="82"
+        font-family="'Sarabun', 'Noto Sans Thai', sans-serif"
+        font-size="9"
+        fill="#2a2a2a"
+        text-anchor="middle">&#x0E1A;&#x0E23;&#x0E34;&#x0E29;&#x0E31;&#x0E17; &#x0E17;&#x0E35;&#x0E08;&#x0E35; &#x0E42;&#x0E04;&#x0E25;&#x0E14;&#x0E4C; &#x0E2A;&#x0E15;&#x0E2D;&#x0E40;&#x0E23;&#x0E08; &#x0E08;&#x0E33;&#x0E01;&#x0E31;&#x0E14;</text>
+
+  <!-- English company name -->
+  <text x="125" y="97"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="9"
+        fill="#2a2a2a"
+        text-anchor="middle">TG COLD STORAGE CO., LTD.</text>
+</svg>

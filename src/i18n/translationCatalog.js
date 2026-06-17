@@ -150,7 +150,7 @@ Object.assign(TRANSLATION_CATALOG, {
 });
 
 Object.assign(TRANSLATION_CATALOG, {
-  app_name: { th: 'TGD WMS', en: 'TGD WMS' },
+  app_name: { th: 'TGC WMS', en: 'TGC WMS' },
   dashboard: { th: 'แดชบอร์ด', en: 'Dashboard' },
   reports: { th: 'รายงาน', en: 'Reports' },
   admin: { th: 'ผู้ดูแลระบบ', en: 'Admin' },
@@ -326,8 +326,8 @@ Object.assign(TRANSLATION_CATALOG, {
 });
 
 Object.assign(TRANSLATION_CATALOG, {
-  tgm_cold_storage_wms: { th: 'TGM Cold Storage WMS', en: 'TGM Cold Storage WMS' },
-  thai_german_meat_product: { th: 'บริษัท ไทย-เยอรมัน มีท โปรดักท์ จำกัด', en: 'Thai-German Meat Product Co., Ltd.' },
+  tgm_cold_storage_wms: { th: 'TGC Cold Storage WMS', en: 'TGC Cold Storage WMS' },
+  thai_german_meat_product: { th: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด', en: 'TG Cold Storage Co., Ltd.' },
   premium_dashboard: { th: 'แดชบอร์ดองค์กรสำหรับคลังเย็น', en: 'Premium dashboard' },
   refresh_data: { th: 'รีเฟรชข้อมูล', en: 'Refresh data' },
   view_details: { th: 'ดูรายละเอียด', en: 'View details' },
@@ -746,7 +746,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_deposit_remove_line: { th: 'ลบรายการ', en: 'Remove line' },
   customer_deposit_line_count_label: { th: 'รายการ', en: 'lines' },
   customer_deposit_select_product: { th: 'เลือกสินค้า', en: 'Select product' },
-  customer_col_weight_per_box: { th: 'น้ำหนักต่อกล่อง (กก.)', en: 'Weight per box (kg)' },
+  customer_col_weight_per_box: { th: 'น้ำหนักต่อหน่วย (กก.)', en: 'Weight per unit (kg)' },
   customer_col_total_deposit_weight: { th: 'น้ำหนักฝากทั้งหมด (กก.)', en: 'Total deposit weight (kg)' },
   customer_col_box_count: { th: 'จำนวนกล่อง', en: 'Box count' },
   customer_col_line_note: { th: 'หมายเหตุ', en: 'Line note' },
@@ -834,7 +834,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_request_history_title: { th: 'ประวัติคำขอ', en: 'Request History' },
   customer_request_history_description: { th: 'ประวัติคำขอฝากและเบิกจากข้อมูลจริง', en: 'Live deposit and withdrawal request history.' },
   customer_request_history_table_title: { th: 'รายการคำขอ', en: 'Request List' },
-  customer_field_expected_arrival_date: { th: 'วันที่คาดว่าจะมาถึง', en: 'Expected Arrival Date' },
+  customer_field_expected_arrival_date: { th: 'วันที่ฝากสินค้า', en: 'Deposit Date' },
   customer_field_requested_dispatch_date: { th: 'วันที่ต้องการเบิก/จ่าย', en: 'Requested Dispatch Date' },
   customer_field_product_code: { th: 'รหัสสินค้า', en: 'Product Code' },
   customer_field_product_name: { th: 'ชื่อสินค้า', en: 'Product Name' },
@@ -873,6 +873,33 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_history_no_results: { th: 'ไม่พบรายการตามเงื่อนไขที่ค้นหา', en: 'No requests match the current filters.' },
   filter_all: { th: 'ทั้งหมด', en: 'All' },
   filter_reset: { th: 'ล้างตัวกรอง', en: 'Reset filters' },
+});
+
+Object.assign(TRANSLATION_CATALOG, {
+  customer_withdrawal_status_draft: { th: 'ร่าง', en: 'Draft' },
+  customer_withdrawal_status_submitted: { th: 'ลูกค้าส่งแล้ว', en: 'Submitted' },
+  customer_withdrawal_status_admin_reviewing: { th: 'ธุรการตรวจสอบ', en: 'Admin reviewing' },
+  customer_withdrawal_status_admin_accepted: { th: 'ธุรการอนุมัติแล้ว', en: 'Approved' },
+  customer_withdrawal_status_dispatched: { th: 'จัดส่งแล้ว', en: 'Dispatched' },
+  customer_withdrawal_status_completed: { th: 'เสร็จสิ้น', en: 'Completed' },
+  customer_withdrawal_status_cancelled: { th: 'ยกเลิก', en: 'Cancelled' },
+  admin_confirm_accept_deposit: { th: 'ยืนยันรับเข้า', en: 'Confirm Receipt' },
+  admin_confirm_accept_withdrawal: { th: 'ยืนยันอนุมัติ', en: 'Approve Withdrawal' },
+  admin_notify_customer: { th: 'ส่งเอกสารถึงลูกค้า', en: 'Notify Customer' },
+  admin_reject_request: { th: 'ปฏิเสธคำขอ', en: 'Reject Request' },
+  admin_review_comment_label: { th: 'หมายเหตุ (Admin)', en: 'Admin Comment' },
+  admin_staff_work_order: { th: 'ใบงานคลัง', en: 'Staff Work Order' },
+  admin_customer_deposit_document: { th: 'ใบแจ้งฝากลูกค้า', en: 'Customer Deposit Document' },
+  weight_from_master_readonly: { th: 'ดึงจาก item master', en: 'Auto from item master' },
+  movement_stock_summary: { th: 'สรุปการเคลื่อนไหวสินค้า', en: 'Stock Movement Summary' },
+  movement_type_breakdown: { th: 'จำแนกตามประเภทการเคลื่อนไหว', en: 'Movement Type Breakdown' },
+  movement_inbound_qty: { th: 'ฝาก / รับเข้า', en: 'Deposit / Inbound Qty' },
+  movement_outbound_qty: { th: 'เบิก / ส่งออก', en: 'Withdrawal / Outbound Qty' },
+  movement_net_qty: { th: 'ยอดสุทธิ', en: 'Net Movement' },
+  movement_total_rows: { th: 'รายการทั้งหมด', en: 'Total Rows' },
+  movement_unique_customers: { th: 'จำนวนลูกค้า', en: 'Customers' },
+  movement_unique_lots: { th: 'จำนวนล็อต', en: 'Lots' },
+  movement_unique_pallets: { th: 'จำนวนพาเลท', en: 'Pallets' },
 });
 
 Object.assign(TRANSLATION_CATALOG, {

@@ -1,39 +1,33 @@
+import { supabase } from './supabaseClient.js';
 import { getCustomerStorageBalanceSummary } from './customerStorageBalanceReportService.js';
-import { listCustomerDepositRequests } from './customerDepositRequestService.js';
-import { listCustomerWithdrawalRequests } from './customerWithdrawalRequestService.js';
 
 const PENDING_DEPOSIT_STATUSES = ['DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'];
 const PENDING_WITHDRAWAL_STATUSES = ['WITHDRAWAL_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'];
 
-function formatActivityTimestamp(value) {
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return String(value);
-  }
+async function countPendingDeposits(customerId) {
+  if (!supabase) return { count: 0, error: null };
+  const { count, error } = await supabase
+    .from('tgd_customer_deposit_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', customerId)
+    .in('status', PENDING_DEPOSIT_STATUSES);
+  return { count: count ?? 0, error };
 }
 
-function pickLatestActivity(deposits = [], withdrawals = []) {
-  const candidates = [
-    ...deposits.map((row) => row.last_action_at || row.updated_at || row.created_at),
-    ...withdrawals.map((row) => row.last_action_at || row.updated_at || row.created_at),
-  ].filter(Boolean);
-
-  if (!candidates.length) return '-';
-
-  const latest = candidates
-    .map((value) => ({ value, time: new Date(value).getTime() }))
-    .filter((entry) => Number.isFinite(entry.time))
-    .sort((left, right) => right.time - left.time)[0];
-
-  return latest ? formatActivityTimestamp(latest.value) : '-';
+async function countPendingWithdrawals(customerId) {
+  if (!supabase) return { count: 0, error: null };
+  const { count, error } = await supabase
+    .from('tgd_customer_withdrawal_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', customerId)
+    .in('status', PENDING_WITHDRAWAL_STATUSES);
+  return { count: count ?? 0, error };
 }
 
 export async function getCustomerPortalDashboardSummary(customerId) {
   const [depositResult, withdrawalResult, stockResult] = await Promise.all([
-    listCustomerDepositRequests({ customerId, statusIn: PENDING_DEPOSIT_STATUSES }),
-    listCustomerWithdrawalRequests({ customerId, statusIn: PENDING_WITHDRAWAL_STATUSES }),
+    countPendingDeposits(customerId),
+    countPendingWithdrawals(customerId),
     getCustomerStorageBalanceSummary({ customerId }),
   ]);
 
@@ -42,15 +36,12 @@ export async function getCustomerPortalDashboardSummary(customerId) {
     return { data: null, error: firstError };
   }
 
-  const deposits = depositResult.data ?? [];
-  const withdrawals = withdrawalResult.data ?? [];
-
   return {
     data: {
-      pendingDepositRequests: deposits.length,
-      pendingWithdrawalRequests: withdrawals.length,
+      pendingDepositRequests: depositResult.count,
+      pendingWithdrawalRequests: withdrawalResult.count,
       availableStockLots: Number(stockResult.data?.lot_count ?? 0),
-      lastActivity: pickLatestActivity(deposits, withdrawals),
+      lastActivity: '-',
     },
     error: null,
   };

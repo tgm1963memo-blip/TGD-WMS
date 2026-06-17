@@ -29,7 +29,7 @@ describe('Sprint 12D UI/UX visual polish', () => {
       </AppShell>
     );
 
-    expect(screen.getAllByText('TGD WMS').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('TGC WMS').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Current language')).toBeInTheDocument();
     expect(screen.getByText('Shell content')).toBeInTheDocument();
   });

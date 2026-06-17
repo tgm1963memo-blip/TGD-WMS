@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -54,6 +54,7 @@ function formatFileSize(size) {
 
 export function CustomerDepositRequestCreatePage() {
   const t = useTranslation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copyFromId = searchParams.get('copyFrom');
   const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
@@ -62,11 +63,9 @@ export function CustomerDepositRequestCreatePage() {
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialDepositLines());
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
-  const [timelineStatus, setTimelineStatus] = useState('DRAFT');
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
-  const [success, setSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -157,14 +156,12 @@ export function CustomerDepositRequestCreatePage() {
 
   function updateHeaderField(field, value) {
     setHeader((current) => ({ ...current, [field]: value }));
-    setSuccess(null);
     setSubmitError('');
   }
 
   function addLine() {
     setLines((current) => [...current, createEmptyDepositLine(nextLineKey)]);
     setNextLineKey((current) => current + 1);
-    setSuccess(null);
     setSubmitError('');
   }
 
@@ -173,7 +170,6 @@ export function CustomerDepositRequestCreatePage() {
       if (current.length <= 1) return current;
       return current.filter((line) => line.key !== lineKey);
     });
-    setSuccess(null);
     setSubmitError('');
   }
 
@@ -192,16 +188,13 @@ export function CustomerDepositRequestCreatePage() {
     setHeader(INITIAL_HEADER);
     setLines(createInitialDepositLines());
     setNextLineKey(DEPOSIT_LINE_DEFAULT_COUNT + 1);
-    setTimelineStatus('DRAFT');
     setAttachments([]);
-    setSuccess(null);
     setSubmitError('');
   }
 
   async function handleImportFile(file) {
     setImporting(true);
     setSubmitError('');
-    setSuccess(null);
 
     try {
       const { rows, errors: parseErrors } = await parseCustomerDepositLineImportFile(file);
@@ -234,7 +227,6 @@ export function CustomerDepositRequestCreatePage() {
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitError('');
-    setSuccess(null);
 
     if (!canWriteCustomerRequests) {
       setSubmitError(t('customer_portal_no_customer_scope'));
@@ -301,12 +293,7 @@ export function CustomerDepositRequestCreatePage() {
       return;
     }
 
-    setTimelineStatus(submitResult.data?.status ?? 'SUBMITTED_BY_CUSTOMER');
-    setSuccess({
-      requestNo: createResult.data?.request_no ?? requestId,
-      lineCount: activeLines.length,
-      status: submitResult.data?.status ?? 'SUBMITTED_BY_CUSTOMER',
-    });
+    navigate('/customer/deposit-request');
   }
 
   return (
@@ -337,20 +324,12 @@ export function CustomerDepositRequestCreatePage() {
       <div className="customer-process-card">
         <h3>{t('customer_deposit_status_timeline_title')}</h3>
         <CustomerProcessTimeline
-          activeStatus={timelineStatus}
+          activeStatus="DRAFT"
           getStatusLabel={(status) => getDepositStatusLabel(status, t)}
           statuses={CUSTOMER_DEPOSIT_STATUSES}
           testId="customer-deposit-status-timeline"
         />
       </div>
-
-      {success ? (
-        <div className="alert-success-panel" data-testid="customer-deposit-live-success-alert" role="status">
-          {t('customer_deposit_live_success')} — {t('customer_request_copy_success_number')}: {success.requestNo} ({success.lineCount} {t('customer_deposit_line_count_label')})
-          {' '}
-          <Link to="/customer/deposit-request">{t('customer_deposit_back_to_list')}</Link>
-        </div>
-      ) : null}
 
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 
@@ -383,7 +362,7 @@ export function CustomerDepositRequestCreatePage() {
           </div>
 
           <CustomerDepositLinesTable
-            customerId={effectiveCustomerId}
+            catalogProducts={catalogProducts}
             lines={lines}
             onChange={setLines}
             onRemoveLine={removeLine}
