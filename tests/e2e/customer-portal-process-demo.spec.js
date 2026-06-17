@@ -98,6 +98,8 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
 
   test('Scenario 11: Withdrawal source and picking rule are selectable', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
+    await expect(page.locator('[data-testid="customer-withdrawal-lines-table"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="customer-withdrawal-product-picker-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-source-deposit-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-lot-select"]')).toBeVisible();
     await page.locator('[data-testid="withdrawal-picking-rule-select"]').selectOption('SPECIFIC_LOT');

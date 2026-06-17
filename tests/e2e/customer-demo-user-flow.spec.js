@@ -32,6 +32,7 @@ test.describe('Customer demo user UAT flow', () => {
 
   test('cannot access customer product catalog page', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/products`);
+    await expect(page.locator('[data-testid="permission-denied-notice"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="customer-product-catalog-page"]')).toHaveCount(0);
   });
 

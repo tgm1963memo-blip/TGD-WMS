@@ -1,5 +1,7 @@
 // src/security/routePermissionCatalog.js
 
+import { matchPath } from 'react-router-dom';
+
 /**
  * Route Permission Catalog for TGD WMS.
  * Each entry describes the permission area, minimum role, access level, and optional notes.
@@ -13,6 +15,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   // Receiving
   { route_path: '/operations/receiving', route_name: 'ReceivingPage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
   { route_path: '/operations/receiving/new', route_name: 'ReceivingCreatePage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'write', notes: '' },
+  { route_path: '/operations/receiving/create', route_name: 'ReceivingCreatePage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'write', notes: 'Alias of /operations/receiving/new' },
   { route_path: '/operations/receiving/:id', route_name: 'ReceivingDetailPage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
   // Putaway
   { route_path: '/operations/putaway', route_name: 'PutawayPage', permission_area: 'putaway', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
@@ -106,9 +109,28 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/adjustment', route_name: 'AdjustmentPage', permission_area: 'unknown', minimum_role: 'admin', access_level: 'read', notes: 'Placeholder route pending permission decision' },
 ];
 
-/** Retrieve permission entry for a specific route path */
+const CATALOG_SORTED_BY_SPECIFICITY = [...ROUTE_PERMISSION_CATALOG].sort(
+  (left, right) => right.route_path.length - left.route_path.length,
+);
+
+/** Retrieve permission entry for a specific route path or resolved pathname */
 export function getRoutePermission(routePath) {
-  return ROUTE_PERMISSION_CATALOG.find((entry) => entry.route_path === routePath) || null;
+  const path = String(routePath ?? '');
+  const exact = ROUTE_PERMISSION_CATALOG.find((entry) => entry.route_path === path);
+  if (exact) {
+    return exact;
+  }
+
+  for (const entry of CATALOG_SORTED_BY_SPECIFICITY) {
+    if (!entry.route_path.includes(':')) {
+      continue;
+    }
+    if (matchPath({ path: entry.route_path, end: true }, path)) {
+      return entry;
+    }
+  }
+
+  return null;
 }
 /** List all permission entries (shallow copy) */
 export function listRoutePermissions() {

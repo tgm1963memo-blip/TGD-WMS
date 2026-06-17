@@ -12,6 +12,11 @@ import { canWarehouseRoleAccessRoute } from './warehouseRolePermissions.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 
+const AUTHENTICATED_ONLY_ROUTES = Object.freeze([
+  '/',
+  '/settings/profile',
+]);
+
 export const ROLE_HIERARCHY = {
   viewer: 1,
   warehouse_staff: 2,
@@ -66,6 +71,17 @@ export function hasRoleAccess(userRole, requiredRole) {
  * @returns {{allowed:boolean, required_role:string, permission_area:string, access_level:string, reason:string}}
  */
 export function canAccessRoute(userRole, routePath) {
+  const path = String(routePath ?? '');
+  if (AUTHENTICATED_ONLY_ROUTES.includes(path)) {
+    return {
+      allowed: true,
+      required_role: null,
+      permission_area: 'admin',
+      access_level: 'read',
+      reason: 'Authenticated profile settings',
+    };
+  }
+
   const warehouseDecision = canWarehouseRoleAccessRoute(userRole, routePath);
   if (warehouseDecision === true) {
     return {

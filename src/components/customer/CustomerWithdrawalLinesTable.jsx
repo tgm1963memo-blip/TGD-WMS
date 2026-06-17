@@ -110,6 +110,7 @@ export function CustomerWithdrawalLinesTable({
                 <td>
                   <select
                     className="form-control form-control-table"
+                    data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
                     onChange={(event) => updateLine(line.key, { source_deposit_request_id: event.target.value })}
                     value={line.source_deposit_request_id || ''}
                   >

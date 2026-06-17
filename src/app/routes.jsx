@@ -61,6 +61,7 @@ import { getPageShellClassName } from '../config/pageShellPresentation.js';
 import { UatOnly } from '../components/common/UatOnly.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
+import { RoutePermissionGuard } from '../features/auth/RoutePermissionGuard.jsx';
 import { LoginPage } from '../features/auth/LoginPage.jsx';
 import { DefaultHomeRedirect } from '../features/auth/DefaultHomeRedirect.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
@@ -99,7 +100,8 @@ export function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AuthGuard />}>
-        <Route element={<AppLayout />}>
+        <Route element={<RoutePermissionGuard />}>
+          <Route element={<AppLayout />}>
           <Route index element={<DefaultHomeRedirect />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/dashboard/inventory" element={<InventoryDashboardPage />} />
@@ -187,6 +189,7 @@ export function AppRoutes() {
           <Route path="/inventory" element={<LegacyPlaceholderPage title="Inventory" />} />
           <Route path="/movement-ledger" element={<LegacyPlaceholderPage title="Movement Ledger" />} />
           <Route path="/audit" element={<LegacyPlaceholderPage title="Audit" />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<DefaultHomeRedirect />} />

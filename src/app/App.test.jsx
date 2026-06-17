@@ -16,6 +16,11 @@ vi.mock('../features/auth/AuthContext.jsx', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
+vi.mock('../features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: vi.fn(() => ({ role: 'admin', ready: true })),
+  UserRoleProvider: ({ children }) => children,
+}));
+
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal();
   return {
