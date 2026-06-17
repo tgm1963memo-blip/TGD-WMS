@@ -1,4 +1,4 @@
-export function CustomerProcessTimeline({ statuses, currentIndex = 0, activeStatus, testId }) {
+export function CustomerProcessTimeline({ statuses, currentIndex = 0, activeStatus, testId, getStatusLabel }) {
   const resolvedIndex = activeStatus
     ? Math.max(0, statuses.indexOf(activeStatus))
     : currentIndex;
@@ -11,7 +11,7 @@ export function CustomerProcessTimeline({ statuses, currentIndex = 0, activeStat
           key={status}
         >
           <span className="customer-process-step-marker">{index + 1}</span>
-          <span>{status}</span>
+          <span>{getStatusLabel ? getStatusLabel(status) : status}</span>
         </li>
       ))}
     </ol>

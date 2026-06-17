@@ -1,37 +1,30 @@
-import { downloadExcelRows, formatExcelDate, readExcelFile } from './excelFileUtils.js';
-import { resolveBarcodeCode } from './customerProductExcelUtils.js';
+import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
 
 export const CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS = [
   'customer_product_code',
-  'lot_no',
-  'mfg_date',
-  'exp_date',
-  'expected_qty',
-  'expected_boxes',
+  'weight_per_box',
   'expected_weight',
+  'expected_boxes',
+  'line_note',
 ];
 
 export function mapDepositLineToExcelRow(line = {}) {
   return {
     customer_product_code: line.customer_product_code ?? '',
-    lot_no: line.lot_no ?? '',
-    mfg_date: line.mfg_date ?? '',
-    exp_date: line.exp_date ?? '',
-    expected_qty: line.expected_qty ?? '',
-    expected_boxes: line.expected_boxes ?? '',
+    weight_per_box: line.weight_per_box ?? '',
     expected_weight: line.expected_weight ?? '',
+    expected_boxes: line.expected_boxes ?? '',
+    line_note: line.line_note ?? '',
   };
 }
 
 export function downloadCustomerDepositLineTemplate(filename = 'customer-deposit-lines-template.xlsx') {
   downloadExcelRows([{
     customer_product_code: 'SAMPLE-001',
-    lot_no: 'LOT-001',
-    mfg_date: '2026-01-01',
-    exp_date: '2027-01-01',
-    expected_qty: '10',
-    expected_boxes: '2',
-    expected_weight: '50',
+    weight_per_box: '10',
+    expected_weight: '100',
+    expected_boxes: '10',
+    line_note: 'ตัวอย่างหมายเหตุ',
   }], CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS, filename, 'DepositLines');
 }
 
@@ -65,9 +58,16 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
       return;
     }
 
-    const expectedQty = String(row.expected_qty ?? '').trim();
-    if (!expectedQty || Number(expectedQty) <= 0) {
-      errors.push(`Row ${row.__row}: expected_qty must be greater than 0.`);
+    const weightPerBox = String(row.weight_per_box ?? catalog.pack_weight_kg ?? '').trim();
+    const expectedWeight = String(row.expected_weight ?? '').trim();
+    const expectedBoxes = String(row.expected_boxes ?? '').trim();
+
+    if (!weightPerBox || Number(weightPerBox) <= 0) {
+      errors.push(`Row ${row.__row}: weight_per_box must be greater than 0.`);
+      return;
+    }
+    if ((!expectedWeight || Number(expectedWeight) <= 0) && (!expectedBoxes || Number(expectedBoxes) <= 0)) {
+      errors.push(`Row ${row.__row}: expected_weight or expected_boxes is required.`);
       return;
     }
 
@@ -75,16 +75,14 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
       key: startKey + lines.length,
       catalog_product_id: catalog.id,
       customer_product_code: catalog.customer_product_code ?? customerProductCode,
-      product_code: resolveBarcodeCode(catalog.customer_product_code, catalog.internal_product_code),
+      product_code: catalog.internal_product_code ?? catalog.customer_product_code ?? customerProductCode,
       product_name: catalog.product_name ?? '',
-      argent_type: catalog.argent_type ?? 'NON_ARGENT',
       temperature_type: catalog.temperature_type ?? 'FROZEN',
-      lot_no: String(row.lot_no ?? '').trim(),
-      mfg_date: formatExcelDate(row.mfg_date),
-      exp_date: formatExcelDate(row.exp_date),
-      expected_qty: expectedQty,
-      expected_boxes: String(row.expected_boxes ?? '').trim(),
-      expected_weight: String(row.expected_weight ?? '').trim(),
+      weight_per_box: weightPerBox,
+      expected_weight: expectedWeight,
+      expected_boxes: expectedBoxes,
+      pack_entry_mode: expectedWeight && !expectedBoxes ? 'WEIGHT' : 'BOXES',
+      line_note: String(row.line_note ?? '').trim(),
     });
   });
 
@@ -93,9 +91,16 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
 
 export async function parseCustomerDepositLineImportFile(file) {
   const { headers, rows } = await readExcelFile(file);
-  const missingHeaders = ['customer_product_code', 'expected_qty'].filter((key) => !headers.includes(key));
+  const missingHeaders = CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS.filter((header) => !headers.includes(header));
   if (missingHeaders.length) {
-    return { rows: [], errors: [`Missing required columns: ${missingHeaders.join(', ')}`] };
+    return {
+      rows: [],
+      errors: [`Missing required columns: ${missingHeaders.join(', ')}`],
+    };
   }
-  return { rows, errors: [] };
+
+  return {
+    rows: rows.map((row, index) => ({ ...row, __row: index + 2 })),
+    errors: [],
+  };
 }

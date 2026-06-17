@@ -15,6 +15,7 @@ const DEPOSIT_HEADER_SELECT = [
   'contact_name',
   'contact_phone',
   'note',
+  'vehicle_registration',
   'created_by_email',
   'created_by_role',
   'submitted_at',
@@ -40,6 +41,7 @@ const DEPOSIT_LINE_SELECT = [
   'expected_qty',
   'expected_boxes',
   'expected_weight',
+  'weight_per_box',
   'uom',
   'temperature_type',
   'note',
@@ -86,6 +88,7 @@ export async function createCustomerDepositRequest({
   contactName,
   contactPhone,
   note,
+  vehicleRegistration,
   customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
@@ -95,6 +98,7 @@ export async function createCustomerDepositRequest({
     p_contact_name: contactName,
     p_contact_phone: contactPhone,
     p_note: toNullableText(note),
+    p_vehicle_registration: toNullableText(vehicleRegistration),
     p_customer_id: customerId,
   });
 
@@ -106,6 +110,7 @@ export async function updateCustomerDepositRequestDraft(requestId, {
   contactName,
   contactPhone,
   note,
+  vehicleRegistration,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -115,6 +120,7 @@ export async function updateCustomerDepositRequestDraft(requestId, {
     p_contact_name: contactName,
     p_contact_phone: contactPhone,
     p_note: toNullableText(note),
+    p_vehicle_registration: toNullableText(vehicleRegistration),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
@@ -137,6 +143,7 @@ export async function upsertCustomerDepositRequestLine(requestId, line = {}) {
     p_expected_qty: toNullableNumber(line.expectedQty),
     p_expected_boxes: toNullableNumber(line.expectedBoxes),
     p_expected_weight: toNullableNumber(line.expectedWeight),
+    p_weight_per_box: toNullableNumber(line.weightPerBox),
     p_uom: toNullableText(line.uom),
     p_temperature_type: toNullableText(line.temperatureType),
     p_note: toNullableText(line.note),

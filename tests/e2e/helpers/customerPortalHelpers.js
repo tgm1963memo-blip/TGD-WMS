@@ -7,7 +7,7 @@ export async function selectProxyCustomerIfPresent(page, testId = 'customer-depo
   }
 }
 
-export async function fillFirstDepositLine(page, { qty = '10' } = {}) {
+export async function fillFirstDepositLine(page, { weightPerBox = '10', boxCount = '5' } = {}) {
   await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
   const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
@@ -17,7 +17,11 @@ export async function fillFirstDepositLine(page, { qty = '10' } = {}) {
     await picker.selectOption({ index: 1 });
   }
 
-  await page.locator('[data-testid="customer-deposit-qty"]').fill(qty);
+  const weightField = page.locator('[data-testid="customer-deposit-weight-per-box"]');
+  if (await weightField.inputValue().then((value) => !value).catch(() => true)) {
+    await weightField.fill(weightPerBox);
+  }
+  await page.locator('[data-testid="customer-deposit-box-count"]').fill(boxCount);
 }
 
 export function isGoLiveTarget(baseUrl) {

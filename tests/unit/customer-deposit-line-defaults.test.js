@@ -18,7 +18,9 @@ describe('customerDepositLineDefaults', () => {
       ...lines[0],
       catalog_product_id: 'prod-1',
       customer_product_code: 'CUS-01',
-      expected_qty: '5',
+      weight_per_box: '10',
+      expected_boxes: '5',
+      expected_weight: '50',
     };
 
     expect(getFilledDepositLines(lines)).toHaveLength(1);

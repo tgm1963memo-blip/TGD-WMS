@@ -57,6 +57,7 @@ vi.mock('../../src/services/customerProductCatalogService.js', () => ({
       internal_product_code: 'FRZ-CHKN-01',
       product_name: 'Frozen Chicken Breast',
       temperature_type: 'FROZEN',
+      pack_weight_kg: 10,
       uom: 'KG',
     }],
     error: null,
@@ -183,7 +184,8 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     fireEvent.change(screen.getByTestId('customer-deposit-product-picker-select'), {
       target: { value: 'cat-prod-1' },
     });
-    fireEvent.change(screen.getByTestId('customer-deposit-qty'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('customer-deposit-weight-per-box'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('customer-deposit-box-count'), { target: { value: '10' } });
     fireEvent.change(screen.getByTestId('customer-deposit-expected-arrival-date'), { target: { value: '2026-06-15' } });
     fireEvent.change(screen.getByTestId('customer-deposit-contact-name'), { target: { value: 'Demo User' } });
     fireEvent.change(screen.getByTestId('customer-deposit-contact-phone'), { target: { value: '0800000000' } });

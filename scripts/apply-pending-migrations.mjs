@@ -10,6 +10,7 @@ const MIGRATIONS = [
   '054_tgd_wms_item_master_and_request_line_extensions.sql',
   '055_tgd_wms_customer_request_execution_bridge.sql',
   '056_tgd_wms_facility_usage_and_storage_rate_rules.sql',
+  '057_tgd_wms_deposit_pack_size_vehicle_and_notifications.sql',
 ];
 
 function runSql(sql, label) {

@@ -98,7 +98,8 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           await page.locator('[data-testid="customer-deposit-product-code"]').fill(process.env.UAT_PRODUCT_CODE || 'FRZ-FLOW-01');
           await page.locator('[data-testid="customer-deposit-product-name"]').fill(process.env.UAT_PRODUCT_NAME || 'Flow Test Product');
         }
-        await page.locator('[data-testid="customer-deposit-qty"]').fill(process.env.UAT_QTY || '10');
+        await page.locator('[data-testid="customer-deposit-weight-per-box"]').fill('10');
+        await page.locator('[data-testid="customer-deposit-box-count"]').fill(process.env.UAT_QTY || '10');
         await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill(process.env.UAT_EXPECTED_ARRIVAL_DATE || '2026-12-31');
         await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Flow Test Contact');
         await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000001');

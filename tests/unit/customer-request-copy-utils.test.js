@@ -34,6 +34,7 @@ describe('customerRequestCopyUtils', () => {
       contact_name: 'A',
       contact_phone: '081',
       note: 'note',
+      vehicle_registration: '',
     });
 
     const lines = mapDepositLinesForCopy([
@@ -41,10 +42,10 @@ describe('customerRequestCopyUtils', () => {
         customer_product_code: 'CUS-01',
         internal_product_code: 'INT-01',
         product_name: 'Chicken',
-        lot_no: 'LOT-1',
-        expected_qty: 10,
+        weight_per_box: 10,
         expected_boxes: 2,
         expected_weight: 100,
+        note: 'line note',
         temperature_type: 'FROZEN',
       },
     ], catalogProducts);
@@ -54,7 +55,9 @@ describe('customerRequestCopyUtils', () => {
       catalog_product_id: 'prod-1',
       customer_product_code: 'CUS-01',
       product_code: 'INT-01',
-      expected_qty: '10',
+      weight_per_box: '10',
+      expected_boxes: '2',
+      line_note: 'line note',
     });
     expect(lines.length).toBeGreaterThanOrEqual(10);
   });

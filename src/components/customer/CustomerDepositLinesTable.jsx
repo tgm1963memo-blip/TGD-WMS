@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
-import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import {
+  applyPackFieldChange,
+  PACK_ENTRY_MODES,
+} from '../../utils/customerDepositPackCalcUtils.js';
 
 export function CustomerDepositLinesTable({
   customerId,
@@ -34,6 +37,18 @@ export function CustomerDepositLinesTable({
     onChange(lines.map((line) => (line.key === lineKey ? { ...line, ...patch } : line)));
   }
 
+  function updatePackField(line, field, value) {
+    const patch = applyPackFieldChange({
+      mode: line.pack_entry_mode ?? PACK_ENTRY_MODES.BOXES,
+      field,
+      value,
+      weightPerBox: line.weight_per_box,
+      expectedBoxes: line.expected_boxes,
+      expectedWeight: line.expected_weight,
+    });
+    updateLine(line.key, patch);
+  }
+
   function selectCatalogProduct(lineKey, productId) {
     const product = catalogProducts.find((row) => row.id === productId);
     if (!product) {
@@ -43,7 +58,7 @@ export function CustomerDepositLinesTable({
         product_code: '',
         product_name: '',
         temperature_type: 'FROZEN',
-        argent_type: '',
+        weight_per_box: '',
       });
       return;
     }
@@ -51,10 +66,10 @@ export function CustomerDepositLinesTable({
     updateLine(lineKey, {
       catalog_product_id: product.id,
       customer_product_code: product.customer_product_code ?? '',
-      product_code: normalizeCatalogBarcode(product),
+      product_code: product.internal_product_code ?? product.customer_product_code ?? '',
       product_name: product.product_name ?? '',
       temperature_type: product.temperature_type ?? 'FROZEN',
-      argent_type: product.argent_type ?? 'NON_ARGENT',
+      weight_per_box: product.pack_weight_kg ? String(product.pack_weight_kg) : '',
     });
   }
 
@@ -66,20 +81,18 @@ export function CustomerDepositLinesTable({
             <th>#</th>
             <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
             <th>{t('catalog_col_product_name')}</th>
-            <th>{t('catalog_col_barcode')}</th>
-            <th>{t('customer_field_lot_no')}</th>
-            <th>{t('customer_col_mfg_date')}</th>
-            <th>{t('customer_col_exp_date')}</th>
-            <th>{t('customer_col_expected_qty')} <span className="field-required">*</span></th>
-            <th>{t('customer_col_expected_boxes')}</th>
-            <th>{t('customer_col_expected_weight')}</th>
-            <th>{t('catalog_col_argent')}</th>
+            <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
+            <th>{t('customer_col_total_deposit_weight')} <span className="field-required">*</span></th>
+            <th>{t('customer_col_box_count')} <span className="field-required">*</span></th>
+            <th>{t('customer_col_line_note')}</th>
+            <th>{t('customer_col_pack_entry_mode')}</th>
             <th>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line, index) => {
             const rowTestId = index === 0 ? 'customer-deposit-line-0' : `customer-deposit-line-${line.key}`;
+            const packMode = line.pack_entry_mode ?? PACK_ENTRY_MODES.BOXES;
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td>{index + 1}</td>
@@ -110,61 +123,21 @@ export function CustomerDepositLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-product-code' : `${rowTestId}-barcode`}
-                    disabled
-                    readOnly
-                    value={line.product_code}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    onChange={(event) => updateLine(line.key, { lot_no: event.target.value })}
-                    value={line.lot_no}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-mfg-date' : `${rowTestId}-mfg-date`}
-                    onChange={(event) => updateLine(line.key, { mfg_date: event.target.value })}
-                    type="date"
-                    value={line.mfg_date}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-exp-date' : `${rowTestId}-exp-date`}
-                    onChange={(event) => updateLine(line.key, { exp_date: event.target.value })}
-                    type="date"
-                    value={line.exp_date}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-qty' : `${rowTestId}-qty`}
-                    min="1"
-                    onChange={(event) => updateLine(line.key, { expected_qty: event.target.value })}
-                    type="number"
-                    value={line.expected_qty}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-weight-per-box' : `${rowTestId}-weight-per-box`}
                     min="0"
-                    onChange={(event) => updateLine(line.key, { expected_boxes: event.target.value })}
+                    onChange={(event) => updatePackField(line, 'weight_per_box', event.target.value)}
+                    step="0.01"
                     type="number"
-                    value={line.expected_boxes}
+                    value={line.weight_per_box}
                   />
                 </td>
                 <td>
                   <input
                     className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-total-weight' : `${rowTestId}-total-weight`}
+                    disabled={packMode === PACK_ENTRY_MODES.BOXES}
                     min="0"
-                    onChange={(event) => updateLine(line.key, { expected_weight: event.target.value })}
+                    onChange={(event) => updatePackField(line, 'expected_weight', event.target.value)}
                     step="0.01"
                     type="number"
                     value={line.expected_weight}
@@ -173,10 +146,32 @@ export function CustomerDepositLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
-                    disabled
-                    readOnly
-                    value={line.argent_type || '-'}
+                    data-testid={index === 0 ? 'customer-deposit-box-count' : `${rowTestId}-box-count`}
+                    disabled={packMode === PACK_ENTRY_MODES.WEIGHT}
+                    min="1"
+                    onChange={(event) => updatePackField(line, 'expected_boxes', event.target.value)}
+                    type="number"
+                    value={line.expected_boxes}
                   />
+                </td>
+                <td>
+                  <input
+                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-line-note' : `${rowTestId}-line-note`}
+                    onChange={(event) => updateLine(line.key, { line_note: event.target.value })}
+                    value={line.line_note}
+                  />
+                </td>
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-pack-entry-mode' : `${rowTestId}-pack-entry-mode`}
+                    onChange={(event) => updateLine(line.key, { pack_entry_mode: event.target.value })}
+                    value={packMode}
+                  >
+                    <option value={PACK_ENTRY_MODES.BOXES}>{t('customer_pack_mode_boxes')}</option>
+                    <option value={PACK_ENTRY_MODES.WEIGHT}>{t('customer_pack_mode_weight')}</option>
+                  </select>
                 </td>
                 <td>
                   {lines.length > 1 ? (

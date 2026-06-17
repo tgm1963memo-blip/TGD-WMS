@@ -6,7 +6,10 @@ import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPort
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CustomerDepositLinesTable } from '../../components/customer/CustomerDepositLinesTable.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
-import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
+import {
+  CUSTOMER_DEPOSIT_STATUSES,
+  getDepositStatusLabel,
+} from '../../utils/customerDepositStatusLabels.js';
 import {
   createCustomerDepositRequest,
   getCustomerDepositRequest,
@@ -42,6 +45,7 @@ const INITIAL_HEADER = {
   note: '',
   contact_name: '',
   contact_phone: '',
+  vehicle_registration: '',
 };
 
 function formatFileSize(size) {
@@ -176,7 +180,7 @@ export function CustomerDepositRequestCreatePage() {
   function handleAttachments(event) {
     const selected = Array.from(event.target.files ?? []);
     const oversized = selected.find((file) => file.size > MAX_ATTACHMENT_SIZE);
-    setAttachmentError(oversized ? `${oversized.name} exceeds the 10MB preview limit.` : '');
+    setAttachmentError(oversized ? t('customer_deposit_attachment_size_error').replace('{filename}', oversized.name) : '');
     setAttachments((current) => [
       ...current,
       ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
@@ -244,7 +248,7 @@ export function CustomerDepositRequestCreatePage() {
 
     const activeLines = getFilledDepositLines(lines);
     if (!activeLines.length) {
-      setSubmitError(t('customer_deposit_catalog_required'));
+      setSubmitError(t('customer_deposit_pack_required'));
       return;
     }
 
@@ -255,6 +259,7 @@ export function CustomerDepositRequestCreatePage() {
       contactName: header.contact_name,
       contactPhone: header.contact_phone,
       note: header.note,
+      vehicleRegistration: header.vehicle_registration,
       customerId: isRequestProxy ? proxyCustomerId : null,
     });
 
@@ -273,14 +278,12 @@ export function CustomerDepositRequestCreatePage() {
         customerProductCode: line.customer_product_code,
         internalProductCode: line.product_code,
         productName: line.product_name,
-        lotNo: line.lot_no,
-        mfgDate: line.mfg_date || null,
-        expDate: line.exp_date || null,
-        expectedQty: line.expected_qty,
+        expectedQty: line.expected_boxes,
         expectedBoxes: line.expected_boxes,
         expectedWeight: line.expected_weight,
+        weightPerBox: line.weight_per_box,
         temperatureType: line.temperature_type,
-        note: header.note,
+        note: line.line_note,
       });
 
       if (lineResult.error) {
@@ -332,9 +335,10 @@ export function CustomerDepositRequestCreatePage() {
       ) : null}
 
       <div className="customer-process-card">
-        <h3>Deposit status timeline</h3>
+        <h3>{t('customer_deposit_status_timeline_title')}</h3>
         <CustomerProcessTimeline
           activeStatus={timelineStatus}
+          getStatusLabel={(status) => getDepositStatusLabel(status, t)}
           statuses={CUSTOMER_DEPOSIT_STATUSES}
           testId="customer-deposit-status-timeline"
         />
@@ -399,6 +403,10 @@ export function CustomerDepositRequestCreatePage() {
             <span>{t('customer_field_contact_phone')} <span className="field-required">*</span></span>
             <input className="form-control" data-testid="customer-deposit-contact-phone" onChange={(e) => updateHeaderField('contact_phone', e.target.value)} required value={header.contact_phone} />
           </label>
+          <label className="form-field">
+            <span>{t('customer_field_vehicle_registration')}</span>
+            <input className="form-control" data-testid="customer-deposit-vehicle-registration" onChange={(e) => updateHeaderField('vehicle_registration', e.target.value)} value={header.vehicle_registration} />
+          </label>
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
@@ -407,7 +415,7 @@ export function CustomerDepositRequestCreatePage() {
 
         <div className="customer-attachment-panel">
           <label className="form-field">
-            <span>Supporting attachments</span>
+            <span>{t('customer_deposit_attachments_title')}</span>
             <input
               accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
               data-testid="customer-deposit-attachment-input"
@@ -417,7 +425,7 @@ export function CustomerDepositRequestCreatePage() {
             />
           </label>
           <p className="form-helper" data-testid="customer-deposit-attachment-demo-note">
-            Storage upload is deferred — files stay in browser preview only until Gate 2G.
+            {t('customer_deposit_attachments_deferred_note')}
           </p>
           {attachmentError ? <p className="field-error" role="alert">{attachmentError}</p> : null}
           <ul className="customer-attachment-list" data-testid="customer-deposit-attachment-list">
@@ -430,7 +438,7 @@ export function CustomerDepositRequestCreatePage() {
                   onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                   type="button"
                 >
-                  Remove
+                  {t('customer_deposit_attachment_remove')}
                 </button>
               </li>
             ))}

@@ -41,7 +41,8 @@ test.describe('Customer demo user UAT flow', () => {
     await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
     await page.locator('[data-testid="customer-deposit-product-picker-select"]').selectOption({ index: 1 });
-    await page.locator('[data-testid="customer-deposit-qty"]').fill('5');
+    await page.locator('[data-testid="customer-deposit-weight-per-box"]').fill('10');
+    await page.locator('[data-testid="customer-deposit-box-count"]').fill('5');
     await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-12-31');
     await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Customer Demo Contact');
     await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000099');

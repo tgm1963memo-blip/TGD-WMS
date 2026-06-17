@@ -16,6 +16,7 @@ const CATALOG_SELECT = [
   'temperature_type',
   'argent_type',
   'storage_charge_basis',
+  'pack_weight_kg',
   'is_active',
   'note',
   'created_at',

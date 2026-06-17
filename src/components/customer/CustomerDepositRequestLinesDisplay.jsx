@@ -15,13 +15,10 @@ export function CustomerDepositRequestLinesDisplay({
             <th>#</th>
             <th>{t('catalog_col_customer_code')}</th>
             <th>{t('catalog_col_product_name')}</th>
-            <th>{t('catalog_col_barcode')}</th>
-            <th>{t('customer_field_lot_no')}</th>
-            <th>{t('customer_col_mfg_date')}</th>
-            <th>{t('customer_col_exp_date')}</th>
-            <th>{t('customer_col_expected_qty')}</th>
-            <th>{t('customer_col_expected_boxes')}</th>
-            <th>{t('customer_col_expected_weight')}</th>
+            <th>{t('customer_col_weight_per_box')}</th>
+            <th>{t('customer_col_total_deposit_weight')}</th>
+            <th>{t('customer_col_box_count')}</th>
+            <th>{t('customer_col_line_note')}</th>
           </tr>
         </thead>
         <tbody>
@@ -30,16 +27,13 @@ export function CustomerDepositRequestLinesDisplay({
               <td>{line.line_no}</td>
               <td>{line.customer_product_code ?? '-'}</td>
               <td>{line.product_name ?? '-'}</td>
-              <td>{line.internal_product_code || line.customer_product_code || '-'}</td>
-              <td>{line.lot_no ?? '-'}</td>
-              <td>{line.mfg_date ?? '-'}</td>
-              <td>{line.exp_date ?? '-'}</td>
-              <td>{line.expected_qty ?? '-'}</td>
-              <td>{line.expected_boxes ?? '-'}</td>
+              <td>{formatRequestWeight(line.weight_per_box)}</td>
               <td>{formatRequestWeight(line.expected_weight)}</td>
+              <td>{line.expected_boxes ?? '-'}</td>
+              <td>{line.note ?? '-'}</td>
             </tr>
           )) : (
-            <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
+            <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
           )}
         </tbody>
       </table>

@@ -1,3 +1,5 @@
+import { PACK_ENTRY_MODES } from './customerDepositPackCalcUtils.js';
+
 export const DEPOSIT_LINE_DEFAULT_COUNT = 10;
 
 export function createEmptyDepositLine(lineKey = 1) {
@@ -7,13 +9,11 @@ export function createEmptyDepositLine(lineKey = 1) {
     customer_product_code: '',
     product_code: '',
     product_name: '',
-    lot_no: '',
-    mfg_date: '',
-    exp_date: '',
-    argent_type: '',
-    expected_qty: '',
+    weight_per_box: '',
     expected_boxes: '',
     expected_weight: '',
+    pack_entry_mode: PACK_ENTRY_MODES.BOXES,
+    line_note: '',
     temperature_type: 'FROZEN',
   };
 }
@@ -27,7 +27,11 @@ export function isCatalogDepositLineSelected(line) {
 }
 
 export function getFilledDepositLines(lines) {
-  return (lines ?? []).filter(
-    (line) => isCatalogDepositLineSelected(line) && String(line.expected_qty ?? '').trim() !== '',
-  );
+  return (lines ?? []).filter((line) => {
+    if (!isCatalogDepositLineSelected(line)) return false;
+    const weightPerBox = Number(line.weight_per_box);
+    const totalWeight = Number(line.expected_weight);
+    const boxes = Number(line.expected_boxes);
+    return weightPerBox > 0 && totalWeight > 0 && boxes > 0;
+  });
 }

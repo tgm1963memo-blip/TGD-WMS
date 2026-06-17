@@ -54,6 +54,7 @@ export function mapDepositHeaderForCopy(source) {
     note: source?.note ?? '',
     contact_name: source?.contact_name ?? '',
     contact_phone: source?.contact_phone ?? '',
+    vehicle_registration: source?.vehicle_registration ?? '',
   };
 }
 
@@ -64,12 +65,11 @@ export function mapDepositLinesForCopy(sourceLines = [], catalogProducts = []) {
     customer_product_code: line.customer_product_code ?? '',
     product_code: line.internal_product_code ?? '',
     product_name: line.product_name ?? '',
-    lot_no: line.lot_no ?? '',
-    mfg_date: line.mfg_date ?? '',
-    exp_date: line.exp_date ?? '',
-    expected_qty: toFormValue(line.expected_qty),
+    weight_per_box: toFormValue(line.weight_per_box),
     expected_boxes: toFormValue(line.expected_boxes),
     expected_weight: toFormValue(line.expected_weight),
+    pack_entry_mode: 'BOXES',
+    line_note: line.note ?? '',
   }));
 
   if (!copied.length) {
