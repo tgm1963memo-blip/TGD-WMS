@@ -63,6 +63,13 @@ vi.mock('../../src/security/currentUserRole.js', () => ({
   normalizeUserRole: (role) => String(role ?? 'admin').trim().toLowerCase(),
 }));
 
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({
+    role: getCurrentUserRoleMock(),
+    ready: true,
+  }),
+}));
+
 const { InvoiceDraftListPage } = await import('../../src/features/billing/InvoiceDraftListPage.jsx');
 const { InvoiceDraftDetailPage } = await import('../../src/features/billing/InvoiceDraftDetailPage.jsx');
 const { BillingMovementWeightReportPage } = await import('../../src/features/reports/BillingMovementWeightReportPage.jsx');

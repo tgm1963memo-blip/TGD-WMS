@@ -34,12 +34,18 @@ export function UserRoleProvider({ children }) {
 
     setState((current) => ({ ...current, ready: false }));
 
-    getCurrentUserProfile().then((result) => {
-      if (!active) return;
-      const resolved = resolveUserProfileRole(result.data);
-      setAuthenticatedUserRole(resolved.role);
-      setState({ role: getCurrentUserRole(), ready: true });
-    });
+    getCurrentUserProfile()
+      .then((result) => {
+        if (!active) return;
+        const resolved = resolveUserProfileRole(result.data);
+        setAuthenticatedUserRole(resolved.role);
+        setState({ role: getCurrentUserRole(), ready: true });
+      })
+      .catch(() => {
+        if (!active) return;
+        setAuthenticatedUserRole('viewer');
+        setState({ role: getCurrentUserRole(), ready: true });
+      });
 
     return () => {
       active = false;

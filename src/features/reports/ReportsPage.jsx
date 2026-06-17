@@ -2,7 +2,10 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { isDemoRoleSelectorAllowed } from '../../security/demoRoleSelectorControl.js';
+import { getAppRuntimeConfig } from '../../config/appConfig.js';
 import { canAccessRoute } from '../../security/permissionGuard.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
@@ -85,10 +88,14 @@ const reportDefinitions = [
 
 export function ReportsPage() {
   const { language } = useLanguage();
-  const currentRole = getCurrentUserRole();
+  const { role: contextRole, ready: roleReady } = useUserRole();
+  const useDemoRole = isDemoRoleSelectorAllowed(getAppRuntimeConfig());
+  const currentRole = useDemoRole ? getCurrentUserRole() : contextRole;
+  const permissionsReady = useDemoRole || roleReady;
   const goLive = isGoLivePresentationEnabled();
 
   const canShow = (def) => {
+    if (!permissionsReady) return false;
     const decision = canAccessRoute(currentRole, def.to);
     return decision && decision.allowed;
   };

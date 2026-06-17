@@ -10,14 +10,15 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { listBillingInvoiceDrafts } from '../../services/billingInvoiceDraftService.js';
 import { getCustomers } from '../../services/masterDataService.js';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
 
 export function InvoiceDraftListPage() {
   const { language } = useLanguage();
-  const userRole = getCurrentUserRole();
-  const canRead = canReadBillingInvoiceDrafts(userRole);
+  const { role: userRole, ready: roleReady } = useUserRole();
+  const canRead = roleReady && canReadBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
   const [customers, setCustomers] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -68,6 +69,14 @@ export function InvoiceDraftListPage() {
     if (!draftNo) return drafts;
     return drafts.filter((draft) => String(draft.draft_no ?? '').toLowerCase().includes(draftNo));
   }, [drafts, filters.draftNo]);
+
+  if (!roleReady) {
+    return (
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-drafts-page">
+        <LoadingState message="Loading permissions..." />
+      </section>
+    );
+  }
 
   if (!canRead) {
     return (

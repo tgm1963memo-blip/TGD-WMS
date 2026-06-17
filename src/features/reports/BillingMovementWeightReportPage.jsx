@@ -8,6 +8,7 @@ import { BillingMovementWeightTable } from '../../components/reports/BillingMove
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { getBillingMovementWeightRows } from '../../services/billingMovementWeightService.js';
 import {
   createBillingInvoiceDraftFromMovements,
@@ -20,7 +21,7 @@ import {
   getMovementDraftSelectionState,
   validateInvoiceDraftSourceRows,
 } from '../../utils/billingInvoiceDraftUtils.js';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import {
   calculateBillingMovementWeightSummary,
@@ -38,9 +39,9 @@ const initialState = {
 export function BillingMovementWeightReportPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { role: userRole, ready: roleReady } = useUserRole();
   const goLive = isGoLivePresentationEnabled();
-  const userRole = getCurrentUserRole();
-  const canCreateDraft = canWriteBillingInvoiceDrafts(userRole);
+  const canCreateDraft = roleReady && canWriteBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
   const [customers, setCustomers] = useState([]);
@@ -197,6 +198,14 @@ export function BillingMovementWeightReportPage() {
     if (draft?.id) {
       navigate(`/billing/invoice-drafts/${draft.id}`);
     }
+  }
+
+  if (!roleReady) {
+    return (
+      <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`} data-testid="billing-movement-weight-report-page">
+        <LoadingState message="Loading permissions..." />
+      </section>
+    );
   }
 
   return (

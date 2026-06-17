@@ -21,7 +21,7 @@ import {
   canCancelBillingInvoiceDraft,
   formatInvoiceDraftError,
 } from '../../utils/billingInvoiceDraftUtils.js';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import {
   canReadBillingInvoiceDrafts,
   canWriteBillingInvoiceDrafts,
@@ -41,9 +41,9 @@ function formatNumber(value) {
 export function InvoiceDraftDetailPage() {
   const { draftId } = useParams();
   const { language } = useLanguage();
-  const userRole = getCurrentUserRole();
-  const canRead = canReadBillingInvoiceDrafts(userRole);
-  const canWrite = canWriteBillingInvoiceDrafts(userRole);
+  const { role: userRole, ready: roleReady } = useUserRole();
+  const canRead = roleReady && canReadBillingInvoiceDrafts(userRole);
+  const canWrite = roleReady && canWriteBillingInvoiceDrafts(userRole);
   const [state, setState] = useState({ draft: null, lines: [], loading: true, error: null });
   const [cancelError, setCancelError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
@@ -91,6 +91,14 @@ export function InvoiceDraftDetailPage() {
       isMounted = false;
     };
   }, [canRead, draftId]);
+
+  if (!roleReady) {
+    return (
+      <section className={getPageShellClassName('page-shell')} data-testid="billing-invoice-draft-detail-page">
+        <LoadingState message="Loading permissions..." />
+      </section>
+    );
+  }
 
   if (!canRead) {
     return (

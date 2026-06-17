@@ -363,7 +363,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       evidence: '15-customer-withdrawal.png',
       action: async () => {
         await expectRouteShell(page, '/customer/withdrawal-request', 'customer-withdrawal-request-page');
-        await expect(page.locator('[data-testid="withdrawal-source-deposit-select"]')).toBeVisible();
+        await expect(page.locator('[data-testid="customer-withdrawal-list-table"]')).toBeVisible();
       },
     });
 

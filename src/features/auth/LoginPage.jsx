@@ -1,14 +1,15 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext.jsx';
+import { useUserRole } from './UserRoleProvider.jsx';
 import { StagingLoginPanel } from '../../components/dashboard/StagingLoginPanel.jsx';
 import { AuthPageShell } from '../../components/auth/AuthPageShell.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
 import { resolveDefaultHomePath } from '../../security/defaultHomePath.js';
 
 export function LoginPage() {
   const { session, loading } = useAuth();
+  const { role, ready: roleReady } = useUserRole();
   const location = useLocation();
   const t = useTranslation();
   const goLive = isGoLivePresentationEnabled();
@@ -22,7 +23,15 @@ export function LoginPage() {
   }
 
   if (session?.user) {
-    const from = location.state?.from?.pathname || resolveDefaultHomePath(getCurrentUserRole());
+    if (!roleReady) {
+      return (
+        <div className="layout-auth login-layout auth-page-shell">
+          <div className="login-loading">{t('auth_loading')}</div>
+        </div>
+      );
+    }
+
+    const from = location.state?.from?.pathname || resolveDefaultHomePath(role);
     return <Navigate to={from} replace />;
   }
 

@@ -1,8 +1,15 @@
 import { Navigate } from 'react-router-dom';
-import { getCurrentUserRole } from '../../security/currentUserRole.js';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { resolveDefaultHomePath } from '../../security/defaultHomePath.js';
+import { useUserRole } from './UserRoleProvider.jsx';
 
 export function DefaultHomeRedirect() {
-  const homePath = resolveDefaultHomePath(getCurrentUserRole());
+  const { role, ready } = useUserRole();
+
+  if (!ready) {
+    return <LoadingState message="Loading permissions..." />;
+  }
+
+  const homePath = resolveDefaultHomePath(role);
   return <Navigate to={homePath} replace />;
 }
