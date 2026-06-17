@@ -15,7 +15,12 @@ const UserRoleContext = createContext({
 
 export function UserRoleProvider({ children }) {
   const { session, loading: authLoading } = useAuth();
-  const [state, setState] = useState({ role: getCurrentUserRole(), ready: false });
+  const sessionUserId = session?.user?.id ?? null;
+  const [state, setState] = useState({
+    role: getCurrentUserRole(),
+    ready: false,
+    resolvedUserId: null,
+  });
 
   useEffect(() => {
     let active = true;
@@ -24,36 +29,59 @@ export function UserRoleProvider({ children }) {
       return undefined;
     }
 
-    if (!session?.user?.id) {
+    if (!sessionUserId) {
       clearAuthenticatedUserRole();
       if (active) {
-        setState({ role: getCurrentUserRole(), ready: true });
+        setState({ role: getCurrentUserRole(), ready: true, resolvedUserId: null });
       }
       return undefined;
     }
 
-    setState((current) => ({ ...current, ready: false }));
+    setState((current) => ({
+      ...current,
+      ready: false,
+      resolvedUserId: current.resolvedUserId === sessionUserId ? current.resolvedUserId : null,
+    }));
 
     getCurrentUserProfile()
       .then((result) => {
         if (!active) return;
         const resolved = resolveUserProfileRole(result.data);
         setAuthenticatedUserRole(resolved.role);
-        setState({ role: getCurrentUserRole(), ready: true });
+        setState({
+          role: getCurrentUserRole(),
+          ready: true,
+          resolvedUserId: sessionUserId,
+        });
       })
       .catch(() => {
         if (!active) return;
         setAuthenticatedUserRole('viewer');
-        setState({ role: getCurrentUserRole(), ready: true });
+        setState({
+          role: getCurrentUserRole(),
+          ready: true,
+          resolvedUserId: sessionUserId,
+        });
       });
 
     return () => {
       active = false;
     };
-  }, [authLoading, session?.user?.id]);
+  }, [authLoading, sessionUserId]);
+
+  const ready = authLoading
+    ? false
+    : (!sessionUserId
+        ? state.ready
+        : state.resolvedUserId === sessionUserId && state.ready);
+
+  const contextValue = {
+    role: state.role,
+    ready,
+  };
 
   return (
-    <UserRoleContext.Provider value={state}>
+    <UserRoleContext.Provider value={contextValue}>
       {children}
     </UserRoleContext.Provider>
   );

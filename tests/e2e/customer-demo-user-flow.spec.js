@@ -1,20 +1,18 @@
 import { test, expect } from '@playwright/test';
-import * as dotenv from 'dotenv';
-import { getBaseUrl } from './helpers/uatAuth.js';
+import { getBaseUrl, login } from './helpers/uatAuth.js';
 
-dotenv.config({ path: '.env.local' });
+const CUSTOMER_EMAIL = process.env.UAT_CUSTOMER_EMAIL || 'customer.demo@tgd-wms.local';
+const CUSTOMER_PASSWORD = process.env.UAT_PASSWORD
+  || process.env.UAT_DEMO_PASSWORD
+  || process.env.UAT_CUSTOMER_PASSWORD;
 
 test.describe('Customer demo user UAT flow', () => {
   test.beforeEach(async ({ page }) => {
-    if (!process.env.UAT_CUSTOMER_EMAIL || !process.env.UAT_CUSTOMER_PASSWORD) {
-      test.skip(true, 'UAT_CUSTOMER_EMAIL / UAT_CUSTOMER_PASSWORD not configured');
+    if (!CUSTOMER_PASSWORD) {
+      test.skip(true, 'UAT_CUSTOMER_PASSWORD / UAT_PASSWORD not configured');
     }
 
-    await page.goto(`${getBaseUrl()}/login`);
-    await page.locator('[data-testid="login-email-input"], input[type="email"]').fill(process.env.UAT_CUSTOMER_EMAIL);
-    await page.locator('[data-testid="login-password-input"], input[type="password"]').fill(process.env.UAT_CUSTOMER_PASSWORD);
-    await page.locator('[data-testid="login-submit-button"], button[type="submit"]').click();
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
+    await login(page, { email: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD });
   });
 
   test('opens customer portal without scope warning', async ({ page }) => {

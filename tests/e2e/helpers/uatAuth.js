@@ -83,12 +83,15 @@ export async function loginAsWarehouseOperator(page) {
 }
 
 export async function loginAsCustomerAdmin(page) {
-  if (!process.env.UAT_CUSTOMER_EMAIL || !process.env.UAT_CUSTOMER_PASSWORD) {
+  const email = process.env.UAT_CUSTOMER_EMAIL || 'customer.demo@tgd-wms.local';
+  const password = process.env.UAT_PASSWORD
+    || process.env.UAT_DEMO_PASSWORD
+    || process.env.UAT_CUSTOMER_PASSWORD;
+
+  if (!password) {
     return false;
   }
-  await switchUser(page, {
-    email: process.env.UAT_CUSTOMER_EMAIL,
-    password: process.env.UAT_CUSTOMER_PASSWORD,
-  });
+
+  await switchUser(page, { email, password });
   return true;
 }

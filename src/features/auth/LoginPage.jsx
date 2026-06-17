@@ -6,6 +6,7 @@ import { AuthPageShell } from '../../components/auth/AuthPageShell.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { resolveDefaultHomePath } from '../../security/defaultHomePath.js';
+import { getRouteAccessDecision } from '../../security/permissionGuard.js';
 
 export function LoginPage() {
   const { session, loading } = useAuth();
@@ -31,7 +32,11 @@ export function LoginPage() {
       );
     }
 
-    const from = location.state?.from?.pathname || resolveDefaultHomePath(role);
+    const homePath = resolveDefaultHomePath(role);
+    const requestedPath = location.state?.from?.pathname;
+    const from = requestedPath && getRouteAccessDecision(role, requestedPath).allowed
+      ? requestedPath
+      : homePath;
     return <Navigate to={from} replace />;
   }
 
