@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CustomerWithdrawalNotificationsSection } from '../../../components/customer/CustomerWithdrawalNotificationsSection.jsx';
 import { DocumentFilterBar } from '../../../components/operations/DocumentFilterBar.jsx';
 import { DocumentToolbar } from '../../../components/operations/DocumentToolbar.jsx';
 import { documentLink, renderStatusBadge } from '../../../components/operations/documentListColumnHelpers.jsx';
@@ -63,6 +64,8 @@ export function WithdrawalRequestListPage() {
           </Link>
         </section>
       )}
+
+      <CustomerWithdrawalNotificationsSection />
 
       <DocumentToolbar title="Withdrawal Requests" createHref="/operations/withdrawal-requests/new" onRefresh={() => window.location.reload()} />
       <DocumentFilterBar onChange={() => {}} />
