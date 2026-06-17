@@ -20,21 +20,22 @@ export async function fillFirstDepositLine(page, { qty = '10' } = {}) {
   await page.locator('[data-testid="customer-deposit-qty"]').fill(qty);
 }
 
-export async function submitDepositCreateForm(page, {
-  arrivalDate = '2026-06-15',
-  contactName = 'Demo Contact',
-  contactPhone = '0800000000',
-  qty = '10',
-} = {}) {
-  await page.goto(page.url().includes('/customer/deposit-request/new') ? page.url() : undefined).catch(() => {});
-  await selectProxyCustomerIfPresent(page);
-  await fillFirstDepositLine(page, { qty });
-  await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill(arrivalDate);
-  await page.locator('[data-testid="customer-deposit-contact-name"]').fill(contactName);
-  await page.locator('[data-testid="customer-deposit-contact-phone"]').fill(contactPhone);
-  await page.locator('[data-testid="customer-deposit-submit-button"]').click();
-}
-
 export function isGoLiveTarget(baseUrl) {
   return !String(baseUrl).includes('localhost');
+}
+
+/** Go-live CSS hides the demo banner; assert it exists in DOM instead of visibility. */
+export async function expectCustomerPortalLiveBanner(page, baseUrl = '') {
+  const banner = page.locator('[data-testid="customer-portal-live-banner"]');
+  if (isGoLiveTarget(baseUrl)) {
+    await expect(banner).toBeAttached();
+  } else {
+    await expect(banner).toBeVisible();
+  }
+}
+
+export async function expectDepositSubmitOutcome(page) {
+  await expect(
+    page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
+  ).toBeVisible({ timeout: 20000 });
 }

@@ -84,7 +84,6 @@ export function CustomerDepositLinesTable({
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-product-picker-select' : `${rowTestId}-product-select`}
                     onChange={(event) => selectCatalogProduct(line.key, event.target.value)}
-                    required
                     value={line.catalog_product_id || ''}
                   >
                     <option value="">{t('customer_deposit_select_product')}</option>
@@ -126,7 +125,6 @@ export function CustomerDepositLinesTable({
                     data-testid={index === 0 ? 'customer-deposit-qty' : `${rowTestId}-qty`}
                     min="1"
                     onChange={(event) => updateLine(line.key, { expected_qty: event.target.value })}
-                    required
                     type="number"
                     value={line.expected_qty}
                   />

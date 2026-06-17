@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { getBaseUrl, login, requireUatCredentials } from './helpers/uatAuth.js';
-import { fillFirstDepositLine, isGoLiveTarget } from './helpers/customerPortalHelpers.js';
+import {
+  expectCustomerPortalLiveBanner,
+  expectDepositSubmitOutcome,
+  fillFirstDepositLine,
+  isGoLiveTarget,
+} from './helpers/customerPortalHelpers.js';
 
 requireUatCredentials();
 
@@ -53,15 +58,13 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
       buffer: Buffer.from('demo'),
     });
     await page.locator('[data-testid="customer-deposit-submit-button"]').click();
-    await expect(
-      page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
-    ).toBeVisible({ timeout: 20000 });
+    await expectDepositSubmitOutcome(page);
   });
 
   test('Scenario 6: Admin deposit review opens with live table', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/admin/deposit-review`);
     await expect(page.locator('[data-testid="admin-deposit-review-table"]')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-testid="customer-portal-live-banner"]')).toBeVisible();
+    await expectCustomerPortalLiveBanner(page, getBaseUrl());
   });
 
   test('Scenario 7: Warehouse receiving opens', async ({ page }) => {

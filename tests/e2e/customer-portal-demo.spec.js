@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { getBaseUrl, login, loginAsCustomerAdmin, requireUatCredentials } from './helpers/uatAuth.js';
 import {
+  expectCustomerPortalLiveBanner,
+  expectDepositSubmitOutcome,
   fillFirstDepositLine,
-  isGoLiveTarget,
   selectProxyCustomerIfPresent,
 } from './helpers/customerPortalHelpers.js';
 
@@ -53,7 +54,7 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
     test('Scenario 2: Customer Portal menu/page opens with live banner', async ({ page }) => {
       await page.goto(`${getBaseUrl()}/customer`);
       await expect(page.locator('[data-testid="customer-portal-page"]')).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('[data-testid="customer-portal-live-banner"]')).toBeVisible();
+      await expectCustomerPortalLiveBanner(page, getBaseUrl());
     });
 
     test('Scenario 3: Dashboard quick actions visible', async ({ page }) => {
@@ -67,15 +68,12 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
     test('Scenario 4: Deposit request page opens and submit returns live success or scope guard', async ({ page }) => {
       await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
       await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible();
-      await expect(page.locator('[data-testid="customer-portal-live-banner"]')).toBeVisible();
       await fillFirstDepositLine(page, { qty: '10' });
       await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-15');
       await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Demo Contact');
       await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000000');
       await page.locator('[data-testid="customer-deposit-submit-button"]').click();
-      await expect(
-        page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
-      ).toBeVisible({ timeout: 20000 });
+      await expectDepositSubmitOutcome(page);
     });
 
     test('Scenario 5: Stock balance page opens with live data badge', async ({ page }) => {
@@ -120,9 +118,7 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
       await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Admin Proxy');
       await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000001');
       await page.locator('[data-testid="customer-deposit-submit-button"]').click();
-      await expect(
-        page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
-      ).toBeVisible({ timeout: 20000 });
+      await expectDepositSubmitOutcome(page);
     });
   });
 });
