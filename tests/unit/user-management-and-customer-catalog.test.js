@@ -34,6 +34,12 @@ describe('USER-MGMT-045 user management admin RPC draft', () => {
     expect(sql).toContain("'customer_admin', 'customer_user'");
     expect(sql).toContain('customer_id is required for customer portal roles');
   });
+
+  it('includes warehouse_admin in user management service roles', () => {
+    const service = read(path.join(process.cwd(), 'src/services/userManagementService.js'));
+    expect(service).toContain("'warehouse_admin'");
+    expect(service).toContain('createAuthUser');
+  });
 });
 
 describe('CUSTOMER-CATALOG-046 customer product catalog draft', () => {

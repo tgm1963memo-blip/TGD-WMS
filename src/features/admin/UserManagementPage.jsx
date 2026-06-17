@@ -7,6 +7,7 @@ import { getCurrentUserProfile } from '../../services/userProfileService.js';
 import {
   ALL_ASSIGNABLE_ROLES,
   CUSTOMER_PORTAL_ROLES,
+  createAuthUser,
   getUserProfiles,
   setUserProfileActive,
   upsertUserProfile,
@@ -18,7 +19,8 @@ const EMPTY_FORM = {
   profileId: '',
   email: '',
   displayName: '',
-  role: 'customer_user',
+  password: '',
+  role: 'warehouse_staff',
   customerId: '',
   authUserId: '',
   isActive: true,
@@ -115,7 +117,8 @@ export function UserManagementPage() {
       profileId: row.id,
       email: row.email ?? '',
       displayName: row.display_name ?? '',
-      role: row.role ?? 'customer_user',
+      password: '',
+      role: row.role ?? 'warehouse_staff',
       customerId: row.customer_id ?? '',
       authUserId: row.auth_user_id ?? '',
       isActive: row.is_active !== false,
@@ -136,13 +139,36 @@ export function UserManagementPage() {
     setError('');
     setSuccess('');
 
+    let authUserId = form.authUserId || null;
+
+    if (!form.profileId) {
+      if (!form.password || form.password.length < 8) {
+        setSaving(false);
+        setError(t('user_mgmt_password_required'));
+        return;
+      }
+
+      const authResult = await createAuthUser({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (authResult.error) {
+        setSaving(false);
+        setError(authResult.error.message ?? t('user_mgmt_auth_create_error'));
+        return;
+      }
+
+      authUserId = authResult.data?.authUserId ?? null;
+    }
+
     const result = await upsertUserProfile({
       profileId: form.profileId || null,
       email: form.email,
       displayName: form.displayName,
       role: form.role,
       customerId: CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
-      authUserId: form.authUserId || null,
+      authUserId,
       isActive: form.isActive,
     });
 
@@ -224,6 +250,20 @@ export function UserManagementPage() {
               value={form.displayName}
             />
           </label>
+          {!form.profileId ? (
+            <label className="form-field">
+              <span>{t('user_mgmt_col_password')}</span>
+              <input
+                className="form-control"
+                data-testid="user-mgmt-password"
+                minLength={8}
+                onChange={(e) => updateField('password', e.target.value)}
+                required
+                type="password"
+                value={form.password}
+              />
+            </label>
+          ) : null}
           <label className="form-field">
             <span>{t('user_mgmt_col_role')}</span>
             <select
@@ -255,16 +295,18 @@ export function UserManagementPage() {
               </select>
             </label>
           ) : null}
-          <label className="form-field form-field-span-2">
-            <span>{t('user_mgmt_col_auth_user')}</span>
-            <input
-              className="form-control"
-              data-testid="user-mgmt-auth-user-id"
-              onChange={(e) => updateField('authUserId', e.target.value)}
-              placeholder="UUID from Supabase Auth (optional)"
-              value={form.authUserId}
-            />
-          </label>
+          {form.profileId ? (
+            <label className="form-field form-field-span-2">
+              <span>{t('user_mgmt_col_auth_user')}</span>
+              <input
+                className="form-control"
+                data-testid="user-mgmt-auth-user-id"
+                disabled
+                readOnly
+                value={form.authUserId || t('user_mgmt_auth_pending')}
+              />
+            </label>
+          ) : null}
         </div>
         <div className="action-row">
           <button className="btn btn-secondary" onClick={startCreate} type="button">{t('close')}</button>

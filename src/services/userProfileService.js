@@ -38,8 +38,8 @@ export async function getUserProfiles(filters = {}) {
 
   let query = supabase
     .from('tgd_user_profiles')
-    .select('*')
-    .order('display_name', { ascending: true });
+    .select('id, auth_user_id, email, display_name, role, customer_id, is_active, created_at, updated_at')
+    .order('email', { ascending: true });
 
   if (filters.role) {
     query = query.eq('role', filters.role);
