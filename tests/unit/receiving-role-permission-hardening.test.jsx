@@ -6,7 +6,12 @@ import { ReceivingDetailPage } from '../../src/features/operations/receiving/Rec
 import { ReceivingListPage } from '../../src/features/operations/receiving/ReceivingListPage.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import * as receivingService from '../../src/services/receivingService.js';
-import * as currentUserRole from '../../src/security/currentUserRole.js';
+
+const mockUserRole = vi.hoisted(() => ({ value: 'admin' }));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: mockUserRole.value, ready: true }),
+}));
 
 vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingCustomers: vi.fn(async () => ({ data: [{ id: 'cust-1', label: 'C1' }], error: null })),
@@ -23,7 +28,7 @@ vi.mock('../../src/services/receivingService.js', () => ({
 }));
 
 vi.mock('../../src/security/currentUserRole.js', () => ({
-  getCurrentUserRole: vi.fn(() => 'admin'),
+  getCurrentUserRole: vi.fn(() => mockUserRole.value),
 }));
 
 describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
@@ -33,7 +38,7 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
 
   describe('ReceivingListPage', () => {
     it('shows Create Internal Receiving Draft button to authorized role', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('warehouse_staff');
+      mockUserRole.value = 'warehouse_admin';
       render(
         <MemoryRouter>
           <LanguageProvider initialLanguage="en">
@@ -45,7 +50,7 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
     });
 
     it('hides Create Internal Receiving Draft button from viewer', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('viewer');
+      mockUserRole.value = 'viewer';
       render(
         <MemoryRouter>
           <LanguageProvider initialLanguage="en">
@@ -66,14 +71,14 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
     );
 
     it('denies access to viewer entirely', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('viewer');
+      mockUserRole.value = 'viewer';
       renderCreatePage();
       expect(await screen.findByRole('alert')).toHaveTextContent('Permission denied');
       expect(screen.queryByRole('button', { name: 'Save Draft' })).not.toBeInTheDocument();
     });
 
     it('allows access to admin and handles RPC authentication error', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('admin');
+      mockUserRole.value = 'admin';
       
       receivingService.createReceivingDocument.mockResolvedValueOnce({
         data: null,
@@ -100,7 +105,7 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
     );
 
     it('hides Confirm/Post button from viewer', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('viewer');
+      mockUserRole.value = 'viewer';
       renderDetailPage();
       await screen.findByText('Controlled Confirm/Post');
       expect(screen.queryByRole('button', { name: 'Confirm/Post Receiving' })).not.toBeInTheDocument();
@@ -108,7 +113,7 @@ describe('Sprint 13J-AO Receiving Role / Permission Hardening', () => {
     });
 
     it('shows Confirm/Post button to admin and handles RPC permission error', async () => {
-      currentUserRole.getCurrentUserRole.mockReturnValue('admin');
+      mockUserRole.value = 'admin';
       receivingService.postReceivingDocument.mockResolvedValueOnce({
         data: null,
         error: new Error('new row violates row-level security policy'),

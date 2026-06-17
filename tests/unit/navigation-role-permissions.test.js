@@ -21,26 +21,36 @@ describe('navigation role permissions', () => {
     expect(hasRoleAccess('admin', 'customer_user')).toBe(true);
   });
 
-  it('warehouse_staff sees operations but not adjustment, master data, billing drafts, dashboard, or customer portal', () => {
+  it('warehouse_staff sees handheld only', () => {
     const labels = visibleLabelsForRole('warehouse_staff');
 
     expect(labels).not.toContain('Dashboard');
-    expect(labels).toContain('Receiving');
-    expect(labels).toContain('Post Outbound');
-    expect(labels).not.toContain('Adjustment');
-    expect(labels).not.toContain('Master Data');
-    expect(labels).not.toContain('Invoice Drafts');
+    expect(labels).not.toContain('Receiving');
+    expect(labels).toContain('Scan Center');
     expect(labels).not.toContain('Portal Overview');
-    expect(labels).not.toContain('Customer Deposit');
   });
 
-  it('warehouse_manager sees adjustment, stock balance, master data, and invoice drafts', () => {
+  it('warehouse_admin sees deposit, withdrawal, and stock balance menus', () => {
+    const labels = visibleLabelsForRole('warehouse_admin');
+
+    expect(labels).toContain('Receiving');
+    expect(labels).toContain('Withdrawal Request');
+    expect(labels).toContain('Stock Balance');
+    expect(labels).not.toContain('Transfer');
+    expect(labels).not.toContain('Scan Center');
+    expect(labels).not.toContain('Adjustment');
+  });
+
+  it('warehouse_manager sees all warehouse operation menus', () => {
     const labels = visibleLabelsForRole('warehouse_manager');
 
     expect(labels).toContain('Adjustment');
     expect(labels).toContain('Stock Balance');
-    expect(labels).toContain('Master Data');
-    expect(labels).toContain('Invoice Drafts');
+    expect(labels).toContain('Transfer');
+    expect(labels).toContain('Scan Center');
+    expect(labels).toContain('Receiving');
+    expect(labels).not.toContain('Master Data');
+    expect(labels).not.toContain('Invoice Drafts');
   });
 
   it('accounting sees billing and reports but not warehouse operations or dashboard', () => {
@@ -88,12 +98,12 @@ describe('navigation role permissions', () => {
     expect(labels).toContain('Invoice Drafts');
   });
 
-  it('allows warehouse staff to access deposit review route without showing customer portal menu', () => {
-    expect(isNavigationPathVisibleForRole('warehouse_staff', '/customer/admin/deposit-review')).toBe(true);
+  it('allows warehouse admin to access deposit review route without showing customer portal menu', () => {
+    expect(isNavigationPathVisibleForRole('warehouse_admin', '/customer/admin/deposit-review')).toBe(true);
     expect(isNavigationItemVisibleForRole(
       { key: 'customer_portal_home', label: 'Portal Overview', path: '/customer' },
       'customer_portal',
-      'warehouse_staff',
+      'warehouse_admin',
     )).toBe(false);
   });
 });

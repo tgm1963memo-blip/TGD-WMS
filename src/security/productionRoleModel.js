@@ -1,6 +1,7 @@
 export const PRODUCTION_ROLES = Object.freeze([
   'viewer',
   'warehouse_staff',
+  'warehouse_admin',
   'warehouse_manager',
   'accounting',
   'admin',
@@ -9,6 +10,7 @@ export const PRODUCTION_ROLES = Object.freeze([
 export const PRODUCTION_ROLE_HIERARCHY = Object.freeze({
   viewer: 10,
   warehouse_staff: 20,
+  warehouse_admin: 25,
   warehouse_manager: 30,
   accounting: 40,
   admin: 50,
@@ -16,8 +18,9 @@ export const PRODUCTION_ROLE_HIERARCHY = Object.freeze({
 
 export const PRODUCTION_ROLE_DESCRIPTIONS = Object.freeze({
   admin: 'System administration and full controlled review access.',
-  warehouse_manager: 'Warehouse supervision for Cold Storage operations and operational reports.',
-  warehouse_staff: 'Warehouse execution access for assigned Receiving, Putaway, Customer Withdrawal, Picking, and Dispatch / Goods Issue work.',
+  warehouse_manager: 'Warehouse supervision for all Cold Storage operations.',
+  warehouse_admin: 'Warehouse operations for customer deposit receiving, withdrawal, and stock balance.',
+  warehouse_staff: 'Handheld scan workflow access for warehouse floor staff.',
   accounting: 'Read-only Monthly Storage Billing Summary and Accounting Charge Review access.',
   viewer: 'General read-only reporting access.',
 });

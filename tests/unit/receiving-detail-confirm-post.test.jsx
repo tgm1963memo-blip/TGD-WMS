@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockUserRole = vi.hoisted(() => ({ value: 'admin' }));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: mockUserRole.value, ready: true }),
+}));
+
 const { postReceivingDocument, getReceivingDocumentById, getReceivingStockMovements } = vi.hoisted(() => ({
   postReceivingDocument: vi.fn(async () => ({
     data: { status: 'CONFIRMED' },
@@ -56,6 +62,7 @@ function renderDetail() {
 describe('Sprint 13J-AJ-FIX1 ReceivingDetailPage Confirm/Post', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserRole.value = 'admin';
     getReceivingDocumentById.mockResolvedValue({
       data: {
         id: '588b8815-3c49-4b12-8d8e-a765f7e55f24',

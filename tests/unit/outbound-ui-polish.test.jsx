@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { OutboundListPage } from '../../src/features/operations/outbound/OutboundListPage.jsx';
 
 vi.mock('../../src/services/outboundPickingService.js', () => ({
@@ -17,7 +18,9 @@ vi.mock('../../src/services/outboundPickingService.js', () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <OutboundListPage />
+      <LanguageProvider initialLanguage="en">
+        <OutboundListPage />
+      </LanguageProvider>
     </MemoryRouter>
   );
 }
@@ -26,14 +29,14 @@ describe('17D Outbound UI Polish', () => {
   it('Outbound UI renders without crashing', async () => {
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Outbound Operations')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Post Outbound' })).toBeInTheDocument();
     });
   });
 
-  it('Outbound UI includes Outbound Operations or Outbound Picking', async () => {
+  it('Outbound UI includes Post Outbound heading', async () => {
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Outbound Operations')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Post Outbound' })).toBeInTheDocument();
     });
   });
 

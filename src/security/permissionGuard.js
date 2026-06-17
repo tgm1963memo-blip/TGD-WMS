@@ -7,12 +7,14 @@
  */
 
 import { getRoutePermission } from './routePermissionCatalog.js';
+import { canWarehouseRoleAccessRoute } from './warehouseRolePermissions.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 
 export const ROLE_HIERARCHY = {
   viewer: 1,
   warehouse_staff: 2,
+  warehouse_admin: 3,
   accounting: 3,
   warehouse_manager: 4,
   admin: 5,
@@ -63,6 +65,26 @@ export function hasRoleAccess(userRole, requiredRole) {
  * @returns {{allowed:boolean, required_role:string, permission_area:string, access_level:string, reason:string}}
  */
 export function canAccessRoute(userRole, routePath) {
+  const warehouseDecision = canWarehouseRoleAccessRoute(userRole, routePath);
+  if (warehouseDecision === true) {
+    return {
+      allowed: true,
+      required_role: normalizeRole(userRole),
+      permission_area: 'warehouse',
+      access_level: 'read',
+      reason: 'Warehouse role route allowlist',
+    };
+  }
+  if (warehouseDecision === false) {
+    return {
+      allowed: false,
+      required_role: normalizeRole(userRole),
+      permission_area: 'warehouse',
+      access_level: 'read',
+      reason: 'Route not allowed for warehouse role scope',
+    };
+  }
+
   const entry = getRoutePermission(routePath);
   if (!entry) {
     return {

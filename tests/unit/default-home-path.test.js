@@ -7,8 +7,9 @@ describe('defaultHomePath', () => {
     expect(resolveDefaultHomePath('customer_admin')).toBe('/customer');
   });
 
-  it('routes admin to dashboard and warehouse staff to receiving', () => {
+  it('routes admin to dashboard and warehouse staff to handheld', () => {
     expect(resolveDefaultHomePath('admin')).toBe('/dashboard');
-    expect(resolveDefaultHomePath('warehouse_staff')).toBe('/operations/receiving');
+    expect(resolveDefaultHomePath('warehouse_staff')).toBe('/handheld');
+    expect(resolveDefaultHomePath('warehouse_admin')).toBe('/operations/receiving');
   });
 });

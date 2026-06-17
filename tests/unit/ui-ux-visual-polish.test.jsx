@@ -1,13 +1,17 @@
 ﻿import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../src/components/layout/AppShell.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { getTranslation } from '../../src/i18n/translationCatalog.js';
 import ReportsPage from '../../src/features/reports/ReportsPage.jsx';
 import { AuthReadinessPage } from '../../src/features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../../src/features/admin/DocumentBrandingAdminPage.jsx';
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'admin', ready: true }),
+}));
 
 function renderWithShell(ui) {
   return render(

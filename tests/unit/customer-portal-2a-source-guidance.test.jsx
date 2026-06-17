@@ -20,7 +20,7 @@ vi.mock('../../src/services/customerDepositRequestService.js', () => ({
 }));
 
 vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
-  useUserRole: () => ({ role: 'warehouse_staff', ready: true }),
+  useUserRole: () => ({ role: 'warehouse_admin', ready: true }),
 }));
 
 vi.mock('../../src/services/withdrawalRequestService.js', () => ({

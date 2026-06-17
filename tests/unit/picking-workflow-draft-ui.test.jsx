@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '../../src/components/layout/Sidebar.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'admin', ready: true }),
+}));
+
 const {
   addOutboundLine,
   confirmOutboundPickDraft,

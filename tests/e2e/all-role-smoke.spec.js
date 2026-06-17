@@ -25,11 +25,19 @@ const ROLE_SMOKE_MATRIX = [
     ],
   },
   {
+    role: 'warehouse_admin',
+    email: process.env.UAT_WAREHOUSE_ADMIN_EMAIL || 'warehouse.admin.demo@tgd-wms.local',
+    checks: [
+      { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
+      { path: '/operations/withdrawal-requests', testId: null },
+      { path: '/stock-count', testId: null },
+    ],
+  },
+  {
     role: 'warehouse_staff',
     email: process.env.UAT_WAREHOUSE_EMAIL || process.env.UAT_EMAIL || 'staff.demo@tgd-wms.local',
     checks: [
-      { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
-      { path: '/customer/admin/deposit-review', testId: 'customer-admin-deposit-review-page' },
+      { path: '/handheld', testId: null },
     ],
   },
   {

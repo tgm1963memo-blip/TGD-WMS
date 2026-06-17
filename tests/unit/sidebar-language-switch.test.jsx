@@ -1,10 +1,14 @@
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Sidebar } from '../../src/components/layout/Sidebar.jsx';
 import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { TRANSLATION_CATALOG } from '../../src/i18n/translationCatalog.js';
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'admin', ready: true }),
+}));
 
 describe('19B Sidebar Language Switch', () => {
   afterEach(() => {

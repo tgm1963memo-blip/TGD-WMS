@@ -23,6 +23,7 @@ import {
 const receivingRpc = vi.hoisted(() => vi.fn());
 const dispatchRpc = vi.hoisted(() => vi.fn());
 const createDepositRpc = vi.hoisted(() => vi.fn());
+const submitDepositRpc = vi.hoisted(() => vi.fn());
 const upsertDepositLineRpc = vi.hoisted(() => vi.fn());
 const createWithdrawalRpc = vi.hoisted(() => vi.fn());
 const upsertWithdrawalLineRpc = vi.hoisted(() => vi.fn());
@@ -76,6 +77,7 @@ vi.mock('../../src/services/customerPortalDashboardService.js', () => ({
 
 vi.mock('../../src/services/customerDepositRequestService.js', () => ({
   createCustomerDepositRequest: createDepositRpc,
+  submitCustomerDepositRequest: submitDepositRpc,
   upsertCustomerDepositRequestLine: upsertDepositLineRpc,
   listCustomerDepositRequests: vi.fn(async () => ({
     data: [{ id: 'dep-1', request_no: 'CDR-20260608-0001', status: 'DRAFT' }],
@@ -150,6 +152,10 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
       error: null,
     });
     upsertDepositLineRpc.mockResolvedValue({ data: { line_id: 'line-1' }, error: null });
+    submitDepositRpc.mockResolvedValue({
+      data: { id: 'dep-new', status: 'SUBMITTED_BY_CUSTOMER' },
+      error: null,
+    });
     createWithdrawalRpc.mockResolvedValue({
       data: { id: 'wd-new', withdrawal_no: 'CWR-20260608-0001', status: 'WITHDRAWAL_DRAFT' },
       error: null,
@@ -188,6 +194,7 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     });
     expect(createDepositRpc).toHaveBeenCalled();
     expect(upsertDepositLineRpc).toHaveBeenCalled();
+    expect(submitDepositRpc).toHaveBeenCalled();
     expect(receivingRpc).not.toHaveBeenCalled();
   });
 

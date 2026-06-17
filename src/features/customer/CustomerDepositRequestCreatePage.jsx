@@ -8,6 +8,7 @@ import { CsvImportExportToolbar } from '../../components/customer/CsvImportExpor
 import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerDepositRequest,
+  submitCustomerDepositRequest,
   upsertCustomerDepositRequestLine,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
@@ -18,6 +19,12 @@ import {
   parseCustomerDepositLineImportRows,
 } from '../../utils/customerDepositLineCsvUtils.js';
 import { readCsvFile } from '../../utils/csvFileUtils.js';
+import {
+  createEmptyDepositLine,
+  createInitialDepositLines,
+  DEPOSIT_LINE_DEFAULT_COUNT,
+  getFilledDepositLines,
+} from '../../utils/customerDepositLineDefaults.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -30,35 +37,17 @@ const INITIAL_HEADER = {
   contact_phone: '',
 };
 
-function createEmptyLine(lineKey = 1) {
-  return {
-    key: lineKey,
-    catalog_product_id: '',
-    customer_product_code: '',
-    product_code: '',
-    product_name: '',
-    lot_no: '',
-    expected_qty: '',
-    expected_boxes: '',
-    expected_weight: '',
-    temperature_type: 'FROZEN',
-  };
-}
-
 function formatFileSize(size) {
   return `${(size / 1024).toFixed(1)} KB`;
-}
-
-function isCatalogLineSelected(line) {
-  return Boolean(line.catalog_product_id && line.catalog_product_id !== '__manual__');
 }
 
 export function CustomerDepositRequestCreatePage() {
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [header, setHeader] = useState(INITIAL_HEADER);
-  const [lines, setLines] = useState([createEmptyLine(1)]);
-  const [nextLineKey, setNextLineKey] = useState(2);
+  const [lines, setLines] = useState(() => createInitialDepositLines());
+  const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
+  const [timelineStatus, setTimelineStatus] = useState('DRAFT');
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
@@ -91,7 +80,7 @@ export function CustomerDepositRequestCreatePage() {
   }
 
   function addLine() {
-    setLines((current) => [...current, createEmptyLine(nextLineKey)]);
+    setLines((current) => [...current, createEmptyDepositLine(nextLineKey)]);
     setNextLineKey((current) => current + 1);
     setSuccess(null);
     setSubmitError('');
@@ -119,8 +108,9 @@ export function CustomerDepositRequestCreatePage() {
 
   function resetForm() {
     setHeader(INITIAL_HEADER);
-    setLines([createEmptyLine(1)]);
-    setNextLineKey(2);
+    setLines(createInitialDepositLines());
+    setNextLineKey(DEPOSIT_LINE_DEFAULT_COUNT + 1);
+    setTimelineStatus('DRAFT');
     setAttachments([]);
     setSuccess(null);
     setSubmitError('');
@@ -170,8 +160,8 @@ export function CustomerDepositRequestCreatePage() {
       return;
     }
 
-    const invalidLine = lines.find((line) => !isCatalogLineSelected(line));
-    if (invalidLine) {
+    const activeLines = getFilledDepositLines(lines);
+    if (!activeLines.length) {
       setSubmitError(t('customer_deposit_catalog_required'));
       return;
     }
@@ -193,8 +183,8 @@ export function CustomerDepositRequestCreatePage() {
 
     const requestId = createResult.data?.id;
 
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
+    for (let index = 0; index < activeLines.length; index += 1) {
+      const line = activeLines[index];
       const lineResult = await upsertCustomerDepositRequestLine(requestId, {
         lineNo: index + 1,
         customerProductCode: line.customer_product_code,
@@ -215,10 +205,19 @@ export function CustomerDepositRequestCreatePage() {
       }
     }
 
+    const submitResult = await submitCustomerDepositRequest(requestId);
     setSubmitting(false);
+
+    if (submitResult.error) {
+      setSubmitError(submitResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
+    setTimelineStatus(submitResult.data?.status ?? 'SUBMITTED_BY_CUSTOMER');
     setSuccess({
       requestNo: createResult.data?.request_no ?? requestId,
-      lineCount: lines.length,
+      lineCount: activeLines.length,
+      status: submitResult.data?.status ?? 'SUBMITTED_BY_CUSTOMER',
     });
   }
 
@@ -237,7 +236,11 @@ export function CustomerDepositRequestCreatePage() {
 
       <div className="customer-process-card">
         <h3>Deposit status timeline</h3>
-        <CustomerProcessTimeline statuses={CUSTOMER_DEPOSIT_STATUSES} testId="customer-deposit-status-timeline" />
+        <CustomerProcessTimeline
+          activeStatus={timelineStatus}
+          statuses={CUSTOMER_DEPOSIT_STATUSES}
+          testId="customer-deposit-status-timeline"
+        />
       </div>
 
       {success ? (

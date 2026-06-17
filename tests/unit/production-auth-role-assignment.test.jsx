@@ -26,12 +26,14 @@ describe('production role model', () => {
     expect(PRODUCTION_ROLES).toEqual([
       'viewer',
       'warehouse_staff',
+      'warehouse_admin',
       'warehouse_manager',
       'accounting',
       'admin',
     ]);
     expect(isValidProductionRole('admin')).toBe(true);
     expect(isValidProductionRole('warehouse_manager')).toBe(true);
+    expect(isValidProductionRole('warehouse_admin')).toBe(true);
     expect(isValidProductionRole('warehouse_staff')).toBe(true);
     expect(isValidProductionRole('accounting')).toBe(true);
     expect(isValidProductionRole('viewer')).toBe(true);

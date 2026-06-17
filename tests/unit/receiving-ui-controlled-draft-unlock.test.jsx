@@ -82,16 +82,24 @@ vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingDocuments: vi.fn(async () => ({ data: [], error: null })),
 }));
 
+vi.mock('../../src/services/customerDepositRequestService.js', () => ({
+  listCustomerDepositRequests: vi.fn(async () => ({ data: [], error: null })),
+}));
+
 vi.mock('../../src/features/auth/AuthContext.jsx', () => ({
   useAuth: vi.fn(() => ({ session: { user: { id: 'test-user' } }, loading: false, isAuthenticated: true })),
   AuthProvider: ({ children }) => children,
+}));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'warehouse_admin', ready: true }),
 }));
 
 vi.mock('../../src/security/currentUserRole.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    getCurrentUserRole: vi.fn(() => 'warehouse_staff'),
+    getCurrentUserRole: vi.fn(() => 'warehouse_admin'),
   };
 });
 

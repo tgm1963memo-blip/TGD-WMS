@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReceivingCreatePage, normalizeReceivingError } from '../../src/features/operations/receiving/ReceivingCreatePage.jsx';
 import * as receivingService from '../../src/services/receivingService.js';
 
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'warehouse_admin', ready: true }),
+}));
+
 vi.mock('../../src/services/receivingService.js', () => ({
   getReceivingCustomers: vi.fn(async () => ({ data: [{ id: 'cust-1', label: 'C1' }], error: null })),
   getReceivingProducts: vi.fn(async () => ({ data: [{ id: 'prod-1', label: 'P1' }], error: null })),

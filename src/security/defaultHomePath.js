@@ -5,7 +5,8 @@ const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 const DEFAULT_HOME_BY_ROLE = Object.freeze({
   admin: '/dashboard',
   warehouse_manager: '/operations/receiving',
-  warehouse_staff: '/operations/receiving',
+  warehouse_admin: '/operations/receiving',
+  warehouse_staff: '/handheld',
   accounting: '/reports',
   viewer: '/reports',
   customer_admin: '/customer',

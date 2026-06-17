@@ -2,11 +2,16 @@ import { normalizeUserRole } from './currentUserRole.js';
 import { canAccessRoute } from './permissionGuard.js';
 import { isBillingNavigationItemVisible } from './billingInvoiceDraftPermissions.js';
 import { isCustomerOpsDemoNavigationVisible } from './customerPortalPermissions.js';
+import {
+  isWarehouseNavGroupVisible,
+  isWarehouseNavItemVisible,
+} from './warehouseRolePermissions.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 const INTERNAL_ROLES = Object.freeze([
   'viewer',
   'warehouse_staff',
+  'warehouse_admin',
   'warehouse_manager',
   'accounting',
   'admin',
@@ -71,6 +76,10 @@ export function isNavigationGroupVisibleForRole(groupKey, role) {
     return false;
   }
 
+  if (['warehouse_staff', 'warehouse_admin', 'warehouse_manager'].includes(normalized)) {
+    return isWarehouseNavGroupVisible(normalized, groupKey);
+  }
+
   return true;
 }
 
@@ -89,6 +98,12 @@ export function isNavigationItemVisibleForRole(item, groupKey, role) {
 
   if (!isBillingNavigationItemVisible(item.key, role)) {
     return false;
+  }
+
+  if (['warehouse_staff', 'warehouse_admin', 'warehouse_manager'].includes(normalized)) {
+    if (!isWarehouseNavItemVisible(normalized, item.key)) {
+      return false;
+    }
   }
 
   if (item.disabled) {

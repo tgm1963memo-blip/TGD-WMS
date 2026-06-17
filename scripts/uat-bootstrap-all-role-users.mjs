@@ -27,6 +27,13 @@ const ROLE_USERS = [
     displayName: 'Demo Warehouse Manager',
   },
   {
+    email: 'warehouse.admin.demo@tgd-wms.local',
+    role: 'warehouse_admin',
+    profileId: '88888888-8888-4888-8888-888888888888',
+    customerId: null,
+    displayName: 'Demo Warehouse Admin',
+  },
+  {
     email: 'staff.demo@tgd-wms.local',
     role: 'warehouse_staff',
     profileId: '77777777-7777-4777-8777-777777777777',
