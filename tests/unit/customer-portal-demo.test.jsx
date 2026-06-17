@@ -210,8 +210,10 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     renderPage(CustomerWithdrawalRequestCreatePage);
     const form = screen.getByTestId('customer-withdrawal-request-form');
     fireEvent.change(screen.getByTestId('customer-withdrawal-dispatch-date'), { target: { value: '2026-06-16' } });
-    fireEvent.change(screen.getByTestId('customer-withdrawal-product-code'), { target: { value: 'CUS-CHKN-01' } });
-    fireEvent.change(screen.getByTestId('customer-withdrawal-product-name'), { target: { value: 'Frozen Chicken' } });
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-withdrawal-product-picker-select')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByTestId('customer-withdrawal-product-picker-select'), { target: { value: 'cat-prod-1' } });
     fireEvent.change(screen.getByTestId('customer-withdrawal-qty'), { target: { value: '5' } });
     fireEvent.change(screen.getByTestId('customer-withdrawal-pickup-contact'), { target: { value: 'Demo Pickup' } });
     fireEvent.submit(form);

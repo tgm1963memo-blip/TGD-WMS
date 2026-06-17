@@ -5,7 +5,7 @@ import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CustomerDepositLinesTable } from '../../components/customer/CustomerDepositLinesTable.jsx';
-import { CsvImportExportToolbar } from '../../components/customer/CsvImportExportToolbar.jsx';
+import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerDepositRequest,
@@ -17,11 +17,10 @@ import {
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
   downloadCustomerDepositLineTemplate,
-  exportCustomerDepositLinesCsv,
+  exportCustomerDepositLinesExcel,
   mapImportedRowsToDepositLines,
-  parseCustomerDepositLineImportRows,
-} from '../../utils/customerDepositLineCsvUtils.js';
-import { readCsvFile } from '../../utils/csvFileUtils.js';
+  parseCustomerDepositLineImportFile,
+} from '../../utils/customerDepositLineExcelUtils.js';
 import {
   createEmptyDepositLine,
   createInitialDepositLines,
@@ -201,8 +200,7 @@ export function CustomerDepositRequestCreatePage() {
     setSuccess(null);
 
     try {
-      const text = await readCsvFile(file);
-      const { rows, errors: parseErrors } = parseCustomerDepositLineImportRows(text);
+      const { rows, errors: parseErrors } = await parseCustomerDepositLineImportFile(file);
 
       if (parseErrors.length) {
         setSubmitError(parseErrors.join(' '));
@@ -216,14 +214,14 @@ export function CustomerDepositRequestCreatePage() {
       }
 
       if (!importedLines.length) {
-        setSubmitError(t('csv_import_empty'));
+        setSubmitError(t('excel_import_empty'));
         return;
       }
 
       setLines(importedLines);
       setNextLineKey(importedLines[importedLines.length - 1].key + 1);
     } catch (importError) {
-      setSubmitError(importError.message ?? t('csv_import_error'));
+      setSubmitError(importError.message ?? t('excel_import_error'));
     } finally {
       setImporting(false);
     }
@@ -276,6 +274,8 @@ export function CustomerDepositRequestCreatePage() {
         internalProductCode: line.product_code,
         productName: line.product_name,
         lotNo: line.lot_no,
+        mfgDate: line.mfg_date || null,
+        expDate: line.exp_date || null,
         expectedQty: line.expected_qty,
         expectedBoxes: line.expected_boxes,
         expectedWeight: line.expected_weight,
@@ -363,11 +363,11 @@ export function CustomerDepositRequestCreatePage() {
           <div className="customer-deposit-lines-header">
             <h3>{t('customer_deposit_lines_title')}</h3>
             <div className="action-row">
-              <CsvImportExportToolbar
+              <ExcelImportExportToolbar
                 disabled={!canWriteCustomerRequests || importing}
                 exportTestId="customer-deposit-export-button"
                 importTestId="customer-deposit-import-input"
-                onExport={() => exportCustomerDepositLinesCsv(lines)}
+                onExport={() => exportCustomerDepositLinesExcel(lines)}
                 onImportFile={handleImportFile}
                 onTemplate={downloadCustomerDepositLineTemplate}
                 templateTestId="customer-deposit-template-button"

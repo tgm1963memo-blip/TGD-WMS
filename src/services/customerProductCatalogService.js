@@ -14,6 +14,8 @@ const CATALOG_SELECT = [
   'internal_product_id',
   'uom',
   'temperature_type',
+  'argent_type',
+  'storage_charge_basis',
   'is_active',
   'note',
   'created_at',
@@ -50,6 +52,8 @@ export async function upsertCustomerProduct(payload = {}) {
     p_internal_product_id: payload.internalProductId ?? null,
     p_uom: toNullableText(payload.uom),
     p_temperature_type: toNullableText(payload.temperatureType),
+    p_argent_type: toNullableText(payload.argentType),
+    p_storage_charge_basis: toNullableText(payload.storageChargeBasis),
     p_note: toNullableText(payload.note),
     p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
   });

@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
+import { CustomerDepositRequestLinesDisplay } from '../../components/customer/CustomerDepositRequestLinesDisplay.jsx';
+import { CustomerDepositRequestPrintDocument } from '../../components/customer/CustomerDepositRequestPrintDocument.jsx';
+import { CustomerDepositStaffWorkOrderPrint } from '../../components/customer/CustomerDepositStaffWorkOrderPrint.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   reviewCustomerDepositRequest,
 } from '../../services/customerDepositRequestService.js';
+import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED'];
@@ -72,6 +77,7 @@ export function CustomerAdminDepositReviewPage() {
   }, [selectedId]);
 
   const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const branding = getDocumentBrandingConfig();
 
   async function handleReview(decision, label) {
     if (!selectedId) return;
@@ -155,22 +161,41 @@ export function CustomerAdminDepositReviewPage() {
         <div className="table-card">
           <div className="table-card-header">
             <h3>{selected.request_no}</h3>
+            <div className="action-row">
+              <Link
+                className="btn btn-secondary btn-sm"
+                data-testid={`admin-deposit-view-${selected.id}`}
+                to={`/customer/deposit-request/${selected.id}`}
+              >
+                {t('customer_request_view_button')}
+              </Link>
+              <ReportPrintActions
+                disabled={!selected}
+                renderReport={(language) => (
+                  <CustomerDepositStaffWorkOrderPrint
+                    branding={branding}
+                    header={selected}
+                    language={language}
+                    lines={lines}
+                  />
+                )}
+                title={`${selected.request_no} — Staff Work Order`}
+              />
+              <ReportPrintActions
+                disabled={!selected}
+                renderReport={(language) => (
+                  <CustomerDepositRequestPrintDocument
+                    branding={branding}
+                    header={selected}
+                    language={language}
+                    lines={lines}
+                  />
+                )}
+                title={selected.request_no}
+              />
+            </div>
           </div>
-          <div className="responsive-table">
-            <table className="data-table" data-testid="admin-deposit-review-lines-table">
-              <thead><tr><th>Line</th><th>{t('catalog_col_customer_code')}</th><th>{t('catalog_col_barcode')}</th><th>Expected</th></tr></thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr key={line.id}>
-                    <td>{line.line_no}</td>
-                    <td>{line.customer_product_code}</td>
-                    <td>{line.internal_product_code || line.customer_product_code}</td>
-                    <td>{line.expected_qty} / {line.expected_boxes} boxes / {line.expected_weight} kg</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CustomerDepositRequestLinesDisplay lines={lines} testId="admin-deposit-review-lines-table" />
         </div>
       ) : null}
       <label className="form-field"><span>Admin comment</span><textarea className="form-control" onChange={(e) => setComment(e.target.value)} rows={3} value={comment} /></label>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -89,6 +90,13 @@ function filterRequestHistoryRows(rows = [], filters = {}) {
 
     return true;
   });
+}
+
+function getRequestDetailPath(row) {
+  if (!row?.id) return null;
+  return row.request_type === 'WITHDRAWAL'
+    ? `/customer/withdrawal-request/${row.id}`
+    : `/customer/deposit-request/${row.id}`;
 }
 
 export function CustomerRequestHistoryPage() {
@@ -255,6 +263,7 @@ export function CustomerRequestHistoryPage() {
                 <th>{t('customer_col_note')}</th>
                 <th>{t('customer_history_latest_action')}</th>
                 <th>{t('customer_history_status_timeline')}</th>
+                <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -273,10 +282,17 @@ export function CustomerRequestHistoryPage() {
                   <td>
                     <RequestTimelineCell documentId={row.id} documentType={row.document_type} />
                   </td>
+                  <td>
+                    {getRequestDetailPath(row) ? (
+                      <Link className="btn btn-secondary btn-sm" to={getRequestDetailPath(row)}>
+                        {t('customer_request_view_button')}
+                      </Link>
+                    ) : '-'}
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7}>{t('customer_history_no_results')}</td>
+                  <td colSpan={8}>{t('customer_history_no_results')}</td>
                 </tr>
               )}
             </tbody>

@@ -54,6 +54,8 @@ import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdminPage.jsx';
 import { UserManagementPage } from '../features/admin/UserManagementPage.jsx';
 import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProductCatalogAdminPage.jsx';
+import { CustomerRequestPolicyAdminPage } from '../features/admin/CustomerRequestPolicyAdminPage.jsx';
+import { CustomerStorageRateRulesAdminPage } from '../features/admin/CustomerStorageRateRulesAdminPage.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../config/pageShellPresentation.js';
 import { UatOnly } from '../components/common/UatOnly.jsx';
@@ -67,9 +69,12 @@ import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.js
 import { CustomerPortalDashboardPage } from '../features/customer/CustomerPortalDashboardPage.jsx';
 import { CustomerDepositRequestPage } from '../features/customer/CustomerDepositRequestPage.jsx';
 import { CustomerDepositRequestCreatePage } from '../features/customer/CustomerDepositRequestCreatePage.jsx';
+import { CustomerDepositRequestDetailPage } from '../features/customer/CustomerDepositRequestDetailPage.jsx';
 import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
 import { CustomerWithdrawalRequestCreatePage } from '../features/customer/CustomerWithdrawalRequestCreatePage.jsx';
+import { CustomerWithdrawalRequestDetailPage } from '../features/customer/CustomerWithdrawalRequestDetailPage.jsx';
+import { CustomerFacilityUsageRequestPage } from '../features/customer/CustomerFacilityUsageRequestPage.jsx';
 import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
 import { CustomerProductCatalogPage } from '../features/customer/CustomerProductCatalogPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../features/customer/CustomerAdminDepositReviewPage.jsx';
@@ -150,15 +155,20 @@ export function AppRoutes() {
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/customer-products" element={<CustomerProductCatalogAdminPage />} />
+          <Route path="/admin/customer-request-policy" element={<CustomerRequestPolicyAdminPage />} />
+          <Route path="/admin/customer-storage-rates" element={<CustomerStorageRateRulesAdminPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
           <Route path="/customer" element={<CustomerPortalDashboardPage />} />
           <Route path="/customer/deposit-request" element={<CustomerDepositRequestPage />} />
           <Route path="/customer/deposit-request/new" element={<CustomerDepositRequestCreatePage />} />
+          <Route path="/customer/deposit-request/:requestId" element={<CustomerDepositRequestDetailPage />} />
           <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
           <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />
           <Route path="/customer/withdrawal-request/new" element={<CustomerWithdrawalRequestCreatePage />} />
+          <Route path="/customer/withdrawal-request/:requestId" element={<CustomerWithdrawalRequestDetailPage />} />
           <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
+          <Route path="/customer/facility-usage" element={<CustomerFacilityUsageRequestPage />} />
           <Route path="/customer/products" element={<CustomerProductCatalogPage />} />
           <Route path="/customer/admin/deposit-review" element={<CustomerAdminDepositReviewPage />} />
           <Route path="/customer/admin/deposit-review/:requestId" element={<CustomerAdminDepositReviewPage />} />

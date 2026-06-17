@@ -106,7 +106,7 @@ export function CustomerWithdrawalRequestListPage() {
                 <th>{t('customer_field_pickup_contact')}</th>
                 <th>{t('customer_col_note')}</th>
                 <th>{t('customer_history_latest_action')}</th>
-                {canWriteCustomerRequests ? <th>{t('catalog_col_actions')}</th> : null}
+                <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,17 +126,26 @@ export function CustomerWithdrawalRequestListPage() {
                   <td>
                     <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
                   </td>
-                  {canWriteCustomerRequests ? (
-                    <td>
+                  <td>
+                    <div className="action-row action-row--table">
                       <Link
                         className="btn btn-secondary btn-sm"
-                        data-testid={`customer-withdrawal-copy-${row.id}`}
-                        to={buildCustomerRequestCopyPath('/customer/withdrawal-request/new', row.id)}
+                        data-testid={`customer-withdrawal-view-${row.id}`}
+                        to={`/customer/withdrawal-request/${row.id}`}
                       >
-                        {t('customer_request_copy_button')}
+                        {t('customer_request_view_button')}
                       </Link>
-                    </td>
-                  ) : null}
+                      {canWriteCustomerRequests ? (
+                        <Link
+                          className="btn btn-secondary btn-sm"
+                          data-testid={`customer-withdrawal-copy-${row.id}`}
+                          to={buildCustomerRequestCopyPath('/customer/withdrawal-request/new', row.id)}
+                        >
+                          {t('customer_request_copy_button')}
+                        </Link>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               )) : (
                 <tr>

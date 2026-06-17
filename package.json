@@ -21,6 +21,7 @@
     "uat:bootstrap-warehouse": "node scripts/uat-bootstrap-warehouse-demo.mjs",
     "uat:set-warehouse-user": "node scripts/uat-set-real-warehouse-user.mjs",
     "uat:bootstrap-all-roles": "node scripts/uat-bootstrap-all-role-users.mjs",
+    "db:apply-pending": "node scripts/apply-pending-migrations.mjs",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },
   "dependencies": {
@@ -29,7 +30,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

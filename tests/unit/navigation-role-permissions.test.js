@@ -87,7 +87,8 @@ describe('navigation role permissions', () => {
     expect(labels).not.toContain('Dashboard');
     expect(labels).toContain('Portal Overview');
     expect(labels).toContain('Customer Deposit');
-    expect(labels).toContain('Customer Products');
+    expect(labels).toContain('Facility Usage');
+    expect(labels).not.toContain('Customer Products');
     expect(labels).not.toContain('Receiving');
     expect(labels).not.toContain('Billing Movement Weight');
     expect(labels).not.toContain('Master Data');

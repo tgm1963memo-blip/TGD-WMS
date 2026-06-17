@@ -87,8 +87,7 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
       await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
       await expect(page.locator('[data-testid="customer-withdrawal-request-create-page"]')).toBeVisible();
       await page.locator('[data-testid="customer-withdrawal-dispatch-date"]').fill('2026-06-16');
-      await page.locator('[data-testid="customer-withdrawal-product-code"]').fill('FRZ-SFOD-02');
-      await page.locator('[data-testid="customer-withdrawal-product-name"]').fill('Frozen Seafood');
+      await page.locator('[data-testid="customer-withdrawal-product-picker-select"]').selectOption({ index: 1 });
       await page.locator('[data-testid="customer-withdrawal-qty"]').fill('5');
       await page.locator('[data-testid="customer-withdrawal-pickup-contact"]').fill('Pickup Contact');
       await page.locator('[data-testid="customer-withdrawal-submit-button"]').click();

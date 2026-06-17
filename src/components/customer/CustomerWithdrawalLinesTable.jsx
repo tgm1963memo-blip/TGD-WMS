@@ -3,12 +3,13 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-export function CustomerDepositLinesTable({
+export function CustomerWithdrawalLinesTable({
   customerId,
+  depositOptions = [],
   lines,
   onChange,
   onRemoveLine,
-  testId = 'customer-deposit-lines-table',
+  testId = 'customer-withdrawal-lines-table',
 }) {
   const t = useTranslation();
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -59,34 +60,36 @@ export function CustomerDepositLinesTable({
   }
 
   return (
-    <div className="responsive-table customer-deposit-lines-table-wrap" data-testid={testId}>
-      <table className="data-table customer-deposit-lines-table">
+    <div className="responsive-table customer-withdrawal-lines-table-wrap" data-testid={testId}>
+      <table className="data-table customer-withdrawal-lines-table">
         <thead>
           <tr>
             <th>#</th>
             <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
             <th>{t('catalog_col_product_name')}</th>
             <th>{t('catalog_col_barcode')}</th>
+            <th>{t('customer_field_source_deposit')}</th>
             <th>{t('customer_field_lot_no')}</th>
             <th>{t('customer_col_mfg_date')}</th>
             <th>{t('customer_col_exp_date')}</th>
-            <th>{t('customer_col_expected_qty')} <span className="field-required">*</span></th>
-            <th>{t('customer_col_expected_boxes')}</th>
-            <th>{t('customer_col_expected_weight')}</th>
+            <th>{t('customer_col_requested_qty')} <span className="field-required">*</span></th>
+            <th>{t('customer_col_requested_boxes')}</th>
+            <th>{t('customer_col_requested_weight')}</th>
+            <th>{t('customer_field_picking_rule')}</th>
             <th>{t('catalog_col_argent')}</th>
             <th>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line, index) => {
-            const rowTestId = index === 0 ? 'customer-deposit-line-0' : `customer-deposit-line-${line.key}`;
+            const rowTestId = index === 0 ? 'customer-withdrawal-line-0' : `customer-withdrawal-line-${line.key}`;
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td>{index + 1}</td>
                 <td>
                   <select
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-product-picker-select' : `${rowTestId}-product-select`}
+                    data-testid={index === 0 ? 'customer-withdrawal-product-picker-select' : `${rowTestId}-product-select`}
                     onChange={(event) => selectCatalogProduct(line.key, event.target.value)}
                     value={line.catalog_product_id || ''}
                   >
@@ -99,26 +102,27 @@ export function CustomerDepositLinesTable({
                   </select>
                 </td>
                 <td>
-                  <input
+                  <input className="form-control form-control-table" disabled readOnly value={line.product_name} />
+                </td>
+                <td>
+                  <input className="form-control form-control-table" disabled readOnly value={line.product_code} />
+                </td>
+                <td>
+                  <select
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-product-name' : `${rowTestId}-product-name`}
-                    disabled
-                    readOnly
-                    value={line.product_name}
-                  />
+                    onChange={(event) => updateLine(line.key, { source_deposit_request_id: event.target.value })}
+                    value={line.source_deposit_request_id || ''}
+                  >
+                    <option value="">{t('customer_field_source_deposit_optional')}</option>
+                    {depositOptions.map((row) => (
+                      <option key={row.id} value={row.id}>{row.request_no} ({row.status})</option>
+                    ))}
+                  </select>
                 </td>
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-product-code' : `${rowTestId}-barcode`}
-                    disabled
-                    readOnly
-                    value={line.product_code}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-lot`}
                     onChange={(event) => updateLine(line.key, { lot_no: event.target.value })}
                     value={line.lot_no}
                   />
@@ -126,7 +130,6 @@ export function CustomerDepositLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-mfg-date' : `${rowTestId}-mfg-date`}
                     onChange={(event) => updateLine(line.key, { mfg_date: event.target.value })}
                     type="date"
                     value={line.mfg_date}
@@ -135,7 +138,6 @@ export function CustomerDepositLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-exp-date' : `${rowTestId}-exp-date`}
                     onChange={(event) => updateLine(line.key, { exp_date: event.target.value })}
                     type="date"
                     value={line.exp_date}
@@ -144,39 +146,46 @@ export function CustomerDepositLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-qty' : `${rowTestId}-qty`}
+                    data-testid={index === 0 ? 'customer-withdrawal-qty' : `${rowTestId}-qty`}
                     min="1"
-                    onChange={(event) => updateLine(line.key, { expected_qty: event.target.value })}
+                    onChange={(event) => updateLine(line.key, { requested_qty: event.target.value })}
                     type="number"
-                    value={line.expected_qty}
+                    value={line.requested_qty}
                   />
                 </td>
                 <td>
                   <input
                     className="form-control form-control-table"
                     min="0"
-                    onChange={(event) => updateLine(line.key, { expected_boxes: event.target.value })}
+                    onChange={(event) => updateLine(line.key, { requested_boxes: event.target.value })}
                     type="number"
-                    value={line.expected_boxes}
+                    value={line.requested_boxes}
                   />
                 </td>
                 <td>
                   <input
                     className="form-control form-control-table"
                     min="0"
-                    onChange={(event) => updateLine(line.key, { expected_weight: event.target.value })}
+                    onChange={(event) => updateLine(line.key, { requested_weight: event.target.value })}
                     step="0.01"
                     type="number"
-                    value={line.expected_weight}
+                    value={line.requested_weight}
                   />
                 </td>
                 <td>
-                  <input
+                  <select
                     className="form-control form-control-table"
-                    disabled
-                    readOnly
-                    value={line.argent_type || '-'}
-                  />
+                    data-testid={index === 0 ? 'withdrawal-picking-rule-select' : `${rowTestId}-picking-rule`}
+                    onChange={(event) => updateLine(line.key, { picking_rule: event.target.value })}
+                    value={line.picking_rule}
+                  >
+                    <option value="FEFO">FEFO</option>
+                    <option value="SPECIFIC_DEPOSIT">SPECIFIC_DEPOSIT</option>
+                    <option value="SPECIFIC_LOT">SPECIFIC_LOT</option>
+                  </select>
+                </td>
+                <td>
+                  <input className="form-control form-control-table" disabled readOnly value={line.argent_type || '-'} />
                 </td>
                 <td>
                   {lines.length > 1 ? (

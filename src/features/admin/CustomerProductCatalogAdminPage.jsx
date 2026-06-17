@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
+import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
 import { getCurrentUserProfile } from '../../services/userProfileService.js';
 import {
@@ -9,6 +10,11 @@ import {
   listCustomerProducts,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import {
+  downloadCustomerProductTemplate,
+  exportCustomerProductsExcel,
+  parseCustomerProductImportFile,
+} from '../../utils/customerProductExcelUtils.js';
 import { canWriteCustomerCatalog } from '../../security/userManagementPermissions.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -20,6 +26,8 @@ const EMPTY_FORM = {
   internalProductCode: '',
   uom: '',
   temperatureType: 'FROZEN',
+  argentType: 'NON_ARGENT',
+  storageChargeBasis: 'WEIGHT',
   note: '',
 };
 
@@ -31,6 +39,7 @@ export function CustomerProductCatalogAdminPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [canWrite, setCanWrite] = useState(false);
@@ -51,6 +60,8 @@ export function CustomerProductCatalogAdminPage() {
     { key: 'internal_product_code', header: t('catalog_col_internal_code') },
     { key: 'uom', header: t('catalog_col_uom') },
     { key: 'temperature_type', header: t('catalog_col_temperature') },
+    { key: 'argent_type', header: t('catalog_col_argent') },
+    { key: 'storage_charge_basis', header: t('catalog_col_charge_basis') },
     { key: 'is_active', header: t('catalog_col_status'), render: (row) => <StatusBadge value={row.is_active} /> },
     {
       key: 'actions',
@@ -117,6 +128,8 @@ export function CustomerProductCatalogAdminPage() {
       internalProductCode: row.internal_product_code ?? '',
       uom: row.uom ?? '',
       temperatureType: row.temperature_type ?? 'FROZEN',
+      argentType: row.argent_type ?? 'NON_ARGENT',
+      storageChargeBasis: row.storage_charge_basis ?? 'WEIGHT',
       note: row.note ?? '',
     });
     setSuccess('');
@@ -143,6 +156,8 @@ export function CustomerProductCatalogAdminPage() {
       internalProductCode: form.internalProductCode,
       uom: form.uom,
       temperatureType: form.temperatureType,
+      argentType: form.argentType,
+      storageChargeBasis: form.storageChargeBasis,
       note: form.note,
       isActive: true,
     });
@@ -174,6 +189,57 @@ export function CustomerProductCatalogAdminPage() {
 
     setSuccess(t('catalog_deactivate_success'));
     await loadProducts();
+  }
+
+  async function handleImportFile(file) {
+    if (!filterCustomerId) {
+      setError(t('catalog_import_customer_required'));
+      return;
+    }
+
+    setImporting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { rows, errors } = await parseCustomerProductImportFile(file);
+      if (errors.length) {
+        setError(errors.join(' '));
+        return;
+      }
+      if (!rows.length) {
+        setError(t('excel_import_empty'));
+        return;
+      }
+
+      let imported = 0;
+      for (const row of rows) {
+        const result = await upsertCustomerProduct({
+          customerId: filterCustomerId,
+          customerProductCode: row.customerProductCode,
+          productName: row.productName,
+          internalProductCode: row.internalProductCode,
+          uom: row.uom,
+          temperatureType: row.temperatureType,
+          argentType: row.argentType,
+          storageChargeBasis: row.storageChargeBasis,
+          note: row.note,
+          isActive: true,
+        });
+        if (result.error) {
+          setError(result.error.message ?? t('catalog_save_error'));
+          return;
+        }
+        imported += 1;
+      }
+
+      setSuccess(`${imported} ${t('excel_import_success')}`);
+      await loadProducts();
+    } catch (importError) {
+      setError(importError.message ?? t('excel_import_error'));
+    } finally {
+      setImporting(false);
+    }
   }
 
   if (!loading && !canWrite) {
@@ -215,6 +281,18 @@ export function CustomerProductCatalogAdminPage() {
             ))}
           </select>
         </label>
+        <div className="form-field">
+          <span>{t('catalog_excel_tools')}</span>
+          <ExcelImportExportToolbar
+            disabled={saving || importing}
+            exportTestId="catalog-admin-export-button"
+            importTestId="catalog-admin-import-input"
+            onExport={() => exportCustomerProductsExcel(products)}
+            onImportFile={handleImportFile}
+            onTemplate={downloadCustomerProductTemplate}
+            templateTestId="catalog-admin-template-button"
+          />
+        </div>
       </div>
 
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
@@ -278,6 +356,20 @@ export function CustomerProductCatalogAdminPage() {
               <option value="AMBIENT">AMBIENT</option>
             </select>
           </label>
+          <label className="form-field">
+            <span>{t('catalog_col_argent')}</span>
+            <select className="form-control" data-testid="catalog-admin-argent-type" onChange={(e) => updateField('argentType', e.target.value)} value={form.argentType}>
+              <option value="NON_ARGENT">NON_ARGENT</option>
+              <option value="ARGENT">ARGENT</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>{t('catalog_col_charge_basis')}</span>
+            <select className="form-control" data-testid="catalog-admin-charge-basis" onChange={(e) => updateField('storageChargeBasis', e.target.value)} value={form.storageChargeBasis}>
+              <option value="WEIGHT">WEIGHT</option>
+              <option value="PALLET">PALLET</option>
+            </select>
+          </label>
           <label className="form-field form-field-span-2">
             <span>{t('catalog_col_note')}</span>
             <textarea className="form-control" onChange={(e) => updateField('note', e.target.value)} rows={2} value={form.note} />
@@ -285,7 +377,7 @@ export function CustomerProductCatalogAdminPage() {
         </div>
         <div className="action-row">
           <button className="btn btn-secondary" onClick={startCreate} type="button">{t('close')}</button>
-          <button className="btn btn-primary" data-testid="catalog-admin-save-button" disabled={saving} type="submit">
+          <button className="btn btn-primary" data-testid="catalog-admin-save-button" disabled={saving || importing} type="submit">
             {saving ? t('catalog_saving') : t('save')}
           </button>
         </div>

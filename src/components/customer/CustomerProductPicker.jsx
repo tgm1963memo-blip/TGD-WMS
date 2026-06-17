@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 
 const MANUAL_VALUE = '__manual__';
@@ -79,9 +78,6 @@ export function CustomerProductPicker({
         <div className="banner banner-warning" role="status" data-testid={`${testId}-empty-banner`}>
           <p>{catalogOnlyEmptyLabel}</p>
           {addProductsHint ? <p>{addProductsHint}</p> : null}
-          <Link className="btn btn-secondary" data-testid={`${testId}-add-products-link`} to="/customer/products">
-            {addProductsLinkLabel ?? 'Add products'}
-          </Link>
         </div>
       </div>
     );

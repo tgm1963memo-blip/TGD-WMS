@@ -4,6 +4,7 @@ import {
   mapDepositHeaderForCopy,
   mapDepositLinesForCopy,
   mapWithdrawalFormForCopy,
+  mapWithdrawalHeaderForCopy,
   mapWithdrawalLinesForCopy,
   resolveCatalogProductId,
 } from '../../src/utils/customerRequestCopyUtils.js';
@@ -88,6 +89,27 @@ describe('customerRequestCopyUtils', () => {
       },
     ];
 
+    expect(mapWithdrawalHeaderForCopy({
+      requested_dispatch_date: '2026-06-12',
+      delivery_type: 'DELIVERY',
+      pickup_contact: 'John',
+      destination: 'Bangkok',
+      note: 'header note',
+    })).toMatchObject({
+      requested_dispatch_date: '2026-06-12',
+      delivery_type: 'DELIVERY',
+      pickup_contact: 'John',
+    });
+
+    const copiedLines = mapWithdrawalLinesForCopy(sourceLines, catalogProducts);
+    expect(copiedLines[0]).toMatchObject({
+      key: 1,
+      catalog_product_id: 'prod-1',
+      customer_product_code: 'CUS-01',
+      requested_qty: '5',
+    });
+    expect(copiedLines.length).toBeGreaterThanOrEqual(10);
+
     expect(mapWithdrawalFormForCopy({
       requested_dispatch_date: '2026-06-12',
       delivery_type: 'DELIVERY',
@@ -100,7 +122,5 @@ describe('customerRequestCopyUtils', () => {
       customer_product_code: 'CUS-01',
       delivery_type: 'DELIVERY',
     });
-
-    expect(mapWithdrawalLinesForCopy(sourceLines)).toHaveLength(2);
   });
 });

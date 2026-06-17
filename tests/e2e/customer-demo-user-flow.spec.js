@@ -24,10 +24,15 @@ test.describe('Customer demo user UAT flow', () => {
     await expect(page.getByText(/not linked to a customer|ไม่ได้เชื่อมกับลูกค้า/i)).toHaveCount(0);
   });
 
-  test('sees product catalog table', async ({ page }) => {
+  test('customer portal hides item master from navigation', async ({ page }) => {
+    await page.goto(`${getBaseUrl()}/customer`);
+    await expect(page.locator('[data-testid="customer-product-catalog-link"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="customer-product-catalog-menu-item"]')).toHaveCount(0);
+  });
+
+  test('cannot access customer product catalog page', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/products`);
-    await expect(page.locator('[data-testid="customer-product-catalog-page"]')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-testid="catalog-customer-table"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="customer-product-catalog-page"]')).toHaveCount(0);
   });
 
   test('submits deposit request using catalog product', async ({ page }) => {

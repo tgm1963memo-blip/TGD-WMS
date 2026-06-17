@@ -89,11 +89,10 @@ describe('User management + catalog frontend wiring', () => {
 
     expect(routes).toContain('/admin/users');
     expect(routes).toContain('/admin/customer-products');
-    expect(routes).toContain('/customer/products');
     expect(navigation).toContain('user_management');
-    expect(navigation).toContain('customer_product_catalog');
+    expect(navigation).not.toContain("key: 'customer_product_catalog'");
     expect(permissions).toContain("route_path: '/admin/users'");
-    expect(permissions).toContain("route_path: '/customer/products'");
+    expect(permissions).toContain("route_path: '/customer/products', route_name: 'CustomerProductCatalogPage', permission_area: 'customer_catalog', minimum_role: 'admin'");
   });
 
   it('wires catalog picker into deposit and withdrawal forms', () => {
@@ -101,7 +100,7 @@ describe('User management + catalog frontend wiring', () => {
     const withdrawal = read(path.join(process.cwd(), 'src/features/customer/CustomerWithdrawalRequestCreatePage.jsx'));
 
     expect(deposit).toContain('CustomerDepositLinesTable');
-    expect(deposit).toContain('CsvImportExportToolbar');
-    expect(withdrawal).toContain('CustomerProductPicker');
+    expect(deposit).toContain('ExcelImportExportToolbar');
+    expect(withdrawal).toContain('CustomerWithdrawalLinesTable');
   });
 });

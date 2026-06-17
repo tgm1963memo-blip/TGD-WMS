@@ -1,0 +1,36 @@
+import { execSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+const ROOT = process.cwd();
+
+const MIGRATIONS = [
+  '053_tgd_wms_customer_request_policy.sql',
+  '054_tgd_wms_item_master_and_request_line_extensions.sql',
+  '055_tgd_wms_customer_request_execution_bridge.sql',
+  '056_tgd_wms_facility_usage_and_storage_rate_rules.sql',
+];
+
+function runSql(sql, label) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'tgd-migration-'));
+  const filePath = path.join(dir, `${label}.sql`);
+  writeFileSync(filePath, sql, 'utf8');
+  console.log(`Applying ${label}...`);
+  execSync(`npx supabase db query --linked -f "${filePath}"`, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  console.log(`Applied ${label}`);
+}
+
+function main() {
+  for (const fileName of MIGRATIONS) {
+    const filePath = path.join(ROOT, 'database', 'migrations', fileName);
+    const sql = readFileSync(filePath, 'utf8');
+    runSql(sql, fileName.replace('.sql', ''));
+  }
+  console.log(JSON.stringify({ ok: true, applied: MIGRATIONS }, null, 2));
+}
+
+main();

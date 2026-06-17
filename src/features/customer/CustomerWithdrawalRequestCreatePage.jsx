@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
-import { CustomerProductPicker } from '../../components/customer/CustomerProductPicker.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
+import { CustomerWithdrawalLinesTable } from '../../components/customer/CustomerWithdrawalLinesTable.jsx';
 import { CUSTOMER_WITHDRAWAL_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerWithdrawalRequest,
@@ -15,25 +15,21 @@ import {
 import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
-  mapWithdrawalFormForCopy,
+  mapWithdrawalHeaderForCopy,
   mapWithdrawalLinesForCopy,
 } from '../../utils/customerRequestCopyUtils.js';
+import {
+  createEmptyWithdrawalLine,
+  createInitialWithdrawalLines,
+  getFilledWithdrawalLines,
+  WITHDRAWAL_LINE_DEFAULT_COUNT,
+} from '../../utils/customerWithdrawalLineDefaults.js';
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-const INITIAL_FORM = {
-  catalog_product_id: '',
+const INITIAL_HEADER = {
   requested_dispatch_date: '',
-  source_deposit_request_id: '',
-  lot_no: '',
-  customer_product_code: '',
-  internal_product_code: '',
-  product_name: '',
-  requested_qty: '',
-  requested_boxes: '',
-  requested_weight: '',
-  picking_rule: 'FEFO',
   delivery_type: 'PICKUP',
   pickup_contact: '',
   destination: '',
@@ -47,9 +43,9 @@ export function CustomerWithdrawalRequestCreatePage() {
   const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [copiedWithdrawalLines, setCopiedWithdrawalLines] = useState([]);
-  const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
+  const [header, setHeader] = useState(INITIAL_HEADER);
+  const [lines, setLines] = useState(() => createInitialWithdrawalLines());
+  const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
   const [depositOptions, setDepositOptions] = useState([]);
   const [success, setSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');
@@ -65,7 +61,6 @@ export function CustomerWithdrawalRequestCreatePage() {
       setCopyLoading(false);
       setCopySourceNo('');
       setCopyError('');
-      setCopiedWithdrawalLines([]);
       return undefined;
     }
 
@@ -100,10 +95,11 @@ export function CustomerWithdrawalRequestCreatePage() {
         return;
       }
 
-      const sourceLines = linesResult.data ?? [];
+      const copiedLines = mapWithdrawalLinesForCopy(linesResult.data ?? [], catalogResult.data ?? []);
       setCopySourceNo(headerResult.data.withdrawal_no ?? copyFromId);
-      setForm(mapWithdrawalFormForCopy(headerResult.data, sourceLines, catalogResult.data ?? []));
-      setCopiedWithdrawalLines(mapWithdrawalLinesForCopy(sourceLines));
+      setHeader(mapWithdrawalHeaderForCopy(headerResult.data));
+      setLines(copiedLines);
+      setNextLineKey(copiedLines.length + 1);
       setCopyLoading(false);
     })();
 
@@ -129,41 +125,6 @@ export function CustomerWithdrawalRequestCreatePage() {
     };
   }, [effectiveCustomerId]);
 
-  function buildWithdrawalLinesForSubmit() {
-    if (!copiedWithdrawalLines.length) {
-      return [{
-        sourceDepositRequestId: form.source_deposit_request_id || null,
-        sourceLotNo: form.lot_no,
-        customerProductCode: form.customer_product_code,
-        internalProductCode: form.internal_product_code,
-        productName: form.product_name,
-        requestedQty: form.requested_qty,
-        requestedBoxes: form.requested_boxes,
-        requestedWeight: form.requested_weight,
-        pickingRule: form.picking_rule,
-        note: form.note,
-      }];
-    }
-
-    return copiedWithdrawalLines.map((line, index) => (
-      index === 0
-        ? {
-          ...line,
-          sourceDepositRequestId: form.source_deposit_request_id || line.sourceDepositRequestId,
-          sourceLotNo: form.lot_no || line.sourceLotNo,
-          customerProductCode: form.customer_product_code || line.customerProductCode,
-          internalProductCode: form.internal_product_code || line.internalProductCode,
-          productName: form.product_name || line.productName,
-          requestedQty: form.requested_qty || line.requestedQty,
-          requestedBoxes: form.requested_boxes || line.requestedBoxes,
-          requestedWeight: form.requested_weight || line.requestedWeight,
-          pickingRule: form.picking_rule || line.pickingRule,
-          note: form.note || line.note,
-        }
-        : line
-    ));
-  }
-
   if (copyLoading) {
     return (
       <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-create-page">
@@ -172,8 +133,24 @@ export function CustomerWithdrawalRequestCreatePage() {
     );
   }
 
-  function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+  function updateHeaderField(field, value) {
+    setHeader((current) => ({ ...current, [field]: value }));
+    setSuccess(null);
+    setSubmitError('');
+  }
+
+  function addLine() {
+    setLines((current) => [...current, createEmptyWithdrawalLine(nextLineKey)]);
+    setNextLineKey((current) => current + 1);
+    setSuccess(null);
+    setSubmitError('');
+  }
+
+  function removeLine(lineKey) {
+    setLines((current) => {
+      if (current.length <= 1) return current;
+      return current.filter((line) => line.key !== lineKey);
+    });
     setSuccess(null);
     setSubmitError('');
   }
@@ -193,14 +170,20 @@ export function CustomerWithdrawalRequestCreatePage() {
       return;
     }
 
+    const activeLines = getFilledWithdrawalLines(lines);
+    if (!activeLines.length) {
+      setSubmitError(t('customer_deposit_catalog_required'));
+      return;
+    }
+
     setSubmitting(true);
 
     const createResult = await createCustomerWithdrawalRequest({
-      requestedDispatchDate: form.requested_dispatch_date,
-      deliveryType: form.delivery_type,
-      pickupContact: form.pickup_contact,
-      destination: form.destination,
-      note: form.note,
+      requestedDispatchDate: header.requested_dispatch_date,
+      deliveryType: header.delivery_type,
+      pickupContact: header.pickup_contact,
+      destination: header.destination,
+      note: header.note,
       customerId: isRequestProxy ? proxyCustomerId : null,
     });
 
@@ -211,22 +194,24 @@ export function CustomerWithdrawalRequestCreatePage() {
     }
 
     const requestId = createResult.data?.id;
-    const linesToSave = buildWithdrawalLinesForSubmit();
 
-    for (let index = 0; index < linesToSave.length; index += 1) {
-      const line = linesToSave[index];
+    for (let index = 0; index < activeLines.length; index += 1) {
+      const line = activeLines[index];
       const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
         lineNo: index + 1,
-        sourceDepositRequestId: line.sourceDepositRequestId,
-        sourceLotNo: line.sourceLotNo,
-        customerProductCode: line.customerProductCode,
-        internalProductCode: line.internalProductCode,
-        productName: line.productName,
-        requestedQty: line.requestedQty,
-        requestedBoxes: line.requestedBoxes,
-        requestedWeight: line.requestedWeight,
-        pickingRule: line.pickingRule,
-        note: line.note,
+        sourceDepositRequestId: line.source_deposit_request_id || null,
+        sourceLotNo: line.lot_no,
+        customerProductCode: line.customer_product_code,
+        internalProductCode: line.product_code,
+        productName: line.product_name,
+        lotNo: line.lot_no,
+        mfgDate: line.mfg_date || null,
+        expDate: line.exp_date || null,
+        requestedQty: line.requested_qty,
+        requestedBoxes: line.requested_boxes,
+        requestedWeight: line.requested_weight,
+        pickingRule: line.picking_rule,
+        note: header.note,
       });
 
       if (lineResult.error) {
@@ -240,7 +225,7 @@ export function CustomerWithdrawalRequestCreatePage() {
 
     setSuccess({
       requestNo: createResult.data?.withdrawal_no ?? requestId,
-      lineCount: linesToSave.length,
+      lineCount: activeLines.length,
     });
   }
 
@@ -265,12 +250,6 @@ export function CustomerWithdrawalRequestCreatePage() {
         </div>
       ) : null}
 
-      {copiedWithdrawalLines.length > 1 ? (
-        <div className="banner banner-info" role="status">
-          {t('customer_withdrawal_copy_multi_line_hint').replace('{count}', String(copiedWithdrawalLines.length))}
-        </div>
-      ) : null}
-
       {copyError ? (
         <div className="banner banner-danger" role="alert">{copyError}</div>
       ) : null}
@@ -283,7 +262,7 @@ export function CustomerWithdrawalRequestCreatePage() {
       {success ? (
         <div className="alert-success-panel" data-testid="customer-withdrawal-live-success-alert" role="status">
           {t('customer_withdrawal_live_success')} — {t('customer_request_copy_success_number')}: {success.requestNo}
-          {success.lineCount ? ` (${success.lineCount} lines)` : ''}
+          {success.lineCount ? ` (${success.lineCount} ${t('customer_deposit_line_count_label')})` : ''}
           {' '}
           <Link to="/customer/withdrawal-request">{t('customer_withdrawal_back_to_list')}</Link>
         </div>
@@ -300,103 +279,48 @@ export function CustomerWithdrawalRequestCreatePage() {
           />
         ) : null}
 
+        <div className="customer-deposit-lines-panel">
+          <div className="customer-deposit-lines-header">
+            <h3>{t('customer_withdrawal_lines_title')}</h3>
+            <div className="action-row">
+              <button className="btn btn-secondary" data-testid="customer-withdrawal-add-line-button" onClick={addLine} type="button">
+                {t('customer_deposit_add_line')}
+              </button>
+            </div>
+          </div>
+
+          <CustomerWithdrawalLinesTable
+            customerId={effectiveCustomerId}
+            depositOptions={depositOptions}
+            lines={lines}
+            onChange={setLines}
+            onRemoveLine={removeLine}
+          />
+        </div>
+
         <div className="form-grid">
           <label className="form-field">
-            <span>Source deposit request</span>
-            <select
-              className="form-control"
-              data-testid="withdrawal-source-deposit-select"
-              onChange={(e) => updateField('source_deposit_request_id', e.target.value)}
-              value={form.source_deposit_request_id}
-            >
-              <option value="">Optional source deposit</option>
-              {depositOptions.map((row) => (
-                <option key={row.id} value={row.id}>{row.request_no} ({row.status})</option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span>Source lot</span>
-            <input className="form-control" data-testid="withdrawal-lot-select" onChange={(e) => updateField('lot_no', e.target.value)} value={form.lot_no} />
-          </label>
-          <label className="form-field">
-            <span>Picking rule</span>
-            <select className="form-control" data-testid="withdrawal-picking-rule-select" onChange={(e) => updateField('picking_rule', e.target.value)} value={form.picking_rule}>
-              <option value="FEFO">FEFO</option>
-              <option value="SPECIFIC_DEPOSIT">SPECIFIC_DEPOSIT</option>
-              <option value="SPECIFIC_LOT">SPECIFIC_LOT</option>
-            </select>
-          </label>
-          <label className="form-field">
             <span>{t('customer_field_requested_dispatch_date')}</span>
-            <input className="form-control" data-testid="customer-withdrawal-dispatch-date" onChange={(e) => updateField('requested_dispatch_date', e.target.value)} required type="date" value={form.requested_dispatch_date} />
-          </label>
-          <div className="form-field form-field-span-2">
-            <CustomerProductPicker
-              customerId={effectiveCustomerId}
-              manualLabel={t('catalog_manual_entry')}
-              onChange={(selection) => {
-                setForm((current) => ({
-                  ...current,
-                  catalog_product_id: selection.catalogProductId,
-                  customer_product_code: selection.customerProductCode,
-                  internal_product_code: selection.internalProductCode,
-                  product_name: selection.productName,
-                }));
-                setSuccess(null);
-                setSubmitError('');
-              }}
-              testId="customer-withdrawal-product-picker"
-              value={{
-                catalogProductId: form.catalog_product_id,
-                customerProductCode: form.customer_product_code,
-                internalProductCode: form.internal_product_code,
-                productName: form.product_name,
-              }}
-            />
-          </div>
-          <label className="form-field">
-            <span>Customer product code</span>
-            <input className="form-control" data-testid="customer-withdrawal-product-code" disabled={catalogLocked} onChange={(e) => updateField('customer_product_code', e.target.value)} required value={form.customer_product_code} />
-          </label>
-          <label className="form-field">
-            <span>Internal product code</span>
-            <input className="form-control" disabled={catalogLocked} onChange={(e) => updateField('internal_product_code', e.target.value)} value={form.internal_product_code} />
-          </label>
-          <label className="form-field">
-            <span>{t('customer_field_product_name')}</span>
-            <input className="form-control" data-testid="customer-withdrawal-product-name" disabled={catalogLocked} onChange={(e) => updateField('product_name', e.target.value)} required value={form.product_name} />
-          </label>
-          <label className="form-field">
-            <span>Requested quantity</span>
-            <input className="form-control" data-testid="customer-withdrawal-qty" min="1" onChange={(e) => updateField('requested_qty', e.target.value)} required type="number" value={form.requested_qty} />
-          </label>
-          <label className="form-field">
-            <span>Requested boxes</span>
-            <input className="form-control" min="0" onChange={(e) => updateField('requested_boxes', e.target.value)} type="number" value={form.requested_boxes} />
-          </label>
-          <label className="form-field">
-            <span>Requested weight (kg)</span>
-            <input className="form-control" min="0" onChange={(e) => updateField('requested_weight', e.target.value)} step="0.01" type="number" value={form.requested_weight} />
+            <input className="form-control" data-testid="customer-withdrawal-dispatch-date" onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required type="date" value={header.requested_dispatch_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_delivery_type')}</span>
-            <select className="form-control" onChange={(e) => updateField('delivery_type', e.target.value)} value={form.delivery_type}>
+            <select className="form-control" onChange={(e) => updateHeaderField('delivery_type', e.target.value)} value={header.delivery_type}>
               <option value="PICKUP">PICKUP</option>
               <option value="DELIVERY">DELIVERY</option>
             </select>
           </label>
           <label className="form-field">
             <span>{t('customer_field_pickup_contact')}</span>
-            <input className="form-control" data-testid="customer-withdrawal-pickup-contact" onChange={(e) => updateField('pickup_contact', e.target.value)} required value={form.pickup_contact} />
+            <input className="form-control" data-testid="customer-withdrawal-pickup-contact" onChange={(e) => updateHeaderField('pickup_contact', e.target.value)} required value={header.pickup_contact} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_destination')}</span>
-            <input className="form-control" onChange={(e) => updateField('destination', e.target.value)} value={form.destination} />
+            <input className="form-control" onChange={(e) => updateHeaderField('destination', e.target.value)} value={header.destination} />
           </label>
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>
-            <textarea className="form-control" onChange={(e) => updateField('note', e.target.value)} rows={3} value={form.note} />
+            <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
           </label>
         </div>
         <div className="action-row customer-portal-form-actions">

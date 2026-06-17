@@ -2,6 +2,10 @@ import {
   createEmptyDepositLine,
   DEPOSIT_LINE_DEFAULT_COUNT,
 } from './customerDepositLineDefaults.js';
+import {
+  createEmptyWithdrawalLine,
+  WITHDRAWAL_LINE_DEFAULT_COUNT,
+} from './customerWithdrawalLineDefaults.js';
 
 function toFormValue(value) {
   if (value === null || typeof value === 'undefined') return '';
@@ -26,6 +30,24 @@ export function resolveCatalogProductId(line, catalogProducts = []) {
   return matched?.id ?? (customerCode || internalCode ? '__manual__' : '');
 }
 
+function catalogFieldsFromLine(line, catalogProducts = []) {
+  const catalogProductId = resolveCatalogProductId(line, catalogProducts);
+  if (!catalogProductId || catalogProductId === '__manual__') {
+    return {
+      catalog_product_id: catalogProductId,
+      argent_type: line.argent_type ?? '',
+      temperature_type: line.temperature_type ?? 'FROZEN',
+    };
+  }
+
+  const product = catalogProducts.find((row) => row.id === catalogProductId);
+  return {
+    catalog_product_id: catalogProductId,
+    argent_type: product?.argent_type ?? 'NON_ARGENT',
+    temperature_type: product?.temperature_type ?? 'FROZEN',
+  };
+}
+
 export function mapDepositHeaderForCopy(source) {
   return {
     expected_arrival_date: source?.expected_arrival_date ?? '',
@@ -38,15 +60,16 @@ export function mapDepositHeaderForCopy(source) {
 export function mapDepositLinesForCopy(sourceLines = [], catalogProducts = []) {
   const copied = sourceLines.map((line, index) => ({
     key: index + 1,
-    catalog_product_id: resolveCatalogProductId(line, catalogProducts),
+    ...catalogFieldsFromLine(line, catalogProducts),
     customer_product_code: line.customer_product_code ?? '',
     product_code: line.internal_product_code ?? '',
     product_name: line.product_name ?? '',
     lot_no: line.lot_no ?? '',
+    mfg_date: line.mfg_date ?? '',
+    exp_date: line.exp_date ?? '',
     expected_qty: toFormValue(line.expected_qty),
     expected_boxes: toFormValue(line.expected_boxes),
     expected_weight: toFormValue(line.expected_weight),
-    temperature_type: line.temperature_type ?? 'FROZEN',
   }));
 
   if (!copied.length) {
@@ -63,12 +86,55 @@ export function mapDepositLinesForCopy(sourceLines = [], catalogProducts = []) {
   return padded;
 }
 
+export function mapWithdrawalHeaderForCopy(source) {
+  return {
+    requested_dispatch_date: source?.requested_dispatch_date ?? '',
+    delivery_type: source?.delivery_type ?? 'PICKUP',
+    pickup_contact: source?.pickup_contact ?? '',
+    destination: source?.destination ?? '',
+    note: source?.note ?? '',
+  };
+}
+
+export function mapWithdrawalLinesForCopy(sourceLines = [], catalogProducts = []) {
+  const copied = sourceLines.map((line, index) => ({
+    key: index + 1,
+    ...catalogFieldsFromLine(line, catalogProducts),
+    customer_product_code: line.customer_product_code ?? '',
+    product_code: line.internal_product_code ?? '',
+    product_name: line.product_name ?? '',
+    source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
+    lot_no: line.source_lot_no ?? line.lot_no ?? '',
+    mfg_date: line.mfg_date ?? '',
+    exp_date: line.exp_date ?? '',
+    requested_qty: toFormValue(line.requested_qty),
+    requested_boxes: toFormValue(line.requested_boxes),
+    requested_weight: toFormValue(line.requested_weight),
+    picking_rule: line.picking_rule ?? 'FEFO',
+  }));
+
+  if (!copied.length) {
+    return Array.from({ length: WITHDRAWAL_LINE_DEFAULT_COUNT }, (_, index) => createEmptyWithdrawalLine(index + 1));
+  }
+
+  const targetCount = Math.max(WITHDRAWAL_LINE_DEFAULT_COUNT, copied.length);
+  const padded = [...copied];
+
+  for (let index = copied.length; index < targetCount; index += 1) {
+    padded.push(createEmptyWithdrawalLine(index + 1));
+  }
+
+  return padded;
+}
+
+/** @deprecated use mapWithdrawalHeaderForCopy + mapWithdrawalLinesForCopy */
 export function mapWithdrawalFormForCopy(source, sourceLines = [], catalogProducts = []) {
   const firstLine = sourceLines[0] ?? {};
+  const header = mapWithdrawalHeaderForCopy(source);
 
   return {
+    ...header,
     catalog_product_id: resolveCatalogProductId(firstLine, catalogProducts),
-    requested_dispatch_date: source?.requested_dispatch_date ?? '',
     source_deposit_request_id: firstLine.source_customer_deposit_request_id ?? '',
     lot_no: firstLine.source_lot_no ?? '',
     customer_product_code: firstLine.customer_product_code ?? '',
@@ -78,14 +144,10 @@ export function mapWithdrawalFormForCopy(source, sourceLines = [], catalogProduc
     requested_boxes: toFormValue(firstLine.requested_boxes),
     requested_weight: toFormValue(firstLine.requested_weight),
     picking_rule: firstLine.picking_rule ?? 'FEFO',
-    delivery_type: source?.delivery_type ?? 'PICKUP',
-    pickup_contact: source?.pickup_contact ?? '',
-    destination: source?.destination ?? '',
-    note: source?.note ?? '',
   };
 }
 
-export function mapWithdrawalLinesForCopy(sourceLines = []) {
+export function mapWithdrawalLinesForSubmit(sourceLines = []) {
   return sourceLines.map((line) => ({
     sourceDepositRequestId: line.source_customer_deposit_request_id ?? null,
     sourceLotNo: line.source_lot_no ?? '',
