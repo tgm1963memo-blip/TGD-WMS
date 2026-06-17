@@ -2,6 +2,8 @@ import { normalizeUserRole } from './currentUserRole.js';
 import { canAccessRoute } from './permissionGuard.js';
 import { isBillingNavigationItemVisible } from './billingInvoiceDraftPermissions.js';
 import { isCustomerOpsDemoNavigationVisible } from './customerPortalPermissions.js';
+import { CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS } from './customerRequestProxyPermissions.js';
+import { isCustomerRequestProxyRole } from '../services/customerPortalServiceUtils.js';
 import {
   isWarehouseNavGroupVisible,
   isWarehouseNavItemVisible,
@@ -69,7 +71,7 @@ export function isNavigationGroupVisibleForRole(groupKey, role) {
   }
 
   if (groupKey === CUSTOMER_PORTAL_GROUP) {
-    return normalized === 'admin';
+    return normalized === 'admin' || isCustomerRequestProxyRole(normalized);
   }
 
   if (normalized === 'accounting' && ACCOUNTING_HIDDEN_GROUPS.has(groupKey)) {
@@ -96,12 +98,23 @@ export function isNavigationItemVisibleForRole(item, groupKey, role) {
     return false;
   }
 
+  if (
+    groupKey === CUSTOMER_PORTAL_GROUP
+    && isCustomerRequestProxyRole(normalized)
+    && normalized !== 'admin'
+    && !CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS.includes(item.key)
+  ) {
+    return false;
+  }
+
   if (!isBillingNavigationItemVisible(item.key, role)) {
     return false;
   }
 
   if (['warehouse_staff', 'warehouse_admin', 'warehouse_manager'].includes(normalized)) {
-    if (!isWarehouseNavItemVisible(normalized, item.key)) {
+    const isProxyPortalItem = groupKey === CUSTOMER_PORTAL_GROUP
+      && CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS.includes(item.key);
+    if (!isProxyPortalItem && !isWarehouseNavItemVisible(normalized, item.key)) {
       return false;
     }
   }

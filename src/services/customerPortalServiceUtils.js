@@ -25,3 +25,13 @@ export function toNullableText(value) {
 
 export const CUSTOMER_PORTAL_WRITE_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 export const CUSTOMER_PORTAL_ADMIN_REVIEW_ROLES = Object.freeze(['admin', 'accounting']);
+export const CUSTOMER_REQUEST_PROXY_ROLES = Object.freeze([
+  'admin',
+  'warehouse_admin',
+  'warehouse_manager',
+  'warehouse_staff',
+]);
+
+export function isCustomerRequestProxyRole(role) {
+  return CUSTOMER_REQUEST_PROXY_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}

@@ -5,27 +5,32 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { listCustomerWithdrawalRequests } from '../../services/customerWithdrawalRequestService.js';
+import { getCustomers } from '../../services/masterDataService.js';
+import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerWithdrawalRequestListPage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests, loading: profileLoading } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
+  const [customerNames, setCustomerNames] = useState({});
 
   useEffect(() => {
     let active = true;
 
     if (profileLoading) return undefined;
 
-    if (!customerId) {
+    if (!isRequestProxy && !customerId) {
       setState({ rows: [], loading: false, error: null });
       return undefined;
     }
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    listCustomerWithdrawalRequests({ customerId }).then((result) => {
+    const filters = isRequestProxy ? {} : { customerId };
+
+    listCustomerWithdrawalRequests(filters).then((result) => {
       if (!active) return;
       setState({
         rows: result.data ?? [],
@@ -34,10 +39,21 @@ export function CustomerWithdrawalRequestListPage() {
       });
     });
 
+    if (isRequestProxy) {
+      getCustomers().then((result) => {
+        if (!active) return;
+        const names = {};
+        (result.data ?? []).forEach((customer) => {
+          names[customer.id] = customer.name ?? customer.code ?? customer.id;
+        });
+        setCustomerNames(names);
+      });
+    }
+
     return () => {
       active = false;
     };
-  }, [customerId, profileLoading]);
+  }, [customerId, profileLoading, isRequestProxy]);
 
   if (profileLoading || state.loading) {
     return (
@@ -47,11 +63,13 @@ export function CustomerWithdrawalRequestListPage() {
     );
   }
 
+  const columnCount = isRequestProxy ? 9 : 8;
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-page">
       <PageHeader
         title={t('customer_withdrawal_title')}
-        description={t('customer_withdrawal_list_description')}
+        description={isRequestProxy ? t('customer_withdrawal_list_proxy_description') : t('customer_withdrawal_list_description')}
         actions={canWriteCustomerRequests ? (
           <Link className="btn btn-primary" data-testid="customer-withdrawal-create-button" to="/customer/withdrawal-request/new">
             {t('customer_withdrawal_create_button')}
@@ -60,7 +78,11 @@ export function CustomerWithdrawalRequestListPage() {
       />
       <CustomerPortalLiveBanner />
 
-      {!customerId ? (
+      {isRequestProxy ? (
+        <div className="banner banner-info" role="status">{t('customer_request_proxy_scope_banner')}</div>
+      ) : null}
+
+      {!isRequestProxy && !customerId ? (
         <div className="banner banner-warning" role="status">{t('customer_portal_no_customer_scope')}</div>
       ) : null}
 
@@ -77,18 +99,21 @@ export function CustomerWithdrawalRequestListPage() {
             <thead>
               <tr>
                 <th>{t('customer_col_request_no')}</th>
+                {isRequestProxy ? <th>{t('customer_col_customer_name')}</th> : null}
                 <th>{t('customer_col_status')}</th>
                 <th>{t('customer_field_requested_dispatch_date')}</th>
                 <th>{t('customer_field_delivery_type')}</th>
                 <th>{t('customer_field_pickup_contact')}</th>
                 <th>{t('customer_col_note')}</th>
                 <th>{t('customer_history_latest_action')}</th>
+                {canWriteCustomerRequests ? <th>{t('catalog_col_actions')}</th> : null}
               </tr>
             </thead>
             <tbody>
               {state.rows.length ? state.rows.map((row) => (
                 <tr key={row.id}>
                   <td>{row.withdrawal_no}</td>
+                  {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {row.status}
@@ -101,10 +126,21 @@ export function CustomerWithdrawalRequestListPage() {
                   <td>
                     <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
                   </td>
+                  {canWriteCustomerRequests ? (
+                    <td>
+                      <Link
+                        className="btn btn-secondary btn-sm"
+                        data-testid={`customer-withdrawal-copy-${row.id}`}
+                        to={buildCustomerRequestCopyPath('/customer/withdrawal-request/new', row.id)}
+                      >
+                        {t('customer_request_copy_button')}
+                      </Link>
+                    </td>
+                  ) : null}
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7}>{t('customer_withdrawal_list_empty')}</td>
+                  <td colSpan={columnCount}>{t('customer_withdrawal_list_empty')}</td>
                 </tr>
               )}
             </tbody>

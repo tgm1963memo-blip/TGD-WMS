@@ -21,24 +21,29 @@ describe('navigation role permissions', () => {
     expect(hasRoleAccess('admin', 'customer_user')).toBe(true);
   });
 
-  it('warehouse_staff sees handheld only', () => {
+  it('warehouse_staff sees handheld and customer deposit/withdrawal menus', () => {
     const labels = visibleLabelsForRole('warehouse_staff');
 
     expect(labels).not.toContain('Dashboard');
     expect(labels).not.toContain('Receiving');
     expect(labels).toContain('Scan Center');
+    expect(labels).toContain('Customer Deposit');
+    expect(labels).toContain('Customer Withdrawal');
     expect(labels).not.toContain('Portal Overview');
   });
 
-  it('warehouse_admin sees deposit, withdrawal, and stock balance menus', () => {
+  it('warehouse_admin sees deposit, withdrawal, stock balance, and customer request menus', () => {
     const labels = visibleLabelsForRole('warehouse_admin');
 
     expect(labels).toContain('Receiving');
     expect(labels).toContain('Withdrawal Request');
     expect(labels).toContain('Stock Balance');
+    expect(labels).toContain('Customer Deposit');
+    expect(labels).toContain('Customer Withdrawal');
     expect(labels).not.toContain('Transfer');
     expect(labels).not.toContain('Scan Center');
     expect(labels).not.toContain('Adjustment');
+    expect(labels).not.toContain('Portal Overview');
   });
 
   it('warehouse_manager sees all warehouse operation menus', () => {
@@ -100,6 +105,8 @@ describe('navigation role permissions', () => {
 
   it('allows warehouse admin to access deposit review route without showing customer portal menu', () => {
     expect(isNavigationPathVisibleForRole('warehouse_admin', '/customer/admin/deposit-review')).toBe(true);
+    expect(isNavigationPathVisibleForRole('warehouse_admin', '/customer/deposit-request')).toBe(true);
+    expect(isNavigationPathVisibleForRole('warehouse_staff', '/customer/deposit-request/new')).toBe(true);
     expect(isNavigationItemVisibleForRole(
       { key: 'customer_portal_home', label: 'Portal Overview', path: '/customer' },
       'customer_portal',

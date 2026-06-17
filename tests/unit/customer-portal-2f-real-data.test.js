@@ -32,6 +32,7 @@ describe('CUSTOMER-PORTAL-2F service and UI real data switch', () => {
   it('defines deposit create/edit/submit RPC wrappers', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/services/customerDepositRequestService.js'), 'utf8');
     expect(source).toContain("supabase.rpc('tgd_create_customer_deposit_request'");
+    expect(source).toContain('p_customer_id: customerId');
     expect(source).toContain("supabase.rpc('tgd_upsert_customer_deposit_request_line'");
     expect(source).toContain("supabase.rpc('tgd_submit_customer_deposit_request'");
     expect(source).toContain("supabase.rpc('tgd_review_customer_deposit_request'");
@@ -41,6 +42,7 @@ describe('CUSTOMER-PORTAL-2F service and UI real data switch', () => {
   it('defines withdrawal create/edit/submit RPC wrappers', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/services/customerWithdrawalRequestService.js'), 'utf8');
     expect(source).toContain("supabase.rpc('tgd_create_customer_withdrawal_request'");
+    expect(source).toContain('p_customer_id: customerId');
     expect(source).toContain("supabase.rpc('tgd_upsert_customer_withdrawal_request_line'");
     expect(source).toContain("supabase.rpc('tgd_submit_customer_withdrawal_request'");
     expect(source).not.toContain('tgd_post_dispatch_document');

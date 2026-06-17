@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getCurrentUserProfile } from '../../services/userProfileService.js';
-import { CUSTOMER_PORTAL_WRITE_ROLES } from '../../services/customerPortalServiceUtils.js';
+import { CUSTOMER_PORTAL_WRITE_ROLES, isCustomerRequestProxyRole } from '../../services/customerPortalServiceUtils.js';
 
 export function useCustomerPortalProfile() {
   const { session, loading: authLoading } = useAuth();
@@ -41,12 +41,17 @@ export function useCustomerPortalProfile() {
 
   const role = state.profile?.role ?? '';
   const customerId = state.profile?.customer_id ?? null;
-  const canWriteCustomerRequests = CUSTOMER_PORTAL_WRITE_ROLES.includes(role) && Boolean(customerId);
+  const isRequestProxy = isCustomerRequestProxyRole(role);
+  const canWriteCustomerRequests = (
+    (CUSTOMER_PORTAL_WRITE_ROLES.includes(role) && Boolean(customerId))
+    || isRequestProxy
+  );
 
   return {
     ...state,
     role,
     customerId,
+    isRequestProxy,
     canWriteCustomerRequests,
   };
 }

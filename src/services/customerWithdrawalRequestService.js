@@ -87,6 +87,7 @@ export async function createCustomerWithdrawalRequest({
   pickupContact,
   destination,
   note,
+  customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -96,6 +97,7 @@ export async function createCustomerWithdrawalRequest({
     p_pickup_contact: pickupContact,
     p_destination: toNullableText(destination),
     p_note: toNullableText(note),
+    p_customer_id: customerId,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

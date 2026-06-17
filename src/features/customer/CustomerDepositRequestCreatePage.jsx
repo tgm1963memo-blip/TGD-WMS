@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
@@ -8,6 +9,8 @@ import { CsvImportExportToolbar } from '../../components/customer/CsvImportExpor
 import { CUSTOMER_DEPOSIT_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerDepositRequest,
+  getCustomerDepositRequest,
+  listCustomerDepositRequestLines,
   submitCustomerDepositRequest,
   upsertCustomerDepositRequestLine,
 } from '../../services/customerDepositRequestService.js';
@@ -25,6 +28,11 @@ import {
   DEPOSIT_LINE_DEFAULT_COUNT,
   getFilledDepositLines,
 } from '../../utils/customerDepositLineDefaults.js';
+import {
+  mapDepositHeaderForCopy,
+  mapDepositLinesForCopy,
+} from '../../utils/customerRequestCopyUtils.js';
+import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -43,7 +51,11 @@ function formatFileSize(size) {
 
 export function CustomerDepositRequestCreatePage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
+  const [searchParams] = useSearchParams();
+  const copyFromId = searchParams.get('copyFrom');
+  const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
+  const [proxyCustomerId, setProxyCustomerId] = useState('');
+  const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialDepositLines());
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
@@ -55,15 +67,74 @@ export function CustomerDepositRequestCreatePage() {
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [copySourceNo, setCopySourceNo] = useState('');
+  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId));
+  const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
     let active = true;
-    if (!customerId) {
-      setCatalogProducts([]);
+
+    if (!copyFromId) {
+      setCopyLoading(false);
+      setCopySourceNo('');
+      setCopyError('');
       return undefined;
     }
 
-    listCustomerProducts({ customerId, activeOnly: true }).then((result) => {
+    setCopyLoading(true);
+    setCopyError('');
+
+    (async () => {
+      const headerResult = await getCustomerDepositRequest(copyFromId);
+      if (!active) return;
+
+      if (headerResult.error || !headerResult.data) {
+        setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+        setCopyLoading(false);
+        return;
+      }
+
+      if (isRequestProxy) {
+        setProxyCustomerId(headerResult.data.customer_id ?? '');
+      }
+
+      const sourceCustomerId = headerResult.data.customer_id;
+      const [linesResult, catalogResult] = await Promise.all([
+        listCustomerDepositRequestLines(copyFromId),
+        listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+      ]);
+
+      if (!active) return;
+
+      if (linesResult.error) {
+        setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+        setCopyLoading(false);
+        return;
+      }
+
+      const catalogRows = catalogResult.data ?? [];
+      setCatalogProducts(catalogRows);
+      setCopySourceNo(headerResult.data.request_no ?? copyFromId);
+      setHeader(mapDepositHeaderForCopy(headerResult.data));
+      const copiedLines = mapDepositLinesForCopy(linesResult.data ?? [], catalogRows);
+      setLines(copiedLines);
+      setNextLineKey(copiedLines.length + 1);
+      setCopyLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [copyFromId, isRequestProxy, t]);
+
+  useEffect(() => {
+    let active = true;
+    if (!effectiveCustomerId || copyFromId) {
+      if (!copyFromId) setCatalogProducts([]);
+      return undefined;
+    }
+
+    listCustomerProducts({ customerId: effectiveCustomerId, activeOnly: true }).then((result) => {
       if (!active) return;
       setCatalogProducts(result.data ?? []);
     });
@@ -71,7 +142,15 @@ export function CustomerDepositRequestCreatePage() {
     return () => {
       active = false;
     };
-  }, [customerId]);
+  }, [effectiveCustomerId, copyFromId]);
+
+  if (copyLoading) {
+    return (
+      <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-create-page">
+        <LoadingState message={t('customer_request_copy_loading')} />
+      </section>
+    );
+  }
 
   function updateHeaderField(field, value) {
     setHeader((current) => ({ ...current, [field]: value }));
@@ -160,6 +239,11 @@ export function CustomerDepositRequestCreatePage() {
       return;
     }
 
+    if (isRequestProxy && !proxyCustomerId) {
+      setSubmitError(t('customer_request_proxy_customer_required'));
+      return;
+    }
+
     const activeLines = getFilledDepositLines(lines);
     if (!activeLines.length) {
       setSubmitError(t('customer_deposit_catalog_required'));
@@ -173,6 +257,7 @@ export function CustomerDepositRequestCreatePage() {
       contactName: header.contact_name,
       contactPhone: header.contact_phone,
       note: header.note,
+      customerId: isRequestProxy ? proxyCustomerId : null,
     });
 
     if (createResult.error) {
@@ -234,6 +319,18 @@ export function CustomerDepositRequestCreatePage() {
       />
       <CustomerPortalLiveBanner />
 
+      <p className="form-helper" data-testid="customer-deposit-auto-number-hint">{t('customer_request_auto_number_hint')}</p>
+
+      {copySourceNo ? (
+        <div className="banner banner-info" data-testid="customer-deposit-copy-banner" role="status">
+          {t('customer_request_copy_banner').replace('{sourceNo}', copySourceNo)}
+        </div>
+      ) : null}
+
+      {copyError ? (
+        <div className="banner banner-danger" role="alert">{copyError}</div>
+      ) : null}
+
       <div className="customer-process-card">
         <h3>Deposit status timeline</h3>
         <CustomerProcessTimeline
@@ -245,7 +342,7 @@ export function CustomerDepositRequestCreatePage() {
 
       {success ? (
         <div className="alert-success-panel" data-testid="customer-deposit-live-success-alert" role="status">
-          {t('customer_deposit_live_success')} ({success.requestNo}, {success.lineCount} {t('customer_deposit_line_count_label')})
+          {t('customer_deposit_live_success')} — {t('customer_request_copy_success_number')}: {success.requestNo} ({success.lineCount} {t('customer_deposit_line_count_label')})
           {' '}
           <Link to="/customer/deposit-request">{t('customer_deposit_back_to_list')}</Link>
         </div>
@@ -254,6 +351,14 @@ export function CustomerDepositRequestCreatePage() {
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-deposit-request-form" onSubmit={handleSubmit}>
+        {isRequestProxy ? (
+          <CustomerRequestCustomerPicker
+            onChange={setProxyCustomerId}
+            testId="customer-deposit-proxy-customer-select"
+            value={proxyCustomerId}
+          />
+        ) : null}
+
         <div className="customer-deposit-lines-panel">
           <div className="customer-deposit-lines-header">
             <h3>{t('customer_deposit_lines_title')}</h3>
@@ -274,7 +379,7 @@ export function CustomerDepositRequestCreatePage() {
           </div>
 
           <CustomerDepositLinesTable
-            customerId={customerId}
+            customerId={effectiveCustomerId}
             lines={lines}
             onChange={setLines}
             onRemoveLine={removeLine}

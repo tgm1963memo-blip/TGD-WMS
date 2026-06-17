@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerProductPicker } from '../../components/customer/CustomerProductPicker.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CUSTOMER_WITHDRAWAL_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerWithdrawalRequest,
+  getCustomerWithdrawalRequest,
+  listCustomerWithdrawalRequestLines,
   upsertCustomerWithdrawalRequestLine,
 } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import {
+  mapWithdrawalFormForCopy,
+  mapWithdrawalLinesForCopy,
+} from '../../utils/customerRequestCopyUtils.js';
+import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -33,22 +42,84 @@ const INITIAL_FORM = {
 
 export function CustomerWithdrawalRequestCreatePage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
+  const [searchParams] = useSearchParams();
+  const copyFromId = searchParams.get('copyFrom');
+  const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
+  const [proxyCustomerId, setProxyCustomerId] = useState('');
+  const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [form, setForm] = useState(INITIAL_FORM);
+  const [copiedWithdrawalLines, setCopiedWithdrawalLines] = useState([]);
   const catalogLocked = Boolean(form.catalog_product_id && form.catalog_product_id !== '__manual__');
   const [depositOptions, setDepositOptions] = useState([]);
   const [success, setSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [copySourceNo, setCopySourceNo] = useState('');
+  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId));
+  const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
     let active = true;
-    if (!customerId) {
+
+    if (!copyFromId) {
+      setCopyLoading(false);
+      setCopySourceNo('');
+      setCopyError('');
+      setCopiedWithdrawalLines([]);
+      return undefined;
+    }
+
+    setCopyLoading(true);
+    setCopyError('');
+
+    (async () => {
+      const headerResult = await getCustomerWithdrawalRequest(copyFromId);
+      if (!active) return;
+
+      if (headerResult.error || !headerResult.data) {
+        setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+        setCopyLoading(false);
+        return;
+      }
+
+      if (isRequestProxy) {
+        setProxyCustomerId(headerResult.data.customer_id ?? '');
+      }
+
+      const sourceCustomerId = headerResult.data.customer_id;
+      const [linesResult, catalogResult] = await Promise.all([
+        listCustomerWithdrawalRequestLines(copyFromId),
+        listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+      ]);
+
+      if (!active) return;
+
+      if (linesResult.error) {
+        setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+        setCopyLoading(false);
+        return;
+      }
+
+      const sourceLines = linesResult.data ?? [];
+      setCopySourceNo(headerResult.data.withdrawal_no ?? copyFromId);
+      setForm(mapWithdrawalFormForCopy(headerResult.data, sourceLines, catalogResult.data ?? []));
+      setCopiedWithdrawalLines(mapWithdrawalLinesForCopy(sourceLines));
+      setCopyLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [copyFromId, isRequestProxy, t]);
+
+  useEffect(() => {
+    let active = true;
+    if (!effectiveCustomerId) {
       setDepositOptions([]);
       return undefined;
     }
 
-    listCustomerDepositRequests({ customerId }).then((result) => {
+    listCustomerDepositRequests({ customerId: effectiveCustomerId }).then((result) => {
       if (!active) return;
       setDepositOptions(result.data ?? []);
     });
@@ -56,7 +127,50 @@ export function CustomerWithdrawalRequestCreatePage() {
     return () => {
       active = false;
     };
-  }, [customerId]);
+  }, [effectiveCustomerId]);
+
+  function buildWithdrawalLinesForSubmit() {
+    if (!copiedWithdrawalLines.length) {
+      return [{
+        sourceDepositRequestId: form.source_deposit_request_id || null,
+        sourceLotNo: form.lot_no,
+        customerProductCode: form.customer_product_code,
+        internalProductCode: form.internal_product_code,
+        productName: form.product_name,
+        requestedQty: form.requested_qty,
+        requestedBoxes: form.requested_boxes,
+        requestedWeight: form.requested_weight,
+        pickingRule: form.picking_rule,
+        note: form.note,
+      }];
+    }
+
+    return copiedWithdrawalLines.map((line, index) => (
+      index === 0
+        ? {
+          ...line,
+          sourceDepositRequestId: form.source_deposit_request_id || line.sourceDepositRequestId,
+          sourceLotNo: form.lot_no || line.sourceLotNo,
+          customerProductCode: form.customer_product_code || line.customerProductCode,
+          internalProductCode: form.internal_product_code || line.internalProductCode,
+          productName: form.product_name || line.productName,
+          requestedQty: form.requested_qty || line.requestedQty,
+          requestedBoxes: form.requested_boxes || line.requestedBoxes,
+          requestedWeight: form.requested_weight || line.requestedWeight,
+          pickingRule: form.picking_rule || line.pickingRule,
+          note: form.note || line.note,
+        }
+        : line
+    ));
+  }
+
+  if (copyLoading) {
+    return (
+      <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-create-page">
+        <LoadingState message={t('customer_request_copy_loading')} />
+      </section>
+    );
+  }
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -74,6 +188,11 @@ export function CustomerWithdrawalRequestCreatePage() {
       return;
     }
 
+    if (isRequestProxy && !proxyCustomerId) {
+      setSubmitError(t('customer_request_proxy_customer_required'));
+      return;
+    }
+
     setSubmitting(true);
 
     const createResult = await createCustomerWithdrawalRequest({
@@ -82,6 +201,7 @@ export function CustomerWithdrawalRequestCreatePage() {
       pickupContact: form.pickup_contact,
       destination: form.destination,
       note: form.note,
+      customerId: isRequestProxy ? proxyCustomerId : null,
     });
 
     if (createResult.error) {
@@ -91,28 +211,36 @@ export function CustomerWithdrawalRequestCreatePage() {
     }
 
     const requestId = createResult.data?.id;
-    const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
-      sourceDepositRequestId: form.source_deposit_request_id || null,
-      sourceLotNo: form.lot_no,
-      customerProductCode: form.customer_product_code,
-      internalProductCode: form.internal_product_code,
-      productName: form.product_name,
-      requestedQty: form.requested_qty,
-      requestedBoxes: form.requested_boxes,
-      requestedWeight: form.requested_weight,
-      pickingRule: form.picking_rule,
-      note: form.note,
-    });
+    const linesToSave = buildWithdrawalLinesForSubmit();
+
+    for (let index = 0; index < linesToSave.length; index += 1) {
+      const line = linesToSave[index];
+      const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
+        lineNo: index + 1,
+        sourceDepositRequestId: line.sourceDepositRequestId,
+        sourceLotNo: line.sourceLotNo,
+        customerProductCode: line.customerProductCode,
+        internalProductCode: line.internalProductCode,
+        productName: line.productName,
+        requestedQty: line.requestedQty,
+        requestedBoxes: line.requestedBoxes,
+        requestedWeight: line.requestedWeight,
+        pickingRule: line.pickingRule,
+        note: line.note,
+      });
+
+      if (lineResult.error) {
+        setSubmitting(false);
+        setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+    }
 
     setSubmitting(false);
 
-    if (lineResult.error) {
-      setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
-      return;
-    }
-
     setSuccess({
       requestNo: createResult.data?.withdrawal_no ?? requestId,
+      lineCount: linesToSave.length,
     });
   }
 
@@ -129,6 +257,24 @@ export function CustomerWithdrawalRequestCreatePage() {
       />
       <CustomerPortalLiveBanner />
 
+      <p className="form-helper" data-testid="customer-withdrawal-auto-number-hint">{t('customer_request_auto_number_hint')}</p>
+
+      {copySourceNo ? (
+        <div className="banner banner-info" data-testid="customer-withdrawal-copy-banner" role="status">
+          {t('customer_request_copy_banner').replace('{sourceNo}', copySourceNo)}
+        </div>
+      ) : null}
+
+      {copiedWithdrawalLines.length > 1 ? (
+        <div className="banner banner-info" role="status">
+          {t('customer_withdrawal_copy_multi_line_hint').replace('{count}', String(copiedWithdrawalLines.length))}
+        </div>
+      ) : null}
+
+      {copyError ? (
+        <div className="banner banner-danger" role="alert">{copyError}</div>
+      ) : null}
+
       <div className="customer-process-card">
         <h3>Withdrawal status timeline</h3>
         <CustomerProcessTimeline statuses={CUSTOMER_WITHDRAWAL_STATUSES} testId="customer-withdrawal-status-timeline" />
@@ -136,7 +282,8 @@ export function CustomerWithdrawalRequestCreatePage() {
 
       {success ? (
         <div className="alert-success-panel" data-testid="customer-withdrawal-live-success-alert" role="status">
-          {t('customer_withdrawal_live_success')} ({success.requestNo})
+          {t('customer_withdrawal_live_success')} — {t('customer_request_copy_success_number')}: {success.requestNo}
+          {success.lineCount ? ` (${success.lineCount} lines)` : ''}
           {' '}
           <Link to="/customer/withdrawal-request">{t('customer_withdrawal_back_to_list')}</Link>
         </div>
@@ -145,6 +292,14 @@ export function CustomerWithdrawalRequestCreatePage() {
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-withdrawal-request-form" onSubmit={handleSubmit}>
+        {isRequestProxy ? (
+          <CustomerRequestCustomerPicker
+            onChange={setProxyCustomerId}
+            testId="customer-withdrawal-proxy-customer-select"
+            value={proxyCustomerId}
+          />
+        ) : null}
+
         <div className="form-grid">
           <label className="form-field">
             <span>Source deposit request</span>
@@ -178,7 +333,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           </label>
           <div className="form-field form-field-span-2">
             <CustomerProductPicker
-              customerId={customerId}
+              customerId={effectiveCustomerId}
               manualLabel={t('catalog_manual_entry')}
               onChange={(selection) => {
                 setForm((current) => ({

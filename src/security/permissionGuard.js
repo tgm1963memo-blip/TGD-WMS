@@ -7,6 +7,7 @@
  */
 
 import { getRoutePermission } from './routePermissionCatalog.js';
+import { canCustomerRequestProxyAccessRoute } from './customerRequestProxyPermissions.js';
 import { canWarehouseRoleAccessRoute } from './warehouseRolePermissions.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
@@ -75,6 +76,18 @@ export function canAccessRoute(userRole, routePath) {
       reason: 'Warehouse role route allowlist',
     };
   }
+
+  const proxyDecision = canCustomerRequestProxyAccessRoute(userRole, routePath);
+  if (proxyDecision === true) {
+    return {
+      allowed: true,
+      required_role: normalizeRole(userRole),
+      permission_area: 'customer_portal',
+      access_level: 'write',
+      reason: 'Customer request proxy role route allowlist',
+    };
+  }
+
   if (warehouseDecision === false) {
     return {
       allowed: false,

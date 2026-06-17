@@ -84,6 +84,7 @@ export async function createCustomerDepositRequest({
   contactName,
   contactPhone,
   note,
+  customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -92,6 +93,7 @@ export async function createCustomerDepositRequest({
     p_contact_name: contactName,
     p_contact_phone: contactPhone,
     p_note: toNullableText(note),
+    p_customer_id: customerId,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
