@@ -1,5 +1,5 @@
 export const brandConfig = {
-  brandName: 'TGC Cold Storage WMS',
+  brandName: 'TG Cold Storage WMS',
   companyNameTh: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด',
   companyNameEn: 'TG Cold Storage Co., Ltd.',
   logoPath: '/brand/tgc-logo.svg',

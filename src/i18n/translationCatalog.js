@@ -326,7 +326,7 @@ Object.assign(TRANSLATION_CATALOG, {
 });
 
 Object.assign(TRANSLATION_CATALOG, {
-  tgm_cold_storage_wms: { th: 'TGC Cold Storage WMS', en: 'TGC Cold Storage WMS' },
+  tgm_cold_storage_wms: { th: 'TG Cold Storage WMS', en: 'TG Cold Storage WMS' },
   thai_german_meat_product: { th: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด', en: 'TG Cold Storage Co., Ltd.' },
   premium_dashboard: { th: 'แดชบอร์ดองค์กรสำหรับคลังเย็น', en: 'Premium dashboard' },
   refresh_data: { th: 'รีเฟรชข้อมูล', en: 'Refresh data' },
@@ -397,7 +397,7 @@ Object.assign(TRANSLATION_CATALOG, {
   'nav.stockAging': { th: 'อายุการจัดเก็บ', en: 'Stock Aging' },
   'nav.operationSummary': { th: 'สรุปการทำงาน', en: 'Operation Summary' },
   'nav.systemAdministration': { th: 'ผู้ดูแลระบบ', en: 'System Administration' },
-  'nav.masterData': { th: 'ข้อมูลหลัก', en: 'Master Data' },
+  'nav.masterData': { th: 'ข้อมูลลูกค้า', en: 'Customer Data' },
   'nav.usersAndRoles': { th: 'ผู้ใช้และสิทธิ์', en: 'Users and Roles' },
   'nav.auditLog': { th: 'บันทึกการตรวจสอบ', en: 'Audit Log' },
 });
@@ -738,6 +738,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_deposit_submit: { th: 'บันทึกร่างคำขอฝาก', en: 'Save Deposit Draft' },
   customer_deposit_demo_success: { th: 'สร้างคำขอฝากตัวอย่างแล้ว — ยังไม่มีการโพสต์เอกสารรับเข้า', en: 'Deposit request draft created for demo. No receiving document has been posted.' },
   customer_deposit_live_success: { th: 'บันทึกร่างคำขอฝากแล้ว', en: 'Deposit request draft saved.' },
+  customer_deposit_submit_success: { th: 'ส่งคำขอฝากสินค้าเรียบร้อยแล้ว กำลังนำท่านไปหน้ารายการ...', en: 'Deposit request submitted. Redirecting to list...' },
   customer_deposit_submitting: { th: 'กำลังบันทึกร่างคำขอฝาก...', en: 'Saving deposit draft...' },
   customer_deposit_catalog_required: { th: 'กรุณาเลือกสินค้าจากรายการสินค้าของลูกค้าทุกบรรทัด', en: 'Select a catalog product for every deposit line.' },
   customer_deposit_lines_title: { th: 'รายการสินค้าที่แจ้งฝาก', en: 'Products to deposit' },
@@ -920,8 +921,8 @@ Object.assign(TRANSLATION_CATALOG, {
   withdrawal_customer_withdrawal_section_title: { th: 'รายการแจ้งเบิกจากลูกค้า', en: 'Customer withdrawal notifications' },
   withdrawal_customer_withdrawal_section_hint: { th: 'รายการที่ลูกค้าแจ้งเบิก — ตรวจสอบหรือคัดลอกเพื่อสร้างใบใหม่', en: 'Customer-submitted withdrawal requests — review or copy to create a new request.' },
   withdrawal_customer_withdrawal_empty: { th: 'ยังไม่มีรายการแจ้งเบิกจากลูกค้า', en: 'No customer withdrawal notifications yet.' },
-  withdrawal_review_customer_button: { th: 'ตรวจสอบ', en: 'Review' },
-  receiving_review_deposit_button: { th: 'ตรวจสอบ', en: 'Review' },
+  withdrawal_review_customer_button: { th: 'ดูรายละเอียด', en: 'View detail' },
+  receiving_review_deposit_button: { th: 'ดูรายละเอียด', en: 'View detail' },
   admin_deposit_review_title: { th: 'ตรวจสอบใบแจ้งฝากลูกค้า', en: 'Admin Deposit Review' },
   admin_deposit_review_description: { th: 'ตรวจสอบและอนุมัติใบแจ้งฝากจากลูกค้า', en: 'Review and approve customer deposit requests.' },
   admin_deposit_review_table_title: { th: 'รายการรอตรวจสอบ', en: 'Requests pending review' },
@@ -952,6 +953,76 @@ export function getTranslation(key, language) {
   // fallback to default language
   return entry[DEFAULT_LANGUAGE] || '';
 }
+
+Object.assign(TRANSLATION_CATALOG, {
+  // Admin deposit / withdrawal new action buttons
+  admin_open_work_order: { th: 'เปิดใบงาน', en: 'Open Work Order' },
+  admin_confirm_receiving: { th: 'ยืนยันการรับเข้า', en: 'Confirm Receiving' },
+  admin_confirm_withdrawal: { th: 'ยืนยันเบิกสินค้า', en: 'Confirm Withdrawal' },
+  admin_work_order_opened: { th: 'เปิดใบงานแล้ว — ส่งไปยัง Handheld เพื่อรับสินค้า', en: 'Work order opened — sent to handheld for receiving.' },
+  admin_receiving_confirmed: { th: 'ยืนยันการรับสินค้าเรียบร้อย', en: 'Receiving confirmed.' },
+  admin_withdrawal_confirmed: { th: 'ยืนยันการเบิกสินค้าเรียบร้อย', en: 'Withdrawal confirmed.' },
+  admin_reject_reason_label: { th: 'เหตุผลการปฏิเสธ', en: 'Rejection reason' },
+  admin_reject_reason_placeholder: { th: 'ระบุเหตุผลการปฏิเสธ...', en: 'Enter rejection reason...' },
+  admin_notify_customer_title: { th: 'ส่งเอกสารแจ้งลูกค้า', en: 'Notify Customer' },
+  admin_notify_customer_description: { th: 'ต้องการส่งเอกสารแจ้งลูกค้าหรือไม่? สามารถเพิ่มบันทึกพิเศษได้', en: 'Would you like to send a notification to the customer? You may add an optional note.' },
+  admin_notify_customer_note_label: { th: 'บันทึกเพิ่มเติมถึงลูกค้า', en: 'Additional note to customer' },
+  admin_notify_customer_note_placeholder: { th: 'ข้อความถึงลูกค้า (ไม่บังคับ)...', en: 'Message to customer (optional)...' },
+  admin_skip_notify: { th: 'ข้ามการแจ้ง', en: 'Skip notification' },
+  admin_received_qty: { th: 'จำนวนที่รับจริง', en: 'Received Qty' },
+  admin_received_boxes: { th: 'กล่องที่รับจริง', en: 'Received Boxes' },
+  admin_picked_qty: { th: 'จำนวนที่หยิบจริง', en: 'Picked Qty' },
+  admin_recount_button: { th: 'ตรวจนับใหม่ หากไม่ตรง', en: 'Recount if mismatch' },
+  admin_recount_title: { th: 'ตรวจนับสินค้า', en: 'Recount Item' },
+  admin_recount_saved: { th: 'บันทึกการตรวจนับแล้ว', en: 'Recount saved.' },
+  admin_withdrawal_review_table_title: { th: 'รายการรอตรวจสอบ', en: 'Requests pending review' },
+  admin_staff_work_order: { th: 'ใบงานพนักงาน', en: 'Staff Work Order' },
+  admin_customer_deposit_document: { th: 'เอกสารฝากลูกค้า', en: 'Customer Deposit Document' },
+  // Handheld workflow
+  handheld_mode_receive: { th: 'รับสินค้าเข้า', en: 'Receive Goods' },
+  handheld_mode_receive_desc: { th: 'รับสินค้าตามใบแจ้งฝากลูกค้า', en: 'Receive goods from customer deposit requests.' },
+  handheld_mode_pick: { th: 'เบิกสินค้าออก', en: 'Pick Goods' },
+  handheld_mode_pick_desc: { th: 'หยิบสินค้าตามใบขอเบิกลูกค้า', en: 'Pick goods from customer withdrawal requests.' },
+  handheld_select_work_order: { th: 'เลือกใบงานรับสินค้า', en: 'Select Receiving Work Order' },
+  handheld_select_picking_order: { th: 'เลือกใบงานเบิกสินค้า', en: 'Select Picking Work Order' },
+  handheld_select_product_line: { th: 'เลือกรายการสินค้า', en: 'Select Product Line' },
+  handheld_enter_received_qty: { th: 'บันทึกจำนวนที่รับ', en: 'Enter Received Quantity' },
+  handheld_enter_pick_qty: { th: 'บันทึกจำนวนที่หยิบ', en: 'Enter Pick Quantity' },
+  handheld_scan_pallet: { th: 'สแกน Pallet', en: 'Scan Pallet' },
+  handheld_scan_lot_pallet: { th: 'สแกน Lot / Pallet', en: 'Scan Lot / Pallet' },
+  handheld_select_location: { th: 'เลือกตำแหน่งจัดเก็บ', en: 'Select Storage Location' },
+  handheld_source_location: { th: 'ตำแหน่งต้นทาง', en: 'Source Location' },
+  handheld_confirm_receiving: { th: 'ยืนยันการรับสินค้า', en: 'Confirm Receiving' },
+  handheld_confirm_picking: { th: 'ยืนยันการหยิบสินค้า', en: 'Confirm Picking' },
+  handheld_confirm_receive_action: { th: 'ยืนยันรับสินค้า ✓', en: 'Confirm Receive ✓' },
+  handheld_confirm_pick_action: { th: 'ยืนยันหยิบสินค้า ✓', en: 'Confirm Pick ✓' },
+  handheld_receiving_complete: { th: 'รับสินค้าสำเร็จ!', en: 'Receiving Complete!' },
+  handheld_picking_complete: { th: 'หยิบสินค้าสำเร็จ!', en: 'Picking Complete!' },
+  handheld_next_line: { th: 'รายการถัดไป', en: 'Next Line' },
+  handheld_new_work_order: { th: 'ใบงานใหม่', en: 'New Work Order' },
+  handheld_session_summary: { th: 'สรุปรายการในครั้งนี้', en: 'Session Summary' },
+  handheld_no_work_orders: { th: 'ยังไม่มีใบงานที่รอรับสินค้า', en: 'No work orders pending receiving.' },
+  handheld_no_picking_orders: { th: 'ยังไม่มีใบงานที่รอหยิบสินค้า', en: 'No work orders pending picking.' },
+  handheld_pallet_placeholder: { th: 'สแกนหรือพิมพ์รหัส Pallet', en: 'Scan or type Pallet ID' },
+  handheld_lot_placeholder: { th: 'สแกนหรือพิมพ์รหัส Lot', en: 'Scan or type Lot No.' },
+  handheld_scan_or_enter: { th: 'สแกนบาร์โค้ดหรือพิมพ์ด้วยตนเอง', en: 'Scan barcode or enter manually.' },
+  handheld_work_order: { th: 'ใบงาน', en: 'Work Order' },
+  handheld_row: { th: 'แถว', en: 'Row' },
+  handheld_shelf: { th: 'ชั้น', en: 'Shelf' },
+  handheld_lot_mismatch: { th: 'Lot ไม่ตรงกับที่ระบุในเอกสาร', en: 'Lot does not match document' },
+  handheld_receiving_go: { th: 'ไป Handheld', en: 'Go to Handheld' },
+  // Handheld step labels
+  handheld_step_select_doc: { th: 'เลือกใบงาน', en: 'Select Doc' },
+  handheld_step_select_line: { th: 'เลือกสินค้า', en: 'Select Item' },
+  handheld_step_enter_qty: { th: 'บันทึกจำนวน', en: 'Enter Qty' },
+  handheld_step_scan_pallet: { th: 'Pallet', en: 'Pallet' },
+  handheld_step_scan_lot: { th: 'Lot/Pallet', en: 'Lot/Pallet' },
+  handheld_step_location: { th: 'ตำแหน่ง', en: 'Location' },
+  handheld_step_confirm: { th: 'ยืนยัน', en: 'Confirm' },
+  // Misc
+  expected: { th: 'ที่คาดไว้', en: 'expected' },
+  requested_qty: { th: 'จำนวนที่ขอ', en: 'Requested Qty' },
+});
 
 /** List all translation keys. */
 export function listTranslationKeys() {

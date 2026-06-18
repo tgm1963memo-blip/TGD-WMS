@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { DashboardInventorySection } from './DashboardInventorySection.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
+import { WarehouseLayoutWidget } from './WarehouseLayoutWidget.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
@@ -219,7 +219,13 @@ export function DashboardPage() {
         </DashboardSection>
       ) : null}
 
-      <DashboardInventorySection />
+      {/* Warehouse Layout Map */}
+      <DashboardSection title={language === 'th' ? 'แผนผังคลังสินค้า' : 'Warehouse Layout Map'}>
+        <div style={{ margin: '-8px -16px', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--tgd-border)' }}>
+          <WarehouseLayoutWidget />
+        </div>
+      </DashboardSection>
+
     </section>
   );
 }

@@ -14,7 +14,7 @@ import {
 /**
  * Professional Black & Gold sidebar navigation (approved mockup style).
  */
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }) {
   const t = useTranslation();
   const { role: userRole } = useUserRole();
   const goLive = isGoLivePresentationEnabled();
@@ -28,10 +28,13 @@ export function Sidebar() {
   ).map((group) => ({
     ...group,
     items: group.items.filter((item) => isNavigationItemVisible(item.key)),
+  })).map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.disabled),
   })).filter((group) => group.items.length > 0);
 
   return (
-    <aside className="sidebar app-sidebar" aria-label="Primary navigation" data-testid="sidebar">
+    <aside className={`sidebar app-sidebar${isOpen ? ' sidebar--mobile-open' : ''}`} aria-label="Primary navigation" data-testid="sidebar">
       <div className="sidebar-header tgm-sidebar-brand">
         <img alt="TGC logo" className="tgm-sidebar-logo" src={brandConfig.logoPath} />
         <span className="sidebar-header-title">TGC WMS</span>
@@ -44,19 +47,6 @@ export function Sidebar() {
               <div className="nav-list">
                 {group.items.map((item) => {
                   const itemLabel = t(getNavKey(item.key)) || item.label;
-                  if (item.disabled) {
-                    return (
-                      <span
-                        key={item.key}
-                        className="nav-link nav-item disabled"
-                        aria-disabled="true"
-                        title="Coming soon"
-                      >
-                        {itemLabel}
-                      </span>
-                    );
-                  }
-
                   return (
                     <NavLink
                       key={item.key}
@@ -65,6 +55,7 @@ export function Sidebar() {
                       }
                       to={item.path}
                       data-testid={item.testId}
+                      onClick={onClose}
                     >
                       {itemLabel}
                     </NavLink>

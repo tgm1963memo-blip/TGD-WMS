@@ -34,6 +34,7 @@ import { DispatchDetailPage } from '../features/operations/dispatch/DispatchDeta
 import { OutboundDraftPage } from '../features/operations/outbound/OutboundDraftPage.jsx';
 import { OutboundListPage } from '../features/operations/outbound/OutboundListPage.jsx';
 import { HandheldPage } from '../features/handheld/HandheldPage.jsx';
+import { InventoryBalancePage } from '../features/inventory/InventoryBalancePage.jsx';
 import { StockCountPage } from '../features/stock-count/StockCountPage.jsx';
 import { StockCountCreatePage } from '../features/stock-count/StockCountCreatePage.jsx';
 import { StockCountDetailPage } from '../features/stock-count/StockCountDetailPage.jsx';
@@ -53,6 +54,7 @@ import { DocumentBrandingPreviewPage } from '../features/admin/DocumentBrandingP
 import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdminPage.jsx';
 import { UserManagementPage } from '../features/admin/UserManagementPage.jsx';
+import { WarehouseLocationSetupPage } from '../features/admin/WarehouseLocationSetupPage.jsx';
 import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProductCatalogAdminPage.jsx';
 import { CustomerRequestPolicyAdminPage } from '../features/admin/CustomerRequestPolicyAdminPage.jsx';
 import { CustomerStorageRateRulesAdminPage } from '../features/admin/CustomerStorageRateRulesAdminPage.jsx';
@@ -101,6 +103,9 @@ export function AppRoutes() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AuthGuard />}>
         <Route element={<RoutePermissionGuard />}>
+          {/* Handheld scanner — full-screen mobile, no sidebar */}
+          <Route path="/handheld" element={<HandheldPage />} />
+
           <Route element={<AppLayout />}>
           <Route index element={<DefaultHomeRedirect />} />
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -137,7 +142,7 @@ export function AppRoutes() {
           <Route path="/operations/dispatch/:id" element={<DispatchDetailPage />} />
           <Route path="/operations/outbound" element={<OutboundListPage />} />
           <Route path="/operations/outbound-draft" element={<OutboundDraftPage />} />
-          <Route path="/handheld" element={<HandheldPage />} />
+          <Route path="/inventory" element={<InventoryBalancePage />} />
           <Route path="/stock-count" element={<StockCountPage />} />
           <Route path="/stock-count/new" element={<StockCountCreatePage />} />
           <Route path="/stock-count/:id" element={<StockCountDetailPage />} />
@@ -156,6 +161,7 @@ export function AppRoutes() {
           <Route path="/admin/document-branding-preview" element={<DocumentBrandingPreviewPage />} />
           <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/admin/warehouse-locations" element={<WarehouseLocationSetupPage />} />
           <Route path="/admin/customer-products" element={<CustomerProductCatalogAdminPage />} />
           <Route path="/admin/customer-request-policy" element={<CustomerRequestPolicyAdminPage />} />
           <Route path="/admin/customer-storage-rates" element={<CustomerStorageRateRulesAdminPage />} />

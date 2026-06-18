@@ -45,7 +45,7 @@ async function getStockQuantityTotal() {
 
   const legacyResult = await supabase
     .from('tgd_stock_balances')
-    .select('qty_on_hand, qty_available');
+    .select('qty_on_hand');
 
   if (legacyResult.error) {
     throw legacyResult.error;

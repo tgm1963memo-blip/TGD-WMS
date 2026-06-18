@@ -151,7 +151,7 @@ export async function getStorageAgingRows(filters = {}) {
   const query = applyStorageAgingFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, qty_available, uom, created_at')
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
       .order('created_at', { ascending: true }),
     filters,
   );

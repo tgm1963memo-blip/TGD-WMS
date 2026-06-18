@@ -1,10 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 
+const HIDDEN_CODE_POINTS = new Set([
+  0xfeff,
+  0x200b,
+  0x200c,
+  0x200d,
+  0x00ad,
+  0x2060,
+]);
+
+function cleanValue(value, { trim = true } = {}) {
+  const cleaned = String(value || '')
+    .split('')
+    .filter((char) => !HIDDEN_CODE_POINTS.has(char.charCodeAt(0)))
+    .join('');
+  return trim ? cleaned.trim() : cleaned;
+}
+
 function getConfig() {
   return {
-    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-    serviceRole: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    anonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    supabaseUrl: cleanValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''),
+    serviceRole: cleanValue(process.env.SUPABASE_SERVICE_ROLE_KEY || ''),
+    anonKey: cleanValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''),
   };
 }
 
@@ -18,8 +35,8 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'Server auth configuration missing' });
   }
 
-  const authHeader = request.headers.authorization || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
+  const authHeader = cleanValue(request.headers.authorization || '');
+  const token = cleanValue(authHeader.replace(/^Bearer\s+/i, ''));
   if (!token) {
     return response.status(401).json({ error: 'Authorization required' });
   }
@@ -54,8 +71,8 @@ export default async function handler(request, response) {
   }
 
   const { email, password } = request.body ?? {};
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  const normalizedPassword = String(password || '');
+  const normalizedEmail = cleanValue(email).toLowerCase();
+  const normalizedPassword = cleanValue(password, { trim: false });
 
   if (!normalizedEmail || !normalizedPassword) {
     return response.status(400).json({ error: 'email and password are required' });

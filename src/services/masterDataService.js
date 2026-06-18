@@ -12,8 +12,37 @@ export async function getCustomers(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_customers').select('*');
+  let query = supabase
+    .from('tgd_customers')
+    .select('id, customer_code, customer_name, customer_type, tax_id, contact_name, phone, email, address, is_active, created_at')
+    .order('customer_code', { ascending: true });
+
+  if (filters.isActive !== undefined) query = query.eq('is_active', filters.isActive);
+
   return query;
+}
+
+export async function upsertCustomer(customer) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const payload = {
+    name: customer.customerName?.trim(),
+    customer_code: customer.customerCode?.trim(),
+    customer_name: customer.customerName?.trim(),
+    customer_type: customer.customerType?.trim() || null,
+    tax_id: customer.taxId?.trim() || null,
+    contact_name: customer.contactName?.trim() || null,
+    phone: customer.phone?.trim() || null,
+    email: customer.email?.trim() || null,
+    address: customer.address?.trim() || null,
+    is_active: customer.isActive ?? true,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (customer.id) {
+    return supabase.from('tgd_customers').update(payload).eq('id', customer.id).select().maybeSingle();
+  }
+  return supabase.from('tgd_customers').insert(payload).select().maybeSingle();
 }
 
 export async function getProducts(filters = {}) {

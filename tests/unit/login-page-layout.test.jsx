@@ -24,7 +24,7 @@ test('LoginPage renders standalone without layout wrappers', async () => {
 
   // Expect login container to be present
   await waitFor(() => {
-    expect(screen.getByText('TGC Cold Storage WMS')).toBeInTheDocument();
+    expect(screen.getByText('TG Cold Storage WMS')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'เข้าสู่ระบบ' })).toBeInTheDocument();
     expect(screen.getByTestId('forgot-password-link')).toBeInTheDocument();
   });

@@ -1,13 +1,7 @@
 /**
- * 17B Black & Gold Professional Navigation Groups.
+ * Black & Gold Professional Navigation Groups.
  *
- * Rules:
- * - Full professional text labels.
- * - No emoji icons.
- * - No short code-only labels (RCV, PTW, PCK, PST).
- * - Groups match the 17A design spec.
- * - Items that map to existing routes get a `path`.
- * - Items without a route are marked `disabled: true`.
+ * Items without a route are marked disabled: true.
  */
 
 export const navigationGroups = [
@@ -22,39 +16,30 @@ export const navigationGroups = [
     label: 'Inbound Management',
     key: 'inbound_management',
     items: [
-      { label: 'Receiving', key: 'receiving', path: '/operations/receiving' },
-      { label: 'Putaway', key: 'putaway', path: '/operations/putaway' },
-      { label: 'Handheld Receiving', key: 'handheld_receiving', path: '/handheld' },
+      { label: 'การรับเข้าสินค้า', key: 'receiving', path: '/operations/receiving' },
     ],
   },
   {
     label: 'Inventory Control',
     key: 'inventory_control',
     items: [
-      { label: 'Stock Balance', key: 'stock_balance', path: '/stock-count' },
-      { label: 'Transfer', key: 'transfer', path: '/operations/transfer' },
-      { label: 'Adjustment', key: 'adjustment', path: '/operations/adjustment' },
-      { label: 'Lot / Pallet', key: 'lot_pallet', disabled: true },
+      { label: 'ยอดคงเหลือ', key: 'stock_balance', path: '/inventory' },
+      { label: 'Transfer', key: 'transfer', path: '/operations/transfer', disabled: true },
+      { label: 'Adjustment', key: 'adjustment', path: '/operations/adjustment', disabled: true },
     ],
   },
   {
     label: 'Outbound Management',
     key: 'outbound_management',
     items: [
-      { label: 'Withdrawal Request', key: 'withdrawal_request', path: '/operations/withdrawal-requests' },
-      { label: 'Reservation', key: 'reservation', path: '/operations/allocations' },
-      { label: 'Picking Confirmation', key: 'picking_confirmation', path: '/operations/picking' },
-      { label: 'Post Outbound', key: 'post_outbound', path: '/operations/outbound' },
-      { label: 'Dispatch History', key: 'dispatch_history', path: '/operations/dispatch' },
+      { label: 'การเบิกสินค้า', key: 'withdrawal_request', path: '/operations/withdrawal-requests' },
     ],
   },
   {
     label: 'Barcode / Handheld',
     key: 'barcode_handheld',
     items: [
-      { label: 'Scan Center', key: 'scan_center', path: '/handheld' },
-      { label: 'Barcode Alias', key: 'barcode_alias', disabled: true },
-      { label: 'Scan Logs', key: 'scan_logs', disabled: true },
+      { label: 'ศูนย์สแกน / รับเข้า-เบิกออก', key: 'scan_center', path: '/handheld' },
     ],
   },
   {
@@ -118,17 +103,6 @@ export const navigationGroups = [
     ],
   },
   {
-    label: 'Customer Ops Demo',
-    key: 'customer_ops_demo',
-    items: [
-      { label: 'Admin Deposit Review', key: 'customer_admin_deposit_review', path: '/customer/admin/deposit-review' },
-      { label: 'Warehouse Deposit Receiving', key: 'customer_warehouse_receiving', path: '/customer/warehouse/receiving' },
-      { label: 'Admin Receiving Verification', key: 'customer_admin_receiving_verification', path: '/customer/admin/receiving-verification' },
-      { label: 'Admin Withdrawal Review', key: 'customer_admin_withdrawal_review', path: '/customer/admin/withdrawal-review' },
-      { label: 'Warehouse Picking / Loading', key: 'customer_warehouse_picking_loading', path: '/customer/warehouse/picking-loading' },
-    ],
-  },
-  {
     label: 'Reports',
     key: 'reports',
     items: [
@@ -141,13 +115,13 @@ export const navigationGroups = [
     label: 'System Administration',
     key: 'system_administration',
     items: [
-      { label: 'Master Data', key: 'master_data', path: '/master/customers' },
+      { label: 'ข้อมูลลูกค้า', key: 'master_data', path: '/master/customers' },
+      { label: 'Location คลังสินค้า', key: 'warehouse_location_setup', path: '/admin/warehouse-locations' },
       { label: 'User Management', key: 'user_management', path: '/admin/users', testId: 'user-management-menu-item' },
       { label: 'Customer Product Catalog', key: 'customer_product_catalog_admin', path: '/admin/customer-products', testId: 'customer-product-catalog-admin-menu-item' },
       { label: 'Customer Request Policy', key: 'customer_request_policy_admin', path: '/admin/customer-request-policy', testId: 'customer-request-policy-admin-menu-item' },
       { label: 'Customer Storage Rates', key: 'customer_storage_rate_rules_admin', path: '/admin/customer-storage-rates', testId: 'customer-storage-rate-rules-admin-menu-item' },
       { label: 'Users and Roles', key: 'users_and_roles', path: '/admin/auth-readiness' },
-      { label: 'Audit Log', key: 'audit_log', disabled: true },
     ],
   },
 ];

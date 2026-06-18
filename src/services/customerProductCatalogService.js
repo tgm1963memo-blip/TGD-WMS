@@ -17,6 +17,7 @@ const CATALOG_SELECT = [
   'argent_type',
   'storage_charge_basis',
   'pack_weight_kg',
+  'allergen',
   'is_active',
   'note',
   'created_at',
@@ -55,6 +56,8 @@ export async function upsertCustomerProduct(payload = {}) {
     p_temperature_type: toNullableText(payload.temperatureType),
     p_argent_type: toNullableText(payload.argentType),
     p_storage_charge_basis: toNullableText(payload.storageChargeBasis),
+    p_pack_weight_kg: payload.packWeightKg ?? null,
+    p_allergen: toNullableText(payload.allergen),
     p_note: toNullableText(payload.note),
     p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
   });
