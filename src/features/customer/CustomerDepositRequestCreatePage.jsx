@@ -69,6 +69,7 @@ export function CustomerDepositRequestCreatePage() {
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
   const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId));
   const [copyError, setCopyError] = useState('');
@@ -293,7 +294,8 @@ export function CustomerDepositRequestCreatePage() {
       return;
     }
 
-    navigate('/customer/deposit-request');
+    setSubmitted(true);
+    setTimeout(() => navigate('/customer/deposit-request'), 2500);
   }
 
   return (
@@ -330,6 +332,19 @@ export function CustomerDepositRequestCreatePage() {
           testId="customer-deposit-status-timeline"
         />
       </div>
+
+      {submitted ? (
+        <div
+          data-testid="customer-deposit-live-success-alert"
+          role="alert"
+          className="banner banner-success"
+          style={{ margin: '12px 0' }}
+        >
+          {t('customer_deposit_submit_success')}
+          {' — '}
+          <Link to="/customer/deposit-request">{t('customer_deposit_back_to_list')}</Link>
+        </div>
+      ) : null}
 
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
 

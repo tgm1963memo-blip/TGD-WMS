@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
+import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { CustomerDepositDetailModal } from './CustomerDepositDetailModal.jsx';
 
 const WAREHOUSE_DEPOSIT_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -20,6 +21,9 @@ const WAREHOUSE_DEPOSIT_STATUSES = [
 export function CustomerDepositNotificationsSection({ testId = 'receiving-customer-deposit-section' }) {
   const t = useTranslation();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
+  const [filterText, setFilterText] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [detailId, setDetailId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -43,11 +47,56 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
     return <LoadingState message={t('customer_portal_loading')} />;
   }
 
+  const filteredRows = state.rows.filter((row) => {
+    const text = filterText.toLowerCase();
+    const matchText = !text ||
+      (row.request_no ?? '').toLowerCase().includes(text) ||
+      (row.contact_name ?? '').toLowerCase().includes(text);
+    const matchStatus = !filterStatus || row.status === filterStatus;
+    return matchText && matchStatus;
+  });
+
   return (
     <section className="table-card customer-deposit-notifications-section" data-testid={testId}>
       <div className="table-card-header">
         <h3>{t('receiving_customer_deposit_section_title')}</h3>
         <span className="form-helper">{t('receiving_customer_deposit_section_hint')}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 0' }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 200px' }}>
+          {'ค้นหา'}
+          <input
+            className="form-control"
+            type="search"
+            placeholder="เลขที่คำขอ / ชื่อผู้ติดต่อ"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        </label>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 180px' }}>
+          {'สถานะ'}
+          <select
+            className="form-control"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">ทุกสถานะ</option>
+            {WAREHOUSE_DEPOSIT_STATUSES.map((s) => (
+              <option key={s} value={s}>{getDepositStatusLabel(s, t)}</option>
+            ))}
+          </select>
+        </label>
+        {(filterText || filterStatus) ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => { setFilterText(''); setFilterStatus(''); }}
+            style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
+          >
+            {'ล้างตัวกรอง'}
+          </button>
+        ) : null}
       </div>
 
       {state.error ? (
@@ -68,12 +117,12 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             </tr>
           </thead>
           <tbody>
-            {state.rows.length ? state.rows.map((row) => (
+            {filteredRows.length ? filteredRows.map((row) => (
               <tr key={row.id}>
                 <td>{row.request_no}</td>
                 <td>
                   <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
-                    {row.status}
+                    {getDepositStatusLabel(row.status, t)}
                   </span>
                 </td>
                 <td>{row.expected_arrival_date ?? '-'}</td>
@@ -81,23 +130,40 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
                 <td>{row.contact_phone ?? '-'}</td>
                 <td>{row.note || '-'}</td>
                 <td>
-                  <Link
+                  <button
                     className="btn btn-secondary btn-sm"
                     data-testid={`receiving-review-deposit-${row.id}`}
-                    to={`/customer/admin/deposit-review/${row.id}`}
+                    type="button"
+                    onClick={() => setDetailId(row.id)}
                   >
                     {t('receiving_review_deposit_button')}
-                  </Link>
+                  </button>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={7}>{t('receiving_customer_deposit_empty')}</td>
+                <td colSpan={7}>
+                  {filterText || filterStatus
+                    ? 'ไม่พบรายการที่ตรงกับเงื่อนไข'
+                    : t('receiving_customer_deposit_empty')}
+                </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <CustomerDepositDetailModal
+        requestId={detailId}
+        isOpen={!!detailId}
+        onClose={() => setDetailId(null)}
+        onStatusChange={(id, newStatus) => {
+          setState((prev) => ({
+            ...prev,
+            rows: prev.rows.map((r) => (r.id === id ? { ...r, status: newStatus } : r)),
+          }));
+        }}
+      />
     </section>
   );
 }

@@ -3,9 +3,14 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
+const ID_TYPES = [
+  { value: 'LOT', label: 'เลข LOT' },
+  { value: 'MFG_DATE', label: 'วันที่ผลิต' },
+  { value: 'EXP_DATE', label: 'วันหมดอายุ' },
+];
+
 export function CustomerWithdrawalLinesTable({
   customerId,
-  depositOptions = [],
   lines,
   onChange,
   onRemoveLine,
@@ -13,6 +18,7 @@ export function CustomerWithdrawalLinesTable({
 }) {
   const t = useTranslation();
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -21,9 +27,11 @@ export function CustomerWithdrawalLinesTable({
       return undefined;
     }
 
+    setLoading(true);
     listCustomerProducts({ customerId, activeOnly: true }).then((result) => {
       if (!active) return;
       setCatalogProducts(result.data ?? []);
+      setLoading(false);
     });
 
     return () => {
@@ -59,41 +67,77 @@ export function CustomerWithdrawalLinesTable({
     });
   }
 
+  function changeIdentifierType(lineKey, newType) {
+    updateLine(lineKey, { identifier_type: newType, lot_no: '', mfg_date: '', exp_date: '' });
+  }
+
+  function setIdentifierValue(line, val) {
+    const type = line.identifier_type ?? 'LOT';
+    if (type === 'LOT') return updateLine(line.key, { lot_no: val, mfg_date: '', exp_date: '' });
+    if (type === 'MFG_DATE') return updateLine(line.key, { mfg_date: val, lot_no: '', exp_date: '' });
+    if (type === 'EXP_DATE') return updateLine(line.key, { exp_date: val, lot_no: '', mfg_date: '' });
+  }
+
+  function getIdentifierValue(line) {
+    const type = line.identifier_type ?? 'LOT';
+    if (type === 'LOT') return line.lot_no ?? '';
+    if (type === 'MFG_DATE') return line.mfg_date ?? '';
+    if (type === 'EXP_DATE') return line.exp_date ?? '';
+    return '';
+  }
+
+  const noCustomer = !customerId;
+
   return (
     <div className="responsive-table customer-withdrawal-lines-table-wrap" data-testid={testId}>
+      {noCustomer && (
+        <div className="banner banner-warning" style={{ margin: '0 0 12px' }}>
+          กรุณาเลือกลูกค้าก่อน เพื่อโหลดรายการสินค้าที่เบิกได้
+        </div>
+      )}
+      {loading && (
+        <div className="banner banner-info" style={{ margin: '0 0 12px' }}>
+          กำลังโหลดรายการสินค้า...
+        </div>
+      )}
+      {!noCustomer && !loading && catalogProducts.length === 0 && (
+        <div className="banner banner-warning" style={{ margin: '0 0 12px' }}>
+          ยังไม่มีรายการสินค้าในแคตตาล็อกของลูกค้านี้
+        </div>
+      )}
       <table className="data-table customer-withdrawal-lines-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
-            <th>{t('catalog_col_product_name')}</th>
-            <th>{t('catalog_col_barcode')}</th>
-            <th>{t('customer_field_source_deposit')}</th>
-            <th>{t('customer_field_lot_no')}</th>
-            <th>{t('customer_col_mfg_date')}</th>
-            <th>{t('customer_col_exp_date')}</th>
-            <th>{t('customer_col_requested_qty')} <span className="field-required">*</span></th>
-            <th>{t('customer_col_requested_boxes')}</th>
-            <th>{t('customer_col_requested_weight')}</th>
-            <th>{t('customer_field_picking_rule')}</th>
-            <th>{t('catalog_col_argent')}</th>
-            <th>{t('catalog_col_actions')}</th>
+            <th style={{ width: 36 }}>#</th>
+            <th style={{ minWidth: 200 }}>รหัสสินค้า <span className="field-required">*</span></th>
+            <th style={{ minWidth: 160 }}>ชื่อสินค้า</th>
+            <th style={{ minWidth: 220 }}>LOT / วันผลิต / วันหมดอายุ</th>
+            <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
+            <th style={{ minWidth: 140 }}>กฎการหยิบ</th>
+            <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line, index) => {
             const rowTestId = index === 0 ? 'customer-withdrawal-line-0' : `customer-withdrawal-line-${line.key}`;
+            const idType = line.identifier_type ?? 'LOT';
+            const idValue = getIdentifierValue(line);
+            const isDateType = idType === 'MFG_DATE' || idType === 'EXP_DATE';
+
             return (
               <tr data-testid={rowTestId} key={line.key}>
-                <td>{index + 1}</td>
+                <td style={{ textAlign: 'center', color: 'var(--tgd-muted-text)', fontWeight: 600 }}>{index + 1}</td>
+
+                {/* Product code dropdown */}
                 <td>
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-withdrawal-product-picker-select' : `${rowTestId}-product-select`}
-                    onChange={(event) => selectCatalogProduct(line.key, event.target.value)}
+                    disabled={noCustomer || loading}
+                    onChange={(e) => selectCatalogProduct(line.key, e.target.value)}
                     value={line.catalog_product_id || ''}
                   >
-                    <option value="">{t('customer_deposit_select_product')}</option>
+                    <option value="">{noCustomer ? '— เลือกลูกค้าก่อน —' : t('customer_deposit_select_product')}</option>
                     {catalogProducts.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.customer_product_code} — {product.product_name}
@@ -101,93 +145,71 @@ export function CustomerWithdrawalLinesTable({
                     ))}
                   </select>
                 </td>
-                <td>
-                  <input className="form-control form-control-table" disabled readOnly value={line.product_name} />
-                </td>
-                <td>
-                  <input className="form-control form-control-table" disabled readOnly value={line.product_code} />
-                </td>
-                <td>
-                  <select
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
-                    onChange={(event) => updateLine(line.key, { source_deposit_request_id: event.target.value })}
-                    value={line.source_deposit_request_id || ''}
-                  >
-                    <option value="">{t('customer_field_source_deposit_optional')}</option>
-                    {depositOptions.map((row) => (
-                      <option key={row.id} value={row.id}>{row.request_no} ({row.status})</option>
-                    ))}
-                  </select>
-                </td>
+
+                {/* Product name (auto-filled) */}
                 <td>
                   <input
                     className="form-control form-control-table"
-                    data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-lot`}
-                    onChange={(event) => updateLine(line.key, { lot_no: event.target.value })}
-                    value={line.lot_no}
+                    disabled
+                    readOnly
+                    placeholder="ชื่อสินค้า"
+                    value={line.product_name}
                   />
                 </td>
+
+                {/* Combined identifier: type selector + input */}
                 <td>
-                  <input
-                    className="form-control form-control-table"
-                    onChange={(event) => updateLine(line.key, { mfg_date: event.target.value })}
-                    type="date"
-                    value={line.mfg_date}
-                  />
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <select
+                      className="form-control form-control-table"
+                      style={{ flex: '0 0 110px', fontSize: 12 }}
+                      value={idType}
+                      onChange={(e) => changeIdentifierType(line.key, e.target.value)}
+                    >
+                      {ID_TYPES.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      className="form-control form-control-table"
+                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                      style={{ flex: 1 }}
+                      type={isDateType ? 'date' : 'text'}
+                      placeholder={idType === 'LOT' ? 'เลข LOT' : ''}
+                      value={idValue}
+                      onChange={(e) => setIdentifierValue(line, e.target.value)}
+                    />
+                  </div>
                 </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    onChange={(event) => updateLine(line.key, { exp_date: event.target.value })}
-                    type="date"
-                    value={line.exp_date}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-withdrawal-qty' : `${rowTestId}-qty`}
-                    min="1"
-                    onChange={(event) => updateLine(line.key, { requested_qty: event.target.value })}
-                    type="number"
-                    value={line.requested_qty}
-                  />
-                </td>
+
+                {/* Weight */}
                 <td>
                   <input
                     className="form-control form-control-table"
                     min="0"
-                    onChange={(event) => updateLine(line.key, { requested_boxes: event.target.value })}
-                    type="number"
-                    value={line.requested_boxes}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    min="0"
-                    onChange={(event) => updateLine(line.key, { requested_weight: event.target.value })}
                     step="0.01"
                     type="number"
+                    placeholder="กก."
+                    onChange={(e) => updateLine(line.key, { requested_weight: e.target.value })}
                     value={line.requested_weight}
                   />
                 </td>
+
+                {/* Picking rule */}
                 <td>
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'withdrawal-picking-rule-select' : `${rowTestId}-picking-rule`}
-                    onChange={(event) => updateLine(line.key, { picking_rule: event.target.value })}
+                    onChange={(e) => updateLine(line.key, { picking_rule: e.target.value })}
                     value={line.picking_rule}
                   >
-                    <option value="FEFO">FEFO</option>
-                    <option value="SPECIFIC_DEPOSIT">SPECIFIC_DEPOSIT</option>
-                    <option value="SPECIFIC_LOT">SPECIFIC_LOT</option>
+                    <option value="FEFO">FEFO (หมดก่อน-หยิบก่อน)</option>
+                    <option value="SPECIFIC_DEPOSIT">ระบุใบฝาก</option>
+                    <option value="SPECIFIC_LOT">ระบุ LOT</option>
                   </select>
                 </td>
-                <td>
-                  <input className="form-control form-control-table" disabled readOnly value={line.argent_type || '-'} />
-                </td>
+
+                {/* Remove */}
                 <td>
                   {lines.length > 1 ? (
                     <button

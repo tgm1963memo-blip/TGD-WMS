@@ -7,6 +7,17 @@ import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUti
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
+const ALL_WITHDRAWAL_STATUSES = [
+  'WITHDRAWAL_DRAFT',
+  'SUBMITTED_BY_CUSTOMER',
+  'ADMIN_REVIEWING',
+  'ADMIN_ACCEPTED',
+  'WAREHOUSE_PICKING',
+  'REJECTED',
+  'COMPLETED',
+  'DISPATCHED',
+];
+
 export function CustomerWithdrawalNotificationsSection({
   testId = 'withdrawal-customer-withdrawal-section',
   showCustomerColumn = true,
@@ -15,6 +26,8 @@ export function CustomerWithdrawalNotificationsSection({
   const t = useTranslation();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
+  const [filterText, setFilterText] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -49,6 +62,16 @@ export function CustomerWithdrawalNotificationsSection({
     return <LoadingState message={t('customer_portal_loading')} />;
   }
 
+  const filteredRows = state.rows.filter((row) => {
+    const text = filterText.toLowerCase();
+    const matchText = !text ||
+      (row.withdrawal_no ?? '').toLowerCase().includes(text) ||
+      (row.pickup_contact ?? '').toLowerCase().includes(text) ||
+      (customerNames[row.customer_id] ?? '').toLowerCase().includes(text);
+    const matchStatus = !filterStatus || row.status === filterStatus;
+    return matchText && matchStatus;
+  });
+
   const columnCount = 8 + (showCustomerColumn ? 1 : 0) + (showCopyAction ? 1 : 0);
 
   return (
@@ -56,6 +79,42 @@ export function CustomerWithdrawalNotificationsSection({
       <div className="table-card-header">
         <h3>{t('withdrawal_customer_withdrawal_section_title')}</h3>
         <span className="form-helper">{t('withdrawal_customer_withdrawal_section_hint')}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 0' }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 200px' }}>
+          {'ค้นหา'}
+          <input
+            className="form-control"
+            type="search"
+            placeholder="เลขที่คำขอ / ผู้ติดต่อ / ลูกค้า"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        </label>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 180px' }}>
+          {'สถานะ'}
+          <select
+            className="form-control"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">ทุกสถานะ</option>
+            {ALL_WITHDRAWAL_STATUSES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+        {(filterText || filterStatus) ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => { setFilterText(''); setFilterStatus(''); }}
+            style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
+          >
+            {'ล้างตัวกรอง'}
+          </button>
+        ) : null}
       </div>
 
       {state.error ? (
@@ -78,7 +137,7 @@ export function CustomerWithdrawalNotificationsSection({
             </tr>
           </thead>
           <tbody>
-            {state.rows.length ? state.rows.map((row) => (
+            {filteredRows.length ? filteredRows.map((row) => (
               <tr key={row.id}>
                 <td>{row.withdrawal_no}</td>
                 {showCustomerColumn ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
@@ -117,7 +176,11 @@ export function CustomerWithdrawalNotificationsSection({
               </tr>
             )) : (
               <tr>
-                <td colSpan={columnCount}>{t('withdrawal_customer_withdrawal_empty')}</td>
+                <td colSpan={columnCount}>
+                  {filterText || filterStatus
+                    ? 'ไม่พบรายการที่ตรงกับเงื่อนไข'
+                    : t('withdrawal_customer_withdrawal_empty')}
+                </td>
               </tr>
             )}
           </tbody>

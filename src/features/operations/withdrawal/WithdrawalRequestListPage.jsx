@@ -43,33 +43,29 @@ export function WithdrawalRequestListPage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="Withdrawal Requests"
-        description={goLive ? t('withdrawal_list_description_golive') : 'Customer withdrawal request list.'}
-      />
-
-      {!goLive ? (
-        <>
-          <section className="warning-panel meeting-safety-panel" data-testid="withdrawal-source-document-guidance" role="status">
-            <p>{t('withdrawal_source_document_guidance')}</p>
-          </section>
-          <section className="card customer-portal-action-card" style={{ marginBottom: 16, maxWidth: 420 }}>
-            <Link className="auth-text-link" data-testid="withdrawal-customer-request-demo-link" to="/customer/warehouse/picking-loading">
-              {t('withdrawal_customer_request_demo_link')}
-            </Link>
-          </section>
-        </>
-      ) : (
-        <section className="card customer-portal-action-card operations-live-action-card" style={{ marginBottom: 16, maxWidth: 480 }}>
-          <Link className="auth-text-link" data-testid="withdrawal-customer-request-live-link" to="/customer/admin/withdrawal-review">
-            {t('withdrawal_customer_request_live_link')}
+        description={t('withdrawal_list_description_golive')}
+        actions={(
+          <Link className="btn btn-secondary" to="/handheld">
+            {t('handheld_mode_pick')}
           </Link>
-        </section>
-      )}
+        )}
+      />
 
       <CustomerWithdrawalNotificationsSection />
 
-      <DocumentToolbar title="Withdrawal Requests" createHref="/operations/withdrawal-requests/new" onRefresh={() => window.location.reload()} />
-      <DocumentFilterBar onChange={() => {}} />
-      <DataTable columns={columns} data={state.data} loading={state.loading} error={state.error} emptyMessage={goLive ? t('withdrawal_empty_message_golive') : 'No withdrawal requests found.'} />
+      {!goLive ? (
+        <>
+          <DocumentToolbar title="Withdrawal Requests" createHref="/operations/withdrawal-requests/new" onRefresh={() => window.location.reload()} />
+          <DocumentFilterBar onChange={() => {}} />
+          <DataTable
+            columns={columns}
+            data={state.data}
+            loading={state.loading}
+            error={state.error}
+            emptyMessage={t('withdrawal_empty_message_golive')}
+          />
+        </>
+      ) : null}
     </section>
   );
 }

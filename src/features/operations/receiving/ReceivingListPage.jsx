@@ -71,20 +71,24 @@ export function ReceivingListPage() {
 
       <CustomerDepositNotificationsSection />
 
-      <DocumentToolbar
-        title="Receiving Documents"
-        createHref={canWrite ? '/operations/receiving/create' : null}
-        createLabel={canWrite ? t('receiving_create_internal_draft') : null}
-        onRefresh={() => window.location.reload()}
-      />
-      <DocumentFilterBar onChange={() => {}} />
-      <DataTable
-        columns={columns}
-        data={state.data}
-        loading={state.loading}
-        error={state.error}
-        emptyMessage={goLive ? t('receiving_empty_message_golive') : 'No receiving documents found.'}
-      />
+      {!goLive ? (
+        <>
+          <DocumentToolbar
+            title="Receiving Documents"
+            createHref={canWrite ? '/operations/receiving/create' : null}
+            createLabel={canWrite ? t('receiving_create_internal_draft') : null}
+            onRefresh={() => window.location.reload()}
+          />
+          <DocumentFilterBar onChange={() => {}} />
+          <DataTable
+            columns={columns}
+            data={state.data}
+            loading={state.loading}
+            error={state.error}
+            emptyMessage="No receiving documents found."
+          />
+        </>
+      ) : null}
     </section>
   );
 }

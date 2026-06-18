@@ -12,7 +12,6 @@ import {
   listCustomerWithdrawalRequestLines,
   upsertCustomerWithdrawalRequestLine,
 } from '../../services/customerWithdrawalRequestService.js';
-import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
   mapWithdrawalHeaderForCopy,
@@ -47,7 +46,7 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialWithdrawalLines());
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
-  const [depositOptions, setDepositOptions] = useState([]);
+  const [depositOptions] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
@@ -108,22 +107,6 @@ export function CustomerWithdrawalRequestCreatePage() {
     };
   }, [copyFromId, isRequestProxy, t]);
 
-  useEffect(() => {
-    let active = true;
-    if (!effectiveCustomerId) {
-      setDepositOptions([]);
-      return undefined;
-    }
-
-    listCustomerDepositRequests({ customerId: effectiveCustomerId }).then((result) => {
-      if (!active) return;
-      setDepositOptions(result.data ?? []);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [effectiveCustomerId]);
 
   if (copyLoading) {
     return (

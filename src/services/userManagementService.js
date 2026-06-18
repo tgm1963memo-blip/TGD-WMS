@@ -6,6 +6,23 @@ import {
   toNullableText,
 } from './customerPortalServiceUtils.js';
 
+/**
+ * Strip invisible / zero-width Unicode characters that break HTTP headers.
+ * BOM (U+FEFF), zero-width space, joiners, soft-hyphen, word-joiner, etc.
+ */
+const HIDDEN_CODE_POINTS = new Set([
+  0xfeff, 0x200b, 0x200c, 0x200d, 0x00ad, 0x2060, 0xfffe,
+]);
+
+function stripHiddenChars(value) {
+  if (!value) return '';
+  return String(value)
+    .split('')
+    .filter((ch) => !HIDDEN_CODE_POINTS.has(ch.charCodeAt(0)))
+    .join('')
+    .trim();
+}
+
 export const INTERNAL_ROLES = Object.freeze([
   'admin',
   'warehouse_manager',
@@ -27,10 +44,19 @@ export async function createAuthUser({ email, password }) {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) return { data: null, error: sessionError };
 
-  const accessToken = sessionData?.session?.access_token;
-  if (!accessToken) {
+  const rawToken = sessionData?.session?.access_token;
+  if (!rawToken) {
     return { data: null, error: new Error('Active login session required') };
   }
+
+  // Sanitize: strip hidden Unicode chars (BOM, zero-width, etc.) that cause
+  // "Cannot convert argument to a ByteString" when placed in HTTP headers.
+  const accessToken = stripHiddenChars(rawToken);
+  const cleanEmail = stripHiddenChars(email);
+  const cleanPassword = String(password || '')
+    .split('')
+    .filter((ch) => !HIDDEN_CODE_POINTS.has(ch.charCodeAt(0)))
+    .join('');
 
   const response = await fetch('/api/admin-create-auth-user', {
     method: 'POST',
@@ -38,7 +64,7 @@ export async function createAuthUser({ email, password }) {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
   });
 
   const payload = await response.json().catch(() => ({}));

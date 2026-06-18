@@ -20,7 +20,7 @@ export function CustomerRequestCustomerPicker({
       if (!active) return;
       const rows = (result.data ?? [])
         .filter((customer) => customer.is_active !== false)
-        .sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? '')));
+        .sort((left, right) => String(left.customer_name ?? '').localeCompare(String(right.customer_name ?? '')));
       setCustomers(rows);
       setLoading(false);
     });
@@ -47,7 +47,7 @@ export function CustomerRequestCustomerPicker({
         <option value="">{t('customer_request_proxy_customer_placeholder')}</option>
         {customers.map((customer) => (
           <option key={customer.id} value={customer.id}>
-            {customer.name ?? customer.code ?? customer.id}
+            {customer.customer_name ?? customer.customer_code ?? customer.id}
           </option>
         ))}
       </select>

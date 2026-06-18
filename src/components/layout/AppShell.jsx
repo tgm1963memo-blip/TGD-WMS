@@ -1,13 +1,11 @@
-import React from 'react';
+import { useState } from 'react';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 
-/**
- * AppShell – approved mockup layout: UAT banner + sidebar + main column.
- */
 export function AppShell({ currentSection, children }) {
   const goLive = isGoLivePresentationEnabled();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className={`app-shell${goLive ? ' app-shell--golive' : ''}`} data-testid="app-shell">
@@ -21,9 +19,17 @@ export function AppShell({ currentSection, children }) {
         </div>
       ) : null}
       <div className="app-body">
-        <Sidebar />
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="sidebar-mobile-backdrop"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="app-main">
-          <Topbar currentSection={currentSection} />
+          <Topbar currentSection={currentSection} onMenuToggle={() => setSidebarOpen((o) => !o)} />
           <main className="main-content app-content">{children}</main>
         </div>
       </div>

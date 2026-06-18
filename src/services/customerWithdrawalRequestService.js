@@ -199,3 +199,17 @@ export async function cancelCustomerWithdrawalRequest(requestId, comment = null)
 
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
+
+export async function enqueueCustomerWithdrawalNotification(requestId, customerId, documentNo, submitterEmail = null, note = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_enqueue_customer_request_notifications', {
+    p_document_type: 'WITHDRAWAL',
+    p_document_id: requestId,
+    p_customer_id: customerId,
+    p_document_no: documentNo,
+    p_submitter_email: submitterEmail ?? null,
+  });
+
+  return { data, error };
+}

@@ -5,6 +5,7 @@ import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
@@ -12,22 +13,32 @@ import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
   reviewCustomerWithdrawalRequest,
+  enqueueCustomerWithdrawalNotification,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED'];
+const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
   const [selectedId, setSelectedId] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
   const [comment, setComment] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyNote, setNotifyNote] = useState('');
+  const [recountLine, setRecountLine] = useState(null);
+  const [recountQty, setRecountQty] = useState('');
+  const [recountBoxes, setRecountBoxes] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -57,26 +68,22 @@ export function CustomerAdminWithdrawalReviewPage() {
     return () => { active = false; };
   }, [selectedId]);
 
+  function openDetail(id) {
+    setSelectedId(id);
+    setComment('');
+    setActionMsg('');
+    setError('');
+    setDetailOpen(true);
+  }
+
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
-  async function handleReview(decision) {
-    if (!selectedId) return;
-    setSubmitting(true);
-    setError('');
-    setActionMsg('');
-    const result = await reviewCustomerWithdrawalRequest(selectedId, decision, comment);
-    setSubmitting(false);
-    if (result.error) {
-      setError(result.error.message ?? 'Review failed');
-      return;
-    }
-    const newStatus = result.data?.status ?? '';
-    setActionMsg(getWithdrawalStatusLabel(newStatus, t) || newStatus);
-    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
-  }
+  const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  const canConfirmWithdrawal = selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'].includes(selected.status);
+  const canReject = selected && !['REJECTED', 'COMPLETED', 'DISPATCHED'].includes(selected.status);
 
-  async function handleApproveWithdrawal() {
+  async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
     setSubmitting(true);
     setError('');
@@ -94,12 +101,68 @@ export function CustomerAdminWithdrawalReviewPage() {
     const acceptResult = await reviewCustomerWithdrawalRequest(selectedId, 'ACCEPT', comment);
     setSubmitting(false);
     if (acceptResult.error) {
-      setError(acceptResult.error.message ?? 'Accept failed');
+      setError(acceptResult.error.message ?? 'Open work order failed');
       return;
     }
     const newStatus = acceptResult.data?.status ?? 'ADMIN_ACCEPTED';
+    setActionMsg(t('admin_work_order_opened'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  async function handleConfirmWithdrawal() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    setActionMsg('');
+
+    const result = await reviewCustomerWithdrawalRequest(selectedId, 'CONFIRM_DISPATCH', comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Confirm withdrawal failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'COMPLETED';
+    setActionMsg(t('admin_withdrawal_confirmed'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setNotifyNote('');
+    setNotifyOpen(true);
+  }
+
+  async function handleReject() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    const result = await reviewCustomerWithdrawalRequest(selectedId, 'REJECT', rejectReason || comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Reject failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'REJECTED';
     setActionMsg(getWithdrawalStatusLabel(newStatus, t) || newStatus);
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setRejectOpen(false);
+    setRejectReason('');
+  }
+
+  async function handleNotifyCustomer() {
+    if (!selected) return;
+    setNotifying(true);
+    setError('');
+    const result = await enqueueCustomerWithdrawalNotification(
+      selected.id,
+      selected.customer_id,
+      selected.withdrawal_no,
+      selected.created_by_email ?? null,
+      notifyNote || null,
+    );
+    setNotifying(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Notification failed');
+      return;
+    }
+    setActionMsg(t('admin_notify_customer'));
+    setNotifyOpen(false);
   }
 
   if (loading) {
@@ -110,16 +173,26 @@ export function CustomerAdminWithdrawalReviewPage() {
     );
   }
 
-  const canApprove = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
-
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-admin-withdrawal-review-page">
-      <PageHeader title={t('admin_withdrawal_review_title')} description={t('admin_withdrawal_review_description')} />
+      <PageHeader
+        title={t('admin_withdrawal_review_title')}
+        description={t('admin_withdrawal_review_description')}
+        actions={(
+          <Link className="btn btn-secondary" to="/handheld">
+            {t('handheld_mode_pick')}
+          </Link>
+        )}
+      />
       <CustomerPortalLiveBanner />
       {actionMsg ? <div className="alert-success-panel" role="status">{actionMsg}</div> : null}
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
 
+      {/* List table */}
       <div className="table-card">
+        <div className="table-card-header">
+          <h3>{t('admin_withdrawal_review_table_title')}</h3>
+        </div>
         <div className="responsive-table">
           <table className="data-table" data-testid="admin-withdrawal-review-table">
             <thead>
@@ -133,7 +206,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             </thead>
             <tbody>
               {rows.length ? rows.map((row) => (
-                <tr className={row.id === selectedId ? 'table-row-selected' : ''} key={row.id}>
+                <tr key={row.id}>
                   <td>{row.withdrawal_no}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
@@ -144,9 +217,10 @@ export function CustomerAdminWithdrawalReviewPage() {
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>
                     <button
-                      className={`btn btn-secondary btn-sm${row.id === selectedId ? ' btn-primary' : ''}`}
-                      onClick={() => setSelectedId(row.id)}
+                      className="btn btn-primary btn-sm"
+                      data-testid={`admin-withdrawal-review-select-${row.id}`}
                       type="button"
+                      onClick={() => openDetail(row.id)}
                     >
                       {t('receiving_review_deposit_button')}
                     </button>
@@ -160,20 +234,44 @@ export function CustomerAdminWithdrawalReviewPage() {
         </div>
       </div>
 
-      {selected ? (
-        <div className="table-card">
-          <div className="table-card-header">
-            <h3>{selected.withdrawal_no}</h3>
-            <div className="action-row">
-              <Link
-                className="btn btn-secondary btn-sm"
-                data-testid={`admin-withdrawal-view-${selected.id}`}
-                to={`/customer/withdrawal-request/${selected.id}`}
-              >
-                {t('customer_request_view_button')}
-              </Link>
+      {/* Detail popup */}
+      <Modal
+        isOpen={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={selected?.withdrawal_no ?? t('admin_withdrawal_review_title')}
+        size="lg"
+      >
+        {selected ? (
+          <>
+            {actionMsg ? <div className="alert-success-panel" role="status" style={{ marginBottom: 12 }}>{actionMsg}</div> : null}
+            {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
+
+            {/* Header info */}
+            <div className="form-grid" style={{ marginBottom: 16 }}>
+              <div>
+                <div className="form-label">{t('customer_col_status')}</div>
+                <span className={`status-badge status-badge--${getCustomerRequestStatusClass(selected.status)}`}>
+                  {getWithdrawalStatusLabel(selected.status, t)}
+                </span>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
+                <div>{selected.requested_dispatch_date ?? '-'}</div>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_delivery_type')}</div>
+                <div>{selected.delivery_type ?? '-'}</div>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_pickup_contact')}</div>
+                <div>{selected.pickup_contact ?? '-'}</div>
+              </div>
+            </div>
+
+            {/* Print action */}
+            <div className="action-row" style={{ marginBottom: 16 }}>
               <ReportPrintActions
-                disabled={!selected}
+                disabled={false}
                 renderReport={(language) => (
                   <CustomerWithdrawalRequestPrintDocument
                     branding={branding}
@@ -185,34 +283,214 @@ export function CustomerAdminWithdrawalReviewPage() {
                 title={selected.withdrawal_no}
               />
             </div>
-          </div>
-          <CustomerWithdrawalRequestLinesDisplay lines={lines} testId="admin-withdrawal-review-lines-table" />
-        </div>
-      ) : null}
 
-      <label className="form-field">
-        <span>{t('admin_review_comment_label')}</span>
-        <textarea className="form-control" onChange={(e) => setComment(e.target.value)} rows={3} value={comment} />
-      </label>
-      <div className="action-row">
-        <button
-          className="btn btn-primary"
-          data-testid="admin-accept-withdrawal-button"
-          disabled={submitting || !canApprove}
-          onClick={handleApproveWithdrawal}
-          type="button"
-        >
-          {t('admin_confirm_accept_withdrawal')}
-        </button>
-        <button
-          className="btn btn-secondary"
-          disabled={submitting || !selectedId}
-          onClick={() => handleReview('REJECT')}
-          type="button"
-        >
-          {t('admin_reject_request')}
-        </button>
-      </div>
+            {/* Lines table with actual qty column and recount button */}
+            <div style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
+              <div className="responsive-table">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>{t('catalog_col_customer_code')}</th>
+                      <th>{t('catalog_col_product_name')}</th>
+                      <th>{t('lot')}</th>
+                      <th>{t('requested_qty')}</th>
+                      <th>{t('admin_picked_qty')}</th>
+                      <th>{t('catalog_col_actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.length ? lines.map((line) => (
+                      <tr key={line.id}>
+                        <td>{line.line_no}</td>
+                        <td>{line.customer_product_code ?? '-'}</td>
+                        <td>{line.product_name ?? '-'}</td>
+                        <td>{line.lot_no ?? '-'}</td>
+                        <td>{line.requested_qty ?? '-'}</td>
+                        <td>
+                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
+                            {t('pending')}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            onClick={() => {
+                              setRecountLine(line);
+                              setRecountQty(line.requested_qty?.toString() ?? '');
+                              setRecountBoxes(line.requested_boxes?.toString() ?? '');
+                            }}
+                          >
+                            {t('admin_recount_button')}
+                          </button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Admin comment */}
+            <label className="form-field" style={{ marginBottom: 16 }}>
+              <span>{t('admin_review_comment_label')}</span>
+              <textarea className="form-control" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
+            </label>
+
+            {/* Action buttons */}
+            <div className="action-row">
+              {canOpenWorkOrder ? (
+                <button
+                  className="btn btn-primary"
+                  disabled={submitting}
+                  onClick={handleOpenWorkOrder}
+                  type="button"
+                >
+                  {t('admin_open_work_order')}
+                </button>
+              ) : null}
+              {canConfirmWithdrawal ? (
+                <button
+                  className="btn btn-primary"
+                  disabled={submitting}
+                  onClick={handleConfirmWithdrawal}
+                  type="button"
+                >
+                  {t('admin_confirm_withdrawal')}
+                </button>
+              ) : null}
+              {canReject ? (
+                <button
+                  className="btn btn-danger"
+                  disabled={submitting}
+                  onClick={() => setRejectOpen(true)}
+                  type="button"
+                >
+                  {t('admin_reject_request')}
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </Modal>
+
+      {/* Reject modal */}
+      <Modal
+        isOpen={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title={t('admin_reject_request')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-danger" disabled={submitting} onClick={handleReject} type="button">
+              {t('admin_reject_request')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRejectOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <label className="form-field">
+          <span>{t('admin_reject_reason_label')}</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder={t('admin_reject_reason_placeholder')}
+          />
+        </label>
+      </Modal>
+
+      {/* Notify customer after confirm */}
+      <Modal
+        isOpen={notifyOpen}
+        onClose={() => setNotifyOpen(false)}
+        title={t('admin_notify_customer_title')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-primary" disabled={notifying} onClick={handleNotifyCustomer} type="button">
+              {notifying ? '...' : t('admin_notify_customer')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setNotifyOpen(false)} type="button">
+              {t('admin_skip_notify')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>{t('admin_notify_customer_description')}</p>
+        <label className="form-field">
+          <span>{t('admin_notify_customer_note_label')}</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={notifyNote}
+            onChange={(e) => setNotifyNote(e.target.value)}
+            placeholder={t('admin_notify_customer_note_placeholder')}
+          />
+        </label>
+      </Modal>
+
+      {/* Recount modal */}
+      <Modal
+        isOpen={!!recountLine}
+        onClose={() => setRecountLine(null)}
+        title={t('admin_recount_title')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => {
+                setActionMsg(t('admin_recount_saved'));
+                setRecountLine(null);
+              }}
+            >
+              {t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRecountLine(null)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        {recountLine ? (
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{recountLine.product_name ?? recountLine.customer_product_code}</strong>
+            </p>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>{t('admin_received_boxes')}</span>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  value={recountBoxes}
+                  onChange={(e) => setRecountBoxes(e.target.value)}
+                />
+              </label>
+              <label className="form-field">
+                <span>{t('admin_picked_qty')}</span>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  value={recountQty}
+                  onChange={(e) => setRecountQty(e.target.value)}
+                />
+              </label>
+            </div>
+          </>
+        ) : null}
+      </Modal>
     </section>
   );
 }

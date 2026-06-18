@@ -45,6 +45,9 @@ const DEPOSIT_LINE_SELECT = [
   'uom',
   'temperature_type',
   'note',
+  'actual_boxes',
+  'actual_weight',
+  'actual_note',
   'created_at',
 ].join(', ');
 
@@ -55,13 +58,53 @@ export async function listCustomerDepositRequests(filters = {}) {
     .from('tgd_customer_deposit_requests')
     .select(DEPOSIT_HEADER_SELECT)
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.statusIn?.length) query = query.in('status', filters.statusIn);
 
   return query;
+}
+
+export async function getDepositInventoryLines(filters = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const RECEIVED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'];
+
+  // Step 1: load received CDR headers (optionally filtered by customer)
+  let hdrQuery = supabase
+    .from('tgd_customer_deposit_requests')
+    .select('id, request_no, customer_id, status, expected_arrival_date, reviewed_at, last_action_at')
+    .in('status', RECEIVED_STATUSES)
+    .order('last_action_at', { ascending: false })
+    .limit(500);
+
+  if (filters.customerId) hdrQuery = hdrQuery.eq('customer_id', filters.customerId);
+
+  const { data: headers, error: hErr } = await hdrQuery;
+  if (hErr) return { data: null, error: hErr };
+  if (!headers?.length) return { data: [], error: null };
+
+  const ids = headers.map((h) => h.id);
+
+  // Step 2: load all lines for those CDRs
+  const { data: lines, error: lErr } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type')
+    .in('deposit_request_id', ids)
+    .order('line_no', { ascending: true });
+
+  if (lErr) return { data: null, error: lErr };
+
+  // Step 3: join in-memory
+  const headerMap = Object.fromEntries(headers.map((h) => [h.id, h]));
+  const enriched = (lines ?? []).map((l) => ({
+    ...l,
+    request: headerMap[l.deposit_request_id] ?? null,
+  }));
+
+  return { data: enriched, error: null };
 }
 
 export async function getCustomerDepositRequest(requestId) {
@@ -193,6 +236,19 @@ export async function cancelCustomerDepositRequest(requestId, comment = null) {
   const { data, error } = await supabase.rpc('tgd_cancel_customer_deposit_request', {
     p_request_id: requestId,
     p_comment: toNullableText(comment),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+export async function recordDepositLineActualReceipt(lineId, { actualBoxes, actualWeight, note = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_record_deposit_line_actual_receipt', {
+    p_line_id: lineId,
+    p_actual_boxes: toNullableNumber(actualBoxes),
+    p_actual_weight: toNullableNumber(actualWeight),
+    p_note: toNullableText(note),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

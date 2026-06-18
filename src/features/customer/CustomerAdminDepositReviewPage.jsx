@@ -6,6 +6,7 @@ import { CustomerDepositRequestPrintDocument } from '../../components/customer/C
 import { CustomerDepositStaffWorkOrderPrint } from '../../components/customer/CustomerDepositStaffWorkOrderPrint.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
@@ -13,6 +14,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   reviewCustomerDepositRequest,
+  recordDepositLineActualReceipt,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -23,6 +25,11 @@ const REVIEW_STATUSES = [
   'ADMIN_REVIEWING',
   'ADMIN_ACCEPTED',
   'WAREHOUSE_RECEIVING',
+  'PALLETIZING',
+  'COUNT_VARIANCE_REVIEW',
+  'ADMIN_RECOUNT_REQUESTED',
+  'RECEIVED_CONFIRMED',
+  'CUSTOMER_NOTIFIED',
 ];
 
 export function CustomerAdminDepositReviewPage() {
@@ -31,7 +38,15 @@ export function CustomerAdminDepositReviewPage() {
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
   const [selectedId, setSelectedId] = useState(routeRequestId ?? '');
+  const [detailOpen, setDetailOpen] = useState(!!routeRequestId);
   const [comment, setComment] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyNote, setNotifyNote] = useState('');
+  const [recountLine, setRecountLine] = useState(null);
+  const [recountQty, setRecountQty] = useState('');
+  const [recountBoxes, setRecountBoxes] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,26 +88,30 @@ export function CustomerAdminDepositReviewPage() {
     return () => { active = false; };
   }, [selectedId]);
 
+  function openDetail(id) {
+    setSelectedId(id);
+    setComment('');
+    setActionMsg('');
+    setError('');
+    setDetailOpen(true);
+  }
+
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
-  async function handleReview(decision) {
-    if (!selectedId) return;
-    setSubmitting(true);
-    setError('');
-    setActionMsg('');
-    const result = await reviewCustomerDepositRequest(selectedId, decision, comment);
-    setSubmitting(false);
-    if (result.error) {
-      setError(result.error.message ?? 'Review failed');
-      return;
-    }
-    const newStatus = result.data?.status ?? '';
-    setActionMsg(getDepositStatusLabel(newStatus, t) || newStatus);
-    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
-  }
+  const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  const allLinesHaveActualQty = lines.length > 0 && lines.every((l) => l.actual_boxes != null || l.actual_weight != null);
+  const canConfirmReceiving = selected &&
+    ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
+    allLinesHaveActualQty;
+  const confirmBlockedReason = selected &&
+    ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
+    !allLinesHaveActualQty
+    ? 'กรุณาบันทึกจำนวนรับจริงทุกรายการก่อนยืนยัน'
+    : '';
+  const canReject = selected && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(selected.status);
 
-  async function handleAcceptDeposit() {
+  async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
     setSubmitting(true);
     setError('');
@@ -110,12 +129,48 @@ export function CustomerAdminDepositReviewPage() {
     const acceptResult = await reviewCustomerDepositRequest(selectedId, 'ACCEPT', comment);
     setSubmitting(false);
     if (acceptResult.error) {
-      setError(acceptResult.error.message ?? 'Accept failed');
+      setError(acceptResult.error.message ?? 'Open work order failed');
       return;
     }
     const newStatus = acceptResult.data?.status ?? 'WAREHOUSE_RECEIVING';
+    setActionMsg(t('admin_work_order_opened'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  async function handleConfirmReceiving() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    setActionMsg('');
+
+    const result = await reviewCustomerDepositRequest(selectedId, 'CONFIRM_RECEIPT', comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Confirm receiving failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'COMPLETED';
+    setActionMsg(t('admin_receiving_confirmed'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setNotifyNote('');
+    setNotifyOpen(true);
+  }
+
+  async function handleReject() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    const result = await reviewCustomerDepositRequest(selectedId, 'REJECT', rejectReason || comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Reject failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'REJECTED';
     setActionMsg(getDepositStatusLabel(newStatus, t) || newStatus);
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setRejectOpen(false);
+    setRejectReason('');
   }
 
   async function handleNotifyCustomer() {
@@ -127,6 +182,7 @@ export function CustomerAdminDepositReviewPage() {
       selected.customer_id,
       selected.request_no,
       selected.created_by_email ?? null,
+      notifyNote || null,
     );
     setNotifying(false);
     if (result.error) {
@@ -134,6 +190,7 @@ export function CustomerAdminDepositReviewPage() {
       return;
     }
     setActionMsg(t('admin_notify_customer'));
+    setNotifyOpen(false);
   }
 
   if (loading) {
@@ -144,17 +201,14 @@ export function CustomerAdminDepositReviewPage() {
     );
   }
 
-  const canAccept = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
-  const canNotify = selected?.status === 'WAREHOUSE_RECEIVING';
-
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-admin-deposit-review-page">
       <PageHeader
         title={t('admin_deposit_review_title')}
         description={t('admin_deposit_review_description')}
         actions={(
-          <Link className="btn btn-secondary" to="/operations/receiving">
-            {t('receiving')}
+          <Link className="btn btn-secondary" to="/handheld">
+            {t('handheld_receiving_go')}
           </Link>
         )}
       />
@@ -162,7 +216,8 @@ export function CustomerAdminDepositReviewPage() {
       {actionMsg ? <div className="alert-success-panel" role="status">{actionMsg}</div> : null}
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
 
-      <div className="table-card">
+      {/* List table — hidden when accessed via direct requestId link (prevents duplicate list) */}
+      <div className="table-card" style={{ display: routeRequestId ? 'none' : undefined }}>
         <div className="table-card-header">
           <h3>{t('admin_deposit_review_table_title')}</h3>
         </div>
@@ -179,7 +234,7 @@ export function CustomerAdminDepositReviewPage() {
             </thead>
             <tbody>
               {rows.length ? rows.map((row) => (
-                <tr className={row.id === selectedId ? 'table-row-selected' : ''} key={row.id}>
+                <tr key={row.id}>
                   <td>{row.request_no}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
@@ -189,13 +244,14 @@ export function CustomerAdminDepositReviewPage() {
                   <td>{row.expected_arrival_date ?? '-'}</td>
                   <td>{row.contact_name ?? '-'}</td>
                   <td>
-                    <Link
-                      className={`btn btn-secondary btn-sm${row.id === selectedId ? ' btn-primary' : ''}`}
+                    <button
+                      className="btn btn-primary btn-sm"
                       data-testid={`admin-deposit-review-select-${row.id}`}
-                      to={`/customer/admin/deposit-review/${row.id}`}
+                      type="button"
+                      onClick={() => openDetail(row.id)}
                     >
                       {t('receiving_review_deposit_button')}
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               )) : (
@@ -206,20 +262,44 @@ export function CustomerAdminDepositReviewPage() {
         </div>
       </div>
 
-      {selected ? (
-        <div className="table-card">
-          <div className="table-card-header">
-            <h3>{selected.request_no}</h3>
-            <div className="action-row">
-              <Link
-                className="btn btn-secondary btn-sm"
-                data-testid={`admin-deposit-view-${selected.id}`}
-                to={`/customer/deposit-request/${selected.id}`}
-              >
-                {t('customer_request_view_button')}
-              </Link>
+      {/* Detail popup */}
+      <Modal
+        isOpen={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={selected?.request_no ?? t('admin_deposit_review_title')}
+        size="lg"
+      >
+        {selected ? (
+          <>
+            {actionMsg ? <div className="alert-success-panel" role="status" style={{ marginBottom: 12 }}>{actionMsg}</div> : null}
+            {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
+
+            {/* Header info */}
+            <div className="form-grid" style={{ marginBottom: 16 }}>
+              <div>
+                <div className="form-label">{t('customer_col_status')}</div>
+                <span className={`status-badge status-badge--${getCustomerRequestStatusClass(selected.status)}`}>
+                  {getDepositStatusLabel(selected.status, t)}
+                </span>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_expected_arrival_date')}</div>
+                <div>{selected.expected_arrival_date ?? '-'}</div>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_contact_name')}</div>
+                <div>{selected.contact_name ?? '-'}</div>
+              </div>
+              <div>
+                <div className="form-label">{t('customer_field_vehicle_registration')}</div>
+                <div>{selected.vehicle_registration ?? '-'}</div>
+              </div>
+            </div>
+
+            {/* Print actions — single set */}
+            <div className="action-row" style={{ marginBottom: 16 }}>
               <ReportPrintActions
-                disabled={!selected}
+                disabled={false}
                 renderReport={(language) => (
                   <CustomerDepositStaffWorkOrderPrint
                     branding={branding}
@@ -230,57 +310,247 @@ export function CustomerAdminDepositReviewPage() {
                 )}
                 title={`${selected.request_no} — ${t('admin_staff_work_order')}`}
               />
-              <ReportPrintActions
-                disabled={!selected}
-                renderReport={(language) => (
-                  <CustomerDepositRequestPrintDocument
-                    branding={branding}
-                    header={selected}
-                    language={language}
-                    lines={lines}
-                  />
-                )}
-                title={`${selected.request_no} — ${t('admin_customer_deposit_document')}`}
-              />
             </div>
-          </div>
-          <CustomerDepositRequestLinesDisplay lines={lines} testId="admin-deposit-review-lines-table" />
-        </div>
-      ) : null}
 
-      <label className="form-field">
-        <span>{t('admin_review_comment_label')}</span>
-        <textarea className="form-control" onChange={(e) => setComment(e.target.value)} rows={3} value={comment} />
-      </label>
-      <div className="action-row">
-        <button
-          className="btn btn-primary"
-          data-testid="admin-accept-deposit-button"
-          disabled={submitting || !canAccept}
-          onClick={handleAcceptDeposit}
-          type="button"
-        >
-          {t('admin_confirm_accept_deposit')}
-        </button>
-        {canNotify ? (
-          <button
-            className="btn btn-secondary"
-            disabled={notifying}
-            onClick={handleNotifyCustomer}
-            type="button"
-          >
-            {notifying ? '...' : t('admin_notify_customer')}
-          </button>
+            {/* Lines table with actual qty column and recount button */}
+            <div style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
+              <div className="responsive-table">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>{t('catalog_col_customer_code')}</th>
+                      <th>{t('catalog_col_product_name')}</th>
+                      <th>{t('customer_col_weight_per_box')}</th>
+                      <th>{t('customer_col_total_deposit_weight')}</th>
+                      <th>{t('customer_col_box_count')}</th>
+                      <th>{t('admin_received_qty')}</th>
+                      <th>{t('catalog_col_actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.length ? lines.map((line) => (
+                      <tr key={line.id}>
+                        <td>{line.line_no}</td>
+                        <td>{line.customer_product_code ?? '-'}</td>
+                        <td>{line.product_name ?? '-'}</td>
+                        <td>{line.weight_per_box ?? '-'}</td>
+                        <td>{line.expected_weight ?? '-'}</td>
+                        <td>{line.expected_boxes ?? '-'}</td>
+                        <td>
+                          {line.actual_boxes != null ? (
+                            <span style={{ fontWeight: 600, color: 'var(--tgd-success)' }}>
+                              {line.actual_boxes} กล่อง
+                              {line.actual_weight != null ? ` · ${line.actual_weight} กก.` : ''}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12, fontWeight: 600 }}>⚠ ยังไม่ได้บันทึก</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            onClick={() => {
+                              setRecountLine(line);
+                              setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
+                              setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
+                            }}
+                          >
+                            {t('admin_recount_button')}
+                          </button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Admin comment */}
+            <label className="form-field" style={{ marginBottom: 16 }}>
+              <span>{t('admin_review_comment_label')}</span>
+              <textarea className="form-control" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
+            </label>
+
+            {/* Warning when confirm is blocked */}
+            {confirmBlockedReason ? (
+              <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
+                ⚠️ {confirmBlockedReason}
+              </div>
+            ) : null}
+
+            {/* Action buttons */}
+            <div className="action-row">
+              {canOpenWorkOrder ? (
+                <button
+                  className="btn btn-primary"
+                  disabled={submitting}
+                  onClick={handleOpenWorkOrder}
+                  type="button"
+                >
+                  {t('admin_open_work_order')}
+                </button>
+              ) : null}
+              {selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) ? (
+                <button
+                  className="btn btn-primary"
+                  disabled={submitting || !canConfirmReceiving}
+                  onClick={handleConfirmReceiving}
+                  title={confirmBlockedReason}
+                  type="button"
+                >
+                  {t('admin_confirm_receiving')}
+                </button>
+              ) : null}
+              {canReject ? (
+                <button
+                  className="btn btn-danger"
+                  disabled={submitting}
+                  onClick={() => setRejectOpen(true)}
+                  type="button"
+                >
+                  {t('admin_reject_request')}
+                </button>
+              ) : null}
+            </div>
+          </>
         ) : null}
-        <button
-          className="btn btn-secondary"
-          disabled={submitting || !selectedId}
-          onClick={() => handleReview('REJECT')}
-          type="button"
-        >
-          {t('admin_reject_request')}
-        </button>
-      </div>
+      </Modal>
+
+      {/* Reject confirmation modal */}
+      <Modal
+        isOpen={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title={t('admin_reject_request')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-danger" disabled={submitting} onClick={handleReject} type="button">
+              {t('admin_reject_request')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRejectOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <label className="form-field">
+          <span>{t('admin_reject_reason_label')}</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder={t('admin_reject_reason_placeholder')}
+          />
+        </label>
+      </Modal>
+
+      {/* Notify customer after confirm */}
+      <Modal
+        isOpen={notifyOpen}
+        onClose={() => setNotifyOpen(false)}
+        title={t('admin_notify_customer_title')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-primary" disabled={notifying} onClick={handleNotifyCustomer} type="button">
+              {notifying ? '...' : t('admin_notify_customer')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setNotifyOpen(false)} type="button">
+              {t('admin_skip_notify')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>{t('admin_notify_customer_description')}</p>
+        <label className="form-field">
+          <span>{t('admin_notify_customer_note_label')}</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={notifyNote}
+            onChange={(e) => setNotifyNote(e.target.value)}
+            placeholder={t('admin_notify_customer_note_placeholder')}
+          />
+        </label>
+      </Modal>
+
+      {/* Recount modal */}
+      <Modal
+        isOpen={!!recountLine}
+        onClose={() => setRecountLine(null)}
+        title={t('admin_recount_title')}
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              disabled={submitting}
+              type="button"
+              onClick={async () => {
+                if (!recountLine) return;
+                setSubmitting(true);
+                setError('');
+                const result = await recordDepositLineActualReceipt(recountLine.id, {
+                  actualBoxes: recountBoxes,
+                  actualWeight: recountQty,
+                  note: null,
+                });
+                setSubmitting(false);
+                if (result.error) {
+                  setError(result.error.message ?? 'Save failed');
+                  return;
+                }
+                setLines((prev) => prev.map((l) => l.id === recountLine.id
+                  ? { ...l, actual_boxes: Number(recountBoxes) || null, actual_weight: Number(recountQty) || null }
+                  : l));
+                setActionMsg(t('admin_recount_saved'));
+                setRecountLine(null);
+              }}
+            >
+              {t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRecountLine(null)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        {recountLine ? (
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{recountLine.product_name ?? recountLine.customer_product_code}</strong>
+            </p>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>{t('admin_received_boxes')}</span>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  value={recountBoxes}
+                  onChange={(e) => setRecountBoxes(e.target.value)}
+                />
+              </label>
+              <label className="form-field">
+                <span>{t('admin_received_qty')}</span>
+                <input
+                  className="form-control"
+                  type="number"
+                  min={0}
+                  value={recountQty}
+                  onChange={(e) => setRecountQty(e.target.value)}
+                />
+              </label>
+            </div>
+          </>
+        ) : null}
+      </Modal>
     </section>
   );
 }

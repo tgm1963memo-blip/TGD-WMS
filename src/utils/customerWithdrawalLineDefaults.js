@@ -1,4 +1,4 @@
-export const WITHDRAWAL_LINE_DEFAULT_COUNT = 10;
+export const WITHDRAWAL_LINE_DEFAULT_COUNT = 5;
 
 export function createEmptyWithdrawalLine(lineKey = 1) {
   return {
@@ -7,6 +7,7 @@ export function createEmptyWithdrawalLine(lineKey = 1) {
     customer_product_code: '',
     product_code: '',
     product_name: '',
+    identifier_type: 'LOT',
     lot_no: '',
     mfg_date: '',
     exp_date: '',
@@ -30,6 +31,6 @@ export function isCatalogWithdrawalLineSelected(line) {
 
 export function getFilledWithdrawalLines(lines) {
   return (lines ?? []).filter(
-    (line) => isCatalogWithdrawalLineSelected(line) && String(line.requested_qty ?? '').trim() !== '',
+    (line) => isCatalogWithdrawalLineSelected(line) && String(line.requested_weight ?? '').trim() !== '',
   );
 }

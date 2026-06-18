@@ -4,24 +4,35 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 
-export function Topbar({ currentSection }) {
+export function Topbar({ currentSection, onMenuToggle }) {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
 
   return (
     <header className="header topbar app-header">
-      <div className="header-title tgm-topbar-title">
-        <span className="header-section eyebrow">{currentSection}</span>
-        <h1 className="header-page-title">
-          {getTranslation('tgm_cold_storage_wms', language)}
-        </h1>
-        <h2 className="sr-only">TGC WMS</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        {/* Hamburger — mobile only */}
+        <button
+          type="button"
+          className="sidebar-hamburger"
+          onClick={onMenuToggle}
+          aria-label="Toggle navigation"
+        >
+          <span /><span /><span />
+        </button>
+        <div className="header-title tgm-topbar-title">
+          <span className="header-section eyebrow">{currentSection}</span>
+          <h1 className="header-page-title">
+            {getTranslation('tgm_cold_storage_wms', language)}
+          </h1>
+          <h2 className="sr-only">TGC WMS</h2>
+        </div>
       </div>
       <div className="header-actions">
         {!goLive ? (
           <>
-            <span className="status-badge status-badge--uat">{getTranslation('uat_mode', language)}</span>
-            <span className="production-hold-badge">{getTranslation('production_hold', language)}</span>
+            <span className="status-badge status-badge--uat hide-xs">{getTranslation('uat_mode', language)}</span>
+            <span className="production-hold-badge hide-xs">{getTranslation('production_hold', language)}</span>
           </>
         ) : (
           <span className="status-badge status-badge--confirmed">{getTranslation('system_online', language)}</span>
