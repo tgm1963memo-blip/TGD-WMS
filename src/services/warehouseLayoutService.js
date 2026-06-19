@@ -20,21 +20,59 @@ export async function ensureDefaultWarehouse() {
     .single();
 }
 
-// Grid dimensions from location codes (format: PREFIX-RxxCxx)
-function inferGrid(locations) {
-  if (locations.length === 0) return { rows: 0, cols: 0 };
-  const parsed = locations.map((l) => {
-    const m = /R(\d+)C(\d+)$/i.exec(l.location_code ?? '');
-    return m ? { r: +m[1], c: +m[2] } : null;
-  }).filter(Boolean);
-  if (parsed.length === locations.length && parsed.length > 0) {
+// New format: {RoomCode}-{L|R}-{Row:02d}-{Level:02d}  e.g. H1-L-01-03
+function parseNewCode(code) {
+  const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
+  return m ? { room: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4] } : null;
+}
+
+// Legacy format: PREFIX-RxxCxx  e.g. S001-R01C01
+function parseOldCode(code) {
+  const m = /R(\d+)C(\d+)$/i.exec(code ?? '');
+  return m ? { row: +m[1], col: +m[2] } : null;
+}
+
+// Legacy v2 format: PREFIX-{Row:02d}{L|R}-{Level:02d}  e.g. S001-01L-03
+function parseMidCode(code) {
+  const m = /(\d+)([LR])-(\d+)$/i.exec(code ?? '');
+  return m ? { row: +m[1], side: m[2].toUpperCase(), level: +m[3] } : null;
+}
+
+// Analyze location codes to return structured grid info
+function analyzeLocations(locations) {
+  if (!locations.length) return { type: 'empty', rows: 0, cols: 0 };
+
+  const newParsed = locations.map((l) => parseNewCode(l.location_code)).filter(Boolean);
+  if (newParsed.length === locations.length) {
+    const numRows = Math.max(...newParsed.map((p) => p.row));
+    const sides = [...new Set(newParsed.map((p) => p.side))].sort();
+    const numLevels = Math.max(...newParsed.map((p) => p.level));
     return {
-      rows: Math.max(...parsed.map((p) => p.r)),
-      cols: Math.max(...parsed.map((p) => p.c)),
+      type: 'new',
+      numRows,
+      numSides: sides.length,
+      sides,
+      numLevels,
+      rows: numRows * sides.length,
+      cols: numLevels,
     };
   }
+
+  const midParsed = locations.map((l) => parseMidCode(l.location_code)).filter(Boolean);
+  if (midParsed.length === locations.length) {
+    const numRows = Math.max(...midParsed.map((p) => p.row));
+    const sides = [...new Set(midParsed.map((p) => p.side))].sort();
+    const numLevels = Math.max(...midParsed.map((p) => p.level));
+    return { type: 'new', numRows, numSides: sides.length, sides, numLevels, rows: numRows * sides.length, cols: numLevels };
+  }
+
+  const oldParsed = locations.map((l) => parseOldCode(l.location_code)).filter(Boolean);
+  if (oldParsed.length === locations.length && oldParsed.length > 0) {
+    return { type: 'old', rows: Math.max(...oldParsed.map((p) => p.row)), cols: Math.max(...oldParsed.map((p) => p.col)) };
+  }
+
   const cols = Math.min(12, Math.ceil(Math.sqrt(locations.length * 1.5)));
-  return { rows: Math.ceil(locations.length / cols), cols };
+  return { type: 'unknown', rows: Math.ceil(locations.length / cols), cols };
 }
 
 export async function getSectionsWithOccupancy() {
@@ -42,7 +80,7 @@ export async function getSectionsWithOccupancy() {
 
   const { data: zones, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, is_active, tgd_rooms(id, tgd_locations(id, location_code))')
+    .select('id, zone_code, zone_name, temperature_type, is_active, tgd_rooms(id, tgd_locations(id, location_code))')
     .eq('is_active', true)
     .order('zone_code');
 
@@ -59,13 +97,15 @@ export async function getSectionsWithOccupancy() {
     const locations = (zone.tgd_rooms ?? []).flatMap((r) => r.tgd_locations ?? []);
     const total = locations.length;
     const used = locations.filter((l) => occupiedSet.has(l.id)).length;
-    const { rows, cols } = inferGrid(locations);
+    const gridInfo = analyzeLocations(locations);
     return {
       id: zone.id,
       code: zone.zone_code,
       name: zone.zone_name,
-      rows,
-      cols,
+      temperatureType: zone.temperature_type ?? null,
+      gridInfo,
+      rows: gridInfo.rows,
+      cols: gridInfo.cols,
       total,
       used,
       empty: total - used,
@@ -106,12 +146,14 @@ export async function getActiveLocations() {
   return { data: locations, error: null };
 }
 
-export async function createSection({ warehouseId, zoneCode, zoneName, rows, cols }) {
+// sides: array of 'L' | 'R' | both
+// Location code format: {roomCode}-{side}-{row:02d}-{level:02d}  e.g. H1-L-01-03
+export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, numRows, sides, numLevels }) {
   if (!supabase) return missing();
 
   const { data: zone, error: ze } = await supabase
     .from('tgd_zones')
-    .insert({ warehouse_id: warehouseId, zone_code: zoneCode, zone_name: zoneName, temperature_type: 'COLD' })
+    .insert({ warehouse_id: warehouseId, zone_code: zoneCode, zone_name: zoneName, temperature_type: temperatureType ?? 'FROZEN' })
     .select('id')
     .single();
   if (ze) return { error: ze };
@@ -123,15 +165,21 @@ export async function createSection({ warehouseId, zoneCode, zoneName, rows, col
     .single();
   if (re) return { error: re };
 
+  const sideNames = { L: 'ซ้าย', R: 'ขวา' };
   const inserts = [];
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      inserts.push({
-        room_id: room.id,
-        location_code: `${zoneCode}-R${String(r).padStart(2, '0')}C${String(c).padStart(2, '0')}`,
-        location_name: `${zoneName} แถว${r} ช่อง${c}`,
-        location_type: 'SHELF',
-      });
+
+  for (let r = 1; r <= numRows; r++) {
+    for (const side of sides) {
+      for (let lv = 1; lv <= numLevels; lv++) {
+        const rowStr = String(r).padStart(2, '0');
+        const lvStr = String(lv).padStart(2, '0');
+        inserts.push({
+          room_id: room.id,
+          location_code: `${zoneCode}-${side}-${rowStr}-${lvStr}`,
+          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv}`,
+          location_type: 'SHELF',
+        });
+      }
     }
   }
 
