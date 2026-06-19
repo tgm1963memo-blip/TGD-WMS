@@ -22,7 +22,7 @@ export function ExcelImportExportToolbar({
 
   return (
     <div className="csv-import-export-toolbar action-row" data-testid="excel-import-export-toolbar">
-      <button className="btn btn-secondary" data-testid={templateTestId} disabled={disabled} onClick={onTemplate} type="button">
+      <button className="btn btn-secondary" data-testid={templateTestId} disabled={disabled} onClick={() => onTemplate?.()} type="button">
         {t('excel_download_template')}
       </button>
       <button className="btn btn-secondary" data-testid={exportTestId} disabled={disabled} onClick={onExport} type="button">

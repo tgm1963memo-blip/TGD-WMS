@@ -58,6 +58,8 @@ import { WarehouseLocationSetupPage } from '../features/admin/WarehouseLocationS
 import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProductCatalogAdminPage.jsx';
 import { CustomerRequestPolicyAdminPage } from '../features/admin/CustomerRequestPolicyAdminPage.jsx';
 import { CustomerStorageRateRulesAdminPage } from '../features/admin/CustomerStorageRateRulesAdminPage.jsx';
+import { CustomerProductServiceRatesPage } from '../features/admin/CustomerProductServiceRatesPage.jsx';
+import { RolePermissionsAdminPage } from '../features/admin/RolePermissionsAdminPage.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../config/pageShellPresentation.js';
 import { UatOnly } from '../components/common/UatOnly.jsx';
@@ -165,6 +167,8 @@ export function AppRoutes() {
           <Route path="/admin/customer-products" element={<CustomerProductCatalogAdminPage />} />
           <Route path="/admin/customer-request-policy" element={<CustomerRequestPolicyAdminPage />} />
           <Route path="/admin/customer-storage-rates" element={<CustomerStorageRateRulesAdminPage />} />
+          <Route path="/admin/product-service-rates" element={<CustomerProductServiceRatesPage />} />
+          <Route path="/admin/role-permissions" element={<RolePermissionsAdminPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
           <Route path="/customer" element={<CustomerPortalDashboardPage />} />
