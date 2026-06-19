@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
@@ -14,34 +14,58 @@ import {
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-// ── Theme tokens ──────────────────────────────────────────────────────────────
+// ── Theme tokens (Clean Light Mode / Glassmorphism) ───────────
 const C = {
-  bg: '#f0f4f8',
-  surface: '#ffffff',
+  bg: '#f8fafc',
+  surface: 'rgba(255, 255, 255, 0.85)',
+  surfaceSolid: '#ffffff',
   card: '#ffffff',
   border: '#e2e8f0',
-  shadow: '0 2px 12px rgba(0,0,0,0.08)',
-  shadowMd: '0 4px 20px rgba(37,99,235,0.12)',
-  primary: '#2563eb',
-  primaryDark: '#1e3a8a',
+  shadow: '0 8px 30px rgba(0,0,0,0.04)',
+  shadowMd: '0 12px 40px rgba(37,99,235,0.08)',
+  primary: '#0ea5e9',
+  primaryDark: '#0369a1',
   amber: '#f59e0b',
-  green: '#16a34a',
-  greenLight: '#dcfce7',
-  greenBorder: '#bbf7d0',
-  red: '#dc2626',
+  green: '#10b981',
+  greenLight: '#d1fae5',
+  greenBorder: '#a7f3d0',
+  red: '#ef4444',
   redLight: '#fee2e2',
-  blue: '#2563eb',
-  blueLight: '#dbeafe',
-  text: '#1e293b',
-  textSec: '#475569',
+  blueLight: '#e0f2fe',
+  text: '#0f172a',
+  textSec: '#64748b',
   muted: '#94a3b8',
-  inputBg: '#ffffff',
-  headerGrad: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-  receiveAccent: '#2563eb',
+  inputBg: 'rgba(255,255,255,0.6)',
+  headerGrad: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)',
+  receiveAccent: '#3b82f6',
   pickAccent: '#f59e0b',
+  glassmorphism: {
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+  }
 };
 
-// ── Camera barcode scanner ────────────────────────────────────────────────────
+// ── Sound & Haptic Feedback ───────────────────────────────────
+function triggerSuccessFeedback() {
+  if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.02);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) { }
+}
+
+// ── Camera barcode scanner ────────────────────────────────────
 function useCameraScanner(onScanned) {
   const inputRef = useRef(null);
 
@@ -74,14 +98,14 @@ function useCameraScanner(onScanned) {
   return { trigger, el };
 }
 
-// ── Status pill ───────────────────────────────────────────────────────────────
+// ── Status pill ───────────────────────────────────────────────
 function Pill({ label, color = C.primary, bg }) {
   return (
     <span style={{
       background: bg ?? (color + '18'),
       color,
       border: `1px solid ${color}33`,
-      borderRadius: 20, padding: '3px 10px',
+      borderRadius: 20, padding: '4px 12px',
       fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
     }}>
       {label}
@@ -89,23 +113,24 @@ function Pill({ label, color = C.primary, bg }) {
   );
 }
 
-// ── Top bar ───────────────────────────────────────────────────────────────────
+// ── Top bar ───────────────────────────────────────────────────
 function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
   return (
     <div style={{
       background: gradient ? C.headerGrad : C.surface,
       borderBottom: gradient ? 'none' : `1px solid ${C.border}`,
-      padding: '14px 16px',
-      display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-      boxShadow: gradient ? '0 2px 12px rgba(37,99,235,0.25)' : 'none',
+      padding: '16px 20px',
+      display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0,
+      boxShadow: gradient ? '0 4px 20px rgba(37,99,235,0.2)' : 'none',
     }}>
       {onBack && (
         <button type="button" onClick={onBack}
           style={{
-            background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.3)',
-            color: '#ffffff', fontSize: 18, cursor: 'pointer',
-            lineHeight: 1, padding: '6px 10px', borderRadius: 10,
+            background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)',
+            color: '#ffffff', fontSize: 20, cursor: 'pointer',
+            width: 40, height: 40, borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}>
           ←
         </button>
@@ -113,11 +138,11 @@ function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           color: gradient ? '#ffffff' : C.text,
-          fontWeight: 800, fontSize: 16,
+          fontWeight: 800, fontSize: 18,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{title}</div>
         {subtitle && (
-          <div style={{ color: gradient ? 'rgba(255,255,255,0.72)' : C.muted, fontSize: 12, marginTop: 1 }}>
+          <div style={{ color: gradient ? 'rgba(255,255,255,0.85)' : C.muted, fontSize: 13, marginTop: 2, fontWeight: 500 }}>
             {subtitle}
           </div>
         )}
@@ -127,166 +152,13 @@ function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
   );
 }
 
-// ── Scan zone ─────────────────────────────────────────────────────────────────
-function ScanZone({ value, onChange, onCameraClick, placeholder, label, hint, inputRef: externalRef }) {
-  const internalRef = useRef(null);
-  const ref = externalRef ?? internalRef;
-  const hasValue = !!value;
-
-  return (
-    <div style={{
-      padding: '16px 16px 12px',
-      background: C.surface,
-      borderBottom: `1px solid ${C.border}`,
-      flexShrink: 0,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    }}>
-      {label && (
-        <div style={{
-          color: C.textSec, fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8,
-        }}>
-          {label}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{
-          flex: 1, position: 'relative',
-          borderRadius: 14,
-          boxShadow: hasValue ? `0 0 0 3px ${C.green}30` : `0 0 0 3px ${C.primary}20`,
-          transition: 'box-shadow 0.2s',
-        }}>
-          <span style={{
-            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 18, pointerEvents: 'none',
-          }}>
-            {hasValue ? '✅' : '🔍'}
-          </span>
-          <input
-            ref={ref}
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder ?? 'สแกนหรือพิมพ์'}
-            autoFocus
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: C.inputBg,
-              border: `2px solid ${hasValue ? C.green : C.primary}`,
-              borderRadius: 14, padding: '14px 14px 14px 44px',
-              color: C.text, fontSize: 16, fontWeight: 600,
-              outline: 'none', transition: 'border-color 0.2s',
-            }}
-          />
-        </div>
-        <button type="button" onClick={onCameraClick}
-          style={{
-            background: C.primary,
-            border: 'none', borderRadius: 14,
-            padding: '14px 16px', color: '#fff', fontSize: 20,
-            cursor: 'pointer', lineHeight: 1, flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(37,99,235,0.35)',
-          }}>
-          📷
-        </button>
-      </div>
-      {hint && (
-        <div style={{
-          color: hasValue ? C.green : C.textSec,
-          fontSize: 12, marginTop: 8, paddingLeft: 2, fontWeight: hasValue ? 600 : 400,
-        }}>
-          {hint}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Item card ─────────────────────────────────────────────────────────────────
-function ItemCard({ line, docNo, statusLabel }) {
-  if (!line) return null;
-  return (
-    <div style={{
-      margin: '12px 16px',
-      background: C.card,
-      borderRadius: 16,
-      border: `1px solid ${C.border}`,
-      overflow: 'hidden',
-      boxShadow: C.shadow,
-      flexShrink: 0,
-    }}>
-      <div style={{
-        background: C.headerGrad,
-        padding: '10px 14px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
-      }}>
-        <span style={{ color: '#ffffff', fontWeight: 800, fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{docNo}</span>
-        <Pill label={statusLabel} color="#ffffff" bg="rgba(255,255,255,0.2)" />
-      </div>
-      <div style={{ padding: '14px 16px' }}>
-        <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 10 }}>
-          {line.product_name ?? line.customer_product_code ?? '—'}
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          {line.customer_product_code && (
-            <span style={{
-              background: C.blueLight, color: C.primary,
-              borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700,
-            }}>
-              รหัส {line.customer_product_code}
-            </span>
-          )}
-          {line.lot_no && (
-            <span style={{
-              background: '#f0fdf4', color: C.green,
-              borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700,
-            }}>
-              LOT {line.lot_no}
-            </span>
-          )}
-          {line.temperature_type && (
-            <span style={{
-              background: '#e0f2fe', color: '#0284c7',
-              borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700,
-            }}>
-              ❄ {line.temperature_type}
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={{
-            flex: 1, background: C.bg, borderRadius: 10, padding: '10px 12px',
-            border: `1px solid ${C.border}`,
-          }}>
-            <div style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>คาดการณ์</div>
-            <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>
-              {line.expected_boxes ?? '-'} กล่อง
-            </div>
-            <div style={{ color: C.textSec, fontSize: 12 }}>{line.expected_weight ?? '-'} กก.</div>
-          </div>
-          {line.actual_boxes != null && (
-            <div style={{
-              flex: 1, background: C.greenLight, borderRadius: 10, padding: '10px 12px',
-              border: `1px solid ${C.greenBorder}`,
-            }}>
-              <div style={{ color: C.green, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>รับจริง ✓</div>
-              <div style={{ color: C.green, fontWeight: 800, fontSize: 14 }}>{line.actual_boxes} กล่อง</div>
-              <div style={{ color: C.green, fontSize: 12 }}>{line.actual_weight ?? '-'} กก.</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Qty input row ─────────────────────────────────────────────────────────────
+// ── Qty input row ─────────────────────────────────────────────
 function QtyRow({ boxes, setBoxes, weight, setWeight }) {
   return (
-    <div style={{ display: 'flex', gap: 12, padding: '0 16px 12px', flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: 16, padding: '0 0 16px', flexShrink: 0 }}>
       {[['📦 กล่อง', boxes, setBoxes], ['⚖️ น้ำหนัก (กก.)', weight, setWeight]].map(([label, val, setVal]) => (
         <label key={label} style={{ flex: 1 }}>
-          <div style={{ color: C.textSec, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{label}</div>
+          <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</div>
           <input
             type="number" min={0} value={val}
             onChange={(e) => setVal(e.target.value)}
@@ -294,10 +166,10 @@ function QtyRow({ boxes, setBoxes, weight, setWeight }) {
               width: '100%', boxSizing: 'border-box',
               background: val ? C.greenLight : C.inputBg,
               border: `2px solid ${val ? C.green : C.border}`,
-              borderRadius: 12, padding: '14px 10px',
+              borderRadius: 16, padding: '16px 12px',
               color: val ? C.green : C.text,
-              fontSize: 24, fontWeight: 800, textAlign: 'center', outline: 'none',
-              transition: 'all 0.2s',
+              fontSize: 26, fontWeight: 800, textAlign: 'center', outline: 'none',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           />
         </label>
@@ -306,139 +178,134 @@ function QtyRow({ boxes, setBoxes, weight, setWeight }) {
   );
 }
 
-// ── Confirmed chip ────────────────────────────────────────────────────────────
+// ── Confirmed chip ────────────────────────────────────────────
 function ConfirmedChip({ item }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-      background: C.greenLight, borderRadius: 12,
-      border: `1px solid ${C.greenBorder}`, marginBottom: 8,
-      boxShadow: '0 1px 4px rgba(22,163,74,0.1)',
+      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+      background: C.greenLight, borderRadius: 16,
+      border: `1px solid ${C.greenBorder}`, marginBottom: 10,
+      boxShadow: '0 2px 8px rgba(16,185,129,0.1)',
     }}>
       <div style={{
-        width: 36, height: 36, borderRadius: '50%',
+        width: 40, height: 40, borderRadius: '50%',
         background: C.green, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff', fontSize: 16,
+        color: '#fff', fontSize: 18, boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
       }}>✓</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: C.text, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ color: C.text, fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {item.line?.product_name ?? item.line?.customer_product_code}
         </div>
-        <div style={{ color: C.green, fontSize: 12, marginTop: 2, fontWeight: 600 }}>
+        <div style={{ color: C.green, fontSize: 13, marginTop: 4, fontWeight: 600 }}>
           {item.boxes} กล่อง · {item.weight} กก.{item.palletId ? ` · ${item.palletId}` : ''}{item.location ? ` · 📍 ${item.location.code}` : ''}
-          <span style={{ color: C.textSec, fontWeight: 400, marginLeft: 8 }}>{item.confirmedAt}</span>
         </div>
       </div>
+      <span style={{ color: C.textSec, fontSize: 12, fontWeight: 600 }}>{item.confirmedAt}</span>
     </div>
   );
 }
 
-// ── Line list item ────────────────────────────────────────────────────────────
+// ── Line list item ────────────────────────────────────────────
 function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
   return (
     <button type="button" onClick={onSelect}
       style={{
-        display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
-        background: isDone ? C.greenLight : C.card,
-        border: `1.5px solid ${isDone ? C.greenBorder : C.border}`,
-        borderRadius: 14, padding: '14px 14px', marginBottom: 8,
+        display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left',
+        background: isDone ? C.surfaceSolid : C.card,
+        border: `1px solid ${isDone ? C.greenBorder : C.border}`,
+        borderRadius: 16, padding: '16px 16px', marginBottom: 10,
         cursor: 'pointer', color: C.text,
         boxShadow: isDone ? 'none' : C.shadow,
-        transition: 'all 0.15s',
-        borderLeft: `4px solid ${isDone ? C.green : C.primary}`,
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        borderLeft: `5px solid ${isDone ? C.green : C.primary}`,
+        opacity: isDone ? 0.7 : 1,
       }}>
       <div style={{
-        width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
         background: isDone ? C.green : C.primary,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff', fontSize: 14, fontWeight: 800,
+        color: '#fff', fontSize: 15, fontWeight: 800,
       }}>
         {isDone ? '✓' : index + 1}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>
+        <div style={{ fontSize: 15, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>
           {line.product_name ?? line.customer_product_code}
         </div>
-        <div style={{ fontSize: 12, color: C.textSec, marginTop: 3 }}>
+        <div style={{ fontSize: 13, color: C.textSec, marginTop: 4, fontWeight: 500 }}>
           {line.expected_boxes != null ? `${line.expected_boxes} กล่อง · ` : ''}{line.expected_weight != null ? `${line.expected_weight} กก.` : ''}
           {isDone && doneLabel && (
             <span style={{
-              color: C.green, fontWeight: 700, marginLeft: 6,
-              background: C.greenLight, borderRadius: 6, padding: '1px 7px',
+              color: C.green, fontWeight: 800, marginLeft: 8,
+              background: C.greenLight, borderRadius: 8, padding: '2px 8px',
             }}>{doneLabel}</span>
           )}
         </div>
       </div>
-      <span style={{
-        width: 28, height: 28, borderRadius: '50%',
-        background: isDone ? C.green + '18' : C.blueLight,
-        color: isDone ? C.green : C.primary,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, fontWeight: 700, flexShrink: 0,
-      }}>›</span>
     </button>
   );
 }
 
-// ── Big confirm button ────────────────────────────────────────────────────────
-function ConfirmBtn({ label, onClick, disabled, saving, color = C.primary }) {
-  const active = !disabled && !saving;
-  return (
-    <div style={{
-      padding: '12px 16px 16px',
-      flexShrink: 0,
-      background: C.surface,
-      borderTop: `1px solid ${C.border}`,
-      boxShadow: '0 -4px 12px rgba(0,0,0,0.06)',
-    }}>
-      <button type="button" disabled={disabled || saving} onClick={onClick}
-        style={{
-          width: '100%', padding: '18px',
-          borderRadius: 16,
-          background: active ? color : C.border,
-          color: active ? '#ffffff' : C.muted,
-          border: 'none', fontSize: 17, fontWeight: 800,
-          cursor: active ? 'pointer' : 'not-allowed',
-          letterSpacing: '0.02em',
-          boxShadow: active ? `0 6px 20px ${color}55` : 'none',
-          transition: 'all 0.2s',
-        }}>
-        {saving ? '⏳ กำลังบันทึก...' : label}
-      </button>
-    </div>
-  );
-}
-
-// ── Doc card ──────────────────────────────────────────────────────────────────
+// ── Doc card ──────────────────────────────────────────────────
 function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText }) {
   return (
     <button type="button" onClick={onClick}
       style={{
         display: 'block', width: '100%', textAlign: 'left',
         background: C.card,
-        border: `1.5px solid ${C.border}`,
-        borderRadius: 16, padding: '16px 16px', marginBottom: 10,
+        border: `1px solid ${C.border}`,
+        borderRadius: 20, padding: '20px 20px', marginBottom: 12,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
-        borderLeft: `4px solid ${statusColor}`,
-        transition: 'box-shadow 0.15s',
+        borderLeft: `6px solid ${statusColor}`,
+        transition: 'transform 0.2s, box-shadow 0.2s',
       }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{
-          fontFamily: 'monospace', fontWeight: 800, fontSize: 15, color: C.primaryDark,
+          fontFamily: 'monospace', fontWeight: 900, fontSize: 17, color: C.text, letterSpacing: '0.02em',
         }}>{docNo}</span>
         <Pill label={statusLabel} color={statusColor} />
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: C.textSec }}>📅 {dateStr}</span>
-        {subText && <span style={{ fontSize: 12, color: C.muted }}>· {subText}</span>}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <span style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>📅 {dateStr}</span>
+        {subText && <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>· {subText}</span>}
       </div>
     </button>
   );
 }
 
-// ── Receiving workflow ────────────────────────────────────────────────────────
+// ── Sort Control ──────────────────────────────────────────────
+function SortDropdown({ sortType, setSortType }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ color: C.textSec, fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        รายการสินค้า
+      </div>
+      <select
+        value={sortType}
+        onChange={(e) => setSortType(e.target.value)}
+        style={{
+          background: C.surfaceSolid,
+          border: `1px solid ${C.border}`,
+          borderRadius: 12,
+          padding: '6px 12px',
+          fontSize: 13,
+          fontWeight: 700,
+          color: C.primaryDark,
+          outline: 'none',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        }}
+      >
+        <option value="pending">เรียงตาม สถานะการทำ (ยังไม่ทำขึ้นก่อน)</option>
+        <option value="name">เรียงตาม ชื่อสินค้า (ก-ฮ)</option>
+        <option value="code">เรียงตาม รหัสสินค้า (A-Z)</option>
+      </select>
+    </div>
+  );
+}
+
+// ── Receiving workflow ────────────────────────────────────────
 function ReceivingWorkflow({ onBack, t }) {
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -455,7 +322,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const [confirmed, setConfirmed] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [flashMsg, setFlashMsg] = useState('');
+  const [sortType, setSortType] = useState('pending');
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
   const { trigger: cameraPallet, el: cameraPalletEl } = useCameraScanner((v) => setPalletScan(v));
@@ -487,6 +354,7 @@ function ReceivingWorkflow({ onBack, t }) {
       (l.lot_no ?? '').toLowerCase() === q,
     );
     if (match) {
+      triggerSuccessFeedback();
       setMatchedLine(match);
       setBoxes(match.actual_boxes?.toString() ?? match.expected_boxes?.toString() ?? '');
       setWeight(match.actual_weight?.toString() ?? match.expected_weight?.toString() ?? '');
@@ -502,40 +370,59 @@ function ReceivingWorkflow({ onBack, t }) {
     setSaving(false);
     if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
 
-    setConfirmed((prev) => [{ line: matchedLine, boxes, weight, palletId: palletScan, location: selectedLocation,
-      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
+    triggerSuccessFeedback();
+    setConfirmed((prev) => [{
+      line: matchedLine, boxes, weight, palletId: palletScan, location: selectedLocation,
+      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+    }, ...prev]);
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
       ? { ...l, actual_boxes: Number(boxes) || null, actual_weight: Number(weight) || null } : l));
 
-    setFlashMsg(`✓ ${matchedLine.product_name ?? matchedLine.customer_product_code}`);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setPalletScan(''); setSelectedLocation(null);
-    setTimeout(() => setFlashMsg(''), 3000);
   }
 
   const doneCount = lines.filter((l) => l.actual_boxes != null).length;
 
-  // Doc select screen
+  const sortedLines = useMemo(() => {
+    return [...lines].sort((a, b) => {
+      if (sortType === 'pending') {
+        const aDone = a.actual_boxes != null;
+        const bDone = b.actual_boxes != null;
+        if (aDone !== bDone) return aDone ? 1 : -1;
+      } else if (sortType === 'name') {
+        const aName = a.product_name ?? '';
+        const bName = b.product_name ?? '';
+        return aName.localeCompare(bName, 'th');
+      } else if (sortType === 'code') {
+        const aCode = a.customer_product_code ?? '';
+        const bCode = b.customer_product_code ?? '';
+        return aCode.localeCompare(bCode);
+      }
+      return 0;
+    });
+  }, [lines, sortType]);
+
   if (!selectedDoc) {
     return (
       <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '16px 16px 24px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 20px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: C.muted }}>กำลังโหลด...</div>
+            <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
           ) : docs.length === 0 ? (
             <div style={{
               textAlign: 'center', padding: '60px 24px',
-              background: C.card, borderRadius: 20, marginTop: 8,
+              background: C.card, borderRadius: 24, marginTop: 8,
               border: `1px solid ${C.border}`, boxShadow: C.shadow,
             }}>
-              <div style={{ fontSize: 52, marginBottom: 14 }}>📭</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>ไม่มีใบงานที่รอรับสินค้า</div>
-              <div style={{ fontSize: 13, color: C.muted }}>ใบงานสถานะ "รับเข้าคลัง" จะปรากฏที่นี่</div>
+              <div style={{ fontSize: 52, marginBottom: 16 }}>📭</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอรับสินค้า</div>
+              <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับเข้าคลัง" จะปรากฏที่นี่</div>
             </div>
           ) : (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>พบ {docs.length} ใบงาน</span>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
               </div>
               {docs.map((doc) => (
                 <DocCard
@@ -566,173 +453,203 @@ function ReceivingWorkflow({ onBack, t }) {
         badge={
           <div style={{
             background: 'rgba(255,255,255,0.2)', borderRadius: 20,
-            padding: '4px 12px', color: '#fff', fontSize: 12, fontWeight: 700,
-            border: '1px solid rgba(255,255,255,0.35)',
+            padding: '4px 12px', color: '#fff', fontSize: 13, fontWeight: 800,
+            border: '1px solid rgba(255,255,255,0.4)',
           }}>
             {doneCount}/{lines.length}
           </div>
         }
       />
 
-      {/* Progress bar */}
       {lines.length > 0 && (
-        <div style={{ background: C.primaryDark, height: 4, flexShrink: 0 }}>
+        <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>
           <div style={{
             height: '100%', background: C.green,
             width: `${(doneCount / lines.length) * 100}%`,
-            transition: 'width 0.4s ease',
+            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
         </div>
       )}
 
-      {linesLoading ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, background: C.bg }}>
-          กำลังโหลด...
-        </div>
-      ) : (
-        <>
-          <ScanZone value={scanValue} onChange={handleScan} onCameraClick={cameraItem}
-            label="สแกนสินค้า" placeholder="รหัส / LOT / ชื่อสินค้า"
-            hint={matchedLine
-              ? `✓ พบ: ${matchedLine.product_name ?? matchedLine.customer_product_code}`
-              : 'สแกนบาร์โค้ดหรือพิมพ์ หรือเลือกจากรายการด้านล่าง'} />
-
-          <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
-            {flashMsg && (
-              <div style={{
-                margin: '12px 16px 0', padding: '12px 16px',
-                background: C.greenLight, border: `1px solid ${C.greenBorder}`,
-                borderRadius: 12, color: C.green, fontSize: 14, fontWeight: 700,
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontSize: 18 }}>🎉</span> {flashMsg}
+      {/* Main Content Area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 220px', background: C.bg }}>
+        {linesLoading ? (
+          <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
+        ) : (
+          <>
+            {confirmed.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{
+                  color: C.green, fontSize: 13, fontWeight: 800, marginBottom: 12,
+                  textTransform: 'uppercase', letterSpacing: '0.08em'
+                }}>
+                  บันทึกแล้วล่าสุด ({confirmed.length})
+                </div>
+                {confirmed.slice(0, 3).map((item, i) => <ConfirmedChip key={i} item={item} />)}
               </div>
             )}
+
+            <SortDropdown sortType={sortType} setSortType={setSortType} />
+
+            {sortedLines.map((l, i) => (
+              <LineListItem key={l.id} line={l} index={i} isDone={l.actual_boxes != null}
+                doneLabel={l.actual_boxes != null ? `รับแล้ว ${l.actual_boxes} กล่อง` : ''}
+                onSelect={() => {
+                  setMatchedLine(l);
+                  setScanValue(l.customer_product_code ?? l.product_name ?? '');
+                  setBoxes(l.actual_boxes?.toString() ?? l.expected_boxes?.toString() ?? '');
+                  setWeight(l.actual_weight?.toString() ?? l.expected_weight?.toString() ?? '');
+                  triggerSuccessFeedback();
+                }} />
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Bottom Thumb Zone Action Bar */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: C.surface,
+        ...C.glassmorphism,
+        borderTop: `1px solid ${C.borderLight}`,
+        borderTopLeftRadius: 32, borderTopRightRadius: 32,
+        boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
+        padding: '24px 20px 32px',
+        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        transform: matchedLine ? 'translateY(0)' : 'translateY(0)',
+        zIndex: 100,
+        maxHeight: '85vh',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {matchedLine ? (
+          <div style={{ flex: 1, overflowY: 'auto', margin: '-24px -20px -32px', padding: '24px 20px 32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ color: C.primaryDark, fontWeight: 900, fontSize: 20 }}>ยืนยันรับเข้า</div>
+              <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
+                style={{
+                  background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, color: C.textSec, cursor: 'pointer',
+                }}>✕</button>
+            </div>
+
+            <div style={{
+              background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
+              border: `2px solid ${C.primary}40`,
+            }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
+                {matchedLine.product_name ?? matchedLine.customer_product_code ?? '—'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ background: C.blueLight, color: C.primaryDark, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>รหัส {matchedLine.customer_product_code}</span>
+                {matchedLine.lot_no && <span style={{ background: '#f0fdf4', color: C.green, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
+              </div>
+            </div>
+
             {saveError && (
-              <div style={{
-                margin: '12px 16px 0', padding: '12px 16px',
-                background: C.redLight, borderRadius: 12, color: C.red, fontSize: 13,
-              }}>
+              <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>
                 {saveError}
               </div>
             )}
 
-            {matchedLine ? (
-              <>
-                <ItemCard line={matchedLine} docNo={selectedDoc.request_no}
-                  statusLabel={getDepositStatusLabel(selectedDoc.status, t)} />
-                <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
+            <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
 
-                <div style={{ padding: '0 16px 12px' }}>
-                  <div style={{ color: C.textSec, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🪵 Pallet ID (ถ้ามี)</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input type="text" value={palletScan} onChange={(e) => setPalletScan(e.target.value)}
-                      placeholder="สแกนหรือพิมพ์ Pallet ID"
-                      style={{
-                        flex: 1, background: C.inputBg,
-                        border: `2px solid ${palletScan ? C.primary : C.border}`,
-                        borderRadius: 12, padding: '12px 14px', color: C.text, fontSize: 14, outline: 'none',
-                      }} />
-                    <button type="button" onClick={cameraPallet}
-                      style={{
-                        background: C.primary, border: 'none', borderRadius: 12,
-                        padding: '12px 16px', color: '#fff', fontSize: 18, cursor: 'pointer',
-                      }}>📷</button>
-                  </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🪵 Pallet ID (ถ้ามี)</div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input type="text" value={palletScan} onChange={(e) => setPalletScan(e.target.value)}
+                  placeholder="สแกนหรือพิมพ์ Pallet ID"
+                  style={{
+                    flex: 1, background: C.inputBg,
+                    border: `2px solid ${palletScan ? C.primary : C.border}`,
+                    borderRadius: 16, padding: '14px 16px', color: C.text, fontSize: 15, fontWeight: 700, outline: 'none',
+                  }} />
+                <button type="button" onClick={cameraPallet}
+                  style={{
+                    background: C.primary, border: 'none', borderRadius: 16,
+                    padding: '0 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(14,165,233,0.3)',
+                  }}>📷</button>
+              </div>
+            </div>
+
+            {locations.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📍 เลือก Location จัดเก็บ</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {locations.map((loc) => {
+                    const isSelected = selectedLocation?.id === loc.id;
+                    return (
+                      <button
+                        key={loc.id} type="button"
+                        onClick={() => setSelectedLocation(isSelected ? null : loc)}
+                        style={{
+                          padding: '10px 14px',
+                          border: `2px solid ${isSelected ? C.green : C.border}`,
+                          borderRadius: 14,
+                          background: isSelected ? C.greenLight : C.surfaceSolid,
+                          color: isSelected ? C.green : C.textSec,
+                          fontSize: 14, fontWeight: isSelected ? 800 : 600,
+                          cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                      >
+                        {loc.sectionCode} · {loc.code}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {/* Location picker */}
-                {locations.length > 0 && (
-                  <div style={{ padding: '0 16px 12px' }}>
-                    <div style={{ color: C.textSec, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>📍 เลือก Location จัดเก็บ</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {locations.map((loc) => {
-                        const isSelected = selectedLocation?.id === loc.id;
-                        return (
-                          <button
-                            key={loc.id}
-                            type="button"
-                            onClick={() => setSelectedLocation(isSelected ? null : loc)}
-                            style={{
-                              padding: '6px 12px',
-                              border: `2px solid ${isSelected ? C.green : C.border}`,
-                              borderRadius: 10,
-                              background: isSelected ? C.greenLight : C.inputBg,
-                              color: isSelected ? C.green : C.textSec,
-                              fontSize: 12, fontWeight: isSelected ? 700 : 400,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {loc.sectionCode} · {loc.code}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedLocation && (
-                      <div style={{ marginTop: 8, color: C.green, fontSize: 12, fontWeight: 700 }}>
-                        ✓ เลือก: {selectedLocation.label}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ padding: '0 16px 16px' }}>
-                  <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
-                    style={{
-                      background: 'none', border: `1px solid ${C.border}`,
-                      color: C.textSec, fontSize: 13, cursor: 'pointer',
-                      borderRadius: 8, padding: '8px 14px',
-                    }}>
-                    ← เลือกสินค้าอื่น
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{ padding: '12px 16px' }}>
-                <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 12,
-                  textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  รายการสินค้า ({lines.length})
-                </div>
-                {lines.map((l, i) => (
-                  <LineListItem key={l.id} line={l} index={i} isDone={l.actual_boxes != null}
-                    doneLabel={l.actual_boxes != null ? `รับแล้ว ${l.actual_boxes} กล่อง` : ''}
-                    onSelect={() => {
-                      setMatchedLine(l);
-                      setScanValue(l.customer_product_code ?? l.product_name ?? '');
-                      setBoxes(l.actual_boxes?.toString() ?? l.expected_boxes?.toString() ?? '');
-                      setWeight(l.actual_weight?.toString() ?? l.expected_weight?.toString() ?? '');
-                    }} />
-                ))}
-
-                {confirmed.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 10,
-                      textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      บันทึกแล้วในเซสชันนี้ ({confirmed.length})
-                    </div>
-                    {confirmed.map((item, i) => <ConfirmedChip key={i} item={item} />)}
-                  </div>
-                )}
               </div>
             )}
-          </div>
 
-          {matchedLine && (
-            <ConfirmBtn
-              label="✓ ยืนยันรับสินค้า"
-              onClick={handleConfirm}
-              disabled={!boxes && !weight}
-              saving={saving}
-              color={C.green}
-            />
-          )}
-        </>
-      )}
+            <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
+              style={{
+                width: '100%', padding: '20px', borderRadius: 20,
+                background: (!boxes && !weight) ? C.border : C.green,
+                color: (!boxes && !weight) ? C.muted : '#ffffff',
+                border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer',
+                boxShadow: (!boxes && !weight) ? 'none' : '0 8px 24px rgba(16,185,129,0.4)',
+                transition: 'all 0.2s',
+              }}>
+              {saving ? '⏳ กำลังบันทึก...' : '✓ ยืนยันรับสินค้า'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{
+                flex: 1, position: 'relative', borderRadius: 20,
+                boxShadow: scanValue ? `0 0 0 3px ${C.primary}30` : `0 0 0 3px ${C.borderLight}`,
+              }}>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 20, pointerEvents: 'none' }}>
+                  🔍
+                </span>
+                <input
+                  type="text" value={scanValue} onChange={(e) => handleScan(e.target.value)}
+                  placeholder="สแกนรหัส หรือ LOT"
+                  style={{
+                    width: '100%', boxSizing: 'border-box', background: C.surfaceSolid,
+                    border: `2px solid ${C.primary}`, borderRadius: 20, padding: '16px 16px 16px 48px',
+                    color: C.text, fontSize: 16, fontWeight: 800, outline: 'none',
+                  }}
+                />
+              </div>
+              <button type="button" onClick={cameraItem}
+                style={{
+                  background: C.primary, border: 'none', borderRadius: 20,
+                  padding: '16px 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(14,165,233,0.3)',
+                }}>
+                📷
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── Picking workflow ──────────────────────────────────────────────────────────
+// ── Picking workflow ──────────────────────────────────────────
 function PickingWorkflow({ onBack, t }) {
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -744,7 +661,7 @@ function PickingWorkflow({ onBack, t }) {
   const [boxes, setBoxes] = useState('');
   const [weight, setWeight] = useState('');
   const [confirmed, setConfirmed] = useState([]);
-  const [flashMsg, setFlashMsg] = useState('');
+  const [sortType, setSortType] = useState('pending');
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
 
@@ -774,6 +691,7 @@ function PickingWorkflow({ onBack, t }) {
       (l.lot_no ?? '').toLowerCase() === q,
     );
     if (match) {
+      triggerSuccessFeedback();
       setMatchedLine(match);
       setBoxes(match.requested_boxes?.toString() ?? '');
       setWeight(match.requested_qty?.toString() ?? '');
@@ -782,36 +700,56 @@ function PickingWorkflow({ onBack, t }) {
 
   function handleConfirm() {
     if (!matchedLine) return;
-    setConfirmed((prev) => [{ line: matchedLine, boxes, weight,
-      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
-    setFlashMsg(`✓ ${matchedLine.product_name ?? matchedLine.customer_product_code}`);
+    triggerSuccessFeedback();
+    setConfirmed((prev) => [{
+      line: matchedLine, boxes, weight,
+      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+    }, ...prev]);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
-    setTimeout(() => setFlashMsg(''), 3000);
   }
 
   const doneCount = confirmed.length;
+
+  const sortedLines = useMemo(() => {
+    return [...lines].sort((a, b) => {
+      if (sortType === 'pending') {
+        const aDone = confirmed.some(c => c.line.id === a.id);
+        const bDone = confirmed.some(c => c.line.id === b.id);
+        if (aDone !== bDone) return aDone ? 1 : -1;
+      } else if (sortType === 'name') {
+        const aName = a.product_name ?? '';
+        const bName = b.product_name ?? '';
+        return aName.localeCompare(bName, 'th');
+      } else if (sortType === 'code') {
+        const aCode = a.customer_product_code ?? '';
+        const bCode = b.customer_product_code ?? '';
+        return aCode.localeCompare(bCode);
+      }
+      return 0;
+    });
+  }, [lines, sortType, confirmed]);
 
   if (!selectedDoc) {
     return (
       <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '16px 16px 24px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 20px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: C.muted }}>กำลังโหลด...</div>
+            <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
           ) : docs.length === 0 ? (
             <div style={{
               textAlign: 'center', padding: '60px 24px',
-              background: C.card, borderRadius: 20, marginTop: 8,
+              background: C.card, borderRadius: 24, marginTop: 8,
               border: `1px solid ${C.border}`, boxShadow: C.shadow,
             }}>
-              <div style={{ fontSize: 52, marginBottom: 14 }}>📭</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>ไม่มีใบงานที่รอหยิบสินค้า</div>
-              <div style={{ fontSize: 13, color: C.muted }}>ใบงานสถานะ "หยิบสินค้า" จะปรากฏที่นี่</div>
+              <div style={{ fontSize: 52, marginBottom: 16 }}>📭</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอหยิบสินค้า</div>
+              <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "หยิบสินค้า" จะปรากฏที่นี่</div>
             </div>
           ) : (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>พบ {docs.length} ใบงาน</span>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
               </div>
               {docs.map((doc) => (
                 <DocCard
@@ -841,8 +779,8 @@ function PickingWorkflow({ onBack, t }) {
         badge={
           <div style={{
             background: 'rgba(255,255,255,0.2)', borderRadius: 20,
-            padding: '4px 12px', color: '#fff', fontSize: 12, fontWeight: 700,
-            border: '1px solid rgba(255,255,255,0.35)',
+            padding: '4px 12px', color: '#fff', fontSize: 13, fontWeight: 800,
+            border: '1px solid rgba(255,255,255,0.4)',
           }}>
             {doneCount}/{lines.length}
           </div>
@@ -850,178 +788,223 @@ function PickingWorkflow({ onBack, t }) {
       />
 
       {lines.length > 0 && (
-        <div style={{ background: C.primaryDark, height: 4, flexShrink: 0 }}>
+        <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>
           <div style={{
             height: '100%', background: C.pickAccent,
             width: `${(doneCount / lines.length) * 100}%`,
-            transition: 'width 0.4s ease',
+            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
         </div>
       )}
 
-      {linesLoading ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, background: C.bg }}>
-          กำลังโหลด...
-        </div>
-      ) : (
-        <>
-          <ScanZone value={scanValue} onChange={handleScan} onCameraClick={cameraItem}
-            label="สแกนสินค้า" placeholder="รหัส / LOT / ชื่อสินค้า"
-            hint={matchedLine
-              ? `✓ พบ: ${matchedLine.product_name ?? matchedLine.customer_product_code}`
-              : 'สแกนบาร์โค้ดหรือพิมพ์ หรือเลือกจากรายการ'} />
+      {/* Main Content Area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 220px', background: C.bg }}>
+        {linesLoading ? (
+          <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
+        ) : (
+          <>
+            {confirmed.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{
+                  color: C.pickAccent, fontSize: 13, fontWeight: 800, marginBottom: 12,
+                  textTransform: 'uppercase', letterSpacing: '0.08em'
+                }}>
+                  หยิบแล้วล่าสุด ({confirmed.length})
+                </div>
+                {confirmed.slice(0, 3).map((item, i) => <ConfirmedChip key={i} item={item} />)}
+              </div>
+            )}
 
-          <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
-            {flashMsg && (
-              <div style={{
-                margin: '12px 16px 0', padding: '12px 16px',
-                background: C.greenLight, border: `1px solid ${C.greenBorder}`,
-                borderRadius: 12, color: C.green, fontSize: 14, fontWeight: 700,
-                display: 'flex', alignItems: 'center', gap: 8,
+            <SortDropdown sortType={sortType} setSortType={setSortType} />
+
+            {sortedLines.map((l, i) => {
+              const done = confirmed.some((c) => c.line.id === l.id);
+              return (
+                <LineListItem key={l.id} line={l} index={i} isDone={done}
+                  doneLabel={done ? 'หยิบแล้ว' : ''}
+                  onSelect={() => {
+                    setMatchedLine(l);
+                    setScanValue(l.customer_product_code ?? l.product_name ?? '');
+                    setBoxes(l.requested_boxes?.toString() ?? '');
+                    setWeight(l.requested_qty?.toString() ?? '');
+                    triggerSuccessFeedback();
+                  }} />
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* Bottom Thumb Zone Action Bar */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: C.surface,
+        ...C.glassmorphism,
+        borderTop: `1px solid ${C.borderLight}`,
+        borderTopLeftRadius: 32, borderTopRightRadius: 32,
+        boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
+        padding: '24px 20px 32px',
+        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        transform: matchedLine ? 'translateY(0)' : 'translateY(0)',
+        zIndex: 100,
+        maxHeight: '85vh',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {matchedLine ? (
+          <div style={{ flex: 1, overflowY: 'auto', margin: '-24px -20px -32px', padding: '24px 20px 32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ color: C.pickAccent, fontWeight: 900, fontSize: 20 }}>ยืนยันหยิบสินค้า</div>
+              <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
+                style={{
+                  background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, color: C.textSec, cursor: 'pointer',
+                }}>✕</button>
+            </div>
+
+            <div style={{
+              background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
+              border: `2px solid ${C.pickAccent}40`,
+            }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
+                {matchedLine.product_name ?? matchedLine.customer_product_code ?? '—'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>รหัส {matchedLine.customer_product_code}</span>
+                {matchedLine.lot_no && <span style={{ background: '#f3f4f6', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
+              </div>
+            </div>
+
+            <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
+
+            <button type="button" disabled={!boxes && !weight} onClick={handleConfirm}
+              style={{
+                width: '100%', padding: '20px', borderRadius: 20,
+                background: (!boxes && !weight) ? C.border : C.pickAccent,
+                color: (!boxes && !weight) ? C.muted : '#ffffff',
+                border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer',
+                boxShadow: (!boxes && !weight) ? 'none' : '0 8px 24px rgba(245,158,11,0.4)',
+                transition: 'all 0.2s',
               }}>
-                <span style={{ fontSize: 18 }}>🎉</span> {flashMsg}
-              </div>
-            )}
-
-            {matchedLine ? (
-              <>
-                <ItemCard line={matchedLine} docNo={selectedDoc.withdrawal_no}
-                  statusLabel={getWithdrawalStatusLabel(selectedDoc.status, t)} />
-                <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
-                <div style={{ padding: '0 16px 16px' }}>
-                  <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
-                    style={{
-                      background: 'none', border: `1px solid ${C.border}`,
-                      color: C.textSec, fontSize: 13, cursor: 'pointer',
-                      borderRadius: 8, padding: '8px 14px',
-                    }}>
-                    ← เลือกสินค้าอื่น
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{ padding: '12px 16px' }}>
-                <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 12,
-                  textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  รายการสินค้า ({lines.length})
-                </div>
-                {lines.map((l, i) => {
-                  const done = confirmed.some((c) => c.line.id === l.id);
-                  return (
-                    <LineListItem key={l.id} line={l} index={i} isDone={done}
-                      doneLabel={done ? 'หยิบแล้ว' : ''}
-                      onSelect={() => {
-                        setMatchedLine(l);
-                        setScanValue(l.customer_product_code ?? l.product_name ?? '');
-                        setBoxes(l.requested_boxes?.toString() ?? '');
-                        setWeight(l.requested_qty?.toString() ?? '');
-                      }} />
-                  );
-                })}
-                {confirmed.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 10,
-                      textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      หยิบแล้ว ({confirmed.length})
-                    </div>
-                    {confirmed.map((item, i) => <ConfirmedChip key={i} item={item} />)}
-                  </div>
-                )}
-              </div>
-            )}
+              ✓ ยืนยันหยิบสินค้า
+            </button>
           </div>
-
-          {matchedLine && (
-            <ConfirmBtn
-              label="✓ ยืนยันหยิบสินค้า"
-              onClick={handleConfirm}
-              disabled={!boxes && !weight}
-              color={C.pickAccent}
-            />
-          )}
-        </>
-      )}
+        ) : (
+          <div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{
+                flex: 1, position: 'relative', borderRadius: 20,
+                boxShadow: scanValue ? `0 0 0 3px ${C.pickAccent}30` : `0 0 0 3px ${C.borderLight}`,
+              }}>
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 20, pointerEvents: 'none' }}>
+                  🔍
+                </span>
+                <input
+                  type="text" value={scanValue} onChange={(e) => handleScan(e.target.value)}
+                  placeholder="สแกนรหัส หรือ LOT"
+                  style={{
+                    width: '100%', boxSizing: 'border-box', background: C.surfaceSolid,
+                    border: `2px solid ${C.pickAccent}`, borderRadius: 20, padding: '16px 16px 16px 48px',
+                    color: C.text, fontSize: 16, fontWeight: 800, outline: 'none',
+                  }}
+                />
+              </div>
+              <button type="button" onClick={cameraItem}
+                style={{
+                  background: C.pickAccent, border: 'none', borderRadius: 20,
+                  padding: '16px 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(245,158,11,0.3)',
+                }}>
+                📷
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── Mode select home ──────────────────────────────────────────────────────────
+// ── Mode select home ──────────────────────────────────────────
 function ModeSelect({ onSelect }) {
   return (
     <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       {/* Hero header */}
       <div style={{
         background: C.headerGrad,
-        padding: '36px 24px 32px',
-        boxShadow: '0 4px 24px rgba(37,99,235,0.35)',
+        padding: '48px 24px 40px',
+        boxShadow: '0 8px 32px rgba(37,99,235,0.25)',
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
           <div style={{
-            width: 56, height: 56, borderRadius: 18,
-            background: 'rgba(255,255,255,0.15)',
-            border: '2px solid rgba(255,255,255,0.35)',
+            width: 64, height: 64, borderRadius: 20,
+            background: 'rgba(255,255,255,0.2)',
+            ...C.glassmorphism,
+            border: '1px solid rgba(255,255,255,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, flexShrink: 0,
+            fontSize: 32, flexShrink: 0,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
           }}>
             📦
           </div>
           <div>
-            <div style={{ color: '#ffffff', fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em' }}>
+            <div style={{ color: '#ffffff', fontWeight: 900, fontSize: 28, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               TGC Handheld
             </div>
-            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, marginTop: 2 }}>
-              Cold Storage · Barcode Scanner
+            <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 4, fontWeight: 500 }}>
+              Cold Storage · Smart Scanner
             </div>
           </div>
         </div>
 
         {/* Stats row */}
         <div style={{
-          background: 'rgba(255,255,255,0.12)',
-          borderRadius: 14, padding: '12px 16px',
+          background: 'rgba(255,255,255,0.15)',
+          ...C.glassmorphism,
+          borderRadius: 16, padding: '12px 20px',
           border: '1px solid rgba(255,255,255,0.2)',
           display: 'flex', justifyContent: 'center', gap: 8,
         }}>
-          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
-            🕐 {new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short' })}
+          <span style={{ color: '#ffffff', fontSize: 13, fontWeight: 600 }}>
+            🕐 {new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </span>
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <div style={{ color: C.muted, fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
-          textTransform: 'uppercase', marginBottom: 14 }}>
+      <div style={{ flex: 1, padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div style={{ color: C.muted, fontSize: 13, fontWeight: 800, letterSpacing: '0.12em',
+          textTransform: 'uppercase', marginBottom: 16, paddingLeft: 4 }}>
           เลือกโหมดการทำงาน
         </div>
 
         {/* Receive button */}
         <button type="button" onClick={() => onSelect('receive')}
           style={{
-            background: C.card, border: 'none',
-            borderRadius: 20, padding: '20px 20px',
+            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.borderLight}`,
+            borderRadius: 24, padding: '24px 20px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 12,
-            boxShadow: `0 4px 20px rgba(37,99,235,0.15)`,
-            borderLeft: `5px solid ${C.receiveAccent}`,
+            marginBottom: 16,
+            boxShadow: `0 8px 30px rgba(37,99,235,0.1)`,
+            transition: 'transform 0.2s, box-shadow 0.2s',
           }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{
-              width: 60, height: 60, borderRadius: 18,
+              width: 64, height: 64, borderRadius: 20,
               background: C.blueLight,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 30, flexShrink: 0,
-            }}>
-              📥
-            </div>
+              fontSize: 32, flexShrink: 0,
+            }}>📥</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 4 }}>รับสินค้าเข้า</div>
-              <div style={{ fontSize: 13, color: C.textSec, lineHeight: 1.5 }}>สแกนและบันทึกสินค้า<br />รับเข้าตามใบแจ้งฝาก</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 4 }}>รับสินค้าเข้า</div>
+              <div style={{ fontSize: 14, color: C.textSec, lineHeight: 1.5, fontWeight: 500 }}>สแกนและบันทึกสินค้า<br />รับเข้าตามใบแจ้งฝาก</div>
             </div>
             <div style={{
-              width: 36, height: 36, borderRadius: '50%',
+              width: 40, height: 40, borderRadius: '50%',
               background: C.blueLight, color: C.primary,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 700, flexShrink: 0,
+              fontSize: 20, fontWeight: 800, flexShrink: 0,
             }}>›</div>
           </div>
         </button>
@@ -1029,59 +1012,57 @@ function ModeSelect({ onSelect }) {
         {/* Pick button */}
         <button type="button" onClick={() => onSelect('pick')}
           style={{
-            background: C.card, border: 'none',
-            borderRadius: 20, padding: '20px 20px',
+            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.borderLight}`,
+            borderRadius: 24, padding: '24px 20px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 20,
-            boxShadow: `0 4px 20px rgba(245,158,11,0.15)`,
-            borderLeft: `5px solid ${C.pickAccent}`,
+            marginBottom: 24,
+            boxShadow: `0 8px 30px rgba(245,158,11,0.1)`,
+            transition: 'transform 0.2s, box-shadow 0.2s',
           }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{
-              width: 60, height: 60, borderRadius: 18,
+              width: 64, height: 64, borderRadius: 20,
               background: '#fef3c7',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 30, flexShrink: 0,
-            }}>
-              📤
-            </div>
+              fontSize: 32, flexShrink: 0,
+            }}>📤</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 4 }}>เบิกสินค้าออก</div>
-              <div style={{ fontSize: 13, color: C.textSec, lineHeight: 1.5 }}>สแกนและหยิบสินค้า<br />ตามใบขอเบิก</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 4 }}>เบิกสินค้าออก</div>
+              <div style={{ fontSize: 14, color: C.textSec, lineHeight: 1.5, fontWeight: 500 }}>สแกนและหยิบสินค้า<br />ตามใบขอเบิก</div>
             </div>
             <div style={{
-              width: 36, height: 36, borderRadius: '50%',
+              width: 40, height: 40, borderRadius: '50%',
               background: '#fef3c7', color: C.amber,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 700, flexShrink: 0,
+              fontSize: 20, fontWeight: 800, flexShrink: 0,
             }}>›</div>
           </div>
         </button>
 
         {/* Tip card */}
         <div style={{
-          background: C.card, borderRadius: 16,
+          background: C.surfaceSolid, borderRadius: 20,
           border: `1px solid ${C.border}`,
-          padding: '16px 18px',
+          padding: '20px',
           boxShadow: C.shadow,
         }}>
-          <div style={{ color: C.primary, fontSize: 12, fontWeight: 800, marginBottom: 10,
-            display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 14 }}>💡</span> วิธีใช้งาน
+          <div style={{ color: C.primaryDark, fontSize: 14, fontWeight: 900, marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>💡</span> วิธีใช้งาน
           </div>
           {[
-            ['1', 'เลือกโหมด → เลือกใบงาน'],
+            ['1', 'เลือกโหมดการทำงาน → เลือกใบงาน'],
             ['2', 'สแกนบาร์โค้ด หรือเลือกสินค้าจากรายการ'],
             ['3', 'กรอกจำนวนที่รับ/หยิบ → กดยืนยัน'],
           ].map(([num, text]) => (
-            <div key={num} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+            <div key={num} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
               <div style={{
-                width: 20, height: 20, borderRadius: '50%',
-                background: C.blueLight, color: C.primary,
-                fontSize: 11, fontWeight: 800,
+                width: 24, height: 24, borderRadius: '50%',
+                background: C.blueLight, color: C.primaryDark,
+                fontSize: 12, fontWeight: 900,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>{num}</div>
-              <span style={{ color: C.textSec, fontSize: 13, lineHeight: 1.4 }}>{text}</span>
+              <span style={{ color: C.textSec, fontSize: 14, lineHeight: 1.5, fontWeight: 500 }}>{text}</span>
             </div>
           ))}
         </div>
@@ -1090,7 +1071,7 @@ function ModeSelect({ onSelect }) {
   );
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Main export ───────────────────────────────────────────────
 export function HandheldPage() {
   const t = useTranslation();
   const [mode, setMode] = useState(null);

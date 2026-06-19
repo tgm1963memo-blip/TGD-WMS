@@ -8,7 +8,7 @@ const PASSWORD = process.env.UAT_PASSWORD || process.env.UAT_DEMO_PASSWORD;
 const ROLE_SMOKE_MATRIX = [
   {
     role: 'admin',
-    email: process.env.UAT_ADMIN_EMAIL || 'admin.demo@tgd-wms.local',
+    email: process.env.UAT_ADMIN_EMAIL || 'admin.test@tgd-wms.local',
     checks: [
       { path: '/dashboard', testId: null },
       { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
@@ -18,7 +18,7 @@ const ROLE_SMOKE_MATRIX = [
   },
   {
     role: 'warehouse_manager',
-    email: process.env.UAT_MANAGER_EMAIL || 'manager.demo@tgd-wms.local',
+    email: process.env.UAT_MANAGER_EMAIL || 'manager.test@tgd-wms.local',
     checks: [
       { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
       { path: '/billing/invoice-drafts', testId: 'billing-invoice-drafts-page' },
@@ -26,7 +26,7 @@ const ROLE_SMOKE_MATRIX = [
   },
   {
     role: 'warehouse_admin',
-    email: process.env.UAT_WAREHOUSE_ADMIN_EMAIL || 'warehouse.admin.demo@tgd-wms.local',
+    email: process.env.UAT_WAREHOUSE_ADMIN_EMAIL || 'warehouse.admin.test@tgd-wms.local',
     checks: [
       { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
       { path: '/operations/withdrawal-requests', testId: null },
@@ -35,28 +35,28 @@ const ROLE_SMOKE_MATRIX = [
   },
   {
     role: 'warehouse_staff',
-    email: process.env.UAT_WAREHOUSE_EMAIL || process.env.UAT_EMAIL || 'staff.demo@tgd-wms.local',
+    email: process.env.UAT_WAREHOUSE_EMAIL || process.env.UAT_EMAIL || 'staff.test@tgd-wms.local',
     checks: [
       { path: '/handheld', testId: null },
     ],
   },
   {
     role: 'accounting',
-    email: process.env.UAT_BILLING_EMAIL || 'accounting.demo@tgd-wms.local',
+    email: process.env.UAT_BILLING_EMAIL || 'accounting.test@tgd-wms.local',
     checks: [
       { path: '/reports/billing-movement-weight', testId: 'billing-movement-weight-report-page' },
     ],
   },
   {
     role: 'viewer',
-    email: process.env.UAT_VIEWER_EMAIL || 'viewer.demo@tgd-wms.local',
+    email: process.env.UAT_VIEWER_EMAIL || 'viewer.test@tgd-wms.local',
     checks: [
       { path: '/reports', testId: null },
     ],
   },
   {
     role: 'customer_admin',
-    email: process.env.UAT_CUSTOMER_EMAIL || 'customer.demo@tgd-wms.local',
+    email: process.env.UAT_CUSTOMER_EMAIL || 'customer.test@tgd-wms.local',
     checks: [
       { path: '/customer', testId: 'customer-portal-page' },
       { path: '/customer/deposit-request', testId: 'customer-deposit-request-page' },
@@ -86,6 +86,7 @@ test.describe('All-role production smoke', () => {
       try {
         await login(page, { email: entry.email, password: PASSWORD });
       } catch (loginErr) {
+        console.error(`Login failed for ${entry.email}:`, loginErr);
         test.skip(true, `Login failed for ${entry.email} — account may not be configured in this environment: ${loginErr.message}`);
         return;
       }
@@ -98,7 +99,8 @@ test.describe('All-role production smoke', () => {
         await page.waitForLoadState('domcontentloaded');
         try {
           await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
-        } catch {
+        } catch (e) {
+          console.error(`App shell missing for ${entry.email} at ${check.path}:`, e);
           test.skip(true, `app-shell not found for ${entry.email} at ${check.path} — session may be invalid or account not properly configured`);
           return;
         }

@@ -13,63 +13,63 @@ const CUSTOMER_BETA_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
 
 const ROLE_USERS = [
   {
-    email: 'admin.demo@tgd-wms.local',
+    email: 'admin.test@tgd-wms.local',
     role: 'admin',
     profileId: '11111111-1111-4111-8111-111111111111',
     customerId: null,
     displayName: 'Demo Admin',
   },
   {
-    email: 'manager.demo@tgd-wms.local',
+    email: 'manager.test@tgd-wms.local',
     role: 'warehouse_manager',
     profileId: '22222222-2222-4222-8222-222222222222',
     customerId: null,
     displayName: 'Demo Warehouse Manager',
   },
   {
-    email: 'warehouse.admin.demo@tgd-wms.local',
+    email: 'warehouse.admin.test@tgd-wms.local',
     role: 'warehouse_admin',
     profileId: '88888888-8888-4888-8888-888888888888',
     customerId: null,
     displayName: 'Demo Warehouse Admin',
   },
   {
-    email: 'staff.demo@tgd-wms.local',
+    email: 'staff.test@tgd-wms.local',
     role: 'warehouse_staff',
     profileId: '77777777-7777-4777-8777-777777777777',
     customerId: null,
     displayName: 'Demo Warehouse Staff',
   },
   {
-    email: 'accounting.demo@tgd-wms.local',
+    email: 'accounting.test@tgd-wms.local',
     role: 'accounting',
     profileId: '44444444-4444-4444-8444-444444444441',
     customerId: null,
     displayName: 'Demo Accounting',
   },
   {
-    email: 'viewer.demo@tgd-wms.local',
+    email: 'viewer.test@tgd-wms.local',
     role: 'viewer',
     profileId: '55555555-5555-4555-8555-555555555555',
     customerId: null,
     displayName: 'Demo Viewer',
   },
   {
-    email: 'customer.admin.demo@tgd-wms.local',
+    email: 'customer.admin.test@tgd-wms.local',
     role: 'customer_admin',
     profileId: '66666666-6666-4666-8666-666666666661',
     customerId: CUSTOMER_ALPHA_ID,
     displayName: 'Demo Customer Admin',
   },
   {
-    email: 'customer.demo@tgd-wms.local',
+    email: 'customer.test@tgd-wms.local',
     role: 'customer_user',
     profileId: '66666666-6666-4666-8666-666666666666',
     customerId: CUSTOMER_ALPHA_ID,
     displayName: 'Demo Customer User',
   },
   {
-    email: 'customer.user.beta@tgd-wms.local',
+    email: 'customer.user.testbeta@tgd-wms.local',
     role: 'customer_user',
     profileId: '66666666-6666-4666-8666-666666666662',
     customerId: CUSTOMER_BETA_ID,
@@ -112,12 +112,9 @@ function sqlLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-async function ensureAuthUser(supabase, email, password) {
-  const { data: listed, error: listError } = await supabase.auth.admin.listUsers({ perPage: 200 });
-  if (listError) throw listError;
-
+async function ensureAuthUser(supabase, listedUsers, email, password) {
   const normalized = email.toLowerCase();
-  const existing = listed.users.find((user) => user.email?.toLowerCase() === normalized);
+  const existing = listedUsers.find((user) => user.email?.toLowerCase() === normalized);
   if (existing) {
     const { data, error } = await supabase.auth.admin.updateUserById(existing.id, {
       password,
@@ -190,26 +187,29 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const rawUsers = runSql(`select id, email from auth.users`);
+  const listedUsers = rawUsers?.rows || [];
+
   const results = [];
 
-  for (const user of ROLE_USERS) {
-    const authUser = await ensureAuthUser(supabase, user.email, password);
-    await upsertProfile(user, authUser.id);
+  for (const entry of ROLE_USERS) {
+    const authUser = await ensureAuthUser(supabase, listedUsers, entry.email, password);
+    await upsertProfile(entry, authUser.id);
 
     const profile = runSql(`
       select id, email, role, customer_id, is_active
       from public.tgd_user_profiles
-      where id = ${sqlLiteral(user.profileId)}
+      where id = ${sqlLiteral(entry.profileId)}
       limit 1;
     `)?.rows?.[0] ?? null;
 
     results.push({
-      email: user.email.toLowerCase(),
-      role: user.role,
-      profileId: user.profileId,
+      email: entry.email.toLowerCase(),
+      role: entry.role,
+      profileId: entry.profileId,
       authUserId: authUser.id,
-      customerId: user.customerId,
-      displayName: user.displayName,
+      customerId: entry.customerId,
+      displayName: entry.displayName,
       profile,
     });
   }

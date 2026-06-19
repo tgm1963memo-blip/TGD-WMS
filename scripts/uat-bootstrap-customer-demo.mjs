@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 const ROOT = process.cwd();
 dotenv.config({ path: path.join(ROOT, '.env.local') });
 
-const CUSTOMER_EMAIL = 'customer.demo@tgd-wms.local';
+const CUSTOMER_EMAIL = 'customer.test@tgd-wms.local';
 const CUSTOMER_ROLE = 'customer_user';
 const CUSTOMER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const PROFILE_ID = '66666666-6666-4666-8666-666666666666';
@@ -56,17 +56,17 @@ function upsertEnvLocal(password) {
 }
 
 async function ensureAuthUser(supabase, password) {
-  const { data: listed, error: listError } = await supabase.auth.admin.listUsers({ perPage: 200 });
-  if (listError) throw listError;
-
-  const existing = listed.users.find((user) => user.email?.toLowerCase() === CUSTOMER_EMAIL);
-  if (existing) {
-    const { data, error } = await supabase.auth.admin.updateUserById(existing.id, {
-      password,
-      email_confirm: true,
-    });
-    if (error) throw error;
-    return data.user;
+  const dir = mkdtempSync(path.join(tmpdir(), 'tgd-uat-sql-'));
+  const filePath = path.join(dir, 'query.sql');
+  writeFileSync(filePath, `select id, email from auth.users where email = '${CUSTOMER_EMAIL}' limit 1`, 'utf8');
+  const raw = execSync(`npx supabase db query --linked -f "${filePath}"`, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const jsonStart = raw.indexOf('{');
+  if (jsonStart >= 0) {
+    const res = JSON.parse(raw.slice(jsonStart));
+    if (res.rows && res.rows.length > 0) return res.rows[0];
   }
 
   const { data, error } = await supabase.auth.admin.createUser({
