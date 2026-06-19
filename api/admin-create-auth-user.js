@@ -88,26 +88,16 @@ export default async function handler(request, response) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Collect all users across pages to find existing accounts
-    let allUsers = [];
-    let page = 1;
-    const perPage = 500;
-    while (true) {
-      const { data: listed, error: listError } = await serviceClient.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-      if (listError) {
-        return response.status(500).json({ error: listError.message });
-      }
-      allUsers = allUsers.concat(listed.users || []);
-      if (!listed.users || listed.users.length < perPage) break;
-      page++;
+    // Use RPC to check if user exists (to avoid listUsers timeout on large db)
+    const { data: existingUserId, error: rpcError } = await serviceClient.rpc('admin_get_auth_user_id_by_email', {
+      p_email: normalizedEmail,
+    });
+    if (rpcError) {
+      console.error('RPC Error:', rpcError);
     }
 
-    const existing = allUsers.find((user) => user.email?.toLowerCase() === normalizedEmail);
-    if (existing) {
-      const { data: updated, error: updateError } = await serviceClient.auth.admin.updateUserById(existing.id, {
+    if (existingUserId) {
+      const { data: updated, error: updateError } = await serviceClient.auth.admin.updateUserById(existingUserId, {
         password: normalizedPassword,
         email_confirm: true,
       });

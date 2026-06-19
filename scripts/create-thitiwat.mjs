@@ -47,8 +47,8 @@ async function main() {
   const password = process.env.UAT_PASSWORD || 'thitiwat';
 
   let authUser;
-  const { data: listed } = await supabase.auth.admin.listUsers({ perPage: 200 });
-  const existing = listed.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  const rawUsers = runSql(`select id, email from auth.users where email = '${email}' limit 1`);
+  const existing = rawUsers?.rows?.[0];
 
   if (existing) {
     console.log('User already exists in auth, updating password...');

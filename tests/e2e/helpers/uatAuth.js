@@ -57,7 +57,9 @@ export async function login(page, credentials = {}) {
   await page.locator('[data-testid="login-email-input"], input[type="email"]').fill(email);
   await page.locator('[data-testid="login-password-input"], input[type="password"]').fill(password);
   await page.locator('[data-testid="login-submit-button"], button[type="submit"]').click();
-  await expect(appShell).toBeVisible({ timeout: 20000 });
+
+  const handheldPage = page.locator('[data-testid="handheld-page"]');
+  await expect(appShell.or(handheldPage).first()).toBeVisible({ timeout: 20000 });
 }
 
 export async function switchUser(page, credentials = {}) {

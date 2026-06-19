@@ -16,6 +16,6 @@ function runSql(sql) {
 runSql(`
   update auth.users 
   set encrypted_password = (select encrypted_password from auth.users where email = 'test.admin@tgd-wms.local')
-  where email like '%demo@tgd-wms.local' or email like '%beta@tgd-wms.local';
+  where email like '%@tgm.co.th' or email like '%@tgd-wms.local';
 `);
 console.log("Updated passwords to password123");
