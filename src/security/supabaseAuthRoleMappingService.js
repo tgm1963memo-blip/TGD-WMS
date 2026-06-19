@@ -11,6 +11,7 @@
 const KNOWN_ROLES = [
   "admin",
   "warehouse_manager",
+  "warehouse_admin",
   "warehouse_staff",
   "accounting",
   "viewer",

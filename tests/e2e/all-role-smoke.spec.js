@@ -98,17 +98,22 @@ test.describe('All-role production smoke', () => {
         await page.goto(`${baseUrl}${check.path}`);
         await page.waitForLoadState('domcontentloaded');
         try {
-          await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
+          const shellLocator = check.path === '/handheld' 
+            ? page.locator('[data-testid="handheld-page"]') 
+            : page.locator('[data-testid="app-shell"]');
+          await expect(shellLocator).toBeVisible({ timeout: 20000 });
         } catch (e) {
-          console.error(`App shell missing for ${entry.email} at ${check.path}:`, e);
-          test.skip(true, `app-shell not found for ${entry.email} at ${check.path} — session may be invalid or account not properly configured`);
+          console.error(`Layout root missing for ${entry.email} at ${check.path}:`, e);
+          test.skip(true, `layout root not found for ${entry.email} at ${check.path} — session may be invalid or account not properly configured`);
           return;
         }
 
         if (check.testId) {
           await expect(page.locator(`[data-testid="${check.testId}"]`)).toBeVisible({ timeout: 20000 });
         } else {
-          await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 20000 });
+          if (check.path !== '/handheld') {
+            await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 20000 });
+          }
         }
 
         const slug = `${entry.role}${check.path.replace(/\//g, '_')}`;
