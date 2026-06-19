@@ -982,7 +982,8 @@ function ModeSelect({ onSelect }) {
         {/* Receive button */}
         <button type="button" onClick={() => onSelect('receive')}
           style={{
-            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.borderLight}`,
+            display: 'block', width: '100%',
+            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.border}`,
             borderRadius: 24, padding: '24px 20px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
             marginBottom: 16,
@@ -1012,7 +1013,8 @@ function ModeSelect({ onSelect }) {
         {/* Pick button */}
         <button type="button" onClick={() => onSelect('pick')}
           style={{
-            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.borderLight}`,
+            display: 'block', width: '100%',
+            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.border}`,
             borderRadius: 24, padding: '24px 20px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
             marginBottom: 24,
