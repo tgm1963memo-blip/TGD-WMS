@@ -151,7 +151,7 @@ export async function getStorageAgingRows(filters = {}) {
   const query = applyStorageAgingFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at, tgd_locations(location_code, location_name)')
       .order('created_at', { ascending: true }),
     filters,
   );
@@ -159,7 +159,13 @@ export async function getStorageAgingRows(filters = {}) {
   const { data, error } = await query;
   if (error) return { data: null, error };
 
-  return { data: enrichAgingRows(data ?? [], filters), error: null };
+  const flat = (data ?? []).map((row) => ({
+    ...row,
+    location_code: row.tgd_locations?.location_code ?? null,
+    location_name: row.tgd_locations?.location_name ?? null,
+  }));
+
+  return { data: enrichAgingRows(flat, filters), error: null };
 }
 
 export async function getStorageAgingSummary(filters = {}) {

@@ -54,6 +54,19 @@ async function getStockQuantityTotal() {
   return (legacyResult.data ?? []).reduce((total, row) => total + resolveQuantity(row), 0);
 }
 
+async function getActiveLocationCount() {
+  const { data, error } = await supabase
+    .from('tgd_zones')
+    .select('tgd_rooms(tgd_locations(id))')
+    .eq('is_active', true);
+  if (error) return 0;
+  return (data ?? []).reduce(
+    (sum, zone) => sum + (zone.tgd_rooms ?? []).reduce(
+      (s2, room) => s2 + (room.tgd_locations ?? []).length, 0,
+    ), 0,
+  );
+}
+
 async function getOpenDocumentCount(tableName) {
   const { count, error } = await supabase
     .from(tableName)
@@ -92,7 +105,7 @@ export async function getReadOnlyDashboardSummary() {
       getRowCount('tgd_customers'),
       getRowCount('tgd_products'),
       getRowCount('tgd_lots'),
-      getRowCount('tgd_locations'),
+      getActiveLocationCount(),
       getOpenDocumentCount('tgd_receiving_documents'),
       getOpenDocumentCount('tgd_putaway_documents'),
       getOpenDocumentCount('tgd_picking_documents'),

@@ -8,7 +8,27 @@ import {
   deleteSection,
 } from '../../services/warehouseLayoutService.js';
 
-const EMPTY_FORM = { zoneCode: '', zoneName: '', rows: 5, cols: 10 };
+const EMPTY_FORM = {
+  zoneCode: '',
+  zoneName: '',
+  temperatureType: 'FROZEN',
+  numRows: 5,
+  sideLeft: true,
+  sideRight: true,
+  numLevels: 5,
+};
+
+const TEMP_OPTIONS = [
+  { value: 'FROZEN', label: 'FROZEN — แช่แข็ง', color: '#1d6fcf', bg: '#eff6ff' },
+  { value: 'CHILLED', label: 'CHILLED — แช่เย็น', color: '#0e7a3a', bg: '#f0fdf4' },
+  { value: 'AMBIENT', label: 'AMBIENT — อุณหภูมิห้อง', color: '#c97d00', bg: '#fffbeb' },
+];
+
+const TEMP_BADGE = {
+  FROZEN: { label: 'แช่แข็ง', color: '#1d6fcf', bg: '#eff6ff' },
+  CHILLED: { label: 'แช่เย็น', color: '#0e7a3a', bg: '#f0fdf4' },
+  AMBIENT: { label: 'อุณหภูมิห้อง', color: '#c97d00', bg: '#fffbeb' },
+};
 
 function pctColor(pct) {
   if (pct >= 80) return '#e74c3c';
@@ -17,10 +37,24 @@ function pctColor(pct) {
   return '#3498db';
 }
 
+function describeGrid(gridInfo) {
+  if (!gridInfo || gridInfo.type === 'empty') return '';
+  if (gridInfo.type === 'new') {
+    const sideStr = gridInfo.numSides === 2
+      ? 'ซ้าย + ขวา'
+      : (gridInfo.sides?.[0] === 'L' ? 'ฝั่งซ้าย' : 'ฝั่งขวา');
+    return `${gridInfo.numRows} แถว · ${sideStr} · ${gridInfo.numLevels} ชั้น`;
+  }
+  if (gridInfo.type === 'old') return `${gridInfo.rows} แถว × ${gridInfo.cols} ช่อง`;
+  return '';
+}
+
 function SectionCard({ section, onDelete }) {
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const color = pctColor(section.usedPct);
+  const gridDesc = describeGrid(section.gridInfo);
+  const tempBadge = TEMP_BADGE[section.temperatureType] ?? null;
 
   async function handleDelete() {
     setDeleting(true);
@@ -41,18 +75,30 @@ function SectionCard({ section, onDelete }) {
       marginBottom: 10,
     }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 10,
+        width: 48, height: 48, borderRadius: 10,
         background: '#f0fdf4',
         border: '1.5px solid #bbf7d0',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 800, fontSize: 13, color: '#2d9348', flexShrink: 0,
+        fontWeight: 800, fontSize: 12, color: '#2d9348', flexShrink: 0,
+        textAlign: 'center', lineHeight: 1.2,
       }}>
         {section.code}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{section.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{section.name}</span>
+          {tempBadge && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+              background: tempBadge.bg, color: tempBadge.color, border: `1px solid ${tempBadge.color}33`,
+            }}>
+              {tempBadge.label}
+            </span>
+          )}
+        </div>
         <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-          {section.total} location · {section.rows} แถว × {section.cols} ช่อง
+          {section.total} location
+          {gridDesc ? ` · ${gridDesc}` : ''}
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -103,17 +149,34 @@ function AddSectionForm({ onAdd }) {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
+  const sides = [];
+  if (form.sideLeft) sides.push('L');
+  if (form.sideRight) sides.push('R');
+
+  const numRows = Math.max(1, Math.min(50, +form.numRows || 1));
+  const numLevels = Math.max(1, Math.min(20, +form.numLevels || 1));
+  const total = numRows * sides.length * numLevels;
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.zoneCode.trim() || !form.zoneName.trim()) {
       setError('กรุณากรอกรหัสและชื่อ Section');
       return;
     }
-    const rows = Math.max(1, Math.min(20, +form.rows || 5));
-    const cols = Math.max(1, Math.min(30, +form.cols || 10));
+    if (sides.length === 0) {
+      setError('กรุณาเลือกฝั่งอย่างน้อย 1 ฝั่ง');
+      return;
+    }
     setSaving(true);
     setError('');
-    const result = await onAdd({ ...form, rows, cols, zoneCode: form.zoneCode.trim().toUpperCase(), zoneName: form.zoneName.trim() });
+    const result = await onAdd({
+      zoneCode: form.zoneCode.trim().toUpperCase(),
+      zoneName: form.zoneName.trim(),
+      temperatureType: form.temperatureType,
+      numRows,
+      sides,
+      numLevels,
+    });
     setSaving(false);
     if (result?.error) {
       setError(result.error.message ?? 'เพิ่มไม่สำเร็จ');
@@ -122,18 +185,16 @@ function AddSectionForm({ onAdd }) {
     }
   }
 
-  const total = (Math.max(1, +form.rows || 1)) * (Math.max(1, +form.cols || 1));
-
   return (
     <form onSubmit={handleSubmit} style={{
       background: '#f8fafc',
       border: '2px dashed #cbd5e1',
       borderRadius: 12,
-      padding: '20px 20px',
+      padding: '20px',
       marginBottom: 16,
     }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 14 }}>
-        + เพิ่ม Section ใหม่
+        + เพิ่มห้องใหม่
       </div>
 
       {error && (
@@ -142,66 +203,147 @@ function AddSectionForm({ onAdd }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
+      {/* Room code + name */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 14 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          รหัส Section *
+          รหัสห้อง *
           <input
             className="form-control"
             type="text"
             value={form.zoneCode}
             onChange={(e) => set('zoneCode', e.target.value)}
-            placeholder="เช่น S001"
+            placeholder="เช่น H1 หรือ A"
             style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
           />
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้เป็นส่วนแรกของรหัส Location</span>
         </label>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          ชื่อ Section *
+          ชื่อห้อง *
           <input
             className="form-control"
             type="text"
             value={form.zoneName}
             onChange={(e) => set('zoneName', e.target.value)}
-            placeholder="เช่น Section 001 ห้องเย็น"
+            placeholder="เช่น ห้องแช่แข็ง 1"
             style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
           />
         </label>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14, alignItems: 'end' }}>
+      {/* Temperature type */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>ประเภทการจัดเก็บ</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {TEMP_OPTIONS.map((opt) => {
+            const active = form.temperatureType === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set('temperatureType', opt.value)}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: active ? 700 : 400,
+                  border: `2px solid ${active ? opt.color : '#e5e7eb'}`,
+                  background: active ? opt.bg : '#fff',
+                  color: active ? opt.color : '#374151',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rows + Sides + Levels */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          จำนวนแถว (Rows)
+          จำนวนแถว
+          <input
+            className="form-control"
+            type="number"
+            min={1} max={50}
+            value={form.numRows}
+            onChange={(e) => set('numRows', e.target.value)}
+            style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+          />
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>แถวตามความยาวคลัง</span>
+        </label>
+
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+          ฝั่ง
+          <div style={{
+            display: 'flex', gap: 8, marginTop: 4,
+            border: '1px solid #d1d5db', borderRadius: 8,
+            padding: '8px 10px', background: '#fff',
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+              <input
+                type="checkbox"
+                checked={form.sideLeft}
+                onChange={(e) => set('sideLeft', e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+              />
+              ซ้าย (L)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+              <input
+                type="checkbox"
+                checked={form.sideRight}
+                onChange={(e) => set('sideRight', e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+              />
+              ขวา (R)
+            </label>
+          </div>
+        </div>
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+          จำนวนชั้น
           <input
             className="form-control"
             type="number"
             min={1} max={20}
-            value={form.rows}
-            onChange={(e) => set('rows', e.target.value)}
+            value={form.numLevels}
+            onChange={(e) => set('numLevels', e.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
           />
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ชั้นวางสินค้า</span>
         </label>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          จำนวนช่อง (Cols)
-          <input
-            className="form-control"
-            type="number"
-            min={1} max={30}
-            value={form.cols}
-            onChange={(e) => set('cols', e.target.value)}
-            style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-          />
-        </label>
-        <div style={{ fontSize: 12, color: '#64748b', paddingBottom: 2 }}>
-          รวม <strong style={{ color: '#1e293b', fontSize: 16 }}>{total}</strong> location
-        </div>
+      </div>
+
+      {/* Preview */}
+      <div style={{
+        background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
+        padding: '10px 14px', marginBottom: 14, fontSize: 13,
+        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+      }}>
+        <span style={{ fontWeight: 700, color: '#2d9348' }}>ตัวอย่างรหัส Location:</span>
+        {form.zoneCode.trim() && sides.length > 0 ? (
+          <span style={{ fontFamily: 'monospace', color: '#1e293b', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
+            {form.zoneCode.trim().toUpperCase()}-{sides[0]}-01-01
+          </span>
+        ) : (
+          <span style={{ color: '#94a3b8' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
+        )}
+        <span style={{ color: '#64748b' }}>
+          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{sides.length > 0 ? total : 0}</strong> location
+          {sides.length > 0 && total > 0 && (
+            <span style={{ color: '#94a3b8', marginLeft: 6 }}>
+              ({numRows} แถว × {sides.length} ฝั่ง × {numLevels} ชั้น)
+            </span>
+          )}
+        </span>
       </div>
 
       <button
         type="submit"
         className="btn btn-primary"
-        disabled={saving}
+        disabled={saving || sides.length === 0}
         style={{ width: '100%' }}
       >
-        {saving ? 'กำลังสร้าง...' : `สร้าง Section (${total} location)`}
+        {saving ? 'กำลังสร้าง...' : `สร้างห้อง (${sides.length > 0 ? total : 0} location)`}
       </button>
     </form>
   );
@@ -227,8 +369,8 @@ export function WarehouseLocationSetupPage() {
     setLoading(false);
   }
 
-  async function handleAdd({ zoneCode, zoneName, rows, cols }) {
-    const result = await createSection({ warehouseId, zoneCode, zoneName, rows, cols });
+  async function handleAdd(params) {
+    const result = await createSection({ warehouseId, ...params });
     if (!result.error) await load();
     return result;
   }
@@ -244,20 +386,20 @@ export function WarehouseLocationSetupPage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="ตั้งค่า Location คลังสินค้า"
-        description="กำหนด Section และตำแหน่งจัดเก็บสินค้า — ส่งผลต่อแผนผังและ Handheld"
+        description="กำหนดห้อง ฝั่ง แถว และชั้น — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว}-{ชั้น} เช่น H1-L-01-03"
       />
 
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         {[
-          { label: 'Section ทั้งหมด', value: sections.length, color: '#2563eb' },
+          { label: 'ห้องทั้งหมด', value: sections.length, color: '#2563eb' },
           { label: 'Location ทั้งหมด', value: totalLocations, color: '#2d9348' },
-          { label: 'Location ที่มีสินค้า', value: sections.reduce((s, z) => s + z.used, 0), color: '#f0a500' },
-          { label: 'Location ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: '#94a3b8' },
+          { label: 'มีสินค้า', value: sections.reduce((s, z) => s + z.used, 0), color: '#f0a500' },
+          { label: 'ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: '#94a3b8' },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-            padding: '14px 18px', minWidth: 140,
+            padding: '14px 18px', minWidth: 130,
           }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: stat.color }}>{stat.value}</div>
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{stat.label}</div>
@@ -273,12 +415,12 @@ export function WarehouseLocationSetupPage() {
         <div className="banner banner-danger">{error.message}</div>
       ) : sections.length === 0 ? (
         <div style={{ color: '#94a3b8', textAlign: 'center', padding: 32, background: '#f8fafc', borderRadius: 12 }}>
-          ยังไม่มี Section — เพิ่มด้านบนเพื่อตั้งค่าผังคลัง
+          ยังไม่มีห้อง — เพิ่มด้านบนเพื่อตั้งค่าผังคลัง
         </div>
       ) : (
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 12 }}>
-            Section ที่มีอยู่ ({sections.length})
+            ห้องที่มีอยู่ ({sections.length})
           </div>
           {sections.map((sec) => (
             <SectionCard key={sec.id} section={sec} onDelete={handleDelete} />

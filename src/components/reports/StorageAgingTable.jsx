@@ -7,7 +7,7 @@ const columns = [
   { key: 'pallet_id', header: 'Pallet', render: (row) => row.pallet_no ?? row.pallet_id ?? '-' },
   { key: 'warehouse_id', header: 'Warehouse', render: (row) => row.warehouse_name ?? row.warehouse_id ?? '-' },
   { key: 'room_zone', header: 'Room / Zone', render: (row) => row.room_code ?? row.zone_code ?? '-' },
-  { key: 'location_id', header: 'Location', render: (row) => row.location_code ?? row.location_id ?? '-' },
+  { key: 'location_id', header: 'Location', render: (row) => row.location_code ? `${row.location_code}${row.location_name ? ' — ' + row.location_name : ''}` : (row.location_id ? row.location_id.slice(0, 8) + '...' : '-') },
   { key: 'condition_status', header: 'Condition', render: (row) => row.condition_status ?? '-' },
   { key: 'qty_on_hand', header: 'Stock Qty' },
   { key: 'uom', header: 'UOM' },
