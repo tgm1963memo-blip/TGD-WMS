@@ -15,7 +15,7 @@ function snap(page, name) {
   return page.screenshot({ path: path.join(EVIDENCE, `${name}.png`), fullPage: true });
 }
 
-const ADMIN_EMAIL = process.env.UAT_ADMIN_EMAIL || process.env.UAT_EMAIL;
+const ADMIN_EMAIL = process.env.UAT_EMAIL || process.env.UAT_ADMIN_EMAIL;
 const ADMIN_PASS  = process.env.UAT_PASSWORD;
 const WAREHOUSE_EMAIL = process.env.UAT_WAREHOUSE_EMAIL;
 const WAREHOUSE_PASS  = process.env.UAT_WAREHOUSE_PASSWORD || process.env.UAT_PASSWORD;
