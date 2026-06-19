@@ -517,7 +517,7 @@ function ReceivingWorkflow({ onBack, t }) {
   // Doc select screen
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 16px 24px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
@@ -556,7 +556,7 @@ function ReceivingWorkflow({ onBack, t }) {
   }
 
   return (
-    <div style={{ background: C.bg, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div data-testid="handheld-page" style={{ background: C.bg, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}{cameraPalletEl}
 
       <TopBar
@@ -948,7 +948,7 @@ function PickingWorkflow({ onBack, t }) {
 // ── Mode select home ──────────────────────────────────────────────────────────
 function ModeSelect({ onSelect }) {
   return (
-    <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       {/* Hero header */}
       <div style={{
         background: C.headerGrad,

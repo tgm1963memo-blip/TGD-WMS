@@ -61,7 +61,6 @@ export async function login(page, credentials = {}) {
 }
 
 export async function switchUser(page, credentials = {}) {
-  await logout(page);
   await login(page, credentials);
 }
 

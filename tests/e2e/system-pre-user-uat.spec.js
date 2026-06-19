@@ -38,7 +38,9 @@ test.describe('System pre-user UAT smoke', () => {
         continue;
       }
 
-      await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
+      if (route.hasAppShell !== false) {
+        await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
+      }
 
       if (route.testId) {
         await expect(page.locator(`[data-testid="${route.testId}"]`)).toBeVisible({ timeout: 20000 });

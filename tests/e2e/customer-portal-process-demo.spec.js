@@ -5,6 +5,7 @@ import {
   expectDepositSubmitOutcome,
   fillFirstDepositLine,
   isGoLiveTarget,
+  selectProxyCustomerIfPresent,
 } from './helpers/customerPortalHelpers.js';
 
 requireUatCredentials();
@@ -98,6 +99,7 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
 
   test('Scenario 11: Withdrawal source and picking rule are selectable', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
+    await selectProxyCustomerIfPresent(page, 'customer-withdrawal-proxy-customer-select');
     await expect(page.locator('[data-testid="customer-withdrawal-lines-table"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="customer-withdrawal-product-picker-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-source-deposit-select"]')).toBeVisible();
