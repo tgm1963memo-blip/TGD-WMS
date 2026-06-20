@@ -13,7 +13,7 @@ import {
   upsertUserProfile,
 } from '../../services/userManagementService.js';
 import { canManageUsers } from '../../security/userManagementPermissions.js';
-import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useTranslation, useLanguage } from '../../i18n/languageProvider.jsx';
 
 const EMPTY_FORM = {
   profileId: '',
@@ -29,6 +29,7 @@ const EMPTY_FORM = {
 
 export function UserManagementPage() {
   const t = useTranslation();
+  const { language } = useLanguage();
   const [profiles, setProfiles] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
