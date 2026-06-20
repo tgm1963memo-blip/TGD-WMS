@@ -29,16 +29,110 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500'
 
 function SectionGrid({ section }) {
   const [hovered, setHovered] = useState(null);
-  const { rows, cols, locations } = section;
+  const { rows, cols, locations, gridInfo } = section;
   const total = rows * cols;
 
+  const locMap = useMemo(() => {
+    const map = {};
+    for (const loc of locations) {
+      if (loc.location_code) map[loc.location_code] = loc;
+    }
+    return map;
+  }, [locations]);
+
+  // Modern Asymmetric Rendering
+  if (gridInfo?.sidesConfig) {
+    const leftConfig = gridInfo.sidesConfig.L || { rows: 0, levels: 0 };
+    const rightConfig = gridInfo.sidesConfig.R || { rows: 0, levels: 0 };
+    const zoneCode = section.code;
+
+    const renderDot = (side, r, c) => {
+      const rowStr = String(r).padStart(2, '0');
+      const lvStr = String(c).padStart(2, '0');
+      const code = `${zoneCode}-${side}-${rowStr}-${lvStr}`;
+      const loc = locMap[code];
+      const isOccupied = loc?.isOccupied ?? false;
+
+      return (
+        <div
+          key={code}
+          onMouseEnter={() => setHovered({ code, row: r, col: c, isOccupied })}
+          onMouseLeave={() => setHovered(null)}
+          title={code}
+          style={{
+            width: 14, height: 14,
+            borderRadius: '50%',
+            background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
+            boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
+            cursor: 'default',
+            transition: 'transform 0.2s, opacity 0.2s',
+            transform: hovered?.code === code ? 'scale(1.5)' : 'scale(1)',
+            opacity: hovered && hovered.code !== code ? 0.6 : 1,
+          }}
+        />
+      );
+    };
+
+    return (
+      <div style={{ position: 'relative', display: 'flex', gap: '32px', justifyContent: 'center', padding: '16px' }}>
+        {/* Left Aisle */}
+        {leftConfig.rows > 0 && leftConfig.levels > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftConfig.levels}, 1fr)`, gap: 6 }}>
+            {Array.from({ length: leftConfig.rows * leftConfig.levels }).map((_, idx) => {
+              const r = Math.floor(idx / leftConfig.levels) + 1;
+              const c = (idx % leftConfig.levels) + 1;
+              return renderDot('L', r, c);
+            })}
+          </div>
+        )}
+
+        {/* Walking Path */}
+        {(leftConfig.rows > 0 || rightConfig.rows > 0) && (
+          <div style={{ width: 8, background: 'rgba(0,0,0,0.02)', borderRadius: 4 }}></div>
+        )}
+
+        {/* Right Aisle */}
+        {rightConfig.rows > 0 && rightConfig.levels > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightConfig.levels}, 1fr)`, gap: 6 }}>
+            {Array.from({ length: rightConfig.rows * rightConfig.levels }).map((_, idx) => {
+              const r = Math.floor(idx / rightConfig.levels) + 1;
+              const c = (idx % rightConfig.levels) + 1;
+              return renderDot('R', r, c);
+            })}
+          </div>
+        )}
+
+        {hovered && (
+          <div style={{
+            position: 'absolute',
+            top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            zIndex: 10,
+            background: 'rgba(15, 23, 42, 0.85)', color: '#fff',
+            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            borderRadius: 12, padding: '12px 16px',
+            fontSize: 13, fontWeight: 600,
+            pointerEvents: 'none',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+            minWidth: 160, whiteSpace: 'nowrap',
+          }}>
+            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 2 }}>{section.name}</div>
+            <div>{hovered.code}</div>
+            <div style={{ marginTop: 4, fontWeight: 400, fontSize: 12 }}>
+              {hovered.isOccupied ? '🟠 มีสินค้า' : '⬜ ว่าง'}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback Legacy Rendering
   const halfCols = Math.ceil(cols / 2);
   const leftCols = halfCols;
   const rightCols = cols - halfCols;
 
   return (
     <div style={{ position: 'relative', display: 'flex', gap: '32px', justifyContent: 'center', padding: '16px' }}>
-      {/* Left Aisle */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftCols}, 1fr)`, gap: 6 }}>
         {Array.from({ length: rows * leftCols }).map((_, idx) => {
           const row = Math.floor(idx / leftCols) + 1;
@@ -53,8 +147,7 @@ function SectionGrid({ section }) {
               onMouseLeave={() => setHovered(null)}
               title={loc?.location_code ?? `R${row}C${col}`}
               style={{
-                width: 14, height: 14,
-                borderRadius: '50%',
+                width: 14, height: 14, borderRadius: '50%',
                 background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
                 boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
                 cursor: 'default',
@@ -67,10 +160,8 @@ function SectionGrid({ section }) {
         })}
       </div>
 
-      {/* Walking Path */}
       <div style={{ width: 8, background: 'rgba(0,0,0,0.02)', borderRadius: 4 }}></div>
 
-      {/* Right Aisle */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightCols}, 1fr)`, gap: 6 }}>
         {Array.from({ length: rows * rightCols }).map((_, idx) => {
           const row = Math.floor(idx / rightCols) + 1;
@@ -85,8 +176,7 @@ function SectionGrid({ section }) {
               onMouseLeave={() => setHovered(null)}
               title={loc?.location_code ?? `R${row}C${col}`}
               style={{
-                width: 14, height: 14,
-                borderRadius: '50%',
+                width: 14, height: 14, borderRadius: '50%',
                 background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
                 boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
                 cursor: 'default',
@@ -102,8 +192,7 @@ function SectionGrid({ section }) {
       {hovered && (
         <div style={{
           position: 'absolute',
-          top: `${Math.floor(hovered.idx / cols) * (100 / rows)}%`,
-          left: `${(hovered.idx % cols) * (100 / cols) + 8}%`,
+          top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
           zIndex: 10,
           background: 'rgba(15, 23, 42, 0.85)', color: '#fff',
           backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',

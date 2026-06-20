@@ -47,12 +47,22 @@ function analyzeLocations(locations) {
     const numRows = Math.max(...newParsed.map((p) => p.row));
     const sides = [...new Set(newParsed.map((p) => p.side))].sort();
     const numLevels = Math.max(...newParsed.map((p) => p.level));
+    
+    const sidesConfig = { L: { rows: 0, levels: 0 }, R: { rows: 0, levels: 0 } };
+    newParsed.forEach(p => {
+      if (sidesConfig[p.side]) {
+        sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
+        sidesConfig[p.side].levels = Math.max(sidesConfig[p.side].levels, p.level);
+      }
+    });
+
     return {
       type: 'new',
       numRows,
       numSides: sides.length,
       sides,
       numLevels,
+      sidesConfig,
       rows: numRows * sides.length,
       cols: numLevels,
     };
@@ -63,7 +73,16 @@ function analyzeLocations(locations) {
     const numRows = Math.max(...midParsed.map((p) => p.row));
     const sides = [...new Set(midParsed.map((p) => p.side))].sort();
     const numLevels = Math.max(...midParsed.map((p) => p.level));
-    return { type: 'new', numRows, numSides: sides.length, sides, numLevels, rows: numRows * sides.length, cols: numLevels };
+    
+    const sidesConfig = { L: { rows: 0, levels: 0 }, R: { rows: 0, levels: 0 } };
+    midParsed.forEach(p => {
+      if (sidesConfig[p.side]) {
+        sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
+        sidesConfig[p.side].levels = Math.max(sidesConfig[p.side].levels, p.level);
+      }
+    });
+
+    return { type: 'new', numRows, numSides: sides.length, sides, numLevels, sidesConfig, rows: numRows * sides.length, cols: numLevels };
   }
 
   const oldParsed = locations.map((l) => parseOldCode(l.location_code)).filter(Boolean);
@@ -178,7 +197,7 @@ export async function getActiveLocations() {
 
 // sides: array of 'L' | 'R' | both
 // Location code format: {roomCode}-{side}-{row:02d}-{level:02d}  e.g. H1-L-01-03
-export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, numRows, sides, numLevels }) {
+export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig }) {
   if (!supabase) return missing();
 
   let { data: zone, error: ze } = await supabase
@@ -218,9 +237,10 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   const sideNames = { L: 'ซ้าย', R: 'ขวา' };
   const inserts = [];
 
-  for (let r = 1; r <= numRows; r++) {
-    for (const side of sides) {
-      for (let lv = 1; lv <= numLevels; lv++) {
+  const addSideLocations = (side, config) => {
+    if (!config?.active) return;
+    for (let r = 1; r <= config.rows; r++) {
+      for (let lv = 1; lv <= config.levels; lv++) {
         const rowStr = String(r).padStart(2, '0');
         const lvStr = String(lv).padStart(2, '0');
         inserts.push({
@@ -233,7 +253,10 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
         });
       }
     }
-  }
+  };
+
+  addSideLocations('L', leftConfig);
+  addSideLocations('R', rightConfig);
 
   if (inserts.length > 0) {
     const { error: le } = await insertLocationsWithSchemaFallback(inserts);

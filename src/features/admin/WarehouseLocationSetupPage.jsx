@@ -12,10 +12,12 @@ const EMPTY_FORM = {
   zoneCode: '',
   zoneName: '',
   temperatureType: 'FROZEN',
-  numRows: 5,
   sideLeft: true,
+  leftRows: 5,
+  leftLevels: 5,
   sideRight: true,
-  numLevels: 5,
+  rightRows: 5,
+  rightLevels: 5,
 };
 
 const TEMP_OPTIONS = [
@@ -40,6 +42,15 @@ function pctColor(pct) {
 function describeGrid(gridInfo) {
   if (!gridInfo || gridInfo.type === 'empty') return '';
   if (gridInfo.type === 'new') {
+    const parts = [];
+    if (gridInfo.sidesConfig?.L && gridInfo.sidesConfig.L.rows > 0) {
+      parts.push(`L: ${gridInfo.sidesConfig.L.rows}×${gridInfo.sidesConfig.L.levels}`);
+    }
+    if (gridInfo.sidesConfig?.R && gridInfo.sidesConfig.R.rows > 0) {
+      parts.push(`R: ${gridInfo.sidesConfig.R.rows}×${gridInfo.sidesConfig.R.levels}`);
+    }
+    if (parts.length > 0) return parts.join(' · ');
+    
     const sideStr = gridInfo.numSides === 2
       ? 'ซ้าย + ขวา'
       : (gridInfo.sides?.[0] === 'L' ? 'ฝั่งซ้าย' : 'ฝั่งขวา');
@@ -153,9 +164,13 @@ function AddSectionForm({ onAdd }) {
   if (form.sideLeft) sides.push('L');
   if (form.sideRight) sides.push('R');
 
-  const numRows = Math.max(1, Math.min(50, +form.numRows || 1));
-  const numLevels = Math.max(1, Math.min(20, +form.numLevels || 1));
-  const total = numRows * sides.length * numLevels;
+  const leftRows = Math.max(1, Math.min(50, +form.leftRows || 1));
+  const leftLevels = Math.max(1, Math.min(20, +form.leftLevels || 1));
+  const rightRows = Math.max(1, Math.min(50, +form.rightRows || 1));
+  const rightLevels = Math.max(1, Math.min(20, +form.rightLevels || 1));
+
+  const total = (form.sideLeft ? leftRows * leftLevels : 0) + (form.sideRight ? rightRows * rightLevels : 0);
+  const totalSides = (form.sideLeft ? 1 : 0) + (form.sideRight ? 1 : 0);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -163,19 +178,22 @@ function AddSectionForm({ onAdd }) {
       setError('กรุณากรอกรหัสและชื่อ Section');
       return;
     }
-    if (sides.length === 0) {
+    if (totalSides === 0) {
       setError('กรุณาเลือกฝั่งอย่างน้อย 1 ฝั่ง');
       return;
     }
     setSaving(true);
     setError('');
+    
+    const leftConfig = { active: form.sideLeft, rows: leftRows, levels: leftLevels };
+    const rightConfig = { active: form.sideRight, rows: rightRows, levels: rightLevels };
+    
     const result = await onAdd({
       zoneCode: form.zoneCode.trim().toUpperCase(),
       zoneName: form.zoneName.trim(),
       temperatureType: form.temperatureType,
-      numRows,
-      sides,
-      numLevels,
+      leftConfig,
+      rightConfig,
     });
     setSaving(false);
     if (result?.error) {
@@ -256,61 +274,85 @@ function AddSectionForm({ onAdd }) {
         </div>
       </div>
 
-      {/* Rows + Sides + Levels */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          จำนวนแถว
-          <input
-            className="form-control"
-            type="number"
-            min={1} max={50}
-            value={form.numRows}
-            onChange={(e) => set('numRows', e.target.value)}
-            style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-          />
-          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>แถวตามความยาวคลัง</span>
-        </label>
-
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          ฝั่ง
-          <div style={{
-            display: 'flex', gap: 8, marginTop: 4,
-            border: '1px solid #d1d5db', borderRadius: 8,
-            padding: '8px 10px', background: '#fff',
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
-              <input
-                type="checkbox"
-                checked={form.sideLeft}
-                onChange={(e) => set('sideLeft', e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#2d9348' }}
-              />
-              ซ้าย (L)
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
-              <input
-                type="checkbox"
-                checked={form.sideRight}
-                onChange={(e) => set('sideRight', e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#2d9348' }}
-              />
-              ขวา (R)
-            </label>
-          </div>
+      {/* Left / Right Configurations */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 14 }}>
+        {/* Left Side */}
+        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={form.sideLeft}
+              onChange={(e) => set('sideLeft', e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+            />
+            ฝั่งซ้าย (L)
+          </label>
+          {form.sideLeft && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนแถว
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={50}
+                  value={form.leftRows}
+                  onChange={(e) => set('leftRows', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนชั้น
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={20}
+                  value={form.leftLevels}
+                  onChange={(e) => set('leftLevels', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+            </div>
+          )}
         </div>
 
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-          จำนวนชั้น
-          <input
-            className="form-control"
-            type="number"
-            min={1} max={20}
-            value={form.numLevels}
-            onChange={(e) => set('numLevels', e.target.value)}
-            style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-          />
-          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ชั้นวางสินค้า</span>
-        </label>
+        {/* Right Side */}
+        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={form.sideRight}
+              onChange={(e) => set('sideRight', e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+            />
+            ฝั่งขวา (R)
+          </label>
+          {form.sideRight && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนแถว
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={50}
+                  value={form.rightRows}
+                  onChange={(e) => set('rightRows', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนชั้น
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={20}
+                  value={form.rightLevels}
+                  onChange={(e) => set('rightLevels', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Preview */}
@@ -320,18 +362,22 @@ function AddSectionForm({ onAdd }) {
         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       }}>
         <span style={{ fontWeight: 700, color: '#2d9348' }}>ตัวอย่างรหัส Location:</span>
-        {form.zoneCode.trim() && sides.length > 0 ? (
+        {form.zoneCode.trim() && totalSides > 0 ? (
           <span style={{ fontFamily: 'monospace', color: '#1e293b', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
-            {form.zoneCode.trim().toUpperCase()}-{sides[0]}-01-01
+            {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01-01
           </span>
         ) : (
           <span style={{ color: '#94a3b8' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
         )}
         <span style={{ color: '#64748b' }}>
-          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{sides.length > 0 ? total : 0}</strong> location
-          {sides.length > 0 && total > 0 && (
+          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{totalSides > 0 ? total : 0}</strong> location
+          {totalSides > 0 && total > 0 && (
             <span style={{ color: '#94a3b8', marginLeft: 6 }}>
-              ({numRows} แถว × {sides.length} ฝั่ง × {numLevels} ชั้น)
+              (
+                {form.sideLeft ? `L: ${leftRows}×${leftLevels}` : ''}
+                {form.sideLeft && form.sideRight ? ' / ' : ''}
+                {form.sideRight ? `R: ${rightRows}×${rightLevels}` : ''}
+              )
             </span>
           )}
         </span>
@@ -340,10 +386,10 @@ function AddSectionForm({ onAdd }) {
       <button
         type="submit"
         className="btn btn-primary"
-        disabled={saving || sides.length === 0}
+        disabled={saving || totalSides === 0}
         style={{ width: '100%' }}
       >
-        {saving ? 'กำลังสร้าง...' : `สร้างห้อง (${sides.length > 0 ? total : 0} location)`}
+        {saving ? 'กำลังสร้าง...' : `สร้างห้อง (${totalSides > 0 ? total : 0} location)`}
       </button>
     </form>
   );
