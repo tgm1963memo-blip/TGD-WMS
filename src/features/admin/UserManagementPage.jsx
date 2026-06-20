@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   role: 'warehouse_staff',
   customerId: '',
   authUserId: '',
+  pinCode: '',
   isActive: true,
 };
 
@@ -121,6 +122,7 @@ export function UserManagementPage() {
       role: row.role ?? 'warehouse_staff',
       customerId: row.customer_id ?? '',
       authUserId: row.auth_user_id ?? '',
+      pinCode: row.pin_code ?? '',
       isActive: row.is_active !== false,
     });
     setSuccess('');
@@ -169,6 +171,7 @@ export function UserManagementPage() {
       role: form.role,
       customerId: CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
       authUserId,
+      pinCode: form.pinCode || null,
       isActive: form.isActive,
     });
 
@@ -248,6 +251,18 @@ export function UserManagementPage() {
               className="form-control"
               onChange={(e) => updateField('displayName', e.target.value)}
               value={form.displayName}
+            />
+          </label>
+          <label className="form-field">
+            <span>{language === 'th' ? 'รหัส PIN (Handheld)' : 'Handheld PIN'}</span>
+            <input
+              className="form-control"
+              type="text"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="e.g. 1234"
+              onChange={(e) => updateField('pinCode', e.target.value)}
+              value={form.pinCode}
             />
           </label>
           {!form.profileId ? (

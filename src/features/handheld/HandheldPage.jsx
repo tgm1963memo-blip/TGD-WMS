@@ -13,35 +13,38 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
+import { HandheldLoginPage } from './HandheldLoginPage.jsx';
 
-// ── Theme tokens (Clean Light Mode / Glassmorphism) ───────────
+// ── Theme tokens (Minimalist Elegant) ───────────
 const C = {
-  bg: '#f8fafc',
-  surface: 'rgba(255, 255, 255, 0.85)',
+  bg: '#ffffff',
+  surface: '#ffffff',
   surfaceSolid: '#ffffff',
   card: '#ffffff',
   border: '#e2e8f0',
-  shadow: '0 8px 30px rgba(0,0,0,0.04)',
-  shadowMd: '0 12px 40px rgba(37,99,235,0.08)',
-  primary: '#0ea5e9',
-  primaryDark: '#0369a1',
-  amber: '#f59e0b',
-  green: '#10b981',
-  greenLight: '#d1fae5',
-  greenBorder: '#a7f3d0',
-  red: '#ef4444',
-  redLight: '#fee2e2',
-  blueLight: '#e0f2fe',
+  borderLight: '#f1f5f9',
+  shadow: '0 4px 20px rgba(15, 23, 42, 0.05)',
+  shadowMd: '0 8px 30px rgba(15, 23, 42, 0.08)',
+  primary: '#0f172a',
+  primaryDark: '#020617',
+  amber: '#d97706',
+  green: '#059669',
+  greenLight: '#ecfdf5',
+  greenBorder: '#6ee7b7',
+  red: '#dc2626',
+  redLight: '#fef2f2',
+  blueLight: '#f1f5f9',
   text: '#0f172a',
-  textSec: '#64748b',
+  textSec: '#475569',
   muted: '#94a3b8',
-  inputBg: 'rgba(255,255,255,0.6)',
-  headerGrad: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)',
-  receiveAccent: '#3b82f6',
-  pickAccent: '#f59e0b',
+  inputBg: '#f8fafc',
+  headerGrad: '#ffffff',
+  receiveAccent: '#0f172a',
+  pickAccent: '#0f172a',
   glassmorphism: {
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
   }
 };
 
@@ -137,12 +140,12 @@ function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          color: gradient ? '#ffffff' : C.text,
+          color: C.text,
           fontWeight: 800, fontSize: 18,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{title}</div>
         {subtitle && (
-          <div style={{ color: gradient ? 'rgba(255,255,255,0.85)' : C.muted, fontSize: 13, marginTop: 2, fontWeight: 500 }}>
+          <div style={{ color: C.textSec, fontSize: 13, marginTop: 2, fontWeight: 600 }}>
             {subtitle}
           </div>
         )}
@@ -156,7 +159,7 @@ function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
 function QtyRow({ boxes, setBoxes, weight, setWeight }) {
   return (
     <div style={{ display: 'flex', gap: 16, padding: '0 0 16px', flexShrink: 0 }}>
-      {[['📦 กล่อง', boxes, setBoxes], ['⚖️ น้ำหนัก (กก.)', weight, setWeight]].map(([label, val, setVal]) => (
+      {[['กล่อง', boxes, setBoxes], ['น้ำหนัก (กก.)', weight, setWeight]].map(([label, val, setVal]) => (
         <label key={label} style={{ flex: 1 }}>
           <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</div>
           <input
@@ -415,7 +418,7 @@ function ReceivingWorkflow({ onBack, t }) {
               background: C.card, borderRadius: 24, marginTop: 8,
               border: `1px solid ${C.border}`, boxShadow: C.shadow,
             }}>
-              <div style={{ fontSize: 52, marginBottom: 16 }}>📭</div>
+              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>{`{ }`}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอรับสินค้า</div>
               <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับเข้าคลัง" จะปรากฏที่นี่</div>
             </div>
@@ -555,7 +558,7 @@ function ReceivingWorkflow({ onBack, t }) {
             <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🪵 Pallet ID (ถ้ามี)</div>
+              <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Pallet ID (ถ้ามี)</div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <input type="text" value={palletScan} onChange={(e) => setPalletScan(e.target.value)}
                   placeholder="สแกนหรือพิมพ์ Pallet ID"
@@ -567,9 +570,9 @@ function ReceivingWorkflow({ onBack, t }) {
                 <button type="button" onClick={cameraPallet}
                   style={{
                     background: C.primary, border: 'none', borderRadius: 16,
-                    padding: '0 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                    padding: '0 20px', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(14,165,233,0.3)',
-                  }}>📷</button>
+                  }}>สแกน</button>
               </div>
             </div>
 
@@ -620,15 +623,15 @@ function ReceivingWorkflow({ onBack, t }) {
                 flex: 1, position: 'relative', borderRadius: 20,
                 boxShadow: scanValue ? `0 0 0 3px ${C.primary}30` : `0 0 0 3px ${C.borderLight}`,
               }}>
-                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 20, pointerEvents: 'none' }}>
-                  🔍
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 700, color: C.muted, pointerEvents: 'none' }}>
+                  ค้นหา
                 </span>
                 <input
                   type="text" value={scanValue} onChange={(e) => handleScan(e.target.value)}
                   placeholder="สแกนรหัส หรือ LOT"
                   style={{
                     width: '100%', boxSizing: 'border-box', background: C.surfaceSolid,
-                    border: `2px solid ${C.primary}`, borderRadius: 20, padding: '16px 16px 16px 48px',
+                    border: `2px solid ${C.primary}`, borderRadius: 20, padding: '16px 16px 16px 60px',
                     color: C.text, fontSize: 16, fontWeight: 800, outline: 'none',
                   }}
                 />
@@ -636,10 +639,10 @@ function ReceivingWorkflow({ onBack, t }) {
               <button type="button" onClick={cameraItem}
                 style={{
                   background: C.primary, border: 'none', borderRadius: 20,
-                  padding: '16px 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                  padding: '16px 20px', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer',
                   boxShadow: '0 4px 16px rgba(14,165,233,0.3)',
                 }}>
-                📷
+                กล้อง
               </button>
             </div>
           </div>
@@ -742,7 +745,7 @@ function PickingWorkflow({ onBack, t }) {
               background: C.card, borderRadius: 24, marginTop: 8,
               border: `1px solid ${C.border}`, boxShadow: C.shadow,
             }}>
-              <div style={{ fontSize: 52, marginBottom: 16 }}>📭</div>
+              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>{`{ }`}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอหยิบสินค้า</div>
               <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "หยิบสินค้า" จะปรากฏที่นี่</div>
             </div>
@@ -896,15 +899,15 @@ function PickingWorkflow({ onBack, t }) {
                 flex: 1, position: 'relative', borderRadius: 20,
                 boxShadow: scanValue ? `0 0 0 3px ${C.pickAccent}30` : `0 0 0 3px ${C.borderLight}`,
               }}>
-                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 20, pointerEvents: 'none' }}>
-                  🔍
+                <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 700, color: C.muted, pointerEvents: 'none' }}>
+                  ค้นหา
                 </span>
                 <input
                   type="text" value={scanValue} onChange={(e) => handleScan(e.target.value)}
                   placeholder="สแกนรหัส หรือ LOT"
                   style={{
                     width: '100%', boxSizing: 'border-box', background: C.surfaceSolid,
-                    border: `2px solid ${C.pickAccent}`, borderRadius: 20, padding: '16px 16px 16px 48px',
+                    border: `2px solid ${C.pickAccent}`, borderRadius: 20, padding: '16px 16px 16px 60px',
                     color: C.text, fontSize: 16, fontWeight: 800, outline: 'none',
                   }}
                 />
@@ -912,10 +915,10 @@ function PickingWorkflow({ onBack, t }) {
               <button type="button" onClick={cameraItem}
                 style={{
                   background: C.pickAccent, border: 'none', borderRadius: 20,
-                  padding: '16px 20px', color: '#fff', fontSize: 22, cursor: 'pointer',
+                  padding: '16px 20px', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer',
                   boxShadow: '0 4px 16px rgba(245,158,11,0.3)',
                 }}>
-                📷
+                กล้อง
               </button>
             </div>
           </div>
@@ -927,55 +930,46 @@ function PickingWorkflow({ onBack, t }) {
 
 // ── Mode select home ──────────────────────────────────────────
 function ModeSelect({ onSelect }) {
+  const { activeProfile, logout } = useHandheldAuth();
+  
   return (
     <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
-      {/* Hero header */}
+      {/* Header */}
       <div style={{
-        background: C.headerGrad,
-        padding: '48px 24px 40px',
-        boxShadow: '0 8px 32px rgba(37,99,235,0.25)',
-        borderBottomLeftRadius: 32,
-        borderBottomRightRadius: 32,
+        background: C.surface,
+        padding: '32px 24px 24px',
+        borderBottom: `1px solid ${C.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 20,
-            background: 'rgba(255,255,255,0.2)',
-            ...C.glassmorphism,
-            border: '1px solid rgba(255,255,255,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32, flexShrink: 0,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        <div>
+          <div style={{ color: C.primaryDark, fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em' }}>
+            TGC Handheld
+          </div>
+          <div style={{ color: C.textSec, fontSize: 14, marginTop: 4, fontWeight: 600 }}>
+            {activeProfile ? `👤 ${activeProfile.displayName || activeProfile.email}` : 'Cold Storage Scanner'}
+          </div>
+        </div>
+        
+        {activeProfile && (
+          <button type="button" onClick={logout} style={{
+            background: C.blueLight,
+            border: 'none',
+            borderRadius: 12,
+            padding: '8px 16px',
+            color: C.text,
+            fontWeight: 700,
+            cursor: 'pointer'
           }}>
-            📦
-          </div>
-          <div>
-            <div style={{ color: '#ffffff', fontWeight: 900, fontSize: 28, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-              TGC Handheld
-            </div>
-            <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 4, fontWeight: 500 }}>
-              Cold Storage · Smart Scanner
-            </div>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div style={{
-          background: 'rgba(255,255,255,0.15)',
-          ...C.glassmorphism,
-          borderRadius: 16, padding: '12px 20px',
-          border: '1px solid rgba(255,255,255,0.2)',
-          display: 'flex', justifyContent: 'center', gap: 8,
-        }}>
-          <span style={{ color: '#ffffff', fontSize: 13, fontWeight: 600 }}>
-            🕐 {new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </span>
-        </div>
+            ออกระบบ
+          </button>
+        )}
       </div>
 
       <div style={{ flex: 1, padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: 0 }}>
         <div style={{ color: C.muted, fontSize: 13, fontWeight: 800, letterSpacing: '0.12em',
-          textTransform: 'uppercase', marginBottom: 16, paddingLeft: 4 }}>
+          textTransform: 'uppercase', marginBottom: 24, paddingLeft: 4 }}>
           เลือกโหมดการทำงาน
         </div>
 
@@ -983,31 +977,45 @@ function ModeSelect({ onSelect }) {
         <button type="button" onClick={() => onSelect('receive')}
           style={{
             display: 'block', width: '100%',
-            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.border}`,
-            borderRadius: 24, padding: '24px 20px',
+            background: C.surface, border: `1px solid ${C.primary}`,
+            borderRadius: 16, padding: '24px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
             marginBottom: 16,
-            boxShadow: `0 8px 30px rgba(37,99,235,0.1)`,
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}>
+            boxShadow: `4px 4px 0px ${C.primary}`,
+            transition: 'transform 0.1s, box-shadow 0.1s',
+          }}
+          onMouseDown={(e) => { e.currentTarget.style.transform = 'translate(2px, 2px)'; e.currentTarget.style.boxShadow = `2px 2px 0px ${C.primary}`; }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `4px 4px 0px ${C.primary}`; }}
+          >
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: 20,
-              background: C.blueLight,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 32, flexShrink: 0,
-            }}>📥</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 6 }}>รับสินค้าเข้า</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>สแกนและบันทึกสินค้า</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500, marginTop: 2 }}>รับเข้าตามใบแจ้งฝาก</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: C.text, marginBottom: 4 }}>รับเข้า (Receiving)</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 600 }}>รับสินค้าเข้าคลังตามใบงาน</div>
             </div>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: C.blueLight, color: C.primary,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, fontWeight: 800, flexShrink: 0,
-            }}>›</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: C.primary }}>→</div>
+          </div>
+        </button>
+
+        {/* Pick button */}
+        <button type="button" onClick={() => onSelect('pick')}
+          style={{
+            display: 'block', width: '100%',
+            background: C.surface, border: `1px solid ${C.primary}`,
+            borderRadius: 16, padding: '24px',
+            textAlign: 'left', cursor: 'pointer', color: C.text,
+            marginBottom: 32,
+            boxShadow: `4px 4px 0px ${C.primary}`,
+            transition: 'transform 0.1s, box-shadow 0.1s',
+          }}
+          onMouseDown={(e) => { e.currentTarget.style.transform = 'translate(2px, 2px)'; e.currentTarget.style.boxShadow = `2px 2px 0px ${C.primary}`; }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `4px 4px 0px ${C.primary}`; }}
+          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: C.text, marginBottom: 4 }}>เบิกออก (Picking)</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 600 }}>หยิบสินค้าตามใบขอเบิก</div>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: C.primary }}>→</div>
           </div>
         </button>
 
@@ -1075,12 +1083,24 @@ function ModeSelect({ onSelect }) {
   );
 }
 
-// ── Main export ───────────────────────────────────────────────
-export function HandheldPage() {
+// ── Main Layout ───────────────────────────────────────────────
+function HandheldApp() {
   const t = useTranslation();
   const [mode, setMode] = useState(null);
+  const { activeProfile, isLoading } = useHandheldAuth();
+
+  if (isLoading) return <div style={{ padding: 40, textAlign: 'center', fontWeight: 700 }}>กำลังโหลด...</div>;
+  if (!activeProfile) return <HandheldLoginPage />;
 
   if (mode === 'receive') return <ReceivingWorkflow onBack={() => setMode(null)} t={t} />;
   if (mode === 'pick') return <PickingWorkflow onBack={() => setMode(null)} t={t} />;
   return <ModeSelect onSelect={setMode} />;
+}
+
+export function HandheldPage() {
+  return (
+    <HandheldProvider>
+      <HandheldApp />
+    </HandheldProvider>
+  );
 }
