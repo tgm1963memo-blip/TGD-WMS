@@ -75,6 +75,36 @@ function analyzeLocations(locations) {
   return { type: 'unknown', rows: Math.ceil(locations.length / cols), cols };
 }
 
+function isUnknownColumnError(error) {
+  return /column .* does not exist|Could not find .* column/i.test(error?.message ?? '');
+}
+
+function getMissingColumnName(error) {
+  const message = error?.message ?? '';
+  return /'([^']+)'\s+column/i.exec(message)?.[1] ?? /column "([^"]+)"/i.exec(message)?.[1] ?? null;
+}
+
+async function insertLocationsWithSchemaFallback(rows) {
+  let candidateRows = rows;
+  const removedColumns = new Set();
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { error } = await supabase.from('tgd_locations').insert(candidateRows);
+    if (!isUnknownColumnError(error)) return { error };
+
+    const missingColumn = getMissingColumnName(error);
+    if (!missingColumn || removedColumns.has(missingColumn)) return { error };
+
+    removedColumns.add(missingColumn);
+    candidateRows = candidateRows.map((row) => {
+      const { [missingColumn]: _removed, ...nextRow } = row;
+      return nextRow;
+    });
+  }
+
+  return { error: new Error('Unable to create locations because the live tgd_locations schema is not compatible.') };
+}
+
 export async function getSectionsWithOccupancy() {
   if (!supabase) return { data: [], error: null };
 
@@ -151,11 +181,31 @@ export async function getActiveLocations() {
 export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, numRows, sides, numLevels }) {
   if (!supabase) return missing();
 
-  const { data: zone, error: ze } = await supabase
+  let { data: zone, error: ze } = await supabase
     .from('tgd_zones')
-    .insert({ warehouse_id: warehouseId, zone_code: zoneCode, zone_name: zoneName, temperature_type: temperatureType ?? 'FROZEN' })
+    .insert({
+      warehouse_id: warehouseId,
+      name: zoneName,
+      zone_code: zoneCode,
+      zone_name: zoneName,
+      temperature_type: temperatureType ?? 'FROZEN',
+    })
     .select('id')
     .single();
+  if (isUnknownColumnError(ze)) {
+    const retry = await supabase
+      .from('tgd_zones')
+      .insert({
+        warehouse_id: warehouseId,
+        zone_code: zoneCode,
+        zone_name: zoneName,
+        temperature_type: temperatureType ?? 'FROZEN',
+      })
+      .select('id')
+      .single();
+    zone = retry.data;
+    ze = retry.error;
+  }
   if (ze) return { error: ze };
 
   const { data: room, error: re } = await supabase
@@ -175,6 +225,8 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
         const lvStr = String(lv).padStart(2, '0');
         inserts.push({
           room_id: room.id,
+          zone_id: zone.id,
+          name: `${zoneCode}-${side}-${rowStr}-${lvStr}`,
           location_code: `${zoneCode}-${side}-${rowStr}-${lvStr}`,
           location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv}`,
           location_type: 'SHELF',
@@ -184,7 +236,7 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   }
 
   if (inserts.length > 0) {
-    const { error: le } = await supabase.from('tgd_locations').insert(inserts);
+    const { error: le } = await insertLocationsWithSchemaFallback(inserts);
     if (le) return { error: le };
   }
 
