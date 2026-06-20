@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSectionsWithOccupancy } from '../../services/warehouseLayoutService.js';
 
@@ -34,8 +34,8 @@ function SectionGrid({ section }) {
 
   const locMap = useMemo(() => {
     const map = {};
-    for (const loc of locations) {
-      if (loc.location_code) map[loc.location_code] = loc;
+    for (const loc of locations || []) {
+      if (loc?.location_code) map[loc.location_code] = loc;
     }
     return map;
   }, [locations]);
@@ -138,7 +138,7 @@ function SectionGrid({ section }) {
           const row = Math.floor(idx / leftCols) + 1;
           const col = (idx % leftCols) + 1;
           const globalIdx = (row - 1) * cols + (col - 1);
-          const loc = locations[globalIdx];
+          const loc = (locations || [])[globalIdx];
           const isOccupied = loc?.isOccupied ?? false;
           return (
             <div
@@ -167,7 +167,7 @@ function SectionGrid({ section }) {
           const row = Math.floor(idx / rightCols) + 1;
           const col = leftCols + (idx % rightCols) + 1;
           const globalIdx = (row - 1) * cols + (col - 1);
-          const loc = locations[globalIdx];
+          const loc = (locations || [])[globalIdx];
           const isOccupied = loc?.isOccupied ?? false;
           return (
             <div
