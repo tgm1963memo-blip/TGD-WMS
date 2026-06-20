@@ -28,7 +28,7 @@ export function ForgotPasswordPage() {
     const result = await requestPasswordReset(email);
     setBusy(false);
 
-    if (result.error?.message?.includes('Supabase client is not configured')) {
+    if (result.error) {
       setError(result.error);
       return;
     }

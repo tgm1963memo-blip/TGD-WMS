@@ -96,6 +96,8 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/customer/warehouse/receiving', route_name: 'CustomerWarehouseReceivingDemoPage', permission_area: 'customer_portal', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'UAT demo route' },
   { route_path: '/customer/warehouse/picking-loading', route_name: 'CustomerWarehousePickingLoadingDemoPage', permission_area: 'customer_portal', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'UAT demo route' },
   { route_path: '/settings/profile', route_name: 'ProfileSettingsPage', permission_area: 'admin', minimum_role: 'viewer', access_level: 'read', notes: 'Authenticated profile settings' },
+  { route_path: '/settings/change-password', route_name: 'ChangePasswordPage', permission_area: 'admin', minimum_role: 'viewer', access_level: 'read', notes: 'All authenticated users can change their own password' },
+  { route_path: '/settings/email', route_name: 'EmailSettingsPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: 'Admin-only: test email delivery and view SMTP configuration guidance' },
   { route_path: '/admin/auth-readiness', route_name: 'AuthReadinessPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
   { route_path: '/admin/document-branding', route_name: 'DocumentBrandingAdminPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
   { route_path: '/admin/document-branding-preview', route_name: 'DocumentBrandingPreviewPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'read', notes: '' },

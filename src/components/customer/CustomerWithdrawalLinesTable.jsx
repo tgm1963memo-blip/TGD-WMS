@@ -11,6 +11,7 @@ const ID_TYPES = [
 
 export function CustomerWithdrawalLinesTable({
   customerId,
+  depositOptions = [],
   lines,
   onChange,
   onRemoveLine,
@@ -114,6 +115,7 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 220 }}>LOT / วันผลิต / วันหมดอายุ</th>
             <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
             <th style={{ minWidth: 140 }}>กฎการหยิบ</th>
+            <th style={{ minWidth: 160 }}>แหล่งที่มา (ใบฝาก)</th>
             <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
@@ -206,6 +208,21 @@ export function CustomerWithdrawalLinesTable({
                     <option value="FEFO">FEFO (หมดก่อน-หยิบก่อน)</option>
                     <option value="SPECIFIC_DEPOSIT">ระบุใบฝาก</option>
                     <option value="SPECIFIC_LOT">ระบุ LOT</option>
+                  </select>
+                </td>
+
+                {/* Source deposit */}
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
+                    onChange={(e) => updateLine(line.key, { source_deposit_request_id: e.target.value })}
+                    value={line.source_deposit_request_id || ''}
+                  >
+                    <option value="">— ทั้งหมด —</option>
+                    {depositOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.label ?? opt.id}</option>
+                    ))}
                   </select>
                 </td>
 

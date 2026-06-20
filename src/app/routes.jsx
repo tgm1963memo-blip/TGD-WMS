@@ -50,6 +50,8 @@ import { BillingMovementWeightReportPage } from '../features/reports/BillingMove
 import { InvoiceDraftListPage } from '../features/billing/InvoiceDraftListPage.jsx';
 import { InvoiceDraftDetailPage } from '../features/billing/InvoiceDraftDetailPage.jsx';
 import { SettingsPage } from '../features/settings/SettingsPage.jsx';
+import { EmailSettingsPage } from '../features/settings/EmailSettingsPage.jsx';
+import { ChangePasswordPage } from '../features/settings/ChangePasswordPage.jsx';
 import { DocumentBrandingPreviewPage } from '../features/admin/DocumentBrandingPreviewPage.jsx';
 import { AuthReadinessPage } from '../features/admin/AuthReadinessPage.jsx';
 import { DocumentBrandingAdminPage } from '../features/admin/DocumentBrandingAdminPage.jsx';
@@ -171,6 +173,8 @@ export function AppRoutes() {
           <Route path="/admin/role-permissions" element={<RolePermissionsAdminPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+          <Route path="/settings/email" element={<EmailSettingsPage />} />
+          <Route path="/settings/change-password" element={<ChangePasswordPage />} />
           <Route path="/customer" element={<CustomerPortalDashboardPage />} />
           <Route path="/customer/deposit-request" element={<CustomerDepositRequestPage />} />
           <Route path="/customer/deposit-request/new" element={<CustomerDepositRequestCreatePage />} />

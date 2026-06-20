@@ -94,7 +94,7 @@ export function ProfileSettingsPage() {
           <Link
             className="btn btn-outline"
             data-testid="profile-change-password-link"
-            to="/forgot-password"
+            to="/settings/change-password"
           >
             {t('change_password_action')}
           </Link>

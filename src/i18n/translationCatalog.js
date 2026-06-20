@@ -547,7 +547,7 @@ Object.assign(TRANSLATION_CATALOG, {
   forgot_password_title: { th: 'ลืมรหัสผ่าน', en: 'Forgot Password' },
   forgot_password_description: { th: 'กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่', en: 'Enter your email to receive a password reset link.' },
   forgot_password_submit: { th: 'ส่งลิงก์รีเซ็ตรหัสผ่าน', en: 'Send reset link' },
-  forgot_password_success: { th: 'หากอีเมลถูกต้อง ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านให้ทางอีเมล', en: 'If the email is registered, a reset link will be sent shortly.' },
+  forgot_password_success: { th: 'ส่งอีเมล์สำเร็จ — กรุณาตรวจสอบกล่องอีเมลของคุณ', en: 'Email sent successfully — please check your inbox.' },
   forgot_password_invalid_email: { th: 'กรุณากรอกอีเมลที่ถูกต้อง', en: 'Please enter a valid email address.' },
   back_to_login: { th: 'กลับไปหน้าเข้าสู่ระบบ', en: 'Back to sign in' },
   reset_password_title: { th: 'ตั้งรหัสผ่านใหม่', en: 'Reset Password' },
@@ -1022,6 +1022,49 @@ Object.assign(TRANSLATION_CATALOG, {
   // Misc
   expected: { th: 'ที่คาดไว้', en: 'expected' },
   requested_qty: { th: 'จำนวนที่ขอ', en: 'Requested Qty' },
+
+  // Email settings page
+  email_settings_title: { th: 'ตั้งค่าอีเมล', en: 'Email Settings' },
+  email_settings_description: { th: 'ทดสอบการส่งอีเมลรีเซ็ตรหัสผ่าน และดูคำแนะนำการตั้งค่า SMTP', en: 'Test password reset email delivery and view SMTP configuration guidance.' },
+  email_settings_test_title: { th: 'ทดสอบการส่งอีเมล', en: 'Test Email Sending' },
+  email_settings_test_description: { th: 'กรอกอีเมลที่ต้องการทดสอบ ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้', en: 'Enter an email address to send a password reset link for testing.' },
+  email_settings_test_email_label: { th: 'อีเมลที่ต้องการทดสอบ', en: 'Test email address' },
+  email_settings_test_send: { th: 'ส่งอีเมลทดสอบ', en: 'Send test email' },
+  email_settings_test_sending: { th: 'กำลังส่ง...', en: 'Sending...' },
+  email_settings_test_sent_success: { th: 'ส่งอีเมลรีเซ็ตรหัสผ่านสำเร็จ — กรุณาตรวจสอบกล่องอีเมล', en: 'Password reset email sent — please check the inbox.' },
+  email_settings_smtp_guide_title: { th: 'วิธีตั้งค่า SMTP ใน Supabase', en: 'How to Configure SMTP in Supabase' },
+  email_settings_smtp_guide_description: { th: 'ตั้งค่า SMTP ของ TGM เพื่อให้ Supabase ส่งอีเมลผ่านเซิร์ฟเวอร์ของบริษัทแทนที่จะใช้บริการอีเมลเริ่มต้น (ซึ่งมี rate limit)', en: 'Configure TGM SMTP so Supabase sends emails through the company server instead of the default service (which has strict rate limits).' },
+  email_settings_smtp_step1: { th: 'ไปที่ Supabase Dashboard → Authentication → Settings', en: 'Go to Supabase Dashboard → Authentication → Settings' },
+  email_settings_smtp_step2: { th: 'เลื่อนลงหาหัวข้อ "SMTP Settings" แล้วเปิดใช้งาน "Enable Custom SMTP"', en: 'Scroll to "SMTP Settings" and enable "Enable Custom SMTP"' },
+  email_settings_smtp_step3: { th: 'กรอก Host, Port, Username และ Password ของ SMTP ของ TGM', en: 'Enter the Host, Port, Username, and Password for TGM SMTP' },
+  email_settings_smtp_step4: { th: 'กด Save แล้วทดสอบด้วยปุ่ม "ส่งอีเมลทดสอบ" ทางซ้าย', en: 'Click Save, then test with the "Send test email" button on the left' },
+  email_settings_smtp_reference_values: { th: 'ค่าอ้างอิงสำหรับกรอก', en: 'Reference values to fill in' },
+  email_settings_smtp_sender_email: { th: 'Sender Email', en: 'Sender Email' },
+  email_settings_smtp_sender_name: { th: 'Sender Name', en: 'Sender Name' },
+  email_settings_smtp_port: { th: 'Port', en: 'Port' },
+  email_settings_smtp_security: { th: 'Security', en: 'Security' },
+
+  // Email template section
+  email_settings_template_title: { th: 'Template อีเมลรีเซ็ตรหัสผ่าน', en: 'Reset Password Email Template' },
+  email_settings_template_description: { th: 'คัดลอก HTML นี้ไปวางใน Supabase → Authentication → Email Templates → Reset Password', en: 'Copy this HTML into Supabase → Authentication → Email Templates → Reset Password.' },
+  email_settings_template_show: { th: 'ดู Template', en: 'View Template' },
+  email_settings_template_hide: { th: 'ซ่อน Template', en: 'Hide Template' },
+  email_settings_template_subject: { th: 'Subject (หัวเรื่อง)', en: 'Subject Line' },
+  email_settings_template_body: { th: 'Body (เนื้อหา HTML)', en: 'Body (HTML)' },
+  email_settings_template_copy: { th: 'คัดลอก', en: 'Copy' },
+  email_settings_template_copied: { th: 'คัดลอกแล้ว!', en: 'Copied!' },
+  email_settings_template_paste_hint: { th: 'วาง Subject ในช่อง "Subject" และวาง HTML ในช่อง "Message" ของ Supabase Email Templates', en: 'Paste the Subject into the "Subject" field and the HTML into the "Message" field in Supabase Email Templates.' },
+
+  // Change password page (within app for authenticated users)
+  change_password_page_title: { th: 'เปลี่ยนรหัสผ่าน', en: 'Change Password' },
+  change_password_page_description: { th: 'ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ', en: 'Set a new password for your account.' },
+  change_password_submit: { th: 'บันทึกรหัสผ่านใหม่', en: 'Save new password' },
+  change_password_success: { th: 'เปลี่ยนรหัสผ่านสำเร็จ กำลังกลับไปหน้าโปรไฟล์...', en: 'Password changed successfully. Returning to profile...' },
+  change_password_hint: { th: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร', en: 'Password must be at least 8 characters.' },
+  change_password_back_to_profile: { th: 'กลับไปหน้าโปรไฟล์', en: 'Back to profile' },
+  change_password_forgot_title: { th: 'ลืมรหัสผ่านปัจจุบัน?', en: 'Forgot current password?' },
+  change_password_forgot_description: { th: 'หากไม่ทราบรหัสผ่านปัจจุบัน ใช้ลิงก์รีเซ็ตทางอีเมลแทน', en: 'If you do not know your current password, use the email reset link instead.' },
+  change_password_forgot_action: { th: 'ขอลิงก์รีเซ็ตทางอีเมล', en: 'Request email reset link' },
 });
 
 /** List all translation keys. */

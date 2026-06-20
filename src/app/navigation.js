@@ -123,6 +123,7 @@ export const navigationGroups = [
       { label: 'อัตราค่าบริการตามสินค้า', key: 'product_service_rates_admin', path: '/admin/product-service-rates' },
       { label: 'สิทธิ์และบทบาท', key: 'role_permissions_admin', path: '/admin/role-permissions' },
       { label: 'Users and Roles', key: 'users_and_roles', path: '/admin/auth-readiness' },
+      { label: 'ตั้งค่าอีเมล', key: 'email_settings', path: '/settings/email', testId: 'email-settings-menu-item' },
     ],
   },
 ];

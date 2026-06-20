@@ -44,6 +44,7 @@ const WAREHOUSE_STAFF_ROUTE_PREFIXES = Object.freeze([
 
 const SHARED_ROUTE_PREFIXES = Object.freeze([
   '/settings/profile',
+  '/settings/change-password',
 ]);
 
 function matchesRoutePrefix(routePath, prefixes) {

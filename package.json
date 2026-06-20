@@ -27,12 +27,12 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "@vitejs/plugin-react": "^4.3.2",
+    "nodemailer": "^9.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
     "vite": "^5.4.8",
-    "xlsx": "^0.18.5",
-    "nodemailer": "^6.9.13"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

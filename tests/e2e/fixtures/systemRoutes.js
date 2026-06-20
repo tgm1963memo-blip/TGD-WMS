@@ -38,4 +38,6 @@ export const systemRouteExpectations = [
   { path: '/admin/role-permissions', testId: null },
   { path: '/admin/auth-readiness', testId: null },
   { path: '/settings/profile', testId: 'profile-settings-page' },
+  { path: '/settings/change-password', testId: 'change-password-page' },
+  { path: '/settings/email', testId: 'email-settings-page' },
 ];

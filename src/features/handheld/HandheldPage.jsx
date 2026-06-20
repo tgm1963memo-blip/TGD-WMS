@@ -997,9 +997,10 @@ function ModeSelect({ onSelect }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 32, flexShrink: 0,
             }}>📥</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 4 }}>รับสินค้าเข้า</div>
-              <div style={{ fontSize: 14, color: C.textSec, lineHeight: 1.5, fontWeight: 500 }}>สแกนและบันทึกสินค้า<br />รับเข้าตามใบแจ้งฝาก</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 6 }}>รับสินค้าเข้า</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>สแกนและบันทึกสินค้า</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500, marginTop: 2 }}>รับเข้าตามใบแจ้งฝาก</div>
             </div>
             <div style={{
               width: 40, height: 40, borderRadius: '50%',
@@ -1017,7 +1018,7 @@ function ModeSelect({ onSelect }) {
             background: C.surface, ...C.glassmorphism, border: `1px solid ${C.border}`,
             borderRadius: 24, padding: '24px 20px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 24,
+            marginBottom: 32,
             boxShadow: `0 8px 30px rgba(245,158,11,0.1)`,
             transition: 'transform 0.2s, box-shadow 0.2s',
           }}>
@@ -1028,9 +1029,10 @@ function ModeSelect({ onSelect }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 32, flexShrink: 0,
             }}>📤</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 4 }}>เบิกสินค้าออก</div>
-              <div style={{ fontSize: 14, color: C.textSec, lineHeight: 1.5, fontWeight: 500 }}>สแกนและหยิบสินค้า<br />ตามใบขอเบิก</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 6 }}>เบิกสินค้าออก</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>สแกนและหยิบสินค้า</div>
+              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500, marginTop: 2 }}>ตามใบขอเบิก</div>
             </div>
             <div style={{
               width: 40, height: 40, borderRadius: '50%',

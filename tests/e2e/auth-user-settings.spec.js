@@ -65,4 +65,70 @@ test.describe('UX-AUTH-1 Auth and User Settings', () => {
     await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
   });
+
+  test('Scenario 11: Change password page loads for admin', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/change-password`);
+    await expect(page.locator('[data-testid="change-password-page"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="change-password-form"]')).toBeVisible();
+    await expect(page.locator('[data-testid="change-password-new-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="change-password-confirm-input"]')).toBeVisible();
+  });
+
+  test('Scenario 12: Change password validates short password', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/change-password`);
+    await page.locator('[data-testid="change-password-new-input"]').fill('abc');
+    await page.locator('[data-testid="change-password-confirm-input"]').fill('abc');
+    await page.locator('[data-testid="change-password-submit-button"]').click();
+    await expect(page.locator('[data-testid="change-password-error"]')).toBeVisible();
+  });
+
+  test('Scenario 13: Change password validates mismatch', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/change-password`);
+    await page.locator('[data-testid="change-password-new-input"]').fill('password123');
+    await page.locator('[data-testid="change-password-confirm-input"]').fill('password456');
+    await page.locator('[data-testid="change-password-submit-button"]').click();
+    await expect(page.locator('[data-testid="change-password-error"]')).toBeVisible();
+  });
+
+  test('Scenario 14: Email settings page loads for admin', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/email`);
+    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="email-settings-test-card"]')).toBeVisible();
+    await expect(page.locator('[data-testid="email-settings-smtp-guide-card"]')).toBeVisible();
+  });
+
+  test('Scenario 15: Email settings test form validates invalid email', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/email`);
+    await page.locator('[data-testid="email-settings-test-email-input"]').fill('not-an-email');
+    await page.locator('[data-testid="email-settings-test-send-button"]').click();
+    await expect(page.locator('[data-testid="email-settings-test-result"]')).toBeVisible();
+  });
+
+  test('Scenario 16: Email template section can be toggled', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/email`);
+    await expect(page.locator('[data-testid="email-settings-template-card"]')).toBeVisible({ timeout: 15000 });
+    await page.locator('[data-testid="email-settings-template-card"] button').first().click();
+    await expect(page.locator('[data-testid="email-settings-template-preview"]')).toBeVisible();
+  });
+
+  test('Scenario 17: Reset password page shows loading then invalid without token', async ({ page }) => {
+    await page.goto(`${getBaseUrl()}/reset-password`);
+    await expect(page.locator('[data-testid="reset-password-page"]')).toBeVisible();
+    // Without an email token the page should eventually show the invalid-session banner
+    await expect(page.locator('[data-testid="reset-password-invalid-session"]')).toBeVisible({ timeout: 8000 });
+  });
+
+  test('Scenario 18: Profile page change-password link points to in-app form', async ({ page }) => {
+    await login(page);
+    await page.goto(`${getBaseUrl()}/settings/profile`);
+    await expect(page.locator('[data-testid="profile-change-password-link"]')).toBeVisible({ timeout: 15000 });
+    const href = await page.locator('[data-testid="profile-change-password-link"]').getAttribute('href');
+    expect(href).toContain('/settings/change-password');
+  });
 });

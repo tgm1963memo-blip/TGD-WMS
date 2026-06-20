@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthPageShell } from '../../components/auth/AuthPageShell.jsx';
-import { getStagingSession, subscribeToStagingAuth, updateStagingPassword } from '../../services/stagingAuthService.js';
+import { subscribeToAuthEvents, updateStagingPassword, verifyRecoveryToken } from '../../services/stagingAuthService.js';
 import { validatePasswordConfirmation, validatePasswordStrength } from '../../utils/authPasswordUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+
+// Events that indicate a valid recovery session is present.
+const RECOVERY_EVENTS = new Set(['PASSWORD_RECOVERY', 'INITIAL_SESSION', 'SIGNED_IN']);
 
 export function ResetPasswordPage() {
   const t = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,26 +20,60 @@ export function ResetPasswordPage() {
   const [sessionReady, setSessionReady] = useState(false);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
 
+  const resolved = useRef(false);
+
   useEffect(() => {
     let active = true;
 
-    getStagingSession().then((result) => {
+    const tokenHash = searchParams.get('token_hash');
+    const tokenType = searchParams.get('type');
+
+    // If the link came from our custom SMTP email (token_hash in URL), exchange it for
+    // a session directly — bypasses Supabase's server-side redirect which would use
+    // the Dashboard "Site URL" (often localhost in dev).
+    if (tokenHash && tokenType === 'recovery') {
+      verifyRecoveryToken(tokenHash).then(({ data: session, error: verifyError }) => {
+        if (!active || resolved.current) return;
+        resolved.current = true;
+        if (verifyError || !session?.user) {
+          setHasRecoverySession(false);
+        } else {
+          setHasRecoverySession(true);
+        }
+        setSessionReady(true);
+      });
+      return () => { active = false; };
+    }
+
+    // Standard Supabase hash-based flow (action_link click → session in URL hash).
+    // INITIAL_SESSION fires on subscription with the current auth state.
+    const subscription = subscribeToAuthEvents((event, session) => {
       if (!active) return;
-      setHasRecoverySession(!!result.data?.user);
-      setSessionReady(true);
+
+      if (RECOVERY_EVENTS.has(event)) {
+        if (!resolved.current) {
+          resolved.current = true;
+          setHasRecoverySession(!!session?.user);
+          setSessionReady(true);
+        } else if (event === 'PASSWORD_RECOVERY' && session?.user) {
+          setHasRecoverySession(true);
+        }
+      }
     });
 
-    const subscription = subscribeToStagingAuth((session) => {
-      if (!active) return;
-      setHasRecoverySession(!!session?.user);
+    const timer = setTimeout(() => {
+      if (!active || resolved.current) return;
+      resolved.current = true;
+      setHasRecoverySession(false);
       setSessionReady(true);
-    });
+    }, 4000);
 
     return () => {
       active = false;
+      clearTimeout(timer);
       subscription.unsubscribe?.();
     };
-  }, []);
+  }, [searchParams]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -77,7 +115,9 @@ export function ResetPasswordPage() {
         </div>
 
         {!sessionReady ? (
-          <p className="auth-muted-text">{t('auth_loading')}</p>
+          <p className="auth-muted-text" data-testid="reset-password-loading">
+            {t('auth_loading')}
+          </p>
         ) : null}
 
         {sessionReady && !hasRecoverySession ? (

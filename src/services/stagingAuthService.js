@@ -1,5 +1,4 @@
 import { supabase } from './supabaseClient.js';
-import nodemailer from 'nodemailer';
 
 function missingClientAuthResult() {
   return {
@@ -49,6 +48,22 @@ export function subscribeToStagingAuth(onChange) {
   };
 }
 
+// Exposes the raw auth event type — needed by ResetPasswordPage to distinguish
+// INITIAL_SESSION / PASSWORD_RECOVERY from regular SIGNED_IN events.
+export function subscribeToAuthEvents(onEvent) {
+  if (!supabase) {
+    return { unsubscribe: () => {} };
+  }
+
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    onEvent(event, session ?? null);
+  });
+
+  return {
+    unsubscribe: () => data?.subscription?.unsubscribe?.(),
+  };
+}
+
 export function getPasswordResetRedirectUrl() {
   if (typeof window === 'undefined' || !window.location?.origin) {
     return '/reset-password';
@@ -56,57 +71,53 @@ export function getPasswordResetRedirectUrl() {
   return `${window.location.origin}/reset-password`;
 }
 
-// Helper to send reset email via custom SMTP
-async function sendResetEmail(email, resetLink) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: 'noreply.ememo@tgm.co.th',
-    to: email,
-    subject: 'Password Reset Request',
-    text: `Click the link to reset your password: ${resetLink}`,
-    html: `<p>Click the link to reset your password:</p><a href="${resetLink}">${resetLink}</a>`,
-  };
-
-  await transporter.sendMail(mailOptions);
-}
-}
-
 export async function requestPasswordReset(email) {
-  if (!supabase) {
-    return missingClientAuthResult();
-  }
-
   const normalizedEmail = String(email ?? '').trim();
   if (!normalizedEmail) {
     return { data: null, error: new Error('Email is required.') };
   }
 
-  // Try Supabase built‑in reset first
+  // Try the server-side SMTP API first (bypasses Supabase email rate limits and
+  // avoids Supabase's built-in email which redirects to the Dashboard Site URL).
+  try {
+    const res = await fetch('/api/send-reset-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return { data: json, error: null };
+    }
+    // Any HTTP error from the API (SMTP failure, missing config, etc.) must be
+    // surfaced to the user — do NOT fall through to Supabase's built-in email
+    // because it uses the Dashboard "Site URL" (may point to localhost in dev).
+    return { data: null, error: new Error(json.error ?? 'ส่งอีเมล์ไม่สำเร็จ') };
+  } catch {
+    // Network error — API endpoint unreachable (e.g. local dev without API server).
+    // Fall through to Supabase's built-in email as last resort.
+  }
+
+  if (!supabase) {
+    return missingClientAuthResult();
+  }
+
   const { data, error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: getPasswordResetRedirectUrl(),
   });
 
-  // If Supabase fails or custom flag is set, fallback to our own email sender
-  if (error || process.env.USE_CUSTOM_RESET_EMAIL === 'true') {
-    try {
-      const resetLink = getPasswordResetRedirectUrl();
-      await sendResetEmail(normalizedEmail, resetLink);
-      return { data: null, error: null };
-    } catch (e) {
-      return { data: null, error: e };
-    }
-  }
-
   return { data, error };
+}
+
+export async function verifyRecoveryToken(tokenHash) {
+  if (!supabase) {
+    return missingClientAuthResult();
+  }
+  const { data, error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: 'recovery',
+  });
+  return { data: data?.session ?? null, error };
 }
 
 export async function updateStagingPassword(password) {
