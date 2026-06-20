@@ -172,31 +172,41 @@ export function DashboardPage() {
 
       <div className="dashboard-grid-2col">
         <DashboardSection title={language === 'th' ? 'งานวันนี้' : 'Today task list'}>
-          <ul className="task-list">
-            <li className="task-item">{language === 'th' ? 'ตรวจสอบเอกสารรับเข้าที่ค้าง' : 'Review pending receiving documents'}</li>
-            <li className="task-item">{language === 'th' ? 'ตรวจสอบงานจัดเก็บ (Putaway)' : 'Complete putaway sessions'}</li>
-            <li className="task-item">{language === 'th' ? 'ตรวจสอบคิวหยิบสินค้า' : 'Review picking confirmation queue'}</li>
-            <li className="task-item">{language === 'th' ? 'ตรวจสอบคิวตัดจ่ายออก' : 'Review dispatch queue'}</li>
-          </ul>
+          {state.loading ? (
+            <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading...'}</div>
+          ) : (
+            <ul className="task-list">
+              {d.openReceivingRows > 0 && <li className="task-item">{language === 'th' ? `เอกสารรับเข้าที่รอตรวจสอบ (${d.openReceivingRows} รายการ)` : `Pending receiving documents (${d.openReceivingRows})`}</li>}
+              {d.openPutawayRows > 0 && <li className="task-item">{language === 'th' ? `งานจัดเก็บ Putaway ที่รอทำ (${d.openPutawayRows} รายการ)` : `Pending putaway sessions (${d.openPutawayRows})`}</li>}
+              {d.openPickingRows > 0 && <li className="task-item">{language === 'th' ? `คิวหยิบสินค้าที่ค้างอยู่ (${d.openPickingRows} รายการ)` : `Pending picking queue (${d.openPickingRows})`}</li>}
+              {d.openDispatchRows > 0 && <li className="task-item">{language === 'th' ? `เอกสารตัดจ่ายออกที่รอตรวจสอบ (${d.openDispatchRows} รายการ)` : `Pending dispatch queue (${d.openDispatchRows})`}</li>}
+              
+              {d.openReceivingRows === 0 && d.openPutawayRows === 0 && d.openPickingRows === 0 && d.openDispatchRows === 0 && (
+                <li className="task-item" style={{ color: 'var(--tgd-text-light)', borderLeftColor: '#cbd5e1' }}>
+                  {language === 'th' ? 'ไม่มีงานค้างสำหรับวันนี้ 🎉' : 'No pending tasks for today 🎉'}
+                </li>
+              )}
+            </ul>
+          )}
         </DashboardSection>
 
         <DashboardSection title={language === 'th' ? 'แจ้งเตือนระบบ' : 'System alerts'}>
-          <ul className="alert-list">
-            {goLive ? (
-              <>
-                <li className="alert-item info">{t('dashboard_alert_live_data')}</li>
-                <li className="alert-item info">{t('dashboard_ready_for_use')}</li>
-                <li className="alert-item success">{t('dashboard_alert_balances_updated')}</li>
-              </>
-            ) : (
-              <>
-                <li className="alert-item warning">{t('production_hold')}</li>
-                <li className="alert-item info">{t('final_go_not_authorized')}</li>
-                <li className="alert-item info">{t('uat_mode')}</li>
-                <li className="alert-item info">{language === 'th' ? 'UI polish — ไม่เปลี่ยน business logic' : 'UI polish — no business logic changed'}</li>
-              </>
-            )}
-          </ul>
+          {state.loading ? (
+            <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading...'}</div>
+          ) : (
+            <ul className="alert-list">
+              {d.locationRows === 0 && <li className="alert-item warning">{language === 'th' ? 'ยังไม่ได้ตั้งค่าผังคลังสินค้า' : 'Warehouse layout not configured'}</li>}
+              {d.productRows === 0 && <li className="alert-item warning">{language === 'th' ? 'ยังไม่ได้นำเข้าข้อมูลสินค้าพื้นฐาน' : 'Product master data missing'}</li>}
+              {d.customerRows === 0 && <li className="alert-item warning">{language === 'th' ? 'ยังไม่ได้เพิ่มข้อมูลลูกค้า' : 'Customer master data missing'}</li>}
+              {d.openReceivingRows === 0 && d.openPutawayRows === 0 && d.stockBalanceRows === 0 && (
+                <li className="alert-item info">{language === 'th' ? 'ยังไม่มีสต๊อกสินค้าในระบบ' : 'No stock balance in system'}</li>
+              )}
+              
+              {d.locationRows > 0 && d.productRows > 0 && d.customerRows > 0 && (
+                <li className="alert-item success">{language === 'th' ? 'ระบบพร้อมใช้งาน ข้อมูลพื้นฐานครบถ้วน' : 'System ready and master data complete'}</li>
+              )}
+            </ul>
+          )}
         </DashboardSection>
       </div>
 
