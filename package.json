@@ -31,7 +31,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
     "vite": "^5.4.8",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
