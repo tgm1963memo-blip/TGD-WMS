@@ -32,29 +32,67 @@ function SectionGrid({ section }) {
   const { rows, cols, locations } = section;
   const total = rows * cols;
 
+  const halfCols = Math.ceil(cols / 2);
+  const leftCols = halfCols;
+  const rightCols = cols - halfCols;
+
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 4 }}>
-        {Array.from({ length: total }).map((_, idx) => {
-          const loc = locations[idx];
+    <div style={{ position: 'relative', display: 'flex', gap: '32px', justifyContent: 'center', padding: '16px' }}>
+      {/* Left Aisle */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftCols}, 1fr)`, gap: 6 }}>
+        {Array.from({ length: rows * leftCols }).map((_, idx) => {
+          const row = Math.floor(idx / leftCols) + 1;
+          const col = (idx % leftCols) + 1;
+          const globalIdx = (row - 1) * cols + (col - 1);
+          const loc = locations[globalIdx];
           const isOccupied = loc?.isOccupied ?? false;
-          const row = Math.floor(idx / cols) + 1;
-          const col = (idx % cols) + 1;
           return (
             <div
-              key={idx}
-              onMouseEnter={() => setHovered({ idx, row, col, isOccupied, code: loc?.location_code })}
+              key={`L-${idx}`}
+              onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
               onMouseLeave={() => setHovered(null)}
               title={loc?.location_code ?? `R${row}C${col}`}
               style={{
-                width: '100%', aspectRatio: '1',
-                borderRadius: 5,
-                background: !loc ? '#f1f5f9' : isOccupied ? '#f0a500' : '#e8f5ec',
-                border: !loc ? '1px solid #e2e8f0' : isOccupied ? '1px solid #d4900a' : '1px solid #c8e6cc',
+                width: 14, height: 14,
+                borderRadius: '50%',
+                background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
+                boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
                 cursor: 'default',
-                transition: 'transform 0.1s, opacity 0.1s',
-                transform: hovered?.idx === idx ? 'scale(1.15)' : 'scale(1)',
-                opacity: hovered && hovered.idx !== idx ? 0.8 : 1,
+                transition: 'transform 0.2s, opacity 0.2s',
+                transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
+                opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Walking Path */}
+      <div style={{ width: 8, background: 'rgba(0,0,0,0.02)', borderRadius: 4 }}></div>
+
+      {/* Right Aisle */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightCols}, 1fr)`, gap: 6 }}>
+        {Array.from({ length: rows * rightCols }).map((_, idx) => {
+          const row = Math.floor(idx / rightCols) + 1;
+          const col = leftCols + (idx % rightCols) + 1;
+          const globalIdx = (row - 1) * cols + (col - 1);
+          const loc = locations[globalIdx];
+          const isOccupied = loc?.isOccupied ?? false;
+          return (
+            <div
+              key={`R-${idx}`}
+              onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
+              onMouseLeave={() => setHovered(null)}
+              title={loc?.location_code ?? `R${row}C${col}`}
+              style={{
+                width: 14, height: 14,
+                borderRadius: '50%',
+                background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
+                boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
+                cursor: 'default',
+                transition: 'transform 0.2s, opacity 0.2s',
+                transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
+                opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
               }}
             />
           );
@@ -67,11 +105,12 @@ function SectionGrid({ section }) {
           top: `${Math.floor(hovered.idx / cols) * (100 / rows)}%`,
           left: `${(hovered.idx % cols) * (100 / cols) + 8}%`,
           zIndex: 10,
-          background: '#2d9348', color: '#fff',
-          borderRadius: 10, padding: '10px 14px',
+          background: 'rgba(15, 23, 42, 0.85)', color: '#fff',
+          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          borderRadius: 12, padding: '12px 16px',
           fontSize: 13, fontWeight: 600,
           pointerEvents: 'none',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
           minWidth: 160, whiteSpace: 'nowrap',
         }}>
           <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 2 }}>{section.name}</div>
@@ -174,12 +213,12 @@ export function WarehouseLayoutWidget() {
               {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
             </span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: '#e8f5ec', border: '1px solid #c8e6cc', display: 'inline-block' }} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                 ว่าง
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: '#f0a500', border: '1px solid #d4900a', display: 'inline-block' }} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)', display: 'inline-block' }} />
                 มีสินค้า
               </span>
             </div>
@@ -233,11 +272,12 @@ export function WarehouseLayoutWidget() {
 
       {/* Right: stats panel */}
       <div style={{
-        background: '#2d9348',
-        borderRadius: '0 12px 12px 0',
-        padding: '24px 20px',
+        background: 'linear-gradient(135deg, #059669 0%, #064e3b 100%)',
+        borderRadius: '0 16px 16px 0',
+        padding: '32px 24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         color: '#fff',
+        boxShadow: '-4px 0 15px rgba(0,0,0,0.05)',
       }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, alignSelf: 'flex-start' }}>
           {selected.name}
