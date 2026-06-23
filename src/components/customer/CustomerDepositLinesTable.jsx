@@ -67,6 +67,8 @@ export function CustomerDepositLinesTable({
             <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
             <th>{t('customer_col_total_deposit_weight')} <span className="field-required">*</span></th>
             <th>{t('customer_col_box_count')} <span className="field-required">*</span></th>
+            <th>เลข LOT</th>
+            <th>วันผลิต / วันหมดอายุ</th>
             <th>{t('customer_col_line_note')}</th>
             <th>{t('customer_col_pack_entry_mode')}</th>
             <th>{t('catalog_col_actions')}</th>
@@ -140,6 +142,34 @@ export function CustomerDepositLinesTable({
                     type="number"
                     value={line.expected_boxes}
                   />
+                </td>
+                <td>
+                  <input
+                    className="form-control form-control-table"
+                    onChange={(event) => updateLine(line.key, { lot_no: event.target.value })}
+                    placeholder="LOT number"
+                    value={line.lot_no ?? ''}
+                  />
+                </td>
+                <td>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 120 }}>
+                    <input
+                      className="form-control form-control-table"
+                      onChange={(event) => updateLine(line.key, { mfg_date: event.target.value })}
+                      placeholder="วันผลิต"
+                      title="วันผลิต"
+                      type="date"
+                      value={line.mfg_date ?? ''}
+                    />
+                    <input
+                      className="form-control form-control-table"
+                      onChange={(event) => updateLine(line.key, { exp_date: event.target.value })}
+                      placeholder="วันหมดอายุ"
+                      title="วันหมดอายุ"
+                      type="date"
+                      value={line.exp_date ?? ''}
+                    />
+                  </div>
                 </td>
                 <td>
                   <input

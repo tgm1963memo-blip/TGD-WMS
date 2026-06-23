@@ -148,7 +148,6 @@ export function ReceivingDetailPage() {
       />
       <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <Link className="action-link" to="/operations/receiving">Back to receiving list</Link>
-        <Link className="action-link" to="/operations/receiving/create">Create another receiving draft</Link>
         <button type="button" onClick={handleRefresh} style={secondaryButtonStyle}>
           Refresh
         </button>

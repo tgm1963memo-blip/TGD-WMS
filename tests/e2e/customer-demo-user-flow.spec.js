@@ -38,7 +38,13 @@ test.describe('Customer demo user UAT flow', () => {
     await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
-    await page.locator('[data-testid="customer-deposit-product-picker-select"]').selectOption({ index: 1 });
+    const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
+    const optionCount = await picker.locator('option').count();
+    if (optionCount <= 1) {
+      test.skip(true, 'No catalog products configured for this customer — add products via admin catalog first');
+      return;
+    }
+    await picker.selectOption({ index: 1 });
     await page.locator('[data-testid="customer-deposit-weight-per-box"]').fill('10');
     await page.locator('[data-testid="customer-deposit-box-count"]').fill('5');
     await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-12-31');

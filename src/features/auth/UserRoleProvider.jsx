@@ -7,6 +7,7 @@ import {
   getCurrentUserRole,
   setAuthenticatedUserRole,
 } from '../../security/currentUserRole.js';
+import { refreshRoleAreaPermissionCache } from '../../services/roleAreaPermissionCacheService.js';
 
 const UserRoleContext = createContext({
   role: 'viewer',
@@ -21,6 +22,10 @@ export function UserRoleProvider({ children }) {
     ready: false,
     resolvedUserId: null,
   });
+
+  useEffect(() => {
+    refreshRoleAreaPermissionCache();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -44,10 +49,12 @@ export function UserRoleProvider({ children }) {
     }));
 
     getCurrentUserProfile()
-      .then((result) => {
+      .then(async (result) => {
         if (!active) return;
         const resolved = resolveUserProfileRole(result.data);
         setAuthenticatedUserRole(resolved.role);
+        await refreshRoleAreaPermissionCache();
+        if (!active) return;
         setState({
           role: getCurrentUserRole(),
           ready: true,

@@ -282,103 +282,42 @@ export async function getReceivingLocations() {
   };
 }
 
-export async function createReceivingDocument(input) {
-  const rpcName = 'tgd_rpc_create_receiving_draft';
-  const baseDiagnostics = {
-    rpcCalled: false,
-    rpcName,
-    errorMessage: null,
-    rawResponseType: null,
-    rawResponsePreview: null,
-    normalizedDocumentId: null,
-  };
+export function normalizeReceivingError(error) {
+  if (!error) return 'An unknown error occurred.';
+  const msg = error.message || String(error);
 
-  if (!supabase) {
-    const result = missingSupabaseClientResult();
-    return {
-      ...result,
-      diagnostics: {
-        ...baseDiagnostics,
-        errorMessage: result.error.message,
-      },
-    };
+  if (msg.includes('duplicate key value') || msg.includes('unique constraint')) {
+    return `Duplicate document number. (${msg})`;
+  }
+  if (msg.includes('invalid input syntax for type uuid')) {
+    return `Invalid UUID format. (${msg})`;
+  }
+  if (msg.includes('status is CONFIRMED') || msg.includes('already confirmed')) {
+    return `Document is already CONFIRMED and cannot be modified. (${msg})`;
+  }
+  if (msg.includes('JWT') || msg.includes('authentication')) {
+    return `Authentication required. (${msg})`;
+  }
+  if (msg.includes('null value in column') || msg.includes('violates not-null')) {
+    return `Missing required field. (${msg})`;
   }
 
-  if (!input?.document_no) {
-    return {
-      data: null,
-      error: new Error('document_no is required for receiving draft creation.'),
-      diagnostics: {
-        ...baseDiagnostics,
-        errorMessage: 'document_no is required',
-      },
-    };
-  }
+  return msg;
+}
 
-  let rpcCalled = false;
-  let response;
-
-  try {
-    rpcCalled = true;
-    response = await supabase.rpc('tgd_rpc_create_receiving_draft', {
-      p_customer_id: input.customer_id,
-      p_document_no: input.document_no,
-    });
-  } catch (error) {
-    return {
-      data: null,
-      error,
-      diagnostics: {
-        ...baseDiagnostics,
-        rpcCalled,
-        errorMessage: error?.message || String(error),
-      },
-    };
-  }
-
-  const rawResponseType = getReceivingRpcResponseType(response.data);
-  const rawResponsePreview = getReceivingRpcResponsePreview(response.data);
-
-  if (response.error) {
-    return {
-      ...response,
-      diagnostics: {
-        ...baseDiagnostics,
-        rpcCalled,
-        rawResponseType,
-        rawResponsePreview,
-        errorMessage: response.error.message || String(response.error),
-      },
-    };
-  }
-
-  const documentId = normalizeReceivingDocumentId(response.data);
-  if (!documentId) {
-    return {
-      data: null,
-      error: new Error(`DRAFT_ID_MISSING: Could not parse document id from RPC response: ${JSON.stringify(response.data)}`),
-      diagnostics: {
-        ...baseDiagnostics,
-        rpcCalled,
-        rawResponseType,
-        rawResponsePreview,
-        errorMessage: 'DRAFT_ID_MISSING',
-      },
-    };
-  }
-
+export async function createReceivingDocument() {
   return {
-    data: {
-      id: documentId,
-      document_id: documentId,
-    },
-    error: null,
+    data: null,
+    error: new Error(
+      'Standalone receiving draft creation was removed. Use customer deposit request → admin review → warehouse receiving bridge.',
+    ),
     diagnostics: {
-      ...baseDiagnostics,
-      rpcCalled,
-      rawResponseType,
-      rawResponsePreview,
-      normalizedDocumentId: documentId,
+      rpcCalled: false,
+      rpcName: 'tgd_rpc_create_receiving_draft',
+      errorMessage: 'Standalone receiving draft UI removed',
+      rawResponseType: null,
+      rawResponsePreview: null,
+      normalizedDocumentId: null,
     },
   };
 }

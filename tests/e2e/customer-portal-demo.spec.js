@@ -138,7 +138,8 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
       await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
       await selectProxyCustomerIfPresent(page);
       await fillFirstDepositLine(page, { qty: '3' });
-      await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-20');
+      const futureDate = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill(futureDate);
       await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Admin Proxy');
       await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000001');
       await page.locator('[data-testid="customer-deposit-submit-button"]').click();

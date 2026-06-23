@@ -14,6 +14,10 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
+  listCustomerDepositRequests,
+  listCustomerDepositRequestLines,
+} from '../../services/customerDepositRequestService.js';
+import {
   mapWithdrawalHeaderForCopy,
   mapWithdrawalLinesForCopy,
 } from '../../utils/customerRequestCopyUtils.js';
@@ -46,7 +50,8 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialWithdrawalLines());
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
-  const [depositOptions] = useState([]);
+  const [depositOptions, setDepositOptions] = useState([]);
+  const [depositLinesMap, setDepositLinesMap] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
@@ -67,39 +72,45 @@ export function CustomerWithdrawalRequestCreatePage() {
     setCopyError('');
 
     (async () => {
-      const headerResult = await getCustomerWithdrawalRequest(copyFromId);
-      if (!active) return;
+      try {
+        const headerResult = await getCustomerWithdrawalRequest(copyFromId);
+        if (!active) return;
 
-      if (headerResult.error || !headerResult.data) {
-        setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+        if (headerResult.error || !headerResult.data) {
+          setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+          setCopyLoading(false);
+          return;
+        }
+
+        if (isRequestProxy) {
+          setProxyCustomerId(headerResult.data.customer_id ?? '');
+        }
+
+        const sourceCustomerId = headerResult.data.customer_id;
+        const [linesResult, catalogResult] = await Promise.all([
+          listCustomerWithdrawalRequestLines(copyFromId),
+          listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+        ]);
+
+        if (!active) return;
+
+        if (linesResult.error) {
+          setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+          setCopyLoading(false);
+          return;
+        }
+
+        const copiedLines = mapWithdrawalLinesForCopy(linesResult.data ?? [], catalogResult.data ?? []);
+        setCopySourceNo(headerResult.data.withdrawal_no ?? copyFromId);
+        setHeader(mapWithdrawalHeaderForCopy(headerResult.data));
+        setLines(copiedLines);
+        setNextLineKey(copiedLines.length + 1);
         setCopyLoading(false);
-        return;
-      }
-
-      if (isRequestProxy) {
-        setProxyCustomerId(headerResult.data.customer_id ?? '');
-      }
-
-      const sourceCustomerId = headerResult.data.customer_id;
-      const [linesResult, catalogResult] = await Promise.all([
-        listCustomerWithdrawalRequestLines(copyFromId),
-        listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
-      ]);
-
-      if (!active) return;
-
-      if (linesResult.error) {
-        setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+      } catch (err) {
+        if (!active) return;
+        setCopyError(err?.message ?? t('customer_request_copy_error'));
         setCopyLoading(false);
-        return;
       }
-
-      const copiedLines = mapWithdrawalLinesForCopy(linesResult.data ?? [], catalogResult.data ?? []);
-      setCopySourceNo(headerResult.data.withdrawal_no ?? copyFromId);
-      setHeader(mapWithdrawalHeaderForCopy(headerResult.data));
-      setLines(copiedLines);
-      setNextLineKey(copiedLines.length + 1);
-      setCopyLoading(false);
     })();
 
     return () => {
@@ -107,6 +118,34 @@ export function CustomerWithdrawalRequestCreatePage() {
     };
   }, [copyFromId, isRequestProxy, t]);
 
+  useEffect(() => {
+    let active = true;
+    if (!effectiveCustomerId) {
+      setDepositOptions([]);
+      setDepositLinesMap({});
+      return undefined;
+    }
+
+    const RECEIVED_STATUSES = ['WAREHOUSE_RECEIVED', 'ADMIN_RECEIVING_REVIEW', 'COMPLETED'];
+    listCustomerDepositRequests({ customerId: effectiveCustomerId, statusIn: RECEIVED_STATUSES }).then(async (result) => {
+      if (!active) return;
+      const deposits = result.data ?? [];
+      const opts = deposits.map((d) => ({
+        id: d.id,
+        label: `${d.request_no} (${d.expected_arrival_date ?? '-'})`,
+      }));
+      setDepositOptions(opts);
+
+      const linesByDeposit = {};
+      await Promise.all(deposits.map(async (d) => {
+        const linesResult = await listCustomerDepositRequestLines(d.id);
+        if (active) linesByDeposit[d.id] = linesResult.data ?? [];
+      }));
+      if (active) setDepositLinesMap(linesByDeposit);
+    });
+
+    return () => { active = false; };
+  }, [effectiveCustomerId]);
 
   if (copyLoading) {
     return (
@@ -262,6 +301,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           <CustomerWithdrawalLinesTable
             customerId={effectiveCustomerId}
             depositOptions={depositOptions}
+            depositLinesMap={depositLinesMap}
             lines={lines}
             onChange={setLines}
             onRemoveLine={removeLine}

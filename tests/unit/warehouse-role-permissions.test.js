@@ -28,9 +28,10 @@ describe('warehouse role permissions', () => {
     expect(canAccessRoute('warehouse_staff', '/operations/receiving').allowed).toBe(false);
   });
 
-  it('warehouse_admin can access receiving and stock balance routes', () => {
+  it('warehouse_admin can access receiving and inventory routes', () => {
     expect(canAccessRoute('warehouse_admin', '/operations/receiving').allowed).toBe(true);
-    expect(canAccessRoute('warehouse_admin', '/stock-count').allowed).toBe(true);
+    expect(canAccessRoute('warehouse_admin', '/inventory').allowed).toBe(true);
+    expect(canAccessRoute('warehouse_admin', '/operations/putaway').allowed).toBe(false);
     expect(canAccessRoute('warehouse_admin', '/handheld').allowed).toBe(false);
     expect(canAccessRoute('warehouse_admin', '/operations/transfer').allowed).toBe(false);
   });

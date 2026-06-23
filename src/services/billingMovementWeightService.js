@@ -106,6 +106,7 @@ async function readFromBillingDatabaseView(filters = {}) {
 
 
 
+  console.log('Fetching billing movement weight rows with filters', filters);
   let query = supabase
 
     .from(BILLING_MOVEMENT_WEIGHT_VIEW_NAME)
@@ -127,6 +128,7 @@ async function readFromBillingDatabaseView(filters = {}) {
 
 
   const result = await query;
+  console.log('Billing movement weight query result', result);
 
   if (result.error) {
 

@@ -2,6 +2,8 @@ import { downloadExcelRows, formatExcelDate, readExcelFile } from './excelFileUt
 
 export const CUSTOMER_PRODUCT_EXCEL_HEADERS = [
   'customer_product_code',
+  'customer_id',
+  'customer_name',
   'product_name',
   'barcode_code',
   'uom',
@@ -30,6 +32,8 @@ export function normalizeCatalogBarcode(row = {}) {
 export function mapProductToExcelRow(product = {}) {
   return {
     customer_product_code: product.customer_product_code ?? '',
+    customer_id: product.customer_id ?? '',
+    customer_name: product.customer_name ?? '',
     product_name: product.product_name ?? '',
     barcode_code: normalizeCatalogBarcode(product),
     uom: product.uom ?? '',
@@ -40,17 +44,26 @@ export function mapProductToExcelRow(product = {}) {
   };
 }
 
-export function downloadCustomerProductTemplate(filename = 'customer-products-template.xlsx') {
-  downloadExcelRows([{
-    customer_product_code: 'SAMPLE-001',
-    product_name: 'Sample product name',
-    barcode_code: '',
-    uom: 'KG',
-    temperature_type: 'FROZEN',
-    argent_type: 'NON_ARGENT',
-    storage_charge_basis: 'WEIGHT',
-    note: '',
-  }], CUSTOMER_PRODUCT_EXCEL_HEADERS, filename, 'Products');
+export function downloadCustomerProductTemplate(customer = null, filename = 'customer-products-template.xlsx') {
+  downloadExcelRows(
+    [
+      {
+        customer_product_code: 'SAMPLE-001',
+        customer_id: customer?.id ?? '',
+        customer_name: customer ? `${customer.customer_code ?? ''} — ${customer.customer_name ?? ''}`.trim().replace(/^—\s*/, '') : '',
+        product_name: 'Sample product name',
+        barcode_code: '',
+        uom: 'KG',
+        temperature_type: 'FROZEN',
+        argent_type: 'NON_ARGENT',
+        storage_charge_basis: 'WEIGHT',
+        note: '',
+      },
+    ],
+    CUSTOMER_PRODUCT_EXCEL_HEADERS,
+    filename,
+    'Products',
+  );
 }
 
 export function exportCustomerProductsExcel(products = [], filename = 'customer-products.xlsx') {
@@ -64,7 +77,7 @@ export function exportCustomerProductsExcel(products = [], filename = 'customer-
 
 export async function parseCustomerProductImportFile(file) {
   const { headers, rows } = await readExcelFile(file);
-  const missingHeaders = ['customer_product_code', 'product_name'].filter((key) => !headers.includes(key));
+  const missingHeaders = ['customer_product_code', 'product_name', 'customer_id'].filter((key) => !headers.includes(key));
   if (missingHeaders.length) {
     return { rows: [], errors: [`Missing required columns: ${missingHeaders.join(', ')}`] };
   }
@@ -75,8 +88,13 @@ export async function parseCustomerProductImportFile(file) {
   rows.forEach((row) => {
     const customerProductCode = String(row.customer_product_code ?? '').trim();
     const productName = String(row.product_name ?? '').trim();
-    if (!customerProductCode || !productName) {
-      errors.push(`Row ${row.__row}: customer_product_code and product_name are required.`);
+
+    if (!customerProductCode) {
+      errors.push(`Row ${row.__row}: customer_product_code is required.`);
+      return;
+    }
+    if (!productName) {
+      errors.push(`Row ${row.__row}: product_name is required.`);
       return;
     }
 
@@ -99,6 +117,7 @@ export async function parseCustomerProductImportFile(file) {
 
     parsed.push({
       customerProductCode,
+      customerId: String(row.customer_id ?? '').trim(),
       productName,
       internalProductCode: resolveBarcodeCode(customerProductCode, row.barcode_code),
       uom: String(row.uom ?? '').trim(),

@@ -8,7 +8,6 @@ export function HandheldProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check localStorage for an existing session on load
     const stored = localStorage.getItem('tgd_handheld_profile');
     if (stored) {
       try {
@@ -20,10 +19,20 @@ export function HandheldProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  const loginWithPin = async (pinCode) => {
+  const listHandheldStaff = async () => {
     if (!supabase) throw new Error('Supabase client not configured');
-    
-    const { data, error } = await supabase.rpc('tgd_handheld_verify_pin', { p_pin_code: pinCode });
+    const { data, error } = await supabase.rpc('tgd_handheld_list_staff');
+    if (error) throw new Error(error.message);
+    return Array.isArray(data) ? data : [];
+  };
+
+  const loginWithPin = async (profileId, pinCode) => {
+    if (!supabase) throw new Error('Supabase client not configured');
+
+    const { data, error } = await supabase.rpc('tgd_handheld_verify_pin_for_user', {
+      p_profile_id: profileId,
+      p_pin_code: pinCode,
+    });
     if (error) throw new Error(error.message);
     if (!data?.success) throw new Error(data?.error || 'รหัส PIN ไม่ถูกต้อง');
 
@@ -39,7 +48,7 @@ export function HandheldProvider({ children }) {
   };
 
   return (
-    <HandheldContext.Provider value={{ activeProfile, isLoading, loginWithPin, logout }}>
+    <HandheldContext.Provider value={{ activeProfile, isLoading, listHandheldStaff, loginWithPin, logout }}>
       {children}
     </HandheldContext.Provider>
   );

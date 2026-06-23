@@ -2,46 +2,104 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
-import { getCustomerStorageBalanceRows } from '../../services/customerStorageBalanceReportService.js';
+import { getDepositInventoryLines } from '../../services/customerDepositRequestService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-function statusBadgeClass(qtyAvailable) {
-  return Number(qtyAvailable) > 0 ? 'open' : 'hold';
+function TempBadge({ type }) {
+  const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
+  return (
+    <span style={{
+      display: 'inline-block',
+      background: map[type] ?? '#888',
+      color: '#fff',
+      borderRadius: 4,
+      padding: '1px 8px',
+      fontSize: 11,
+      fontWeight: 600,
+    }}>
+      {type ?? '-'}
+    </span>
+  );
+}
+
+function formatDate(iso) {
+  if (!iso) return '-';
+  try {
+    return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+  } catch { return iso; }
 }
 
 export function CustomerStockBalancePage() {
   const t = useTranslation();
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
-  const [state, setState] = useState({ rows: [], loading: true, error: null });
+  const [lines, setLines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [expandedKeys, setExpandedKeys] = useState(new Set());
 
   useEffect(() => {
     let active = true;
-
     if (profileLoading) return undefined;
+    if (!customerId) { setLoading(false); return undefined; }
 
-    if (!customerId) {
-      setState({ rows: [], loading: false, error: null });
-      return undefined;
-    }
+    setLoading(true);
+    setError(null);
 
-    setState((current) => ({ ...current, loading: true, error: null }));
-
-    getCustomerStorageBalanceRows({ customerId }).then((result) => {
+    getDepositInventoryLines({ customerId }).then(({ data, error: err }) => {
       if (!active) return;
-      setState({
-        rows: result.data ?? [],
-        loading: false,
-        error: result.error ?? null,
-      });
+      setLines(data ?? []);
+      setError(err ?? null);
+      setLoading(false);
     });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [customerId, profileLoading]);
 
-  if (profileLoading || state.loading) {
+  function toggleKey(key) {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  const filtered = lines.filter((l) => {
+    if (!searchText) return true;
+    const q = searchText.toLowerCase();
+    return (
+      (l.product_name ?? '').toLowerCase().includes(q) ||
+      (l.customer_product_code ?? '').toLowerCase().includes(q) ||
+      (l.lot_no ?? '').toLowerCase().includes(q) ||
+      (l.request?.request_no ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  // Group by product (code + name)
+  const productMap = {};
+  for (const line of filtered) {
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}`;
+    if (!productMap[pk]) productMap[pk] = [];
+    productMap[pk].push(line);
+  }
+  const productGroups = Object.entries(productMap).map(([pk, pLines]) => {
+    const first = pLines[0];
+    return {
+      productKey: pk,
+      productCode: first?.customer_product_code ?? '-',
+      productName: first?.product_name ?? '-',
+      temperatureType: first?.temperature_type,
+      totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
+      totalWeight: pLines.reduce((s, l) => s + (Number(l.actual_weight) ?? 0), 0),
+      lines: pLines,
+    };
+  });
+
+  const grandBoxes = productGroups.reduce((s, g) => s + g.totalBoxes, 0);
+  const grandWeight = productGroups.reduce((s, g) => s + g.totalWeight, 0);
+
+  if (profileLoading || loading) {
     return (
       <section className="page-shell customer-portal-page" data-testid="customer-stock-balance-page">
         <LoadingState message={t('customer_portal_loading')} />
@@ -63,52 +121,151 @@ export function CustomerStockBalancePage() {
         <div className="banner banner-warning" role="status">{t('customer_portal_no_customer_scope')}</div>
       ) : null}
 
-      {state.error ? (
-        <div className="banner banner-danger" role="alert">{state.error.message ?? t('customer_portal_load_error')}</div>
+      {error ? (
+        <div className="banner banner-danger" role="alert">{error.message ?? t('customer_portal_load_error')}</div>
       ) : null}
 
-      <div className="table-card">
-        <div className="table-card-header">
-          <h3>{t('customer_stock_balance_table_title')}</h3>
-          <span className="status-badge status-badge--open">{t('customer_live_data_badge')}</span>
-        </div>
-        <div className="responsive-table">
-          <table className="data-table" data-testid="customer-stock-balance-table">
-            <thead>
-              <tr>
-                <th>{t('customer_col_product_code')}</th>
-                <th>{t('customer_col_lot_no')}</th>
-                <th>{t('customer_col_pallet_no')}</th>
-                <th>{t('customer_col_location')}</th>
-                <th>{t('customer_col_available_qty')}</th>
-                <th>{t('customer_col_uom')}</th>
-                <th>{t('customer_col_status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.rows.length ? state.rows.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.product_id ?? '-'}</td>
-                  <td>{row.lot_id ?? '-'}</td>
-                  <td>{row.pallet_id ?? '-'}</td>
-                  <td>{row.location_id ?? '-'}</td>
-                  <td>{row.qty_available ?? 0}</td>
-                  <td>{row.uom ?? '-'}</td>
-                  <td>
-                    <span className={`status-badge status-badge--${statusBadgeClass(row.qty_available)}`}>
-                      {Number(row.qty_available) > 0 ? 'AVAILABLE' : 'EMPTY'}
+      {customerId && !error && (
+        <>
+          {/* Summary */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #8b5cf6' }}>
+              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>ประเภทสินค้า</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{productGroups.length} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
+            </div>
+            <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #22c55e' }}>
+              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>กล่องรับจริงรวม</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{grandBoxes.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กล่อง</span></div>
+            </div>
+            <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #f59e0b' }}>
+              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>น้ำหนักรับจริงรวม</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{grandWeight.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กก.</span></div>
+            </div>
+          </div>
+
+          {/* Search + expand */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+            <label className="form-field" style={{ margin: 0, flex: '1 1 220px' }}>
+              <span>ค้นหาสินค้า</span>
+              <input
+                className="form-control"
+                type="search"
+                placeholder="ชื่อสินค้า / รหัส / LOT / เลขที่ใบฝาก"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </label>
+            {productGroups.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ alignSelf: 'flex-end' }}
+                onClick={() => setExpandedKeys(expandedKeys.size > 0 ? new Set() : new Set(productGroups.map((p) => p.productKey)))}
+              >
+                {expandedKeys.size > 0 ? '▲ ย่อทั้งหมด' : '▼ ขยายทั้งหมด'}
+              </button>
+            )}
+          </div>
+
+          <div className="table-card" style={{ overflow: 'hidden', padding: 0 }}>
+            {productGroups.length === 0 ? (
+              <p style={{ padding: '24px', textAlign: 'center', color: 'var(--tgd-muted-text)' }}>
+                {lines.length === 0 ? 'ยังไม่มีสินค้าที่รับเข้าคลัง' : 'ไม่พบสินค้าที่ตรงกับเงื่อนไข'}
+              </p>
+            ) : productGroups.map((pg) => {
+              const isExpanded = expandedKeys.has(pg.productKey);
+              return (
+                <div key={pg.productKey}>
+                  <button
+                    type="button"
+                    onClick={() => toggleKey(pg.productKey)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                      textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
+                      border: 'none', borderBottom: '1px solid var(--tgd-border)',
+                      padding: '14px 16px', cursor: 'pointer', color: 'var(--tgd-text)',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 14, color: 'var(--tgd-muted-text)', width: 16, flexShrink: 0 }}>
+                      {isExpanded ? '▼' : '▶'}
                     </span>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={7}>{t('customer_portal_empty_rows')}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{pg.productCode}</span>
+                      {pg.productCode !== pg.productName && (
+                        <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13, marginLeft: 8 }}>{pg.productName}</span>
+                      )}
+                      {pg.temperatureType && <span style={{ marginLeft: 10 }}><TempBadge type={pg.temperatureType} /></span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>กล่อง</div>
+                        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalBoxes.toLocaleString()}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>น้ำหนัก</div>
+                        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalWeight.toLocaleString()} กก.</div>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: '#f1f5f9' }}>
+                            <th style={{ padding: '8px 16px 8px 32px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>เลขที่ใบฝาก</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันที่รับเข้า</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>LOT</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันผลิต</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันหมดอายุ</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>กล่อง</th>
+                            <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>น้ำหนัก (กก.)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pg.lines.map((l) => (
+                            <tr key={l.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                              <td style={{ padding: '10px 16px 10px 32px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
+                                {l.request?.request_no ?? '-'}
+                              </td>
+                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                                {formatDate(l.request?.last_action_at ?? l.request?.expected_arrival_date)}
+                              </td>
+                              <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: 'var(--tgd-muted-text)' }}>
+                                {l.lot_no || '-'}
+                              </td>
+                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{formatDate(l.mfg_date)}</td>
+                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{formatDate(l.exp_date)}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                {l.actual_boxes?.toLocaleString() ?? (
+                                  <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_boxes ?? '-'}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                {l.actual_weight?.toLocaleString() ?? (
+                                  <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {productGroups.length > 0 && (
+              <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
+                แสดง {filtered.length} รายการ (เฉพาะใบฝากที่ยืนยันรับแล้ว)
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }

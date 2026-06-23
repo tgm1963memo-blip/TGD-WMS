@@ -45,12 +45,13 @@ export function UserManagementPage() {
   );
 
   const columns = [
-    { key: 'email', header: t('user_mgmt_col_email') },
-    { key: 'display_name', header: t('user_mgmt_col_display_name') },
-    { key: 'role', header: t('user_mgmt_col_role') },
+    { key: 'email', header: t('user_mgmt_col_email'), truncate: true },
+    { key: 'display_name', header: t('user_mgmt_col_display_name'), truncate: true },
+    { key: 'role', header: t('user_mgmt_col_role'), truncate: true },
     {
       key: 'customer_id',
       header: t('user_mgmt_col_customer'),
+      truncate: true,
       render: (row) => (row.customer_id ? customerMap[row.customer_id] ?? row.customer_id : '-'),
     },
     {

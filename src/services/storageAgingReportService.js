@@ -151,7 +151,7 @@ export async function getStorageAgingRows(filters = {}) {
   const query = applyStorageAgingFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at, tgd_locations(location_code, location_name)')
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
       .order('created_at', { ascending: true }),
     filters,
   );
@@ -159,10 +159,27 @@ export async function getStorageAgingRows(filters = {}) {
   const { data, error } = await query;
   if (error) return { data: null, error };
 
+  // Fetch location codes separately — tgd_stock_balances.location_id has no FK constraint
+  // so PostgREST nested join syntax cannot be used directly.
+  const locationIds = [...new Set((data ?? []).map((r) => r.location_id).filter(Boolean))];
+  const locationMap = {};
+  if (locationIds.length > 0) {
+    const { data: locs } = await supabase
+      .from('tgd_locations')
+      .select('id, location_code, location_name, name')
+      .in('id', locationIds);
+    for (const loc of (locs ?? [])) {
+      locationMap[loc.id] = {
+        location_code: loc.location_code ?? loc.name ?? null,
+        location_name: loc.location_name ?? loc.name ?? null,
+      };
+    }
+  }
+
   const flat = (data ?? []).map((row) => ({
     ...row,
-    location_code: row.tgd_locations?.location_code ?? null,
-    location_name: row.tgd_locations?.location_name ?? null,
+    location_code: locationMap[row.location_id]?.location_code ?? null,
+    location_name: locationMap[row.location_id]?.location_name ?? null,
   }));
 
   return { data: enrichAgingRows(flat, filters), error: null };

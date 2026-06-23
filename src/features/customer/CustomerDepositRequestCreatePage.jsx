@@ -88,41 +88,47 @@ export function CustomerDepositRequestCreatePage() {
     setCopyError('');
 
     (async () => {
-      const headerResult = await getCustomerDepositRequest(copyFromId);
-      if (!active) return;
+      try {
+        const headerResult = await getCustomerDepositRequest(copyFromId);
+        if (!active) return;
 
-      if (headerResult.error || !headerResult.data) {
-        setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+        if (headerResult.error || !headerResult.data) {
+          setCopyError(headerResult.error?.message ?? t('customer_request_copy_error'));
+          setCopyLoading(false);
+          return;
+        }
+
+        if (isRequestProxy) {
+          setProxyCustomerId(headerResult.data.customer_id ?? '');
+        }
+
+        const sourceCustomerId = headerResult.data.customer_id;
+        const [linesResult, catalogResult] = await Promise.all([
+          listCustomerDepositRequestLines(copyFromId),
+          listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+        ]);
+
+        if (!active) return;
+
+        if (linesResult.error) {
+          setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+          setCopyLoading(false);
+          return;
+        }
+
+        const catalogRows = catalogResult.data ?? [];
+        setCatalogProducts(catalogRows);
+        setCopySourceNo(headerResult.data.request_no ?? copyFromId);
+        setHeader(mapDepositHeaderForCopy(headerResult.data));
+        const copiedLines = mapDepositLinesForCopy(linesResult.data ?? [], catalogRows);
+        setLines(copiedLines);
+        setNextLineKey(copiedLines.length + 1);
         setCopyLoading(false);
-        return;
-      }
-
-      if (isRequestProxy) {
-        setProxyCustomerId(headerResult.data.customer_id ?? '');
-      }
-
-      const sourceCustomerId = headerResult.data.customer_id;
-      const [linesResult, catalogResult] = await Promise.all([
-        listCustomerDepositRequestLines(copyFromId),
-        listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
-      ]);
-
-      if (!active) return;
-
-      if (linesResult.error) {
-        setCopyError(linesResult.error.message ?? t('customer_request_copy_error'));
+      } catch (err) {
+        if (!active) return;
+        setCopyError(err?.message ?? t('customer_request_copy_error'));
         setCopyLoading(false);
-        return;
       }
-
-      const catalogRows = catalogResult.data ?? [];
-      setCatalogProducts(catalogRows);
-      setCopySourceNo(headerResult.data.request_no ?? copyFromId);
-      setHeader(mapDepositHeaderForCopy(headerResult.data));
-      const copiedLines = mapDepositLinesForCopy(linesResult.data ?? [], catalogRows);
-      setLines(copiedLines);
-      setNextLineKey(copiedLines.length + 1);
-      setCopyLoading(false);
     })();
 
     return () => {
@@ -276,6 +282,9 @@ export function CustomerDepositRequestCreatePage() {
         expectedWeight: line.expected_weight,
         weightPerBox: line.weight_per_box,
         temperatureType: line.temperature_type,
+        lotNo: line.lot_no || null,
+        mfgDate: line.mfg_date || null,
+        expDate: line.exp_date || null,
         note: line.line_note,
       });
 
@@ -367,7 +376,7 @@ export function CustomerDepositRequestCreatePage() {
                 importTestId="customer-deposit-import-input"
                 onExport={() => exportCustomerDepositLinesExcel(lines)}
                 onImportFile={handleImportFile}
-                onTemplate={downloadCustomerDepositLineTemplate}
+                onTemplate={() => downloadCustomerDepositLineTemplate(catalogProducts)}
                 templateTestId="customer-deposit-template-button"
               />
               <button className="btn btn-secondary" data-testid="customer-deposit-add-line-button" disabled={importing} onClick={addLine} type="button">

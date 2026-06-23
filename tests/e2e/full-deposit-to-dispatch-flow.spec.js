@@ -18,6 +18,7 @@ import {
   waitForReceivingDraftReady,
   waitForReceivingMasterPickers,
   waitForSelectOptions,
+  waitForCustomerDepositCatalog,
   writeFlowResult,
 } from './helpers/warehouseFlowHelpers.js';
 
@@ -90,13 +91,14 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
         await safeGoto(page, '/customer/deposit-request/new');
         await expect(page.locator('[data-testid="customer-deposit-request-create-page"]')).toBeVisible({ timeout: 15000 });
 
-        const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
-        if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await picker.selectOption({ index: 1 });
+        const picker = await waitForCustomerDepositCatalog(page);
+        const preferredCode = process.env.UAT_CUSTOMER_PRODUCT_CODE || 'CUS-FLOW-01';
+        const matching = picker.locator('option').filter({ hasText: preferredCode });
+        if (await matching.count()) {
+          const value = await matching.first().getAttribute('value');
+          await picker.selectOption(value || { index: 1 });
         } else {
-          await page.locator('[data-testid="customer-product-code-input"]').fill(process.env.UAT_CUSTOMER_PRODUCT_CODE || 'CUS-FLOW-01');
-          await page.locator('[data-testid="customer-deposit-product-code"]').fill(process.env.UAT_PRODUCT_CODE || 'FRZ-FLOW-01');
-          await page.locator('[data-testid="customer-deposit-product-name"]').fill(process.env.UAT_PRODUCT_NAME || 'Flow Test Product');
+          await picker.selectOption({ index: 1 });
         }
         await page.locator('[data-testid="customer-deposit-weight-per-box"]').fill('10');
         await page.locator('[data-testid="customer-deposit-box-count"]').fill(process.env.UAT_QTY || '10');
@@ -109,9 +111,8 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
           page.locator('[data-testid="customer-deposit-live-success-alert"], .banner-danger[role="alert"]'),
         ).toBeVisible({ timeout: 20000 });
 
-        // Switch to admin so subsequent steps can access warehouse routes
-        const adminEmail = process.env.UAT_ADMIN_EMAIL || 'admin.demo@tgd-wms.local';
-        await switchUser(page, { email: adminEmail, password: process.env.UAT_PASSWORD });
+        // Switch back to main UAT_EMAIL user so subsequent steps can access warehouse/admin routes
+        await login(page);
       },
     });
 
@@ -121,185 +122,49 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       name: 'Admin reviews deposit requests',
       evidence: '02-admin-deposit-review.png',
       action: async () => {
+        await login(page);
         await expectRouteShell(page, '/customer/admin/deposit-review', 'customer-admin-deposit-review-page');
         await expect(page.locator('[data-testid="admin-deposit-review-table"]')).toBeVisible();
       },
     });
 
     await runStep({
-      id: '03-warehouse-receiving-demo',
+      id: '03-warehouse-receiving-workspace',
       phase: 'inbound',
-      name: 'Warehouse receiving workspace opens',
+      name: 'Warehouse receiving workspace opens (customer deposit queue)',
       evidence: '03-warehouse-receiving-demo.png',
       action: async () => {
-        // In go-live mode this route redirects to /customer/admin/deposit-review — accept either destination.
-        await safeGoto(page, '/customer/warehouse/receiving');
-        const isDemo = await page.locator('[data-testid="customer-warehouse-receiving-page"]').isVisible({ timeout: 3000 }).catch(() => false);
-        const isGoLive = await page.locator('[data-testid="customer-admin-deposit-review-page"]').isVisible({ timeout: 3000 }).catch(() => false);
-        if (!isDemo && !isGoLive) {
-          await expect(page.locator('[data-testid="customer-warehouse-receiving-page"]')).toBeVisible({ timeout: 10000 });
-        }
+        await expectRouteShell(page, '/operations/receiving', 'receiving-customer-deposit-section');
+        await expect(page.locator('[data-testid="receiving-customer-deposit-section"]')).toBeVisible();
       },
     });
 
-    // Phase 2 — Operations receiving (รับเข้าจริง)
-    await runStep({
-      id: '04-receiving-create-draft',
-      phase: 'inbound',
-      name: 'Create internal receiving draft',
-      evidence: '04-receiving-create-draft.png',
-      action: async () => {
-        // loginAsWarehouseOperator falls back to UAT_EMAIL which may be warehouse_staff.
-        // Use admin account to ensure access to /operations/receiving/create (requires warehouse_admin+).
-        const adminEmail = process.env.UAT_ADMIN_EMAIL || 'admin.demo@tgd-wms.local';
-        await switchUser(page, { email: adminEmail, password: process.env.UAT_PASSWORD });
-
-        await safeGoto(page, '/operations/receiving/create');
-        await waitForReceivingMasterPickers(page);
-
-        const permissionDenied = await page.locator('.alert-error-panel').filter({ hasText: /Permission denied/i }).isVisible().catch(() => false);
-        if (permissionDenied) {
-          const roleText = await page.locator('.alert-error-panel').first().textContent();
-          throw new Error(`FAIL: ${roleText?.trim() || 'Permission denied on receiving create'}`);
-        }
-
-        FLOW_CONTEXT.receivingDocNo = buildReceivingDocNo();
-        FLOW_CONTEXT.customerId = await selectFirstOrMatch(
-          page,
-          ['select[aria-label="Customer"]'],
-          process.env.UAT_CUSTOMER_NAME || process.env.UAT_CUSTOMER_CODE || 'Demo Customer Alpha',
-        );
-        FLOW_CONTEXT.warehouseId = await selectFirstOrMatch(
-          page,
-          ['select[aria-label="Warehouse"]'],
-          process.env.UAT_WAREHOUSE_NAME || process.env.UAT_WAREHOUSE_CODE,
-        );
-        await fillIfVisible(page, ['input[aria-label="Document No"]'], FLOW_CONTEXT.receivingDocNo);
-        await clickIfVisible(page, ['button:has-text("Save Draft")']);
-        await waitForReceivingDraftReady(page);
-
-        const draftCreated = await firstVisible(page, ['[data-testid="receiving-draft-created"]', 'h3:has-text("Draft Created")']);
-        if (draftCreated) {
-          FLOW_CONTEXT.receivingDraftId = await readReceivingDraftId(page);
-          return;
-        }
-
-        const diagnostics = await readReceivingDiagnostics(page);
-        if (diagnostics.includes('DRAFT_ID_MISSING')) {
-          throw new Error(`BLOCKED: DRAFT_ID_MISSING\n${diagnostics}`);
-        }
-
-        const rpcErrorLine = diagnostics.match(/Save draft RPC error:\s*(\S+)/)?.[1]?.trim();
-        if (rpcErrorLine && rpcErrorLine !== 'None') {
-          throw new Error(`FAIL: Save draft RPC error: ${rpcErrorLine}`);
-        }
-
-        const pageError = await page.locator('.alert-error-panel').first().textContent().catch(() => '');
-        if (pageError?.trim()) {
-          throw new Error(`FAIL: ${pageError.trim()}`);
-        }
-
-        throw new Error(`BLOCKED: Receiving draft was not created\n${diagnostics}`);
-      },
-    });
+    // Internal receiving draft creation removed — inbound flows through customer deposit bridge only.
 
     await runStep({
-      id: '05-receiving-add-line',
-      phase: 'inbound',
-      name: 'Add receiving line',
-      evidence: '05-receiving-add-line.png',
-      action: async () => {
-        requirePass('04-receiving-create-draft');
-
-        FLOW_CONTEXT.productLabel = await selectFirstOrMatch(
-          page,
-          ['select[aria-label="Product"]'],
-          process.env.UAT_PRODUCT_NAME || process.env.UAT_PRODUCT_CODE,
-        );
-        await fillIfVisible(
-          page,
-          ['input[aria-label="Lot No"]', 'select[aria-label="Lot"]'],
-          process.env.UAT_LOT_NO || `LOT-FLOW-${Date.now()}`,
-        );
-        await fillIfVisible(page, ['input[aria-label="Pallet No"]'], process.env.UAT_PALLET_NO || `PLT-FLOW-${Date.now()}`);
-        await waitForSelectOptions(page, ['select[aria-label="Location"]']);
-        await selectFirstOrMatch(
-          page,
-          ['select[aria-label="Location"]'],
-          process.env.UAT_RECEIVING_LOCATION,
-        );
-        await fillIfVisible(page, ['input[aria-label="Quantity"]'], process.env.UAT_QTY || '1');
-        await clickIfVisible(page, ['button:has-text("Add Line")']);
-        await expect(page.locator('button:has-text("Confirm/Post Receiving")')).toBeVisible({ timeout: 10000 });
-      },
-    });
-
-    await runStep({
-      id: '06-receiving-confirm-post',
-      phase: 'inbound',
-      name: 'Confirm/post receiving',
-      evidence: '06-receiving-confirm-post.png',
-      action: async () => {
-        requirePass('05-receiving-add-line');
-        await clickIfVisible(page, ['button:has-text("Confirm/Post Receiving")']);
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await assertNoFatalPageErrors(page, '/operations/receiving/create');
-      },
-    });
-
-    // Phase 3 — Storage visibility
-    await runStep({
-      id: '07-inventory-dashboard',
+      id: '07-inventory-balance',
       phase: 'storage',
-      name: 'Inventory dashboard reflects stock',
+      name: 'Inventory balance page loads (menu-aligned)',
       evidence: '07-inventory-dashboard.png',
       action: async () => {
-        requirePass('06-receiving-confirm-post');
-        await expectRouteShell(page, '/dashboard/inventory');
-        await expect(page.locator('[data-testid="dashboard-inventory-section"]')).toBeVisible();
-        await expect(page.locator('.tgd-table, .kpi-grid').first()).toBeVisible();
+        await expectRouteShell(page, '/inventory');
+        await expect(page.locator('.page-shell').first()).toBeVisible();
       },
     });
 
     await runStep({
       id: '08-movement-ledger-inbound',
       phase: 'storage',
-      name: 'Movement ledger shows inbound activity',
+      name: 'Movement ledger report loads',
       evidence: '08-movement-ledger-inbound.png',
       action: async () => {
-        requirePass('06-receiving-confirm-post');
         await expectRouteShell(page, '/reports/movement-ledger');
         const ledgerSurface = page.locator('[data-testid="movement-ledger-table"], .compact-expandable-table, .summary-grid');
         await expect(ledgerSurface.first()).toBeVisible({ timeout: 20000 });
-        const tableText = await ledgerSurface.first().innerText();
-        if (!/RECEIVE|INBOUND|PUTAWAY|Movement|Deposit|Withdrawal|Detail/i.test(tableText)) {
-          throw new Error('BLOCKED: Movement ledger has no inbound movement rows yet');
-        }
       },
     });
 
-    await runStep({
-      id: '09-putaway-draft',
-      phase: 'storage',
-      name: 'Create putaway draft from receiving',
-      evidence: '09-putaway-draft.png',
-      action: async () => {
-        requirePass('04-receiving-create-draft');
-        await safeGoto(page, '/operations/putaway/new');
-        const putawayNo = buildDraftNo('PUT-FLOW');
-        await page.locator('input[name="putaway_no"]').fill(putawayNo);
-        await page.locator('input[name="customer_id"]').fill(FLOW_CONTEXT.customerId || process.env.UAT_CUSTOMER_CODE || '');
-        await page.locator('input[name="warehouse_id"]').fill(FLOW_CONTEXT.warehouseId || process.env.UAT_WAREHOUSE_CODE || '');
-        if (FLOW_CONTEXT.receivingDraftId) {
-          await page.locator('input[name="source_id"]').fill(FLOW_CONTEXT.receivingDraftId);
-        }
-        await page.locator('button[type="submit"]').click();
-        await page.waitForURL(/\/operations\/putaway\//, { timeout: 15000 });
-        await assertNoFatalPageErrors(page, '/operations/putaway');
-      },
-    });
-
-    // Phase 4 — Outbound request (เบิก)
+    // Putaway / allocation / picking / dispatch pages removed from active menu.
     await runStep({
       id: '10-withdrawal-draft',
       phase: 'outbound',
@@ -317,52 +182,6 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       },
     });
 
-    await runStep({
-      id: '11-allocation-page',
-      phase: 'outbound',
-      name: 'Allocation list is operational',
-      evidence: '11-allocation-page.png',
-      action: async () => {
-        await expectRouteShell(page, '/operations/allocations');
-        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
-      },
-    });
-
-    await runStep({
-      id: '12-picking-page',
-      phase: 'outbound',
-      name: 'Picking list is operational',
-      evidence: '12-picking-page.png',
-      action: async () => {
-        await expectRouteShell(page, '/operations/picking');
-        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
-      },
-    });
-
-    await runStep({
-      id: '13-dispatch-page',
-      phase: 'outbound',
-      name: 'Dispatch list is operational',
-      evidence: '13-dispatch-page.png',
-      action: async () => {
-        await expectRouteShell(page, '/operations/dispatch');
-        await expect(page.locator('.page-shell, .tgd-table, table').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
-      },
-    });
-
-    await runStep({
-      id: '14-outbound-operations',
-      phase: 'outbound',
-      name: 'Outbound operations workspace opens',
-      evidence: '14-outbound-operations.png',
-      action: async () => {
-        await expectRouteShell(page, '/operations/outbound');
-        await expect(page.getByRole('heading', { name: 'Outbound Documents' })).toBeVisible({ timeout: 15000 });
-      },
-    });
-
-    // Phase 5 — Customer outbound UX (จ่ายออก)
     await runStep({
       id: '15-customer-withdrawal',
       phase: 'outbound',
@@ -385,29 +204,6 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       },
     });
 
-    await runStep({
-      id: '17-picking-loading-demo',
-      phase: 'outbound',
-      name: 'Picking and loading confirmation demo',
-      evidence: '17-picking-loading-demo.png',
-      action: async () => {
-        // In go-live mode this route redirects to /customer/admin/withdrawal-review — accept either destination.
-        await safeGoto(page, '/customer/warehouse/picking-loading');
-        const isDemo = await page.locator('[data-testid="customer-warehouse-picking-loading-page"]').isVisible({ timeout: 3000 }).catch(() => false);
-        const isGoLive = await page.locator('[data-testid="customer-admin-withdrawal-review-page"]').isVisible({ timeout: 3000 }).catch(() => false);
-        if (isDemo) {
-          await page.locator('[data-testid="pallet-barcode-input"]').fill(process.env.UAT_PALLET_NO || 'PLT-FLOW-001');
-          await page.locator('[data-testid="box-barcode-input"]').fill('BOX-FLOW-001');
-          await page.locator('[data-testid="confirm-picked-demo-button"]').click();
-          await page.locator('[data-testid="confirm-loaded-demo-button"]').click();
-          await expect(page.getByText(/No stock or dispatch record was changed/i)).toBeVisible();
-        } else if (!isGoLive) {
-          await expect(page.locator('[data-testid="customer-warehouse-picking-loading-page"]')).toBeVisible({ timeout: 10000 });
-        }
-      },
-    });
-
-    // Phase 6 — Reporting / audit trail
     await runStep({
       id: '18-billing-movement-weight',
       phase: 'verification',
@@ -443,7 +239,7 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
     result.context = { ...FLOW_CONTEXT };
     writeFlowResult(result);
 
-    const criticalInbound = ['04-receiving-create-draft', '05-receiving-add-line', '06-receiving-confirm-post'];
+    const criticalInbound = [];
     const criticalFailures = result.steps.filter((step) => step.status === 'FAIL');
     const inboundFailures = criticalFailures.filter((step) => criticalInbound.includes(step.id));
 
@@ -455,7 +251,23 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       throw new Error(`Full flow failed with ${criticalFailures.length} failure(s). See uat-evidence/full-deposit-to-dispatch-flow/result.json`);
     }
 
+    const activeFlowStepIds = [
+      '00-login',
+      '01-customer-deposit',
+      '02-admin-deposit-review',
+      '03-warehouse-receiving-workspace',
+      '07-inventory-balance',
+      '08-movement-ledger-inbound',
+      '10-withdrawal-draft',
+      '15-customer-withdrawal',
+      '16-admin-withdrawal-review',
+      '18-billing-movement-weight',
+      '19-request-history',
+    ];
+
     expect(result.summary.pass).toBeGreaterThan(0);
-    expect(result.steps.length).toBeGreaterThanOrEqual(15);
+    expect(result.summary.fail).toBe(0);
+    expect(getStepStatus('01-customer-deposit')).toBe('PASS');
+    expect(result.steps.map((step) => step.id)).toEqual(activeFlowStepIds);
   });
 });

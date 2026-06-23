@@ -323,9 +323,8 @@ export function CustomerAdminDepositReviewPage() {
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th>{t('customer_col_weight_per_box')}</th>
-                      <th>{t('customer_col_total_deposit_weight')}</th>
-                      <th>{t('customer_col_box_count')}</th>
-                      <th>{t('admin_received_qty')}</th>
+                      <th>กล่อง (รับจริง / แจ้งฝาก)</th>
+                      <th>น้ำหนัก กก. (รับจริง / แจ้งฝาก)</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
@@ -336,17 +335,25 @@ export function CustomerAdminDepositReviewPage() {
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.weight_per_box ?? '-'}</td>
-                        <td>{line.expected_weight ?? '-'}</td>
-                        <td>{line.expected_boxes ?? '-'}</td>
                         <td>
                           {line.actual_boxes != null ? (
-                            <span style={{ fontWeight: 600, color: 'var(--tgd-success)' }}>
-                              {line.actual_boxes} กล่อง
-                              {line.actual_weight != null ? ` · ${line.actual_weight} กก.` : ''}
+                            <span style={{ fontWeight: 700, color: 'var(--tgd-success)' }}>
+                              {line.actual_boxes}
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12, fontWeight: 600 }}>⚠ ยังไม่ได้บันทึก</span>
+                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12, fontWeight: 600 }}>⚠</span>
                           )}
+                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}> / {line.expected_boxes ?? '-'}</span>
+                        </td>
+                        <td>
+                          {line.actual_weight != null ? (
+                            <span style={{ fontWeight: 700, color: 'var(--tgd-success)' }}>
+                              {line.actual_weight}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
+                          )}
+                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}> / {line.expected_weight ?? '-'}</span>
                         </td>
                         <td>
                           <button
@@ -363,7 +370,7 @@ export function CustomerAdminDepositReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -417,6 +424,30 @@ export function CustomerAdminDepositReviewPage() {
                 </button>
               ) : null}
             </div>
+
+            {/* Persistent email notification section */}
+            {selected && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(selected.status) ? (
+              <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--tgd-surface-alt, #f8fafc)', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>แจ้งลูกค้าทางอีเมล</div>
+                    {selected.status === 'CUSTOMER_NOTIFIED' ? (
+                      <span style={{ fontSize: 12, color: 'var(--tgd-success)', fontWeight: 600 }}>✓ ส่งอีเมลแจ้งลูกค้าแล้ว</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--tgd-warning, #d97706)', fontWeight: 600 }}>⚠ ยังไม่ได้ส่งอีเมลแจ้งลูกค้า</span>
+                    )}
+                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={notifying}
+                    onClick={() => { setNotifyNote(''); setNotifyOpen(true); }}
+                    type="button"
+                  >
+                    {selected.status === 'CUSTOMER_NOTIFIED' ? 'ส่งอีเมลซ้ำ' : 'ส่งอีเมลแจ้งลูกค้า'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
       </Modal>

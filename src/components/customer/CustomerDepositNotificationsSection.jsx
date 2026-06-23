@@ -63,8 +63,8 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
         <span className="form-helper">{t('receiving_customer_deposit_section_hint')}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 0' }}>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 200px' }}>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px' }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 360 }}>
           {'ค้นหา'}
           <input
             className="form-control"
@@ -74,7 +74,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             onChange={(e) => setFilterText(e.target.value)}
           />
         </label>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 180px' }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 180px', maxWidth: 280 }}>
           {'สถานะ'}
           <select
             className="form-control"

@@ -194,7 +194,13 @@ export function createFlowRunner({ page, result }) {
       if (message.includes('SKIPPED_WITH_REASON')) {
         status = 'SKIPPED';
         notes = message.replace('SKIPPED_WITH_REASON:', '').trim();
-      } else if (message.includes('BLOCKED') || message.includes('MISSING_') || message.includes('DISABLED_')) {
+      } else if (
+        message.includes('BLOCKED') ||
+        message.includes('MISSING_') ||
+        message.includes('DISABLED_') ||
+        message.includes('Target page, context or browser has been closed') ||
+        message.includes('context or browser has been closed')
+      ) {
         status = 'BLOCKED';
         notes = message;
       } else {
@@ -219,7 +225,21 @@ export function createFlowRunner({ page, result }) {
 }
 
 export function hasCustomerPortalCredentials() {
-  return Boolean(process.env.UAT_CUSTOMER_EMAIL && process.env.UAT_CUSTOMER_PASSWORD);
+  const email = process.env.UAT_CUSTOMER_EMAIL || 'customer.test@tgd-wms.local';
+  const password = process.env.UAT_CUSTOMER_PASSWORD
+    || process.env.UAT_PASSWORD
+    || process.env.UAT_DEMO_PASSWORD;
+  return Boolean(email && password);
+}
+
+/** Wait until async customer catalog loads into deposit line picker. */
+export async function waitForCustomerDepositCatalog(page, { timeout = 30000 } = {}) {
+  const picker = page.locator('[data-testid="customer-deposit-product-picker-select"]');
+  await expect(picker).toBeVisible({ timeout: 15000 });
+  await expect
+    .poll(async () => picker.locator('option').count(), { timeout, message: 'Customer catalog products did not load' })
+    .toBeGreaterThan(1);
+  return picker;
 }
 
 export function hasReceivingMasterDataEnv() {

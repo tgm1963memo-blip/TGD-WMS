@@ -1,31 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { listRoleDefinitions, upsertRoleDefinition } from '../../services/productServiceRatesService.js';
 import { PRODUCTION_ROLES, PRODUCTION_ROLE_DESCRIPTIONS } from '../../security/productionRoleModel.js';
-import { groupRoutesByPermissionArea } from '../../security/routePermissionCatalog.js';
 import { getUserProfiles } from '../../services/userManagementService.js';
-import { listRoleAreaPermissions, resetRoleAreaPermissions, saveRoleAreaPermissionOverrides } from '../../services/roleAreaPermissionService.js';
-import { refreshRoleAreaPermissionCache } from '../../services/roleAreaPermissionCacheService.js';
+import { listRoleFunctionPermissions, resetRoleFunctionPermissions, saveRoleFunctionPermissionOverrides } from '../../services/roleFunctionPermissionService.js';
+import { refreshRolePermissionCache } from '../../services/roleAreaPermissionCacheService.js';
+import { listNavigationPermissionFunctionsByGroup } from '../../security/navigationPermissionCatalog.js';
 import {
-  buildRoleAreaMatrix,
-  diffRoleAreaOverrides,
-  getDefaultAreaAccess,
-  getRoleAreaOverride,
-  listPermissionAreas,
-} from '../../security/roleAreaPermissions.js';
+  buildRoleFunctionMatrix,
+  diffAllRoleFunctionOverrides,
+  diffRoleFunctionOverrides,
+  functionDraftsAreEqual,
+  matrixDraftsAreEqual,
+  getDefaultFunctionAccess,
+  getRoleFunctionOverride,
+} from '../../security/roleFunctionPermissions.js';
 
-const AREA_LABELS = {
-  master_data:         'ข้อมูลหลัก',
-  receiving:           'รับสินค้าเข้า',
-  withdrawal:          'เบิกสินค้า',
-  reports:             'รายงาน',
-  accounting_review:   'ตรวจสอบบัญชี',
-  admin:               'ผู้ดูแลระบบ',
-  user_management:     'จัดการผู้ใช้',
-  customer_catalog:    'แคตตาล็อกสินค้า',
-  customer_portal:     'Customer Portal',
-  unknown:             'อื่นๆ',
+const GROUP_LABELS_TH = {
+  main_operation: 'การดำเนินงานหลัก',
+  inbound_management: 'รับเข้า',
+  inventory_control: 'ควบคุมสต็อก',
+  outbound_management: 'เบิกออก',
+  barcode_handheld: 'Barcode / Handheld',
+  customer_portal: 'Customer Portal',
+  billing: 'การเรียกเก็บเงิน',
+  reports: 'รายงาน',
+  system_administration: 'ระบบผู้ดูแล',
 };
 
 const MATRIX_ROLE_ORDER = ['admin', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff', 'accounting', 'viewer', 'customer_user'];
@@ -44,26 +45,16 @@ function sortMatrixRoles(roles) {
 
 function EditablePermissionMatrix({
   roles,
-  permissions,
-  editingRole,
-  onEditingRoleChange,
-  draftValues,
-  onDraftChange,
+  draftMatrix,
+  savedMatrix,
+  onToggle,
   dirty,
   saving,
   onSave,
-  onResetRole,
   onResetDraft,
 }) {
   const matrixRoles = useMemo(() => sortMatrixRoles(roles), [roles]);
-  const roleCodes = matrixRoles.map((role) => role.role_code);
-  const areas = listPermissionAreas();
-  const { matrix } = useMemo(
-    () => buildRoleAreaMatrix(roleCodes, permissions),
-    [roleCodes, permissions],
-  );
-
-  const editingRoleDef = matrixRoles.find((role) => role.role_code === editingRole);
+  const groupedFunctions = useMemo(() => listNavigationPermissionFunctionsByGroup(), []);
 
   return (
     <div>
@@ -71,34 +62,10 @@ function EditablePermissionMatrix({
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
         padding: '14px 18px', borderBottom: '1px solid #f1f5f9', background: '#fafafa',
       }}>
-        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-          แก้ไขสิทธิ์ของบทบาท
-          <select
-            className="form-control"
-            data-testid="role-permissions-edit-role"
-            value={editingRole}
-            onChange={(e) => onEditingRoleChange(e.target.value)}
-            style={{ marginLeft: 10, minWidth: 220, display: 'inline-block' }}
-          >
-            {matrixRoles
-              .filter((role) => role.role_code !== 'admin')
-              .map((role) => (
-                <option key={role.role_code} value={role.role_code}>
-                  {role.display_name} ({role.role_code})
-                </option>
-              ))}
-          </select>
-        </label>
+        <div style={{ fontSize: 13, color: '#374151' }}>
+          เลือกฟังก์ชันที่แต่ละบทบาทเข้าใช้งานได้ — ติ๊กเพื่อเปิด/ปิดสิทธิ์อิสระ
+        </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            data-testid="role-permissions-reset-role"
-            disabled={saving || !editingRole}
-            onClick={onResetRole}
-          >
-            คืนค่าเริ่มต้น
-          </button>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -111,25 +78,19 @@ function EditablePermissionMatrix({
             type="button"
             className="btn btn-primary btn-sm"
             data-testid="role-permissions-save"
-            disabled={saving || !dirty || !editingRole}
+            disabled={saving || !dirty}
             onClick={onSave}
           >
-            {saving ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์'}
+            {saving ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์ทั้งหมด'}
           </button>
         </div>
       </div>
 
-      {editingRoleDef && (
-        <div style={{ padding: '10px 18px', fontSize: 12, color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>
-          กำลังแก้ไข: <strong>{editingRoleDef.display_name}</strong>
-          {editingRoleDef.base_role && editingRoleDef.base_role !== editingRoleDef.role_code
-            ? ` · อ้างอิงจาก ${editingRoleDef.base_role}`
-            : ''}
-          {' · '}
-          <span style={{ color: '#2d9348' }}>●</span> ค่าเริ่มต้น &nbsp;
-          <span style={{ color: '#1d6fcf' }}>●</span> ปรับแต่งแล้ว
-        </div>
-      )}
+      <div style={{ padding: '10px 18px', fontSize: 12, color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>
+        <span style={{ color: '#2d9348' }}>●</span> ค่าเริ่มต้น &nbsp;
+        <span style={{ color: '#1d6fcf' }}>●</span> ปรับแต่งแล้ว &nbsp;|&nbsp;
+        บทบาท Admin มีสิทธิ์ครบทุกฟังก์ชัน
+      </div>
 
       <div style={{ overflowX: 'auto', marginTop: 0 }}>
         <table
@@ -137,88 +98,86 @@ function EditablePermissionMatrix({
           style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}
         >
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 180 }}>
-                ฟีเจอร์
+            <tr style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
+              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 220 }}>
+                ฟังก์ชัน
               </th>
-              {matrixRoles.map((role) => {
-                const isEditingColumn = role.role_code === editingRole;
-                return (
-                  <th
-                    key={role.role_code}
-                    style={{
-                      padding: '10px 8px',
-                      textAlign: 'center',
-                      fontWeight: 700,
-                      color: isEditingColumn ? '#2d9348' : '#374151',
-                      borderBottom: '2px solid #e5e7eb',
-                      minWidth: 110,
-                      background: isEditingColumn ? '#f0fdf4' : '#f8fafc',
-                    }}
-                  >
-                    {role.display_name?.split(' ')[0] ?? role.role_code}
-                  </th>
-                );
-              })}
+              {matrixRoles.map((role) => (
+                <th
+                  key={role.role_code}
+                  style={{
+                    padding: '10px 8px',
+                    textAlign: 'center',
+                    fontWeight: 700,
+                    color: '#374151',
+                    borderBottom: '2px solid #e5e7eb',
+                    minWidth: 96,
+                    fontSize: 11,
+                  }}
+                  title={role.role_code}
+                >
+                  {role.display_name?.split(' ')[0] ?? role.role_code}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {areas.map((area) => {
-              const minRole = groupRoutesByPermissionArea()[area]?.[0]?.minimum_role ?? 'admin';
-              return (
-                <tr key={area} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '8px 14px', fontWeight: 600, color: '#1e293b' }}>
-                    <div>{AREA_LABELS[area] ?? area}</div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400, marginTop: 2 }}>
-                      ขั้นต่ำ: {minRole}
-                    </div>
+            {groupedFunctions.map((group) => (
+              <Fragment key={group.groupKey}>
+                <tr key={`group-${group.groupKey}`} style={{ background: '#f1f5f9' }}>
+                  <td
+                    colSpan={matrixRoles.length + 1}
+                    style={{ padding: '8px 14px', fontWeight: 700, color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                  >
+                    {GROUP_LABELS_TH[group.groupKey] ?? group.groupLabel}
                   </td>
-                  {matrixRoles.map((role) => {
-                    const roleCode = role.role_code;
-                    const isEditingColumn = roleCode === editingRole;
-                    const savedValue = matrix[roleCode]?.[area] ?? false;
-                    const displayValue = isEditingColumn && draftValues
-                      ? Boolean(draftValues[area])
-                      : savedValue;
-                    const isOverride = getRoleAreaOverride(roleCode, area) !== undefined;
-                    const isDefault = getDefaultAreaAccess(roleCode, area);
-                    const isAdminLocked = roleCode === 'admin';
+                </tr>
+                {group.items.map((fn) => (
+                  <tr key={fn.functionKey} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 14px', color: '#1e293b' }}>
+                      <div style={{ fontWeight: 600 }}>{fn.label}</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                        {fn.minimumRole ? `ขั้นต่ำ: ${fn.minimumRole}` : fn.path}
+                      </div>
+                    </td>
+                    {matrixRoles.map((role) => {
+                      const roleCode = role.role_code;
+                      const isAdminLocked = roleCode === 'admin';
+                      const displayValue = Boolean(draftMatrix?.[roleCode]?.[fn.functionKey]);
+                      const savedValue = Boolean(savedMatrix?.[roleCode]?.[fn.functionKey]);
+                      const isOverride = getRoleFunctionOverride(roleCode, fn.functionKey) !== undefined
+                        || displayValue !== getDefaultFunctionAccess(roleCode, fn.functionKey);
 
-                    if (isEditingColumn && !isAdminLocked) {
+                      if (isAdminLocked) {
+                        return (
+                          <td key={roleCode} style={{ padding: '8px', textAlign: 'center', background: '#fafafa' }}>
+                            <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} />
+                          </td>
+                        );
+                      }
+
                       return (
-                        <td
-                          key={roleCode}
-                          style={{ padding: '8px', textAlign: 'center', background: '#f0fdf4' }}
-                        >
+                        <td key={roleCode} style={{ padding: '8px', textAlign: 'center' }}>
                           <input
                             type="checkbox"
-                            data-testid={`role-permission-${roleCode}-${area}`}
+                            data-testid={`role-permission-${roleCode}-${fn.functionKey}`}
                             checked={displayValue}
-                            onChange={(e) => onDraftChange(area, e.target.checked)}
-                            aria-label={`${role.display_name} ${AREA_LABELS[area] ?? area}`}
+                            onChange={(e) => onToggle(roleCode, fn.functionKey, e.target.checked)}
+                            aria-label={`${role.display_name} ${fn.label}`}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              accentColor: isOverride || displayValue !== savedValue ? '#1d6fcf' : '#2d9348',
+                              cursor: 'pointer',
+                            }}
                           />
                         </td>
                       );
-                    }
-
-                    return (
-                      <td key={roleCode} style={{ padding: '8px', textAlign: 'center' }}>
-                        {displayValue ? (
-                          <span
-                            style={{ color: isOverride ? '#1d6fcf' : '#2d9348', fontSize: 16, fontWeight: 700 }}
-                            title={isOverride ? 'ปรับแต่งแล้ว' : 'ค่าเริ่มต้น'}
-                          >
-                            ✓
-                          </span>
-                        ) : (
-                          <span style={{ color: '#e5e7eb', fontSize: 14 }} title={isDefault ? 'ค่าเริ่มต้น' : 'ไม่มีสิทธิ์'}>—</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+                    })}
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       </div>
@@ -227,19 +186,19 @@ function EditablePermissionMatrix({
 }
 
 function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving, onSave, onCancel }) {
-  const areas = listPermissionAreas();
+  const groupedFunctions = useMemo(() => listNavigationPermissionFunctionsByGroup(), []);
   const { matrix } = useMemo(
-    () => buildRoleAreaMatrix(matrixRoleCodes, permissions),
+    () => buildRoleFunctionMatrix(matrixRoleCodes, permissions),
     [matrixRoleCodes, permissions],
   );
 
-  const initialDraft = useMemo(() => ({ ...(matrix[role.role_code] ?? {}) }), []);
+  const initialDraft = useMemo(() => ({ ...(matrix[role.role_code] ?? {}) }), [matrix, role.role_code]);
   const [draft, setDraft] = useState(initialDraft);
 
-  const dirty = useMemo(() => !draftsAreEqual(draft, initialDraft), [draft]);
+  const dirty = useMemo(() => !functionDraftsAreEqual(draft, initialDraft), [draft, initialDraft]);
 
-  function toggle(area) {
-    setDraft((prev) => ({ ...prev, [area]: !prev[area] }));
+  function toggle(functionKey) {
+    setDraft((prev) => ({ ...prev, [functionKey]: !prev[functionKey] }));
   }
 
   return (
@@ -253,9 +212,8 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          <span style={{ fontWeight: 700, color: '#166534', marginRight: 10 }}>สิทธิ์การเข้าถึง — {role.display_name}</span>
-          <span style={{ color: '#2d9348' }}>●</span> ค่าเริ่มต้น &nbsp;
-          <span style={{ color: '#1d6fcf' }}>●</span> ปรับแต่งแล้ว
+          <span style={{ fontWeight: 700, color: '#166534', marginRight: 10 }}>สิทธิ์ฟังก์ชัน — {role.display_name}</span>
+          เลือกเมนู/ฟังก์ชันที่บทบาทนี้เข้าใช้งานได้
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -280,38 +238,45 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
-        {areas.map((area) => {
-          const isOn = Boolean(draft[area]);
-          const isDefault = getDefaultAreaAccess(role.role_code, area);
-          const isCustomized = isOn !== isDefault;
-          return (
-            <label
-              key={area}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                cursor: 'pointer', padding: '10px 14px',
-                background: '#fff', borderRadius: 8,
-                border: `1px solid ${isCustomized ? '#93c5fd' : '#e5e7eb'}`,
-                userSelect: 'none',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={isOn}
-                onChange={() => toggle(area)}
-                style={{ width: 16, height: 16, accentColor: '#2d9348', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{AREA_LABELS[area] ?? area}</div>
-                <div style={{ fontSize: 10, marginTop: 1, color: isCustomized ? '#1d6fcf' : '#94a3b8' }}>
-                  {isCustomized ? 'ปรับแต่งแล้ว' : 'ค่าเริ่มต้น'}
-                </div>
-              </div>
-            </label>
-          );
-        })}
-      </div>
+      {groupedFunctions.map((group) => (
+        <div key={group.groupKey} style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' }}>
+            {GROUP_LABELS_TH[group.groupKey] ?? group.groupLabel}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
+            {group.items.map((fn) => {
+              const isOn = Boolean(draft[fn.functionKey]);
+              const isDefault = getDefaultFunctionAccess(role.role_code, fn.functionKey);
+              const isCustomized = isOn !== isDefault;
+              return (
+                <label
+                  key={fn.functionKey}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    cursor: 'pointer', padding: '10px 14px',
+                    background: '#fff', borderRadius: 8,
+                    border: `1px solid ${isCustomized ? '#93c5fd' : '#e5e7eb'}`,
+                    userSelect: 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isOn}
+                    onChange={() => toggle(fn.functionKey)}
+                    style={{ width: 16, height: 16, accentColor: '#2d9348', cursor: 'pointer', flexShrink: 0 }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{fn.label}</div>
+                    <div style={{ fontSize: 10, marginTop: 1, color: isCustomized ? '#1d6fcf' : '#94a3b8' }}>
+                      {isCustomized ? 'ปรับแต่งแล้ว' : 'ค่าเริ่มต้น'}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -368,19 +333,13 @@ function RoleCard({ role, userCount, onEdit, onEditPermissions, isPermissionExpa
 
 const ROLE_ORDER = ['admin','warehouse_manager','warehouse_admin','warehouse_staff','accounting','viewer','customer_user'];
 
-function buildDraftForRole(roleCode, permissions, roleCodes) {
-  const { matrix } = buildRoleAreaMatrix(roleCodes, permissions);
-  return { ...(matrix[roleCode] ?? {}) };
+function buildFunctionMatrix(roleCodes, permissions) {
+  const { matrix } = buildRoleFunctionMatrix(roleCodes, permissions);
+  return matrix;
 }
 
-function draftsAreEqual(left, right) {
-  const keys = new Set([...Object.keys(left ?? {}), ...Object.keys(right ?? {})]);
-  for (const key of keys) {
-    if (Boolean(left?.[key]) !== Boolean(right?.[key])) {
-      return false;
-    }
-  }
-  return true;
+function cloneMatrix(matrix) {
+  return JSON.parse(JSON.stringify(matrix ?? {}));
 }
 
 const EMPTY_ROLE_FORM = {
@@ -396,9 +355,9 @@ export function RolePermissionsAdminPage() {
   const [roles, setRoles] = useState([]);
   const [users, setUsers] = useState([]);
   const [permissions, setPermissions] = useState([]);
-  const [editingRole, setEditingRole] = useState('warehouse_manager');
-  const [permissionDraft, setPermissionDraft] = useState(null);
-  const [permissionBaseline, setPermissionBaseline] = useState(null);
+  const [permissionDraft, setPermissionDraft] = useState({});
+  const [permissionBaseline, setPermissionBaseline] = useState({});
+  const [savedMatrix, setSavedMatrix] = useState({});
   const [roleForm, setRoleForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [permissionSaving, setPermissionSaving] = useState(false);
@@ -415,67 +374,63 @@ export function RolePermissionsAdminPage() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    if (!editingRole || !matrixRoleCodes.length) return;
-    const draft = buildDraftForRole(editingRole, permissions, matrixRoleCodes);
-    setPermissionDraft(draft);
-    setPermissionBaseline(draft);
-  }, [editingRole, permissions, matrixRoleCodes]);
+    if (!matrixRoleCodes.length) return;
+    const matrix = buildFunctionMatrix(matrixRoleCodes, permissions);
+    setPermissionDraft(cloneMatrix(matrix));
+    setPermissionBaseline(cloneMatrix(matrix));
+    setSavedMatrix(cloneMatrix(matrix));
+  }, [permissions, matrixRoleCodes]);
 
   async function load() {
     const [roleResult, userResult, permissionResult] = await Promise.all([
       listRoleDefinitions(),
       getUserProfiles(),
-      listRoleAreaPermissions(),
+      listRoleFunctionPermissions(),
     ]);
     setRoles(roleResult.data ?? []);
     setUsers(userResult.data ?? []);
     setPermissions(permissionResult.data ?? []);
-    await refreshRoleAreaPermissionCache();
+    await refreshRolePermissionCache();
   }
 
-  const permissionDirty = permissionDraft && permissionBaseline
-    ? !draftsAreEqual(permissionDraft, permissionBaseline)
-    : false;
+  const permissionDirty = useMemo(
+    () => !matrixDraftsAreEqual(permissionBaseline, permissionDraft),
+    [permissionBaseline, permissionDraft],
+  );
 
-  function handlePermissionDraftChange(area, allowed) {
+  function handleMatrixToggle(roleCode, functionKey, allowed) {
     setPermissionDraft((current) => ({
-      ...(current ?? {}),
-      [area]: allowed,
+      ...current,
+      [roleCode]: {
+        ...(current[roleCode] ?? {}),
+        [functionKey]: allowed,
+      },
     }));
   }
 
   function handlePermissionDraftReset() {
-    setPermissionDraft(permissionBaseline ? { ...permissionBaseline } : null);
+    setPermissionDraft(cloneMatrix(permissionBaseline));
   }
 
   async function handlePermissionSave() {
-    if (!editingRole || !permissionDraft) return;
-    setPermissionSaving(true);
-    setError('');
-    setSuccess('');
-    const diff = diffRoleAreaOverrides(editingRole, permissionDraft);
-    const result = await saveRoleAreaPermissionOverrides(editingRole, diff);
-    setPermissionSaving(false);
-    if (result.error) {
-      setError(result.error.message ?? 'บันทึกสิทธิ์ไม่สำเร็จ');
-      return;
-    }
-    setSuccess(`บันทึกสิทธิ์ของ ${editingRole} เรียบร้อยแล้ว`);
-    await load();
-  }
+    const changedRoles = diffAllRoleFunctionOverrides(permissionBaseline, permissionDraft);
+    if (!changedRoles.length) return;
 
-  async function handlePermissionResetRole() {
-    if (!editingRole) return;
     setPermissionSaving(true);
     setError('');
     setSuccess('');
-    const result = await resetRoleAreaPermissions(editingRole);
-    setPermissionSaving(false);
-    if (result.error) {
-      setError(result.error.message ?? 'คืนค่าเริ่มต้นไม่สำเร็จ');
-      return;
+
+    for (const { roleCode, diff } of changedRoles) {
+      const result = await saveRoleFunctionPermissionOverrides(roleCode, diff);
+      if (result.error) {
+        setPermissionSaving(false);
+        setError(result.error.message ?? `บันทึกสิทธิ์ของ ${roleCode} ไม่สำเร็จ`);
+        return;
+      }
     }
-    setSuccess(`คืนค่าเริ่มต้นสิทธิ์ของ ${editingRole} เรียบร้อยแล้ว`);
+
+    setPermissionSaving(false);
+    setSuccess(`บันทึกสิทธิ์ ${changedRoles.length} บทบาทเรียบร้อยแล้ว`);
     await load();
   }
 
@@ -489,8 +444,8 @@ export function RolePermissionsAdminPage() {
     setInlineSaving(true);
     setError('');
     setSuccess('');
-    const diff = diffRoleAreaOverrides(roleCode, draft);
-    const result = await saveRoleAreaPermissionOverrides(roleCode, diff);
+    const diff = diffRoleFunctionOverrides(roleCode, draft);
+    const result = await saveRoleFunctionPermissionOverrides(roleCode, diff);
     setInlineSaving(false);
     if (result.error) {
       setError(result.error.message ?? 'บันทึกสิทธิ์ไม่สำเร็จ');
@@ -534,7 +489,7 @@ export function RolePermissionsAdminPage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="จัดการสิทธิ์และบทบาทผู้ใช้"
-        description="กำหนดบทบาทในระบบ ดูสิทธิ์ต่อฟีเจอร์ และสร้าง role ใหม่ได้"
+        description="กำหนดบทบาท ปรับสิทธิ์เข้าถึงแต่ละฟังก์ชัน/เมนูได้อิสระ และสร้าง role ใหม่ได้"
       />
 
       {/* Tabs */}
@@ -606,19 +561,16 @@ export function RolePermissionsAdminPage() {
       {tab === 'matrix' && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14 }}>
-            ตารางสิทธิ์เข้าถึงฟีเจอร์
+            ตารางสิทธิ์เข้าถึงฟังก์ชัน (เมนูระบบ)
           </div>
           <EditablePermissionMatrix
             roles={roles}
-            permissions={permissions}
-            editingRole={editingRole}
-            onEditingRoleChange={setEditingRole}
-            draftValues={permissionDraft}
-            onDraftChange={handlePermissionDraftChange}
+            draftMatrix={permissionDraft}
+            savedMatrix={savedMatrix}
+            onToggle={handleMatrixToggle}
             dirty={permissionDirty}
             saving={permissionSaving}
             onSave={handlePermissionSave}
-            onResetRole={handlePermissionResetRole}
             onResetDraft={handlePermissionDraftReset}
           />
         </div>

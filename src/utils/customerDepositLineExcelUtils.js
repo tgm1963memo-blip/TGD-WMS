@@ -2,30 +2,55 @@ import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
 
 export const CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS = [
   'customer_product_code',
+  'product_name',
   'weight_per_box',
   'expected_weight',
   'expected_boxes',
+  'lot_no',
+  'mfg_date',
+  'exp_date',
   'line_note',
 ];
 
 export function mapDepositLineToExcelRow(line = {}) {
   return {
     customer_product_code: line.customer_product_code ?? '',
+    product_name: line.product_name ?? '',
     weight_per_box: line.weight_per_box ?? '',
     expected_weight: line.expected_weight ?? '',
     expected_boxes: line.expected_boxes ?? '',
+    lot_no: line.lot_no ?? '',
+    mfg_date: line.mfg_date ?? '',
+    exp_date: line.exp_date ?? '',
     line_note: line.line_note ?? '',
   };
 }
 
-export function downloadCustomerDepositLineTemplate(filename = 'customer-deposit-lines-template.xlsx') {
-  downloadExcelRows([{
-    customer_product_code: 'SAMPLE-001',
-    weight_per_box: '10',
-    expected_weight: '100',
-    expected_boxes: '10',
-    line_note: 'ตัวอย่างหมายเหตุ',
-  }], CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS, filename, 'DepositLines');
+export function downloadCustomerDepositLineTemplate(catalogProducts = [], filename = 'customer-deposit-lines-template.xlsx') {
+  const rows = catalogProducts.length > 0
+    ? catalogProducts.map((p) => ({
+        customer_product_code: p.customer_product_code ?? '',
+        product_name: p.product_name ?? '',
+        weight_per_box: p.pack_weight_kg ?? '',
+        expected_weight: '',
+        expected_boxes: '',
+        lot_no: '',
+        mfg_date: '',
+        exp_date: '',
+        line_note: '',
+      }))
+    : [{
+        customer_product_code: 'SAMPLE-001',
+        product_name: 'Sample product name',
+        weight_per_box: '10',
+        expected_weight: '100',
+        expected_boxes: '10',
+        lot_no: '',
+        mfg_date: '',
+        exp_date: '',
+        line_note: 'ตัวอย่างหมายเหตุ',
+      }];
+  downloadExcelRows(rows, CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS, filename, 'DepositLines');
 }
 
 export function exportCustomerDepositLinesExcel(lines = [], filename = 'customer-deposit-lines.xlsx') {
@@ -82,6 +107,9 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
       expected_weight: expectedWeight,
       expected_boxes: expectedBoxes,
       pack_entry_mode: expectedWeight && !expectedBoxes ? 'WEIGHT' : 'BOXES',
+      lot_no: String(row.lot_no ?? '').trim(),
+      mfg_date: String(row.mfg_date ?? '').trim(),
+      exp_date: String(row.exp_date ?? '').trim(),
       line_note: String(row.line_note ?? '').trim(),
     });
   });
@@ -89,9 +117,11 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
   return { lines, errors };
 }
 
+const REQUIRED_IMPORT_HEADERS = ['customer_product_code'];
+
 export async function parseCustomerDepositLineImportFile(file) {
   const { headers, rows } = await readExcelFile(file);
-  const missingHeaders = CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS.filter((header) => !headers.includes(header));
+  const missingHeaders = REQUIRED_IMPORT_HEADERS.filter((header) => !headers.includes(header));
   if (missingHeaders.length) {
     return {
       rows: [],

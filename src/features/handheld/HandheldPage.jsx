@@ -6,6 +6,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   recordDepositLineActualReceipt,
+  upsertCustomerDepositRequestLine,
 } from '../../services/customerDepositRequestService.js';
 import {
   listCustomerWithdrawalRequests,
@@ -16,9 +17,9 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
 
-// ── Theme tokens (Minimalist Elegant) ───────────
+// ── Theme tokens (aligned with main app: dark navy + gold) ───────────
 const C = {
-  bg: '#ffffff',
+  bg: '#f8fafb',
   surface: '#ffffff',
   surfaceSolid: '#ffffff',
   card: '#ffffff',
@@ -26,8 +27,10 @@ const C = {
   borderLight: '#f1f5f9',
   shadow: '0 4px 20px rgba(15, 23, 42, 0.05)',
   shadowMd: '0 8px 30px rgba(15, 23, 42, 0.08)',
-  primary: '#0f172a',
-  primaryDark: '#020617',
+  primary: '#09111c',
+  primaryDark: '#050505',
+  gold: '#d4af37',
+  goldHover: '#b5952f',
   amber: '#d97706',
   green: '#059669',
   greenLight: '#ecfdf5',
@@ -39,9 +42,9 @@ const C = {
   textSec: '#475569',
   muted: '#94a3b8',
   inputBg: '#f8fafc',
-  headerGrad: '#ffffff',
-  receiveAccent: '#0f172a',
-  pickAccent: '#0f172a',
+  headerBg: '#09111c',
+  receiveAccent: '#09111c',
+  pickAccent: '#09111c',
   glassmorphism: {
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
@@ -77,28 +80,80 @@ function useCameraScanner(onScanned) {
   function handleCapture(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if ('BarcodeDetector' in window) {
-      const detector = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'code_39', 'ean_13', 'ean_8'] });
-      const img = new Image();
-      img.onload = async () => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = async () => {
+      URL.revokeObjectURL(objectUrl);
+      if ('BarcodeDetector' in window) {
         try {
+          const detector = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'code_39', 'ean_13', 'ean_8', 'itf', 'data_matrix'] });
           const codes = await detector.detect(img);
-          if (codes.length) onScanned(codes[0].rawValue);
-          else alert('ไม่พบบาร์โค้ดในภาพ');
-        } catch { alert('ไม่สามารถอ่านบาร์โค้ดได้'); }
-      };
-      img.src = URL.createObjectURL(file);
-    } else {
-      alert('เบราว์เซอร์นี้ไม่รองรับ BarcodeDetector');
-    }
+          if (codes.length > 0) {
+            onScanned(codes[0].rawValue);
+          } else {
+            alert('ไม่พบบาร์โค้ดในภาพ กรุณาถ่ายภาพใหม่ให้ชัดขึ้น');
+          }
+        } catch {
+          alert('ไม่สามารถอ่านบาร์โค้ดได้ กรุณาลองใหม่');
+        }
+      } else {
+        // Fallback: prompt user to enter manually
+        const manual = window.prompt('เบราว์เซอร์ไม่รองรับการสแกนอัตโนมัติ กรุณากรอกรหัสสินค้า:');
+        if (manual) onScanned(manual.trim());
+      }
+    };
+    img.src = objectUrl;
     e.target.value = '';
   }
 
+  // Use capture="environment" to open rear camera directly on mobile
   const el = (
-    <input ref={inputRef} type="file" accept="image/*" capture="environment"
+    <input ref={inputRef} type="file" accept="image/*;capture=camera" capture="environment"
       style={{ display: 'none' }} onChange={handleCapture} />
   );
   return { trigger, el };
+}
+
+// ── Print sticker ─────────────────────────────────────────────
+function printSticker({ customerName, productName, lotNo, mfgDate, expDate, locationCode, locationDetail }) {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sticker</title>
+<style>
+  @page { size: 100mm 60mm; margin: 4mm; }
+  body { font-family: sans-serif; font-size: 10px; margin: 0; padding: 0; }
+  .sticker { border: 1px solid #000; padding: 4mm; width: 92mm; box-sizing: border-box; }
+  .title { font-size: 13px; font-weight: 900; margin-bottom: 3mm; border-bottom: 1px solid #000; padding-bottom: 2mm; }
+  .row { display: flex; gap: 4px; margin-bottom: 2mm; }
+  .label { font-weight: 700; min-width: 22mm; color: #555; }
+  .val { font-weight: 600; }
+  .location-box { margin-top: 3mm; padding: 2mm; border: 2px solid #000; border-radius: 2mm; text-align: center; }
+  .loc-main { font-size: 18px; font-weight: 900; letter-spacing: 2px; }
+  .loc-detail { font-size: 9px; color: #666; }
+</style>
+</head>
+<body>
+<div class="sticker">
+  <div class="title">TGC Cold Storage — สติ๊กเกอร์จัดเก็บ</div>
+  <div class="row"><span class="label">ลูกค้า:</span><span class="val">${customerName ?? '-'}</span></div>
+  <div class="row"><span class="label">สินค้า:</span><span class="val">${productName ?? '-'}</span></div>
+  ${lotNo ? `<div class="row"><span class="label">LOT:</span><span class="val">${lotNo}</span></div>` : ''}
+  ${mfgDate ? `<div class="row"><span class="label">วันผลิต:</span><span class="val">${mfgDate}</span></div>` : ''}
+  ${expDate ? `<div class="row"><span class="label">วันหมดอายุ:</span><span class="val">${expDate}</span></div>` : ''}
+  <div class="location-box">
+    <div class="loc-main">${locationCode ?? '-'}</div>
+    ${locationDetail ? `<div class="loc-detail">${locationDetail}</div>` : ''}
+  </div>
+</div>
+</body>
+</html>`;
+  const win = window.open('', '_blank', 'width=400,height=300');
+  if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.print(); };
 }
 
 // ── Status pill ───────────────────────────────────────────────
@@ -117,35 +172,34 @@ function Pill({ label, color = C.primary, bg }) {
 }
 
 // ── Top bar ───────────────────────────────────────────────────
-function TopBar({ title, subtitle, onBack, badge, gradient = true }) {
+function TopBar({ title, subtitle, onBack, badge }) {
   return (
     <div style={{
-      background: gradient ? C.headerGrad : C.surface,
-      borderBottom: gradient ? 'none' : `1px solid ${C.border}`,
-      padding: '16px 20px',
+      background: C.headerBg,
+      borderBottom: 'none',
+      padding: '16px 24px',
       display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0,
-      boxShadow: gradient ? '0 4px 20px rgba(37,99,235,0.2)' : 'none',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
     }}>
       {onBack && (
         <button type="button" onClick={onBack}
           style={{
-            background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)',
+            background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
             color: '#ffffff', fontSize: 20, cursor: 'pointer',
             width: 40, height: 40, borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}>
           ←
         </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          color: C.text,
+          color: '#ffffff',
           fontWeight: 800, fontSize: 18,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{title}</div>
         {subtitle && (
-          <div style={{ color: C.textSec, fontSize: 13, marginTop: 2, fontWeight: 600 }}>
+          <div style={{ color: C.gold, fontSize: 13, marginTop: 2, fontWeight: 600 }}>
             {subtitle}
           </div>
         )}
@@ -197,7 +251,7 @@ function ConfirmedChip({ item }) {
         color: '#fff', fontSize: 18, boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
       }}>✓</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: C.text, fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ color: C.text, fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'break-word' }}>
           {item.line?.product_name ?? item.line?.customer_product_code}
         </div>
         <div style={{ color: C.green, fontSize: 13, marginTop: 4, fontWeight: 600 }}>
@@ -214,15 +268,16 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
   return (
     <button type="button" onClick={onSelect}
       style={{
-        display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left',
+        display: 'flex', alignItems: 'center', gap: 14, width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: isDone ? C.surfaceSolid : C.card,
         border: `1px solid ${isDone ? C.greenBorder : C.border}`,
-        borderRadius: 16, padding: '16px 16px', marginBottom: 10,
+        borderRadius: 16, padding: '16px', marginBottom: 10,
         cursor: 'pointer', color: C.text,
         boxShadow: isDone ? 'none' : C.shadow,
         transition: 'transform 0.2s, box-shadow 0.2s',
         borderLeft: `5px solid ${isDone ? C.green : C.primary}`,
         opacity: isDone ? 0.7 : 1,
+        overflow: 'hidden',
       }}>
       <div style={{
         width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
@@ -232,11 +287,11 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
       }}>
         {isDone ? '✓' : index + 1}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ fontSize: 15, fontWeight: 800, wordBreak: 'break-word', overflowWrap: 'anywhere', color: C.text, lineHeight: 1.4 }}>
           {line.product_name ?? line.customer_product_code}
         </div>
-        <div style={{ fontSize: 13, color: C.textSec, marginTop: 4, fontWeight: 500 }}>
+        <div style={{ fontSize: 13, color: C.textSec, marginTop: 4, fontWeight: 500, lineHeight: 1.5 }}>
           {line.expected_boxes != null ? `${line.expected_boxes} กล่อง · ` : ''}{line.expected_weight != null ? `${line.expected_weight} กก.` : ''}
           {isDone && doneLabel && (
             <span style={{
@@ -255,24 +310,26 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText })
   return (
     <button type="button" onClick={onClick}
       style={{
-        display: 'block', width: '100%', textAlign: 'left',
+        display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 20, padding: '20px 20px', marginBottom: 12,
+        borderRadius: 20, padding: '20px', marginBottom: 12,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
         borderLeft: `6px solid ${statusColor}`,
+        overflow: 'hidden',
         transition: 'transform 0.2s, box-shadow 0.2s',
       }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
         <span style={{
-          fontFamily: 'monospace', fontWeight: 900, fontSize: 17, color: C.text, letterSpacing: '0.02em',
+          fontFamily: 'monospace', fontWeight: 900, fontSize: 15, color: C.text, letterSpacing: '0.02em',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, lineHeight: 1.4,
         }}>{docNo}</span>
         <Pill label={statusLabel} color={statusColor} />
       </div>
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-        <span style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>📅 {dateStr}</span>
-        {subText && <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>· {subText}</span>}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500, lineHeight: 1.5 }}>{dateStr}</span>
+        {subText && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, lineHeight: 1.5, wordBreak: 'break-word' }}>· {subText}</span>}
       </div>
     </button>
   );
@@ -281,18 +338,19 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText })
 // ── Sort Control ──────────────────────────────────────────────
 function SortDropdown({ sortType, setSortType }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-      <div style={{ color: C.textSec, fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ color: C.textSec, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
         รายการสินค้า
       </div>
       <select
         value={sortType}
         onChange={(e) => setSortType(e.target.value)}
         style={{
+          width: '100%',
           background: C.surfaceSolid,
           border: `1px solid ${C.border}`,
           borderRadius: 12,
-          padding: '6px 12px',
+          padding: '8px 12px',
           fontSize: 13,
           fontWeight: 700,
           color: C.primaryDark,
@@ -300,9 +358,9 @@ function SortDropdown({ sortType, setSortType }) {
           boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         }}
       >
-        <option value="pending">เรียงตาม สถานะการทำ (ยังไม่ทำขึ้นก่อน)</option>
-        <option value="name">เรียงตาม ชื่อสินค้า (ก-ฮ)</option>
-        <option value="code">เรียงตาม รหัสสินค้า (A-Z)</option>
+        <option value="pending">ยังไม่ทำก่อน</option>
+        <option value="name">ชื่อสินค้า (ก-ฮ)</option>
+        <option value="code">รหัสสินค้า (A-Z)</option>
       </select>
     </div>
   );
@@ -322,10 +380,69 @@ function ReceivingWorkflow({ onBack, t }) {
   const [palletScan, setPalletScan] = useState('');
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [locations, setLocations] = useState([]);
+  const [locZone, setLocZone] = useState('');
+  const [locSide, setLocSide] = useState('');
+  const [locRow, setLocRow] = useState('');
+  const [locLevel, setLocLevel] = useState('');
   const [confirmed, setConfirmed] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [sortType, setSortType] = useState('pending');
+  const [mismatchWarned, setMismatchWarned] = useState(false);
+  const [editLotNo, setEditLotNo] = useState('');
+  const [editMfgDate, setEditMfgDate] = useState('');
+  const [editExpDate, setEditExpDate] = useState('');
+  const [stickerItem, setStickerItem] = useState(null);
+  const [addExtraOpen, setAddExtraOpen] = useState(false);
+  const [extraProductName, setExtraProductName] = useState('');
+  const [extraProductCode, setExtraProductCode] = useState('');
+  const [extraLotNo, setExtraLotNo] = useState('');
+  const [extraMfgDate, setExtraMfgDate] = useState('');
+  const [extraExpDate, setExtraExpDate] = useState('');
+  const [extraBoxes, setExtraBoxes] = useState('');
+  const [extraWeight, setExtraWeight] = useState('');
+  const [extraSaving, setExtraSaving] = useState(false);
+  const [extraError, setExtraError] = useState('');
+
+  // Parse location code into hierarchy parts: zone, side, row, level
+  function parseLocCode(code) {
+    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4] } : null;
+  }
+  const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })), [locations]);
+  const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
+
+  const availableZones = useMemo(() => {
+    if (!useHierarchy) return [];
+    return [...new Set(parsedLocs.map((l) => l.parsed.zone))].sort();
+  }, [parsedLocs, useHierarchy]);
+
+  const availableSides = useMemo(() => {
+    if (!locZone) return [];
+    return [...new Set(parsedLocs.filter((l) => l.parsed.zone === locZone).map((l) => l.parsed.side))].sort();
+  }, [parsedLocs, locZone]);
+
+  const availableRows = useMemo(() => {
+    if (!locZone || !locSide) return [];
+    return [...new Set(parsedLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort();
+  }, [parsedLocs, locZone, locSide]);
+
+  const availableLevels = useMemo(() => {
+    if (!locZone || !locSide || !locRow) return [];
+    return [...new Set(parsedLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow).map((l) => l.parsed.level))].sort();
+  }, [parsedLocs, locZone, locSide, locRow]);
+
+  // Auto-resolve selectedLocation from the 4-part hierarchy selection
+  useEffect(() => {
+    if (!useHierarchy || !locZone || !locSide || !locRow || !locLevel) {
+      if (useHierarchy) setSelectedLocation(null);
+      return;
+    }
+    const match = parsedLocs.find((l) =>
+      l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow && l.parsed.level === locLevel
+    );
+    setSelectedLocation(match ?? null);
+  }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
   const { trigger: cameraPallet, el: cameraPalletEl } = useCameraScanner((v) => setPalletScan(v));
@@ -361,27 +478,98 @@ function ReceivingWorkflow({ onBack, t }) {
       setMatchedLine(match);
       setBoxes(match.actual_boxes?.toString() ?? match.expected_boxes?.toString() ?? '');
       setWeight(match.actual_weight?.toString() ?? match.expected_weight?.toString() ?? '');
+      setEditLotNo(match.lot_no ?? '');
+      setEditMfgDate(match.mfg_date ?? '');
+      setEditExpDate(match.exp_date ?? '');
+      setMismatchWarned(false);
     } else {
       setMatchedLine(null);
     }
   }
 
+  function hasMismatch() {
+    const enteredBoxes = Number(boxes);
+    const enteredWeight = Number(weight);
+    const expectedBoxes = Number(matchedLine?.expected_boxes ?? 0);
+    const expectedWeight = Number(matchedLine?.expected_weight ?? 0);
+    const boxesDiff = expectedBoxes > 0 && Math.abs(enteredBoxes - expectedBoxes) > 0;
+    const weightDiff = expectedWeight > 0 && Math.abs(enteredWeight - expectedWeight) > 0.01;
+    return boxesDiff || weightDiff;
+  }
+
   async function handleConfirm() {
     if (!matchedLine) return;
+    if (hasMismatch() && !mismatchWarned) {
+      setMismatchWarned(true);
+      return;
+    }
     setSaving(true); setSaveError('');
-    const r = await recordDepositLineActualReceipt(matchedLine.id, { actualBoxes: boxes, actualWeight: weight, note: null });
+    const r = await recordDepositLineActualReceipt(matchedLine.id, {
+      actualBoxes: boxes,
+      actualWeight: weight,
+      note: null,
+      lotNo: editLotNo || null,
+      mfgDate: editMfgDate || null,
+      expDate: editExpDate || null,
+      locationId: selectedLocation?.id || null,
+    });
     setSaving(false);
     if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
 
     triggerSuccessFeedback();
-    setConfirmed((prev) => [{
+    const confirmedItem = {
       line: matchedLine, boxes, weight, palletId: palletScan, location: selectedLocation,
-      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-    }, ...prev]);
+      lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
+      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      customerName: selectedDoc?.contact_name ?? '',
+    };
+    setConfirmed((prev) => [confirmedItem, ...prev]);
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
       ? { ...l, actual_boxes: Number(boxes) || null, actual_weight: Number(weight) || null } : l));
 
-    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setPalletScan(''); setSelectedLocation(null);
+    setStickerItem(confirmedItem);
+    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setPalletScan('');
+    setSelectedLocation(null); setMismatchWarned(false);
+    setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
+    setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
+  }
+
+  async function handleAddExtra() {
+    if (!extraProductName.trim() || !extraBoxes) return;
+    setExtraSaving(true); setExtraError('');
+    const upsertResult = await upsertCustomerDepositRequestLine(selectedDoc.id, {
+      productName: extraProductName.trim(),
+      customerProductCode: extraProductCode.trim() || null,
+      lotNo: extraLotNo || null,
+      mfgDate: extraMfgDate || null,
+      expDate: extraExpDate || null,
+      expectedBoxes: Number(extraBoxes) || null,
+      expectedWeight: Number(extraWeight) || null,
+    });
+    if (upsertResult.error) {
+      setExtraError(upsertResult.error.message ?? 'เพิ่มรายการไม่สำเร็จ');
+      setExtraSaving(false);
+      return;
+    }
+    const newLineId = upsertResult.data?.id;
+    if (newLineId) {
+      await recordDepositLineActualReceipt(newLineId, {
+        actualBoxes: Number(extraBoxes) || null,
+        actualWeight: Number(extraWeight) || null,
+        note: null,
+        lotNo: extraLotNo || null,
+        mfgDate: extraMfgDate || null,
+        expDate: extraExpDate || null,
+      });
+    }
+    triggerSuccessFeedback();
+    // Refresh lines
+    const refreshed = await listCustomerDepositRequestLines(selectedDoc.id);
+    setLines(refreshed.data ?? []);
+    setExtraSaving(false);
+    setAddExtraOpen(false);
+    setExtraProductName(''); setExtraProductCode(''); setExtraLotNo('');
+    setExtraMfgDate(''); setExtraExpDate(''); setExtraBoxes(''); setExtraWeight('');
   }
 
   const doneCount = lines.filter((l) => l.actual_boxes != null).length;
@@ -407,9 +595,10 @@ function ReceivingWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
+      <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 20px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 24px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
             <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
           ) : docs.length === 0 ? (
@@ -442,17 +631,19 @@ function ReceivingWorkflow({ onBack, t }) {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <div data-testid="handheld-page" style={{ background: C.bg, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}{cameraPalletEl}
 
       <TopBar
         title={selectedDoc.request_no}
         subtitle={`✅ ${doneCount}/${lines.length} รายการ`}
-        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); }}
+        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
         badge={
           <div style={{
             background: 'rgba(255,255,255,0.2)', borderRadius: 20,
@@ -475,7 +666,7 @@ function ReceivingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 220px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 320px', background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (
@@ -502,6 +693,10 @@ function ReceivingWorkflow({ onBack, t }) {
                   setScanValue(l.customer_product_code ?? l.product_name ?? '');
                   setBoxes(l.actual_boxes?.toString() ?? l.expected_boxes?.toString() ?? '');
                   setWeight(l.actual_weight?.toString() ?? l.expected_weight?.toString() ?? '');
+                  setEditLotNo(l.lot_no ?? '');
+                  setEditMfgDate(l.mfg_date ?? '');
+                  setEditExpDate(l.exp_date ?? '');
+                  setMismatchWarned(false);
                   triggerSuccessFeedback();
                 }} />
             ))}
@@ -509,23 +704,67 @@ function ReceivingWorkflow({ onBack, t }) {
         )}
       </div>
 
-      {/* Bottom Thumb Zone Action Bar */}
+      {/* Sticker print popup */}
+      {stickerItem && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 24, padding: '24px 20px',
+            width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 16, color: C.text }}>พิมพ์สติ๊กเกอร์</div>
+            <div style={{ background: C.blueLight, borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 13 }}>
+              <div><strong>สินค้า:</strong> {stickerItem.line?.product_name}</div>
+              <div><strong>LOT:</strong> {stickerItem.lotNo || '-'}</div>
+              <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'} / <strong>หมดอายุ:</strong> {stickerItem.expDate || '-'}</div>
+              <div><strong>Location:</strong> {stickerItem.location?.code ?? 'ยังไม่ได้เลือก'}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="button"
+                onClick={() => {
+                  printSticker({
+                    customerName: stickerItem.customerName,
+                    productName: stickerItem.line?.product_name,
+                    lotNo: stickerItem.lotNo,
+                    mfgDate: stickerItem.mfgDate,
+                    expDate: stickerItem.expDate,
+                    locationCode: stickerItem.location?.code,
+                    locationDetail: stickerItem.location ? `Section: ${stickerItem.location.sectionCode ?? '-'}` : '',
+                  });
+                }}
+                style={{ flex: 1, padding: '16px', borderRadius: 16, background: C.primary, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>
+                พิมพ์สติ๊กเกอร์
+              </button>
+              <button type="button" onClick={() => setStickerItem(null)}
+                style={{ padding: '16px 20px', borderRadius: 16, background: C.blueLight, border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', color: C.textSec }}>
+                ข้าม
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Bar */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
+        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 720,
         background: C.surface,
-        ...C.glassmorphism,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
-        padding: '24px 20px 32px',
-        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        transform: matchedLine ? 'translateY(0)' : 'translateY(0)',
+        padding: '20px 24px 32px',
         zIndex: 100,
-        maxHeight: '85vh',
-        display: 'flex', flexDirection: 'column',
+        maxHeight: '60vh',
+        overflowY: 'auto',
       }}>
         {matchedLine ? (
-          <div style={{ flex: 1, overflowY: 'auto', margin: '-24px -20px -32px', padding: '24px 20px 32px' }}>
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ color: C.primaryDark, fontWeight: 900, fontSize: 20 }}>ยืนยันรับเข้า</div>
               <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
@@ -540,12 +779,29 @@ function ReceivingWorkflow({ onBack, t }) {
               background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
               border: `2px solid ${C.primary}40`,
             }}>
-              <div style={{ color: C.text, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {matchedLine.product_name ?? matchedLine.customer_product_code ?? '—'}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ background: C.blueLight, color: C.primaryDark, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>รหัส {matchedLine.customer_product_code}</span>
-                {matchedLine.lot_no && <span style={{ background: '#f0fdf4', color: C.green, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                <span style={{ background: C.blueLight, color: C.primaryDark, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, overflowWrap: 'break-word', wordBreak: 'break-all' }}>รหัส {matchedLine.customer_product_code}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <label>
+                  <div style={{ fontSize: 11, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>เลข LOT</div>
+                  <input type="text" value={editLotNo} onChange={(e) => setEditLotNo(e.target.value)}
+                    placeholder="LOT number"
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, outline: 'none' }} />
+                </label>
+                <label>
+                  <div style={{ fontSize: 11, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันผลิต</div>
+                  <input type="date" value={editMfgDate} onChange={(e) => setEditMfgDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', fontSize: 13, outline: 'none' }} />
+                </label>
+                <label style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 11, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันหมดอายุ</div>
+                  <input type="date" value={editExpDate} onChange={(e) => setEditExpDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', fontSize: 13, outline: 'none' }} />
+                </label>
               </div>
             </div>
 
@@ -556,6 +812,17 @@ function ReceivingWorkflow({ onBack, t }) {
             )}
 
             <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
+
+            {mismatchWarned && (
+              <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 16 }}>
+                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 4 }}>⚠ จำนวนไม่ตรงกับที่แจ้ง</div>
+                <div style={{ color: '#78350f', fontSize: 13 }}>
+                  ที่แจ้ง: {matchedLine.expected_boxes} กล่อง / {matchedLine.expected_weight} กก.
+                  — ที่นับได้: {boxes} กล่อง / {weight} กก.
+                </div>
+                <div style={{ color: '#92400e', fontSize: 13, marginTop: 4, fontWeight: 700 }}>กดยืนยันอีกครั้งเพื่อบันทึกตามจำนวนที่นับได้</div>
+              </div>
+            )}
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Pallet ID (ถ้ามี)</div>
@@ -578,42 +845,134 @@ function ReceivingWorkflow({ onBack, t }) {
 
             {locations.length > 0 && (
               <div style={{ marginBottom: 20 }}>
-                <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📍 เลือก Location จัดเก็บ</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {locations.map((loc) => {
-                    const isSelected = selectedLocation?.id === loc.id;
-                    return (
-                      <button
-                        key={loc.id} type="button"
-                        onClick={() => setSelectedLocation(isSelected ? null : loc)}
-                        style={{
-                          padding: '10px 14px',
-                          border: `2px solid ${isSelected ? C.green : C.border}`,
-                          borderRadius: 14,
-                          background: isSelected ? C.greenLight : C.surfaceSolid,
-                          color: isSelected ? C.green : C.textSec,
-                          fontSize: 14, fontWeight: isSelected ? 800 : 600,
-                          cursor: 'pointer', transition: 'all 0.2s'
-                        }}
-                      >
-                        {loc.sectionCode} · {loc.code}
-                      </button>
-                    );
-                  })}
+                <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  📍 เลือก Location จัดเก็บ
+                  {selectedLocation && (
+                    <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>
+                      ✓ {selectedLocation.code}
+                    </span>
+                  )}
                 </div>
+
+                {useHierarchy ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Zone row */}
+                    <div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ห้อง / โซน</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {availableZones.map((z) => (
+                          <button key={z} type="button"
+                            onClick={() => { setLocZone(z === locZone ? '' : z); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                            style={{
+                              padding: '10px 18px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                              border: `2px solid ${locZone === z ? C.primary : C.border}`,
+                              background: locZone === z ? C.primary : C.surfaceSolid,
+                              color: locZone === z ? '#ffffff' : C.text, transition: 'all 0.15s',
+                            }}>
+                            {z}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Side row */}
+                    {locZone && availableSides.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ฝั่ง (Side)</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {availableSides.map((s) => (
+                            <button key={s} type="button"
+                              onClick={() => { setLocSide(s === locSide ? '' : s); setLocRow(''); setLocLevel(''); }}
+                              style={{
+                                padding: '10px 24px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                                border: `2px solid ${locSide === s ? C.primary : C.border}`,
+                                background: locSide === s ? C.primary : C.surfaceSolid,
+                                color: locSide === s ? '#ffffff' : C.text, transition: 'all 0.15s',
+                              }}>
+                              {s === 'L' ? 'ซ้าย (L)' : s === 'R' ? 'ขวา (R)' : s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Row row */}
+                    {locSide && availableRows.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>แถว (Row)</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {availableRows.map((r) => (
+                            <button key={r} type="button"
+                              onClick={() => { setLocRow(r === locRow ? '' : r); setLocLevel(''); }}
+                              style={{
+                                width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                                border: `2px solid ${locRow === r ? C.primary : C.border}`,
+                                background: locRow === r ? C.primary : C.surfaceSolid,
+                                color: locRow === r ? '#ffffff' : C.text, transition: 'all 0.15s',
+                              }}>
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Level row */}
+                    {locRow && availableLevels.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ชั้น (Level)</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {availableLevels.map((lv) => (
+                            <button key={lv} type="button"
+                              onClick={() => setLocLevel(lv === locLevel ? '' : lv)}
+                              style={{
+                                width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                                border: `2px solid ${locLevel === lv ? C.green : C.border}`,
+                                background: locLevel === lv ? C.greenLight : C.surfaceSolid,
+                                color: locLevel === lv ? C.green : C.text, transition: 'all 0.15s',
+                              }}>
+                              {lv}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Fallback: flat chip list for non-standard codes */
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {locations.map((loc) => {
+                      const isSelected = selectedLocation?.id === loc.id;
+                      return (
+                        <button key={loc.id} type="button"
+                          onClick={() => setSelectedLocation(isSelected ? null : loc)}
+                          style={{
+                            padding: '10px 14px', borderRadius: 14,
+                            border: `2px solid ${isSelected ? C.green : C.border}`,
+                            background: isSelected ? C.greenLight : C.surfaceSolid,
+                            color: isSelected ? C.green : C.textSec,
+                            fontSize: 14, fontWeight: isSelected ? 800 : 600,
+                            cursor: 'pointer', transition: 'all 0.2s',
+                          }}>
+                          {loc.sectionCode} · {loc.code}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
             <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
               style={{
                 width: '100%', padding: '20px', borderRadius: 20,
-                background: (!boxes && !weight) ? C.border : C.green,
+                background: (!boxes && !weight) ? C.border : (mismatchWarned ? '#f59e0b' : C.green),
                 color: (!boxes && !weight) ? C.muted : '#ffffff',
                 border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer',
-                boxShadow: (!boxes && !weight) ? 'none' : '0 8px 24px rgba(16,185,129,0.4)',
+                boxShadow: (!boxes && !weight) ? 'none' : (mismatchWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(16,185,129,0.4)'),
                 transition: 'all 0.2s',
               }}>
-              {saving ? '⏳ กำลังบันทึก...' : '✓ ยืนยันรับสินค้า'}
+              {saving ? '⏳ กำลังบันทึก...' : (mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : '✓ ยืนยันรับสินค้า')}
             </button>
           </div>
         ) : (
@@ -645,9 +1004,101 @@ function ReceivingWorkflow({ onBack, t }) {
                 กล้อง
               </button>
             </div>
+            <button type="button" onClick={() => setAddExtraOpen(true)}
+              style={{
+                marginTop: 12, width: '100%', padding: '14px', borderRadius: 16,
+                background: 'transparent', border: `2px dashed ${C.border}`,
+                color: C.textSec, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>
+              + เพิ่มสินค้าที่ไม่ได้แจ้ง / เพิ่ม LOT ใหม่
+            </button>
           </div>
         )}
       </div>
+
+      {/* Add Extra Item Modal */}
+      {addExtraOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+            padding: '28px 20px 40px', width: '100%', maxWidth: 480,
+            maxHeight: '90vh', overflowY: 'auto',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontWeight: 900, fontSize: 18, color: C.text }}>เพิ่มสินค้าที่ไม่ได้แจ้ง</div>
+              <button type="button" onClick={() => { setAddExtraOpen(false); setExtraError(''); }}
+                style={{ background: C.border, border: 'none', borderRadius: 14, width: 36, height: 36, fontSize: 18, cursor: 'pointer', color: C.textSec }}>
+                ✕
+              </button>
+            </div>
+            {extraError && (
+              <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 12, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>
+                {extraError}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <label>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>ชื่อสินค้า <span style={{ color: C.red }}>*</span></div>
+                <input type="text" value={extraProductName} onChange={(e) => setExtraProductName(e.target.value)}
+                  placeholder="ชื่อสินค้า"
+                  style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 15, fontWeight: 700, outline: 'none' }} />
+              </label>
+              <label>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>รหัสสินค้าลูกค้า</div>
+                <input type="text" value={extraProductCode} onChange={(e) => setExtraProductCode(e.target.value)}
+                  placeholder="รหัสสินค้า (ถ้ามี)"
+                  style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 15, fontWeight: 700, outline: 'none' }} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label>
+                  <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>เลข LOT</div>
+                  <input type="text" value={extraLotNo} onChange={(e) => setExtraLotNo(e.target.value)}
+                    placeholder="LOT"
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 14, fontWeight: 700, outline: 'none' }} />
+                </label>
+                <label>
+                  <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันผลิต</div>
+                  <input type="date" value={extraMfgDate} onChange={(e) => setExtraMfgDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 13, outline: 'none' }} />
+                </label>
+                <label>
+                  <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันหมดอายุ</div>
+                  <input type="date" value={extraExpDate} onChange={(e) => setExtraExpDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 13, outline: 'none' }} />
+                </label>
+                <label>
+                  <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>จำนวนกล่อง <span style={{ color: C.red }}>*</span></div>
+                  <input type="number" min="0" value={extraBoxes} onChange={(e) => setExtraBoxes(e.target.value)}
+                    placeholder="0"
+                    style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 15, fontWeight: 800, outline: 'none' }} />
+                </label>
+              </div>
+              <label>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>น้ำหนัก (กก.)</div>
+                <input type="number" min="0" step="0.01" value={extraWeight} onChange={(e) => setExtraWeight(e.target.value)}
+                  placeholder="0.00"
+                  style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 15, fontWeight: 800, outline: 'none' }} />
+              </label>
+            </div>
+            <button type="button"
+              disabled={!extraProductName.trim() || !extraBoxes || extraSaving}
+              onClick={handleAddExtra}
+              style={{
+                marginTop: 20, width: '100%', padding: '18px', borderRadius: 18,
+                background: (!extraProductName.trim() || !extraBoxes) ? C.border : C.green,
+                color: (!extraProductName.trim() || !extraBoxes) ? C.muted : '#fff',
+                border: 'none', fontSize: 17, fontWeight: 900, cursor: 'pointer',
+              }}>
+              {extraSaving ? '⏳ กำลังบันทึก...' : '✓ เพิ่มและบันทึก'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 }
@@ -734,9 +1185,10 @@ function PickingWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 20px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 24px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
             <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
           ) : docs.length === 0 ? (
@@ -769,11 +1221,13 @@ function PickingWorkflow({ onBack, t }) {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <div style={{ background: C.bg, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}
       <TopBar
         title={selectedDoc.withdrawal_no}
@@ -801,7 +1255,7 @@ function PickingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 220px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 280px', background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (
@@ -838,23 +1292,23 @@ function PickingWorkflow({ onBack, t }) {
         )}
       </div>
 
-      {/* Bottom Thumb Zone Action Bar */}
+      {/* Action Bar */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
+        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 720,
         background: C.surface,
-        ...C.glassmorphism,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
-        padding: '24px 20px 32px',
-        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        transform: matchedLine ? 'translateY(0)' : 'translateY(0)',
+        padding: '20px 24px 32px',
         zIndex: 100,
-        maxHeight: '85vh',
-        display: 'flex', flexDirection: 'column',
+        maxHeight: '60vh',
+        overflowY: 'auto',
       }}>
         {matchedLine ? (
-          <div style={{ flex: 1, overflowY: 'auto', margin: '-24px -20px -32px', padding: '24px 20px 32px' }}>
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ color: C.pickAccent, fontWeight: 900, fontSize: 20 }}>ยืนยันหยิบสินค้า</div>
               <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
@@ -869,12 +1323,12 @@ function PickingWorkflow({ onBack, t }) {
               background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
               border: `2px solid ${C.pickAccent}40`,
             }}>
-              <div style={{ color: C.text, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {matchedLine.product_name ?? matchedLine.customer_product_code ?? '—'}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>รหัส {matchedLine.customer_product_code}</span>
-                {matchedLine.lot_no && <span style={{ background: '#f3f4f6', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
+                <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, overflowWrap: 'break-word', wordBreak: 'break-all' }}>รหัส {matchedLine.customer_product_code}</span>
+                {matchedLine.lot_no && <span style={{ background: '#f3f4f6', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
               </div>
             </div>
 
@@ -925,6 +1379,7 @@ function PickingWorkflow({ onBack, t }) {
         )}
       </div>
     </div>
+    </div>
   );
 }
 
@@ -933,41 +1388,43 @@ function ModeSelect({ onSelect }) {
   const { activeProfile, logout } = useHandheldAuth();
   
   return (
-    <div data-testid="handheld-page" style={{ background: C.bg, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
+    <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      {/* Header - matches app sidebar branding */}
       <div style={{
-        background: C.surface,
-        padding: '32px 24px 24px',
-        borderBottom: `1px solid ${C.border}`,
+        background: C.headerBg,
+        padding: '24px 28px 20px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }}>
         <div>
-          <div style={{ color: C.primaryDark, fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em' }}>
-            TGC Handheld
+          <div style={{ color: C.gold, fontWeight: 900, fontSize: 22, letterSpacing: '-0.01em' }}>
+            TGC Cold Storage
           </div>
-          <div style={{ color: C.textSec, fontSize: 14, marginTop: 4, fontWeight: 600 }}>
-            {activeProfile ? `👤 ${activeProfile.displayName || activeProfile.email}` : 'Cold Storage Scanner'}
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3, fontWeight: 600 }}>
+            {activeProfile ? `${activeProfile.displayName || activeProfile.email}` : 'Handheld Scanner'}
           </div>
         </div>
-        
+
         {activeProfile && (
           <button type="button" onClick={logout} style={{
-            background: C.blueLight,
-            border: 'none',
-            borderRadius: 12,
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 10,
             padding: '8px 16px',
-            color: C.text,
+            color: 'rgba(255,255,255,0.85)',
             fontWeight: 700,
-            cursor: 'pointer'
+            fontSize: 13,
+            cursor: 'pointer',
           }}>
             ออกระบบ
           </button>
         )}
       </div>
 
-      <div style={{ flex: 1, padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <div style={{ flex: 1, padding: '32px 28px 40px', display: 'flex', flexDirection: 'column', gap: 0 }}>
         <div style={{ color: C.muted, fontSize: 13, fontWeight: 800, letterSpacing: '0.12em',
           textTransform: 'uppercase', marginBottom: 24, paddingLeft: 4 }}>
           เลือกโหมดการทำงาน
@@ -976,78 +1433,42 @@ function ModeSelect({ onSelect }) {
         {/* Receive button */}
         <button type="button" onClick={() => onSelect('receive')}
           style={{
-            display: 'block', width: '100%',
-            background: C.surface, border: `1px solid ${C.primary}`,
-            borderRadius: 16, padding: '24px',
+            display: 'flex', alignItems: 'center', gap: 16,
+            width: '100%', boxSizing: 'border-box',
+            background: C.surface, border: `2px solid ${C.border}`,
+            borderRadius: 20, padding: '28px 24px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 16,
-            boxShadow: `4px 4px 0px ${C.primary}`,
-            transition: 'transform 0.1s, box-shadow 0.1s',
+            marginBottom: 16, overflow: 'hidden',
+            boxShadow: C.shadow,
+            transition: 'border-color 0.15s, box-shadow 0.15s',
           }}
-          onMouseDown={(e) => { e.currentTarget.style.transform = 'translate(2px, 2px)'; e.currentTarget.style.boxShadow = `2px 2px 0px ${C.primary}`; }}
-          onMouseUp={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `4px 4px 0px ${C.primary}`; }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.gold; e.currentTarget.style.boxShadow = `0 4px 16px rgba(212,175,55,0.25)`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
           >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: C.text, marginBottom: 4 }}>รับเข้า (Receiving)</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 600 }}>รับสินค้าเข้าคลังตามใบงาน</div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: C.primary }}>→</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>รับเข้า (Receiving)</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>รับสินค้าเข้าคลังตามใบงาน</div>
           </div>
         </button>
 
         {/* Pick button */}
         <button type="button" onClick={() => onSelect('pick')}
           style={{
-            display: 'block', width: '100%',
-            background: C.surface, border: `1px solid ${C.primary}`,
-            borderRadius: 16, padding: '24px',
+            display: 'flex', alignItems: 'center', gap: 16,
+            width: '100%', boxSizing: 'border-box',
+            background: C.surface, border: `2px solid ${C.border}`,
+            borderRadius: 20, padding: '28px 24px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 32,
-            boxShadow: `4px 4px 0px ${C.primary}`,
-            transition: 'transform 0.1s, box-shadow 0.1s',
+            marginBottom: 36, overflow: 'hidden',
+            boxShadow: C.shadow,
+            transition: 'border-color 0.15s, box-shadow 0.15s',
           }}
-          onMouseDown={(e) => { e.currentTarget.style.transform = 'translate(2px, 2px)'; e.currentTarget.style.boxShadow = `2px 2px 0px ${C.primary}`; }}
-          onMouseUp={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `4px 4px 0px ${C.primary}`; }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.gold; e.currentTarget.style.boxShadow = `0 4px 16px rgba(212,175,55,0.25)`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
           >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: C.text, marginBottom: 4 }}>เบิกออก (Picking)</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 600 }}>หยิบสินค้าตามใบขอเบิก</div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: C.primary }}>→</div>
-          </div>
-        </button>
-
-        {/* Pick button */}
-        <button type="button" onClick={() => onSelect('pick')}
-          style={{
-            display: 'block', width: '100%',
-            background: C.surface, ...C.glassmorphism, border: `1px solid ${C.border}`,
-            borderRadius: 24, padding: '24px 20px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 32,
-            boxShadow: `0 8px 30px rgba(245,158,11,0.1)`,
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: 20,
-              background: '#fef3c7',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 32, flexShrink: 0,
-            }}>📤</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: C.text, marginBottom: 6 }}>เบิกสินค้าออก</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500 }}>สแกนและหยิบสินค้า</div>
-              <div style={{ fontSize: 14, color: C.textSec, fontWeight: 500, marginTop: 2 }}>ตามใบขอเบิก</div>
-            </div>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: '#fef3c7', color: C.amber,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, fontWeight: 800, flexShrink: 0,
-            }}>›</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>เบิกออก (Picking)</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>หยิบสินค้าตามใบขอเบิก</div>
           </div>
         </button>
 
@@ -1058,9 +1479,8 @@ function ModeSelect({ onSelect }) {
           padding: '20px',
           boxShadow: C.shadow,
         }}>
-          <div style={{ color: C.primaryDark, fontSize: 14, fontWeight: 900, marginBottom: 12,
-            display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>💡</span> วิธีใช้งาน
+          <div style={{ color: C.primaryDark, fontSize: 14, fontWeight: 900, marginBottom: 12 }}>
+            วิธีใช้งาน
           </div>
           {[
             ['1', 'เลือกโหมดการทำงาน → เลือกใบงาน'],
@@ -1080,6 +1500,7 @@ function ModeSelect({ onSelect }) {
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
@@ -1089,8 +1510,8 @@ function HandheldApp() {
   const [mode, setMode] = useState(null);
   const { activeProfile, isLoading } = useHandheldAuth();
 
-  if (isLoading) return <div style={{ padding: 40, textAlign: 'center', fontWeight: 700 }}>กำลังโหลด...</div>;
-  if (!activeProfile) return <HandheldLoginPage />;
+  if (isLoading) return <div data-testid="handheld-page" style={{ padding: 40, textAlign: 'center', fontWeight: 700 }}>กำลังโหลด...</div>;
+  if (!activeProfile) return <div data-testid="handheld-page" style={{ minHeight: '100dvh', background: '#f8fafb', display: 'flex', justifyContent: 'center' }}><HandheldLoginPage /></div>;
 
   if (mode === 'receive') return <ReceivingWorkflow onBack={() => setMode(null)} t={t} />;
   if (mode === 'pick') return <PickingWorkflow onBack={() => setMode(null)} t={t} />;

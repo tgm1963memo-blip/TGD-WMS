@@ -65,7 +65,15 @@ export async function listRoleDefinitions() {
 
 export async function upsertRoleDefinition(payload = {}) {
   if (!supabase) return missing();
-  const row = {
+  if (payload.id) {
+    const updateRow = {
+      display_name: payload.displayName,
+      description:  payload.description ?? null,
+      base_role:    payload.baseRole ?? null,
+    };
+    return supabase.from('tgd_role_definitions').update(updateRow).eq('id', payload.id).select().single();
+  }
+  const insertRow = {
     role_code:    payload.roleCode,
     display_name: payload.displayName,
     description:  payload.description ?? null,
@@ -74,8 +82,5 @@ export async function upsertRoleDefinition(payload = {}) {
     sort_order:   payload.sortOrder ?? 99,
     is_active:    payload.isActive ?? true,
   };
-  if (payload.id) {
-    return supabase.from('tgd_role_definitions').update(row).eq('id', payload.id).select().single();
-  }
-  return supabase.from('tgd_role_definitions').insert(row).select().single();
+  return supabase.from('tgd_role_definitions').insert(insertRow).select().single();
 }

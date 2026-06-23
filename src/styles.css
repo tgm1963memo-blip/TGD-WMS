@@ -391,7 +391,7 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .page-header h2, .doc-info h2 { color: var(--tgd-main-text); font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0 0 4px; }
 .page-header p, .doc-meta { color: var(--tgd-muted-text); font-size: 14px; line-height: 1.5; margin: 0; }
 .page-header-actions, .doc-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-.sprint-status, .barcode-placeholder { background: var(--tgd-surface); border: 1px solid var(--tgd-border); border-radius: 6px; display: inline-flex; font-size: 12px; font-weight: 600; margin-top: 12px; padding: 6px 10px; }
+.sprint-status, .barcode-placeholder { background: var(--tgd-surface); border: 1px solid var(--tgd-border); border-radius: 6px; display: inline-flex; font-size: 12px; font-weight: 600; margin-top: 12px; padding: 6px 10px; word-break: break-word; white-space: normal; }
 .sprint-status--compact { font-size: 11px; font-weight: 600; margin: 0 0 16px; padding: 4px 8px; }
 .document-link { color: var(--tgd-primary-gold); font-weight: 600; text-decoration: none; }
 .document-link:hover { text-decoration: underline; }
@@ -414,7 +414,7 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .compact-detail-value { color: var(--tgd-main-text); font-size: 12px; overflow-wrap: anywhere; }
 .compact-cell-text { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .compact-cell-qty { font-size: 12px; font-weight: 700; white-space: nowrap; }
-.app-shell--golive .main-content { padding-top: 0; }
+.app-shell--golive .main-content { padding-top: 28px; }
 .app-shell--golive .sprint-status,
 .page-shell--golive .sprint-status,
 .app-shell--golive .production-hold-badge,
@@ -461,11 +461,12 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .table-responsive { overflow-x: auto; }
 table, .tgd-table, .table { width: 100%; border-collapse: collapse; }
 th, .table-header, .table th { padding: 6px 8px; background: #fafafa; color: #52525b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; font-weight: 600; border-bottom: 1px solid var(--tgd-border); text-align: left; }
-td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd-main-text); border-bottom: 1px solid var(--tgd-border); vertical-align: middle; word-break: break-word; }
+td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd-main-text); border-bottom: 1px solid var(--tgd-border); vertical-align: middle; word-break: break-word; white-space: normal; }
 .table-meta-text { color: var(--tgd-muted-text); font-size: 12px; white-space: nowrap; }
+.tgd-table td.cell-nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; word-break: normal; }
 .table tbody tr:hover, .tgd-table tbody tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 
-.empty-state { padding: 48px 32px; text-align: center; color: var(--tgd-muted-text); background: transparent; border: 1px dashed var(--tgd-border); border-radius: 4px; margin: 16px 0; }
+.empty-state { padding: 48px 32px; text-align: center; color: var(--tgd-muted-text); background: transparent; border: 1px dashed var(--tgd-border); border-radius: 4px; margin: 16px 0; word-break: break-word; white-space: normal; }
 .empty-icon { font-size: 40px; color: #d1d5db; margin-bottom: 12px; }
 .empty-state h3 { margin: 0 0 8px; font-size: 16px; color: var(--tgd-main-text); font-weight: 600; }
 .empty-state p { margin: 0; font-size: 14px; }
@@ -784,8 +785,10 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 }
 
 .page-header-content {
-  border-left: 3px solid var(--tgd-accent);
-  padding-left: 12px;
+  border-left: 4px solid var(--tgd-accent);
+  padding-left: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .card,
@@ -824,7 +827,7 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 
 .table-card .table-responsive,
 .table-card .responsive-table {
-  padding: 0 8px 8px;
+  padding: 0 12px 12px;
 }
 
 .form-card h3,

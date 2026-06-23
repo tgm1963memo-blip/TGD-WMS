@@ -54,6 +54,10 @@ export function CustomerWithdrawalRequestDetailPage() {
 
       setPolicy(policyResult.data ?? null);
       setLoading(false);
+    }).catch((err) => {
+      if (!active) return;
+      setError(err?.message || t('customer_portal_load_error'));
+      setLoading(false);
     });
 
     return () => {

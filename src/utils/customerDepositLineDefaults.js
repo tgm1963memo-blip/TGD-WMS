@@ -15,6 +15,9 @@ export function createEmptyDepositLine(lineKey = 1) {
     pack_entry_mode: PACK_ENTRY_MODES.BOXES,
     line_note: '',
     temperature_type: 'FROZEN',
+    lot_no: '',
+    mfg_date: '',
+    exp_date: '',
   };
 }
 

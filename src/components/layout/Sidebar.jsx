@@ -54,6 +54,7 @@ export function Sidebar({ isOpen, onClose }) {
                         isActive ? 'nav-link nav-item active' : 'nav-link nav-item'
                       }
                       to={item.path}
+                      end
                       data-testid={item.testId}
                       onClick={onClose}
                     >

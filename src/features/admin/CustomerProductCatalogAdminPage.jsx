@@ -25,13 +25,17 @@ const EMPTY_FORM = {
   productName: '',
   internalProductCode: '',
   uom: '',
+  uomCustom: '',
   packWeightKg: '',
   temperatureType: 'FROZEN',
   argentType: 'NON_ARGENT',
   storageChargeBasis: 'WEIGHT',
+  allergenHas: false,
   allergen: '',
   note: '',
 };
+
+const UOM_PRESETS = ['กก.', 'กล่อง', 'ถุง', 'ชิ้น', 'แพ็ค', 'โหล', 'ลัง'];
 
 const TEMP_COLORS = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
 
@@ -145,15 +149,46 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
                 placeholder="รหัสภายในคลัง"
               />
             </label>
-            <label className="form-field" style={{ margin: 0 }}>
+            <div className="form-field" style={{ margin: 0 }}>
               <span>หน่วย (UOM)</span>
-              <input
-                className="form-control"
-                onChange={(e) => onFieldChange('uom', e.target.value)}
-                value={form.uom}
-                placeholder="กก. / กล่อง / ถุง"
-              />
-            </label>
+              {(() => {
+                const dropdownVal = UOM_PRESETS.includes(form.uom)
+                  ? form.uom
+                  : form.uomCustom
+                    ? 'OTHER'
+                    : '';
+                return (
+                  <>
+                    <select
+                      className="form-control"
+                      style={{ marginBottom: dropdownVal === 'OTHER' ? 6 : 0 }}
+                      value={dropdownVal}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'OTHER') {
+                          onFieldChange('uom', '');
+                        } else {
+                          onFieldChange('uom', val);
+                          onFieldChange('uomCustom', '');
+                        }
+                      }}
+                    >
+                      <option value="">— เลือกหน่วย —</option>
+                      {UOM_PRESETS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      <option value="OTHER">อื่นๆ (ระบุเอง)</option>
+                    </select>
+                    {dropdownVal === 'OTHER' && (
+                      <input
+                        className="form-control"
+                        placeholder="ระบุหน่วย เช่น KG หรือ ชิ้น"
+                        value={form.uomCustom}
+                        onChange={(e) => onFieldChange('uomCustom', e.target.value)}
+                      />
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
@@ -187,15 +222,45 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
                 placeholder="เช่น 1.500"
               />
             </label>
-            <label className="form-field" style={{ margin: 0 }}>
+            <div className="form-field" style={{ margin: 0 }}>
               <span>สารก่อภูมิแพ้ (Allergen)</span>
-              <input
-                className="form-control"
-                onChange={(e) => onFieldChange('allergen', e.target.value)}
-                value={form.allergen}
-                placeholder="เช่น Gluten, Dairy, Nuts"
-              />
-            </label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: form.allergenHas ? 6 : 0 }}>
+                <button
+                  type="button"
+                  onClick={() => { onFieldChange('allergenHas', false); onFieldChange('allergen', ''); }}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 8,
+                    border: `1px solid ${!form.allergenHas ? '#059669' : 'var(--tgd-border)'}`,
+                    background: !form.allergenHas ? '#ecfdf5' : 'transparent',
+                    color: !form.allergenHas ? '#059669' : 'var(--tgd-muted-text)',
+                    fontWeight: 700, cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  ไม่มี
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFieldChange('allergenHas', true)}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 8,
+                    border: `1px solid ${form.allergenHas ? '#ef4444' : 'var(--tgd-border)'}`,
+                    background: form.allergenHas ? '#fef2f2' : 'transparent',
+                    color: form.allergenHas ? '#ef4444' : 'var(--tgd-muted-text)',
+                    fontWeight: 700, cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  มี
+                </button>
+              </div>
+              {form.allergenHas && (
+                <input
+                  className="form-control"
+                  placeholder="ระบุสารก่อภูมิแพ้ เช่น Gluten, Dairy, Nuts"
+                  value={form.allergen}
+                  onChange={(e) => onFieldChange('allergen', e.target.value)}
+                />
+              )}
+            </div>
           </div>
 
           <label className="form-field" style={{ margin: '0 0 20px' }}>
@@ -278,10 +343,12 @@ export function CustomerProductCatalogAdminPage() {
       productName: row.product_name ?? '',
       internalProductCode: row.internal_product_code ?? '',
       uom: row.uom ?? '',
+      uomCustom: row.uom && !UOM_PRESETS.includes(row.uom) ? row.uom : '',
       packWeightKg: row.pack_weight_kg != null ? String(row.pack_weight_kg) : '',
       temperatureType: row.temperature_type ?? 'FROZEN',
       argentType: row.argent_type ?? 'NON_ARGENT',
       storageChargeBasis: row.storage_charge_basis ?? 'WEIGHT',
+      allergenHas: !!(row.allergen),
       allergen: row.allergen ?? '',
       note: row.note ?? '',
     });
@@ -306,7 +373,7 @@ export function CustomerProductCatalogAdminPage() {
       customerProductCode: form.customerProductCode,
       productName: form.productName,
       internalProductCode: form.internalProductCode,
-      uom: form.uom,
+      uom: form.uom || form.uomCustom,
       packWeightKg: form.packWeightKg !== '' ? parseFloat(form.packWeightKg) : null,
       temperatureType: form.temperatureType,
       argentType: form.argentType,
@@ -455,7 +522,10 @@ export function CustomerProductCatalogAdminPage() {
             importTestId="catalog-admin-import-input"
             onExport={() => exportCustomerProductsExcel(products)}
             onImportFile={handleImportFile}
-            onTemplate={downloadCustomerProductTemplate}
+            onTemplate={() => {
+              const customer = customers.find((c) => c.id === filterCustomerId) ?? null;
+              downloadCustomerProductTemplate(customer);
+            }}
             templateTestId="catalog-admin-template-button"
           />
         </div>

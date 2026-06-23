@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import dotenv from 'dotenv';
+import { resolveServiceRoleKey } from './lib/uatSupabaseAdmin.mjs';
 
 const ROOT = process.cwd();
 dotenv.config({ path: path.join(ROOT, '.env.local') });
@@ -17,16 +18,7 @@ const CATALOG_NAME = 'Flow Test Product';
 const INTERNAL_CODE = 'FRZ-FLOW-01';
 
 function getServiceRoleKey() {
-  const raw = execSync('npx supabase projects api-keys --project-ref lievvsqbosvrolkrftna', {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const jsonStart = raw.indexOf('{');
-  if (jsonStart < 0) throw new Error('Unable to parse Supabase API keys output');
-  const payload = JSON.parse(raw.slice(jsonStart));
-  const key = payload.keys?.find((row) => row.name === 'service_role')?.api_key;
-  if (!key) throw new Error('service_role key not found');
-  return key;
+  return resolveServiceRoleKey().key;
 }
 
 function getCustomerPassword() {

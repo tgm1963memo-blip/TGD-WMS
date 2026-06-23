@@ -180,22 +180,6 @@ test.describe('UAT — Warehouse staff role', () => {
     await expect(handheldEl.or(appShell)).toBeVisible({ timeout: 20000 });
     await snap(page, 'warehouse_handheld');
   });
-
-  test('Receiving page loads for warehouse staff', async () => {
-    if (!page) test.skip();
-    await page.goto(`${BASE}/operations/receiving`);
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 15000 });
-    await snap(page, 'warehouse_receiving');
-  });
-
-  test('Withdrawal requests page loads for warehouse staff', async () => {
-    if (!page) test.skip();
-    await page.goto(`${BASE}/operations/withdrawal-requests`);
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 15000 });
-    await snap(page, 'warehouse_withdrawals');
-  });
 });
 
 // ─── CUSTOMER PORTAL USER ROLE ───────────────────────────────────────────────

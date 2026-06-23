@@ -16,24 +16,14 @@ const WAREHOUSE_ADMIN_NAV_GROUPS = Object.freeze([
 ]);
 const WAREHOUSE_ADMIN_NAV_KEYS = Object.freeze([
   'receiving',
-  'putaway',
   'withdrawal_request',
-  'reservation',
-  'picking_confirmation',
-  'post_outbound',
-  'dispatch_history',
   'stock_balance',
 ]);
 
 const WAREHOUSE_ADMIN_ROUTE_PREFIXES = Object.freeze([
   '/operations/receiving',
-  '/operations/putaway',
   '/operations/withdrawal-requests',
-  '/operations/allocations',
-  '/operations/picking',
-  '/operations/outbound',
-  '/operations/dispatch',
-  '/stock-count',
+  '/inventory',
   '/customer/admin/deposit-review',
   '/customer/admin/withdrawal-review',
 ]);

@@ -24,8 +24,6 @@ export const navigationGroups = [
     key: 'inventory_control',
     items: [
       { label: 'ยอดคงเหลือ', key: 'stock_balance', path: '/inventory' },
-      { label: 'Transfer', key: 'transfer', path: '/operations/transfer', disabled: true },
-      { label: 'Adjustment', key: 'adjustment', path: '/operations/adjustment', disabled: true },
     ],
   },
   {

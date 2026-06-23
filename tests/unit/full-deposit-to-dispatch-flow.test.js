@@ -12,25 +12,23 @@ describe('full deposit-to-dispatch Playwright flow', () => {
     expect(fs.existsSync(helpersPath)).toBe(true);
   });
 
-  it('covers inbound, storage, outbound, and verification phases', () => {
+  it('covers customer deposit driven inbound and menu-aligned routes', () => {
     const source = fs.readFileSync(specPath, 'utf8');
 
     [
       'customer-deposit',
-      'receiving-create-draft',
-      'receiving-confirm-post',
-      'putaway-draft',
+      'warehouse-receiving-workspace',
+      'inventory-balance',
       'withdrawal-draft',
-      'dispatch-page',
-      'picking-loading-demo',
       'movement-ledger-inbound',
       'billing-movement-weight',
     ].forEach((marker) => {
       expect(source).toContain(marker);
     });
 
-    expect(source).toContain('/operations/receiving/create');
+    expect(source).not.toContain('/operations/receiving/create');
+    expect(source).not.toContain('/operations/putaway');
+    expect(source).toContain('/operations/receiving');
     expect(source).toContain('/reports/movement-ledger');
-    expect(source).toContain('/customer/warehouse/picking-loading');
   });
 });

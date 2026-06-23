@@ -134,11 +134,15 @@ export function BillingMovementWeightReportPage() {
 
   const classifiedError = state.error ? classifyBillingMovementWeightError(state.error) : null;
 
+  const hasActiveFilter = filters.customerId || filters.productId || filters.dateFrom || filters.dateTo || filters.movementType || filters.billingStatus || filters.isBillable;
+
   const emptyMessage = state.loading
     ? null
     : classifiedError
       ? null
-      : 'No billing movement weight rows match the selected filters.';
+      : hasActiveFilter
+        ? 'ไม่พบรายการที่ตรงกับเงื่อนไขที่เลือก — ลองล้างตัวกรองเพื่อดูข้อมูลทั้งหมด'
+        : 'ยังไม่มีข้อมูลการเคลื่อนไหว — ข้อมูลจะปรากฏเมื่อมีการยืนยันรับสินค้าเข้าคลังผ่านหน้า Operations › Receiving';
 
   function handleExport() {
     if (!state.rows.length) return;

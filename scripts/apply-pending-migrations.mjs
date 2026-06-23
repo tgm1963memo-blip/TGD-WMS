@@ -11,6 +11,20 @@ const MIGRATIONS = [
   '055_tgd_wms_customer_request_execution_bridge.sql',
   '056_tgd_wms_facility_usage_and_storage_rate_rules.sql',
   '057_tgd_wms_deposit_pack_size_vehicle_and_notifications.sql',
+  '058_tgd_wms_confirm_deposit_receiving.sql',
+  '058_tgd_wms_customer_product_allergen_weight.sql',
+  '059_tgd_wms_deposit_line_actual_receipt.sql',
+  '060_tgd_wms_customer_columns_backfill.sql',
+  '061_tgd_wms_handheld_pin_login.sql',
+  '062_tgd_wms_withdrawal_lines_lot_no.sql',
+  '063_tgd_wms_handheld_staff_list_and_pin_reuse.sql',
+  '064_tgd_wms_deposit_line_location_lot.sql',
+  '065_tgd_wms_schema_relationship_and_rls_fixes.sql',
+  '066_tgd_wms_product_service_rates_foundation.sql',
+  '067_tgd_wms_demo_customer_seed.sql',
+  '068_tgd_wms_deprecate_standalone_receiving_draft.sql',
+  '069_tgd_wms_role_area_permissions.sql',
+  '070_tgd_wms_role_function_permissions.sql',
 ];
 
 function runSql(sql, label) {

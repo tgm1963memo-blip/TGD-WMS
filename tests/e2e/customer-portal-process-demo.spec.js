@@ -50,7 +50,8 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
   test('Scenario 5: Deposit with attachment submits in live mode or shows scope guard', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/deposit-request/new`);
     await fillFirstDepositLine(page, { qty: '10' });
-    await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill('2026-06-15');
+    const futureDate = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+    await page.locator('[data-testid="customer-deposit-expected-arrival-date"]').fill(futureDate);
     await page.locator('[data-testid="customer-deposit-contact-name"]').fill('Demo Contact');
     await page.locator('[data-testid="customer-deposit-contact-phone"]').fill('0800000000');
     await page.locator('[data-testid="customer-deposit-attachment-input"]').setInputFiles({
@@ -97,15 +98,13 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
     await expect(page.locator('[data-testid="customer-notification-preview"]')).toContainText('was not sent');
   });
 
-  test('Scenario 11: Withdrawal source and picking rule are selectable', async ({ page }) => {
+  test('Scenario 11: Withdrawal form shows product picker, source deposit and LOT fields', async ({ page }) => {
     await page.goto(`${getBaseUrl()}/customer/withdrawal-request/new`);
     await selectProxyCustomerIfPresent(page, 'customer-withdrawal-proxy-customer-select');
     await expect(page.locator('[data-testid="customer-withdrawal-lines-table"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="customer-withdrawal-product-picker-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-source-deposit-select"]')).toBeVisible();
     await expect(page.locator('[data-testid="withdrawal-lot-select"]')).toBeVisible();
-    await page.locator('[data-testid="withdrawal-picking-rule-select"]').selectOption('SPECIFIC_LOT');
-    await expect(page.locator('[data-testid="withdrawal-picking-rule-select"]')).toHaveValue('SPECIFIC_LOT');
   });
 
   test('Scenario 12: Admin withdrawal review opens', async ({ page }) => {

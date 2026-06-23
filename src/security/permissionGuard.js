@@ -9,6 +9,9 @@
 import { getRoutePermission } from './routePermissionCatalog.js';
 import { canCustomerRequestProxyAccessRoute } from './customerRequestProxyPermissions.js';
 import { canWarehouseRoleAccessRoute } from './warehouseRolePermissions.js';
+import { hasRoleAccess } from './roleAccess.js';
+import { getRoleFunctionOverride } from './roleFunctionPermissions.js';
+import { getFunctionKeysForPath } from './navigationPermissionCatalog.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 
@@ -17,50 +20,22 @@ const AUTHENTICATED_ONLY_ROUTES = Object.freeze([
   '/settings/profile',
 ]);
 
-export const ROLE_HIERARCHY = {
-  viewer: 1,
-  warehouse_staff: 2,
-  warehouse_admin: 3,
-  accounting: 3,
-  warehouse_manager: 4,
-  admin: 5,
-};
+export { hasRoleAccess, ROLE_HIERARCHY } from './roleAccess.js';
 
 function normalizeRole(role) {
   return String(role ?? '').trim().toLowerCase();
 }
 
-/**
- * Check if a user role meets or exceeds a required role.
- * @param {string} userRole - role of the current user.
- * @param {string} requiredRole - minimum role required.
- * @returns {boolean}
- */
-export function hasRoleAccess(userRole, requiredRole) {
-  const user = normalizeRole(userRole);
-  const required = normalizeRole(requiredRole);
-
-  if (user === 'admin') {
-    return true;
-  }
-
-  if (CUSTOMER_ROLES.includes(required)) {
-    if (required === 'customer_user') {
-      return user === 'customer_user' || user === 'customer_admin';
+function getFunctionAccessDecision(userRole, routePath) {
+  const role = normalizeRole(userRole);
+  const keys = getFunctionKeysForPath(routePath);
+  for (const functionKey of keys) {
+    const override = getRoleFunctionOverride(role, functionKey);
+    if (override !== undefined) {
+      return { allowed: override, functionKey };
     }
-    if (required === 'customer_admin') {
-      return user === 'customer_admin';
-    }
-    return false;
   }
-
-  if (CUSTOMER_ROLES.includes(user)) {
-    return false;
-  }
-
-  const userLevel = ROLE_HIERARCHY[user] ?? 0;
-  const requiredLevel = ROLE_HIERARCHY[required] ?? 0;
-  return userLevel >= requiredLevel;
+  return null;
 }
 
 /**
@@ -82,13 +57,28 @@ export function canAccessRoute(userRole, routePath) {
     };
   }
 
+  const functionDecision = getFunctionAccessDecision(userRole, path);
+  if (functionDecision) {
+    const entry = getRoutePermission(routePath);
+    return {
+      allowed: functionDecision.allowed,
+      required_role: entry?.minimum_role ?? normalizeRole(userRole),
+      permission_area: entry?.permission_area ?? null,
+      access_level: entry?.access_level ?? 'read',
+      reason: functionDecision.allowed
+        ? `Access granted by function override (${functionDecision.functionKey})`
+        : `Function permission denied (${functionDecision.functionKey})`,
+    };
+  }
+
   const warehouseDecision = canWarehouseRoleAccessRoute(userRole, routePath);
   if (warehouseDecision === true) {
+    const warehouseEntry = getRoutePermission(routePath);
     return {
       allowed: true,
       required_role: normalizeRole(userRole),
-      permission_area: 'warehouse',
-      access_level: 'read',
+      permission_area: warehouseEntry?.permission_area ?? 'warehouse',
+      access_level: warehouseEntry?.access_level ?? 'read',
       reason: 'Warehouse role route allowlist',
     };
   }

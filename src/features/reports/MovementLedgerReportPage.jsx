@@ -16,6 +16,7 @@ import {
   groupByMovementType,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
+import { getCustomers } from '../../services/masterDataService.js';
 
 const initialState = {
   rows: [],
@@ -30,6 +31,17 @@ export function MovementLedgerReportPage() {
   const goLive = isGoLivePresentationEnabled();
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
+  const [customerOptions, setCustomerOptions] = useState([]);
+
+  useEffect(() => {
+    getCustomers({ isActive: true }).then((result) => {
+      const opts = (result.data ?? []).map((c) => ({
+        value: c.id,
+        label: c.customer_name ?? c.customer_code ?? c.id,
+      }));
+      setCustomerOptions(opts);
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,7 +89,7 @@ export function MovementLedgerReportPage() {
           )}
         />
       </div>
-      <ReportFilterPanel onChange={setFilters} />
+      <ReportFilterPanel onChange={setFilters} customerOptions={customerOptions} showMovementType={false} />
 
       <DashboardSection title={t('movement_stock_summary') || 'Stock Movement Summary'}>
         <div className="summary-grid summary-grid--4col">

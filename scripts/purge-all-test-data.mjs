@@ -14,9 +14,9 @@
 import { createClient } from '@supabase/supabase-js';
 import path from 'node:path';
 import dotenv from 'dotenv';
+import { resolveServiceRoleKey } from './lib/uatSupabaseAdmin.mjs';
 
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, '.env.local') });
+dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 const DEMO_CUSTOMER_IDS = [
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
@@ -65,12 +65,7 @@ const TRANSACTIONAL_TABLES = [
 ];
 
 function getServiceRoleKey() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (key && key.length > 100) return key;
-  throw new Error(
-    'Missing or invalid SUPABASE_SERVICE_ROLE_KEY in .env.local\n' +
-    'Get it from: Supabase Dashboard → Project Settings → API → service_role',
-  );
+  return resolveServiceRoleKey().key;
 }
 
 async function deleteAllRows(supabase, tableName) {

@@ -1,13 +1,12 @@
 import { normalizeUserRole } from './currentUserRole.js';
-import { canAccessRoute } from './permissionGuard.js';
-import { isBillingNavigationItemVisible } from './billingInvoiceDraftPermissions.js';
-import { isCustomerOpsDemoNavigationVisible } from './customerPortalPermissions.js';
-import { CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS } from './customerRequestProxyPermissions.js';
-import { isCustomerRequestProxyRole } from '../services/customerPortalServiceUtils.js';
+import { getRoleFunctionOverride } from './roleFunctionPermissions.js';
+import { hasRoleAccess } from './roleAccess.js';
+import { getRoutePermission } from './routePermissionCatalog.js';
+import { resolveNavigationItemPath } from './navigationPaths.js';
 import {
-  isWarehouseNavGroupVisible,
-  isWarehouseNavItemVisible,
-} from './warehouseRolePermissions.js';
+  isLegacyNavigationGroupVisibleForRole,
+  isLegacyNavigationItemVisibleForRole,
+} from './legacyNavigationVisibility.js';
 
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 const INTERNAL_ROLES = Object.freeze([
@@ -20,24 +19,8 @@ const INTERNAL_ROLES = Object.freeze([
 ]);
 
 const CUSTOMER_PORTAL_GROUP = 'customer_portal';
-const CUSTOMER_OPS_DEMO_GROUP = 'customer_ops_demo';
 
-const WAREHOUSE_OPERATION_GROUPS = Object.freeze([
-  'inbound_management',
-  'outbound_management',
-  'inventory_control',
-  'barcode_handheld',
-]);
-
-const ACCOUNTING_HIDDEN_GROUPS = new Set(WAREHOUSE_OPERATION_GROUPS);
-
-const NAV_ITEM_ROUTE_OVERRIDES = Object.freeze({
-  master_data: '/master/customers',
-  users_and_roles: '/admin/auth-readiness',
-  user_management: '/admin/users',
-  customer_product_catalog_admin: '/admin/customer-products',
-  customer_storage_rate_rules_admin: '/admin/customer-storage-rates',
-});
+export { resolveNavigationItemPath } from './navigationPaths.js';
 
 export function isCustomerRole(role) {
   return CUSTOMER_ROLES.includes(normalizeUserRole(role));
@@ -47,89 +30,29 @@ export function isInternalRole(role) {
   return INTERNAL_ROLES.includes(normalizeUserRole(role));
 }
 
-export function resolveNavigationItemPath(item) {
-  if (!item) return null;
-  if (item.path) return item.path;
-  return NAV_ITEM_ROUTE_OVERRIDES[item.key] ?? null;
-}
-
 export function isNavigationPathVisibleForRole(role, path) {
   if (!path) return true;
-
-  const decision = canAccessRoute(normalizeUserRole(role), path);
-  return decision.allowed;
+  const entry = getRoutePermission(path);
+  if (!entry) return false;
+  return hasRoleAccess(normalizeUserRole(role), entry.minimum_role);
 }
 
 export function isNavigationGroupVisibleForRole(groupKey, role) {
-  const normalized = normalizeUserRole(role);
-
-  if (groupKey === CUSTOMER_OPS_DEMO_GROUP) {
-    return isCustomerOpsDemoNavigationVisible(normalized);
-  }
-
-  if (isCustomerRole(normalized)) {
-    return groupKey === CUSTOMER_PORTAL_GROUP;
-  }
-
-  if (groupKey === CUSTOMER_PORTAL_GROUP) {
-    return normalized === 'admin' || isCustomerRequestProxyRole(normalized);
-  }
-
-  if (normalized === 'accounting' && ACCOUNTING_HIDDEN_GROUPS.has(groupKey)) {
-    return false;
-  }
-
-  if (['warehouse_staff', 'warehouse_admin', 'warehouse_manager'].includes(normalized)) {
-    return isWarehouseNavGroupVisible(normalized, groupKey);
-  }
-
-  return true;
+  return isLegacyNavigationGroupVisibleForRole(groupKey, role);
 }
+
+export { isLegacyNavigationItemVisibleForRole } from './legacyNavigationVisibility.js';
 
 export function isNavigationItemVisibleForRole(item, groupKey, role) {
   if (!item) return false;
 
   const normalized = normalizeUserRole(role);
-
-  if (item.key === 'dashboard') {
-    return normalized === 'admin';
+  const functionOverride = getRoleFunctionOverride(normalized, item.key);
+  if (functionOverride !== undefined) {
+    return functionOverride;
   }
 
-  if (!isNavigationGroupVisibleForRole(groupKey, role)) {
-    return false;
-  }
-
-  if (
-    groupKey === CUSTOMER_PORTAL_GROUP
-    && isCustomerRequestProxyRole(normalized)
-    && normalized !== 'admin'
-    && !CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS.includes(item.key)
-  ) {
-    return false;
-  }
-
-  if (!isBillingNavigationItemVisible(item.key, role)) {
-    return false;
-  }
-
-  if (['warehouse_staff', 'warehouse_admin', 'warehouse_manager'].includes(normalized)) {
-    const isProxyPortalItem = groupKey === CUSTOMER_PORTAL_GROUP
-      && CUSTOMER_PORTAL_PROXY_NAV_ITEM_KEYS.includes(item.key);
-    if (!isProxyPortalItem && !isWarehouseNavItemVisible(normalized, item.key)) {
-      return false;
-    }
-  }
-
-  if (item.disabled) {
-    return isInternalRole(normalizeUserRole(role)) && normalizeUserRole(role) !== 'viewer';
-  }
-
-  const path = resolveNavigationItemPath(item);
-  if (!path) {
-    return false;
-  }
-
-  return isNavigationPathVisibleForRole(role, path);
+  return isLegacyNavigationItemVisibleForRole(item, groupKey, role);
 }
 
 export function filterNavigationGroupsForRole(groups, role) {

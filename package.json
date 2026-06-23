@@ -21,6 +21,11 @@
     "uat:bootstrap-warehouse": "node scripts/uat-bootstrap-warehouse-demo.mjs",
     "uat:set-warehouse-user": "node scripts/uat-set-real-warehouse-user.mjs",
     "uat:bootstrap-all-roles": "node scripts/uat-bootstrap-all-role-users.mjs",
+    "uat:ensure-policy": "node scripts/ensure-uat-policy-seed.mjs",
+    "uat:validate-admin-key": "node scripts/validate-uat-admin-key.mjs",
+    "uat:restore-environment": "node scripts/uat-restore-environment.mjs",
+    "uat:sync-vercel-env": "node scripts/sync-vercel-env-from-local.mjs",
+    "uat:publish-env-and-deploy": "node scripts/set-local-service-role-key.mjs --from-cli && npm run uat:sync-vercel-env && vercel --prod --yes",
     "db:apply-pending": "node scripts/apply-pending-migrations.mjs",
     "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
   },

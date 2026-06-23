@@ -55,16 +55,12 @@ async function getStockQuantityTotal() {
 }
 
 async function getActiveLocationCount() {
-  const { data, error } = await supabase
-    .from('tgd_zones')
-    .select('tgd_rooms(tgd_locations(id))')
-    .eq('is_active', true);
+  // Query locations directly — avoid FK-chain joins that require schema constraints
+  const { count, error } = await supabase
+    .from('tgd_locations')
+    .select('*', { count: 'exact', head: true });
   if (error) return 0;
-  return (data ?? []).reduce(
-    (sum, zone) => sum + (zone.tgd_rooms ?? []).reduce(
-      (s2, room) => s2 + (room.tgd_locations ?? []).length, 0,
-    ), 0,
-  );
+  return count ?? 0;
 }
 
 async function getOpenDocumentCount(tableName) {

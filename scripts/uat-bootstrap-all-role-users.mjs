@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync, mkdtempSync, mkdirSync } from 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import dotenv from 'dotenv';
+import { resolveServiceRoleKey } from './lib/uatSupabaseAdmin.mjs';
 
 const ROOT = process.cwd();
 dotenv.config({ path: path.join(ROOT, '.env.local') });
@@ -78,16 +79,7 @@ const ROLE_USERS = [
 ];
 
 function getServiceRoleKey() {
-  const raw = execSync('npx supabase projects api-keys --project-ref lievvsqbosvrolkrftna', {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const jsonStart = raw.indexOf('{');
-  if (jsonStart < 0) throw new Error('Unable to parse Supabase API keys output');
-  const payload = JSON.parse(raw.slice(jsonStart));
-  const key = payload.keys?.find((row) => row.name === 'service_role')?.api_key;
-  if (!key) throw new Error('service_role key not found');
-  return key;
+  return resolveServiceRoleKey().key;
 }
 
 function getDemoPassword() {
@@ -227,6 +219,12 @@ async function main() {
       internal_product_code = excluded.internal_product_code,
       is_active = true,
       updated_at = now();
+  `);
+
+  runSql(`
+    insert into public.tgd_customer_request_policy (id)
+    values (1)
+    on conflict (id) do nothing;
   `);
 
   const manifestPath = writeManifest(password, results);

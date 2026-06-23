@@ -1,17 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-const ID_TYPES = [
-  { value: 'LOT', label: 'เลข LOT' },
-  { value: 'MFG_DATE', label: 'วันที่ผลิต' },
-  { value: 'EXP_DATE', label: 'วันหมดอายุ' },
-];
-
 export function CustomerWithdrawalLinesTable({
   customerId,
   depositOptions = [],
+  depositLinesMap = {},
   lines,
   onChange,
   onRemoveLine,
@@ -40,6 +35,9 @@ export function CustomerWithdrawalLinesTable({
     };
   }, [customerId]);
 
+  // Collect all deposit lines across all deposits for LOT lookup
+  const allDepositLines = useMemo(() => Object.values(depositLinesMap).flat(), [depositLinesMap]);
+
   function updateLine(lineKey, patch) {
     onChange(lines.map((line) => (line.key === lineKey ? { ...line, ...patch } : line)));
   }
@@ -65,26 +63,30 @@ export function CustomerWithdrawalLinesTable({
       product_name: product.product_name ?? '',
       temperature_type: product.temperature_type ?? 'FROZEN',
       argent_type: product.argent_type ?? 'NON_ARGENT',
+      lot_no: '',
+      mfg_date: '',
+      exp_date: '',
     });
   }
 
-  function changeIdentifierType(lineKey, newType) {
-    updateLine(lineKey, { identifier_type: newType, lot_no: '', mfg_date: '', exp_date: '' });
+  function selectLotFromBalance(line, lotNo) {
+    if (!lotNo) {
+      updateLine(line.key, { lot_no: '', mfg_date: '', exp_date: '' });
+      return;
+    }
+    const matchedDepositLine = allDepositLines.find(
+      (dl) => dl.lot_no === lotNo &&
+        (dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name),
+    );
+    updateLine(line.key, {
+      lot_no: lotNo,
+      mfg_date: matchedDepositLine?.mfg_date ?? '',
+      exp_date: matchedDepositLine?.exp_date ?? '',
+    });
   }
 
-  function setIdentifierValue(line, val) {
-    const type = line.identifier_type ?? 'LOT';
-    if (type === 'LOT') return updateLine(line.key, { lot_no: val, mfg_date: '', exp_date: '' });
-    if (type === 'MFG_DATE') return updateLine(line.key, { mfg_date: val, lot_no: '', exp_date: '' });
-    if (type === 'EXP_DATE') return updateLine(line.key, { exp_date: val, lot_no: '', mfg_date: '' });
-  }
-
-  function getIdentifierValue(line) {
-    const type = line.identifier_type ?? 'LOT';
-    if (type === 'LOT') return line.lot_no ?? '';
-    if (type === 'MFG_DATE') return line.mfg_date ?? '';
-    if (type === 'EXP_DATE') return line.exp_date ?? '';
-    return '';
+  function selectSourceDeposit(lineKey, depositId) {
+    updateLine(lineKey, { source_deposit_request_id: depositId, lot_no: '', mfg_date: '', exp_date: '' });
   }
 
   const noCustomer = !customerId;
@@ -112,9 +114,10 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ width: 36 }}>#</th>
             <th style={{ minWidth: 200 }}>รหัสสินค้า <span className="field-required">*</span></th>
             <th style={{ minWidth: 160 }}>ชื่อสินค้า</th>
-            <th style={{ minWidth: 220 }}>LOT / วันผลิต / วันหมดอายุ</th>
+            <th style={{ minWidth: 180 }}>LOT (จากยอดคงเหลือ)</th>
+            <th style={{ minWidth: 110 }}>วันผลิต</th>
+            <th style={{ minWidth: 110 }}>วันหมดอายุ</th>
             <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
-            <th style={{ minWidth: 140 }}>กฎการหยิบ</th>
             <th style={{ minWidth: 160 }}>แหล่งที่มา (ใบฝาก)</th>
             <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
           </tr>
@@ -122,9 +125,25 @@ export function CustomerWithdrawalLinesTable({
         <tbody>
           {lines.map((line, index) => {
             const rowTestId = index === 0 ? 'customer-withdrawal-line-0' : `customer-withdrawal-line-${line.key}`;
-            const idType = line.identifier_type ?? 'LOT';
-            const idValue = getIdentifierValue(line);
-            const isDateType = idType === 'MFG_DATE' || idType === 'EXP_DATE';
+
+            // Available LOTs for this line's product from all deposit lines
+            const availableLots = allDepositLines.filter(
+              (dl) => dl.lot_no &&
+                (dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name),
+            );
+            const uniqueLots = [...new Set(availableLots.map((dl) => dl.lot_no))];
+
+            // Available deposits filtered by source_deposit_request_id if set
+            const sourceDepositLines = line.source_deposit_request_id
+              ? (depositLinesMap[line.source_deposit_request_id] ?? [])
+              : allDepositLines;
+            const lotsForSource = [...new Set(
+              sourceDepositLines
+                .filter((dl) => dl.lot_no &&
+                  (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name))
+                .map((dl) => dl.lot_no),
+            )];
+            const displayLots = lotsForSource.length > 0 ? lotsForSource : uniqueLots;
 
             return (
               <tr data-testid={rowTestId} key={line.key}>
@@ -159,56 +178,82 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
-                {/* Combined identifier: type selector + input */}
+                {/* LOT dropdown from balance */}
                 <td>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {displayLots.length > 0 ? (
                     <select
                       className="form-control form-control-table"
-                      style={{ flex: '0 0 110px', fontSize: 12 }}
-                      value={idType}
-                      onChange={(e) => changeIdentifierType(line.key, e.target.value)}
+                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                      value={line.lot_no || ''}
+                      onChange={(e) => selectLotFromBalance(line, e.target.value)}
                     >
-                      {ID_TYPES.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option value="">— เลือก LOT —</option>
+                      {displayLots.map((lot) => (
+                        <option key={lot} value={lot}>{lot}</option>
                       ))}
                     </select>
+                  ) : (
                     <input
                       className="form-control form-control-table"
                       data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
-                      style={{ flex: 1 }}
-                      type={isDateType ? 'date' : 'text'}
-                      placeholder={idType === 'LOT' ? 'เลข LOT' : ''}
-                      value={idValue}
-                      onChange={(e) => setIdentifierValue(line, e.target.value)}
+                      type="text"
+                      placeholder="เลข LOT"
+                      value={line.lot_no || ''}
+                      onChange={(e) => updateLine(line.key, { lot_no: e.target.value })}
                     />
-                  </div>
+                  )}
+                </td>
+
+                {/* Mfg date (auto-filled or editable) */}
+                <td>
+                  <input
+                    className="form-control form-control-table"
+                    type="date"
+                    value={line.mfg_date || ''}
+                    onChange={(e) => updateLine(line.key, { mfg_date: e.target.value })}
+                  />
+                </td>
+
+                {/* Exp date (auto-filled or editable) */}
+                <td>
+                  <input
+                    className="form-control form-control-table"
+                    type="date"
+                    value={line.exp_date || ''}
+                    onChange={(e) => updateLine(line.key, { exp_date: e.target.value })}
+                  />
                 </td>
 
                 {/* Weight */}
                 <td>
-                  <input
-                    className="form-control form-control-table"
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    placeholder="กก."
-                    onChange={(e) => updateLine(line.key, { requested_weight: e.target.value })}
-                    value={line.requested_weight}
-                  />
-                </td>
-
-                {/* Picking rule */}
-                <td>
-                  <select
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'withdrawal-picking-rule-select' : `${rowTestId}-picking-rule`}
-                    onChange={(e) => updateLine(line.key, { picking_rule: e.target.value })}
-                    value={line.picking_rule}
-                  >
-                    <option value="FEFO">FEFO (หมดก่อน-หยิบก่อน)</option>
-                    <option value="SPECIFIC_DEPOSIT">ระบุใบฝาก</option>
-                    <option value="SPECIFIC_LOT">ระบุ LOT</option>
-                  </select>
+                  {(() => {
+                    const balanceLines = lotsForSource.length > 0
+                      ? sourceDepositLines.filter((dl) => dl.lot_no === line.lot_no || !line.lot_no)
+                      : allDepositLines.filter((dl) =>
+                          (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name) &&
+                          (!line.lot_no || dl.lot_no === line.lot_no));
+                    const maxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
+                    const exceedsBalance = maxBalance > 0 && Number(line.requested_weight) > maxBalance;
+                    return (
+                      <>
+                        <input
+                          className="form-control form-control-table"
+                          min="0"
+                          step="0.01"
+                          type="number"
+                          placeholder="กก."
+                          style={exceedsBalance ? { borderColor: '#dc2626', backgroundColor: '#fef2f2' } : {}}
+                          onChange={(e) => updateLine(line.key, { requested_weight: e.target.value })}
+                          value={line.requested_weight}
+                        />
+                        {exceedsBalance && (
+                          <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                            เกินยอดคงเหลือ ({maxBalance.toFixed(2)} กก.)
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </td>
 
                 {/* Source deposit */}
@@ -216,7 +261,7 @@ export function CustomerWithdrawalLinesTable({
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
-                    onChange={(e) => updateLine(line.key, { source_deposit_request_id: e.target.value })}
+                    onChange={(e) => selectSourceDeposit(line.key, e.target.value)}
                     value={line.source_deposit_request_id || ''}
                   >
                     <option value="">— ทั้งหมด —</option>

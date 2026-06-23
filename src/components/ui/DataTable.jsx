@@ -61,7 +61,9 @@ export function DataTable({ columns, data = [], loading = false, error = null, e
           {data.map((row) => (
             <tr key={row.id}>
               {columns.map((column) => (
-                <td key={column.key}>{column.render ? column.render(row) : renderDefaultCell(column, row)}</td>
+                <td key={column.key} className={column.truncate ? 'cell-nowrap' : undefined}>
+                  {column.render ? column.render(row) : renderDefaultCell(column, row)}
+                </td>
               ))}
             </tr>
           ))}

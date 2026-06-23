@@ -48,6 +48,7 @@ const DEPOSIT_LINE_SELECT = [
   'actual_boxes',
   'actual_weight',
   'actual_note',
+  'location_id',
   'created_at',
 ].join(', ');
 
@@ -241,7 +242,15 @@ export async function cancelCustomerDepositRequest(requestId, comment = null) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
-export async function recordDepositLineActualReceipt(lineId, { actualBoxes, actualWeight, note = null } = {}) {
+export async function recordDepositLineActualReceipt(lineId, {
+  actualBoxes,
+  actualWeight,
+  note = null,
+  lotNo = null,
+  mfgDate = null,
+  expDate = null,
+  locationId = null,
+} = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
   const { data, error } = await supabase.rpc('tgd_record_deposit_line_actual_receipt', {
@@ -249,6 +258,10 @@ export async function recordDepositLineActualReceipt(lineId, { actualBoxes, actu
     p_actual_boxes: toNullableNumber(actualBoxes),
     p_actual_weight: toNullableNumber(actualWeight),
     p_note: toNullableText(note),
+    p_lot_no: toNullableText(lotNo),
+    p_mfg_date: mfgDate || null,
+    p_exp_date: expDate || null,
+    p_location_id: locationId || null,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
