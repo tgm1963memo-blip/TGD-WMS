@@ -22,27 +22,41 @@ export async function getCustomers(filters = {}) {
   return query;
 }
 
-export async function upsertCustomer(customer) {
+
+
+export async function upsertCustomer(form = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
+  const nameValue = form.customerName?.trim() ?? '';
   const payload = {
-    name: customer.customerName?.trim(),
-    customer_code: customer.customerCode?.trim(),
-    customer_name: customer.customerName?.trim(),
-    customer_type: customer.customerType?.trim() || null,
-    tax_id: customer.taxId?.trim() || null,
-    contact_name: customer.contactName?.trim() || null,
-    phone: customer.phone?.trim() || null,
-    email: customer.email?.trim() || null,
-    address: customer.address?.trim() || null,
-    is_active: customer.isActive ?? true,
-    updated_at: new Date().toISOString(),
+    name: nameValue,
+    customer_code: form.customerCode?.trim() ?? '',
+    customer_name: nameValue,
+    customer_type: form.customerType || null,
+    tax_id: form.taxId?.trim() || null,
+    contact_name: form.contactName?.trim() || null,
+    phone: form.phone?.trim() || null,
+    email: form.email?.trim() || null,
+    address: form.address?.trim() || null,
+    is_active: form.isActive ?? true,
   };
 
-  if (customer.id) {
-    return supabase.from('tgd_customers').update(payload).eq('id', customer.id).select().maybeSingle();
+  if (form.id) {
+    const { data, error } = await supabase
+      .from('tgd_customers')
+      .update(payload)
+      .eq('id', form.id)
+      .select()
+      .maybeSingle();
+    return { data, error };
   }
-  return supabase.from('tgd_customers').insert(payload).select().maybeSingle();
+
+  const { data, error } = await supabase
+    .from('tgd_customers')
+    .insert(payload)
+    .select()
+    .maybeSingle();
+  return { data, error };
 }
 
 export async function getProducts(filters = {}) {
@@ -68,10 +82,13 @@ export async function getLocations(filters = {}) {
     return missingSupabaseClientResult();
   }
 
-  let query = supabase.from('tgd_locations').select('*').order('code');
+  let query = supabase.from('tgd_locations').select('*').order('location_code', { nullsFirst: false });
 
   if (filters.roomId) {
     query = query.eq('room_id', filters.roomId);
+  }
+  if (filters.zoneId) {
+    query = query.eq('zone_id', filters.zoneId);
   }
 
   return query;
