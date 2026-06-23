@@ -260,7 +260,7 @@ export function WarehouseLayoutWidget() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 0, minHeight: 500 }}>
 
       {/* Left: grid + section list */}
-      <div style={{ padding: '20px 20px 20px 0' }}>
+      <div style={{ padding: '20px' }}>
         {/* Section tabs */}
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
           {sections.map((sec) => (
