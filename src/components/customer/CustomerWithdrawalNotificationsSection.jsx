@@ -81,7 +81,7 @@ export function CustomerWithdrawalNotificationsSection({
         <span className="form-helper">{t('withdrawal_customer_withdrawal_section_hint')}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 0' }}>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 16px' }}>
         <label className="form-label" style={{ margin: 0, flex: '1 1 200px' }}>
           {'ค้นหา'}
           <input
