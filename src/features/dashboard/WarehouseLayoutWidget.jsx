@@ -74,29 +74,29 @@ function SectionGrid({ section }) {
     };
 
     return (
-      <div style={{ position: 'relative', display: 'flex', gap: '32px', justifyContent: 'center', padding: '16px' }}>
-        {/* Left Aisle */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
+        {/* Left Aisle — horizontal band: each column = 1 row, each grid row = 1 level */}
         {leftConfig.rows > 0 && leftConfig.levels > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftConfig.levels}, 1fr)`, gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftConfig.rows}, 1fr)`, gap: 6 }}>
             {Array.from({ length: leftConfig.rows * leftConfig.levels }).map((_, idx) => {
-              const r = Math.floor(idx / leftConfig.levels) + 1;
-              const c = (idx % leftConfig.levels) + 1;
+              const r = (idx % leftConfig.rows) + 1;
+              const c = Math.floor(idx / leftConfig.rows) + 1;
               return renderDot('L', r, c);
             })}
           </div>
         )}
 
-        {/* Walking Path */}
+        {/* Walking Path — horizontal */}
         {(leftConfig.rows > 0 || rightConfig.rows > 0) && (
-          <div style={{ width: 8, background: 'rgba(0,0,0,0.02)', borderRadius: 4 }}></div>
+          <div style={{ height: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
         )}
 
-        {/* Right Aisle */}
+        {/* Right Aisle — horizontal band */}
         {rightConfig.rows > 0 && rightConfig.levels > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightConfig.levels}, 1fr)`, gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightConfig.rows}, 1fr)`, gap: 6 }}>
             {Array.from({ length: rightConfig.rows * rightConfig.levels }).map((_, idx) => {
-              const r = Math.floor(idx / rightConfig.levels) + 1;
-              const c = (idx % rightConfig.levels) + 1;
+              const r = (idx % rightConfig.rows) + 1;
+              const c = Math.floor(idx / rightConfig.rows) + 1;
               return renderDot('R', r, c);
             })}
           </div>
@@ -132,11 +132,11 @@ function SectionGrid({ section }) {
   const rightCols = cols - halfCols;
 
   return (
-    <div style={{ position: 'relative', display: 'flex', gap: '32px', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftCols}, 1fr)`, gap: 6 }}>
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows}, 1fr)`, gap: 6 }}>
         {Array.from({ length: rows * leftCols }).map((_, idx) => {
-          const row = Math.floor(idx / leftCols) + 1;
-          const col = (idx % leftCols) + 1;
+          const row = (idx % rows) + 1;
+          const col = Math.floor(idx / rows) + 1;
           const globalIdx = (row - 1) * cols + (col - 1);
           const loc = (locations || [])[globalIdx];
           const isOccupied = loc?.isOccupied ?? false;
@@ -160,12 +160,12 @@ function SectionGrid({ section }) {
         })}
       </div>
 
-      <div style={{ width: 8, background: 'rgba(0,0,0,0.02)', borderRadius: 4 }}></div>
+      <div style={{ height: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightCols}, 1fr)`, gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows}, 1fr)`, gap: 6 }}>
         {Array.from({ length: rows * rightCols }).map((_, idx) => {
-          const row = Math.floor(idx / rightCols) + 1;
-          const col = leftCols + (idx % rightCols) + 1;
+          const row = (idx % rows) + 1;
+          const col = leftCols + Math.floor(idx / rows) + 1;
           const globalIdx = (row - 1) * cols + (col - 1);
           const loc = (locations || [])[globalIdx];
           const isOccupied = loc?.isOccupied ?? false;
