@@ -267,6 +267,19 @@ export async function recordDepositLineActualReceipt(lineId, {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Update only the location on a deposit line — preserves actual_boxes/actual_weight unchanged
+export async function updateDepositLineLocation(lineId, locationId, existingLine = {}) {
+  return recordDepositLineActualReceipt(lineId, {
+    actualBoxes: existingLine.actual_boxes,
+    actualWeight: existingLine.actual_weight,
+    note: existingLine.actual_note,
+    lotNo: existingLine.lot_no,
+    mfgDate: existingLine.mfg_date,
+    expDate: existingLine.exp_date,
+    locationId,
+  });
+}
+
 export async function enqueueCustomerDepositNotification(requestId, customerId, documentNo, submitterEmail = null) {
   if (!supabase) return missingSupabaseClientResult();
 

@@ -25,6 +25,8 @@ const MIGRATIONS = [
   '068_tgd_wms_deprecate_standalone_receiving_draft.sql',
   '069_tgd_wms_role_area_permissions.sql',
   '070_tgd_wms_role_function_permissions.sql',
+  '071_tgd_wms_withdrawal_review_send_to_picking.sql',
+  '072_tgd_wms_confirm_receipt_creates_stock_movements.sql',
 ];
 
 function runSql(sql, label) {

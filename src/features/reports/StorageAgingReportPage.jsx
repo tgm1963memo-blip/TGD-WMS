@@ -6,6 +6,7 @@ import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.js
 import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
 import { StorageAgingTable } from '../../components/reports/StorageAgingTable.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { getCustomers } from '../../services/masterDataService.js';
 import {
   getExpiryAlertRows,
   getStorageAgingRows,
@@ -27,6 +28,17 @@ const initialState = {
 export function StorageAgingReportPage() {
   const [filters, setFilters] = useState({});
   const [state, setState] = useState(initialState);
+  const [customerOptions, setCustomerOptions] = useState(null);
+
+  useEffect(() => {
+    getCustomers({ isActive: true }).then(({ data }) => {
+      if (data) {
+        setCustomerOptions(
+          data.map((c) => ({ value: c.id, label: `${c.customer_code} — ${c.customer_name}` })),
+        );
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +76,7 @@ export function StorageAgingReportPage() {
         title="Storage Aging / Lot / Expiry / Chargeable Days Report"
         description="Read-only cold storage report for customer-owned inventory aging, expiry monitoring, and monthly storage billing preparation."
       />
-      <ReportFilterPanel onChange={setFilters} />
+      <ReportFilterPanel onChange={setFilters} customerOptions={customerOptions} />
 
       <DashboardSection title="Storage Aging Summary">
         <div className="kpi-grid">

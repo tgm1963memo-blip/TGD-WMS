@@ -74,26 +74,49 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
 }
 
 export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null }) {
-  const mappedLines = rows.map((row, index) => ({
-    id: row.id ?? `row-${index}`,
-    date: formatDate(row.movement_date ?? row.created_at),
-    receivedDate: formatDate(row.received_date ?? row.inbound_date),
-    deliveryDate: formatDate(row.delivery_date ?? row.outbound_date),
-    lotNo: row.lot_no ?? row.lot_id ?? '-',
-    customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
-    descCode: row.product_code ?? row.product_id ?? '-',
-    weightKg: row.weight ?? row.weight_kg ?? '-',
-    balanceForward: row.balance_forward ?? row.opening_balance ?? '-',
-    received: row.received_qty ?? row.inbound_qty ?? '-',
-    delivery: row.delivery_qty ?? row.outbound_qty ?? '-',
-    balance: row.balance_qty ?? row.closing_balance ?? '-',
-    volumeUnit: row.volume_unit ?? row.uom ?? '-',
-    remark: row.remark ?? '-',
-  }));
+  // Classify each row as inbound or outbound
+  const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
+  const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
 
-  const subtotalReceived = mappedLines.reduce((total, line) => total + (Number(line.received) || 0), 0);
-  const subtotalDelivery = mappedLines.reduce((total, line) => total + (Number(line.delivery) || 0), 0);
-  const subtotalWeight = mappedLines.reduce((total, line) => total + (Number(line.weightKg) || 0), 0);
+  const mappedLines = rows.map((row, index) => {
+    const movType = (row.movement_type ?? row.movement_type_raw ?? '').toUpperCase();
+    const isInbound = INBOUND_TYPES.some((t) => movType.includes(t));
+    const isOutbound = OUTBOUND_TYPES.some((t) => movType.includes(t));
+    const qty = Number(row.qty ?? row.quantity ?? 0);
+    const weight = Number(row.weight ?? row.chargeable_weight ?? row.gross_weight ?? 0);
+
+    return {
+      id: row.id ?? `row-${index}`,
+      date: formatDate(row.movement_date ?? row.created_at),
+      receivedDate: isInbound ? formatDate(row.movement_date ?? row.created_at) : '-',
+      deliveryDate: isOutbound ? formatDate(row.movement_date ?? row.created_at) : '-',
+      lotNo: row.lot_no ?? row.lot_id ?? '-',
+      customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
+      descCode: row.product_code ?? row.customer_product_code ?? '-',
+      weightKg: weight || '-',
+      // Balance forward (opening) — from view if available, else 0
+      balanceForwardVolume: row.balance_forward_vol ?? row.opening_balance_vol ?? 0,
+      balanceForwardWeight: row.balance_forward_weight ?? row.opening_balance_weight ?? 0,
+      // Received section
+      receivedVolume: isInbound ? qty : 0,
+      receivedWeight: isInbound ? weight : 0,
+      // Delivery section
+      deliveryVolume: isOutbound ? qty : 0,
+      deliveryWeight: isOutbound ? weight : 0,
+      // Balance (closing) — from view if available, else calculate
+      balanceVolume: row.balance_vol ?? row.closing_balance_vol ?? (isInbound ? qty : -qty),
+      balanceWeight: row.balance_weight ?? row.closing_balance_weight ?? (isInbound ? weight : -weight),
+      volumeUnit: row.volume_unit ?? row.uom ?? 'Box',
+      remark: row.remark ?? row.source_reference ?? '-',
+    };
+  });
+
+  const subtotalReceivedVol = mappedLines.reduce((s, l) => s + (Number(l.receivedVolume) || 0), 0);
+  const subtotalReceivedWt = mappedLines.reduce((s, l) => s + (Number(l.receivedWeight) || 0), 0);
+  const subtotalDeliveryVol = mappedLines.reduce((s, l) => s + (Number(l.deliveryVolume) || 0), 0);
+  const subtotalDeliveryWt = mappedLines.reduce((s, l) => s + (Number(l.deliveryWeight) || 0), 0);
+  const totalBalanceVol = subtotalReceivedVol - subtotalDeliveryVol;
+  const totalBalanceWt = subtotalReceivedWt - subtotalDeliveryWt;
 
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',
@@ -103,11 +126,16 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     dateTo: formatDate(filters.date_to ?? filters.to_date),
     issuedDate: formatDate(new Date().toISOString()),
     lines: mappedLines,
-    subtotalReceived,
-    subtotalDelivery,
-    subtotalWeight,
-    totalReceived: summary?.totalInboundQty ?? subtotalReceived,
-    totalDelivery: summary?.totalOutboundQty ?? subtotalDelivery,
-    totalWeight: subtotalWeight,
+    subtotalReceived: subtotalReceivedVol,
+    subtotalDelivery: subtotalDeliveryVol,
+    subtotalWeight: subtotalReceivedWt + subtotalDeliveryWt,
+    totalReceived: summary?.totalInboundQty ?? subtotalReceivedVol,
+    totalReceivedWeight: subtotalReceivedWt,
+    totalDelivery: summary?.totalOutboundQty ?? subtotalDeliveryVol,
+    totalDeliveryWeight: subtotalDeliveryWt,
+    totalBalanceVolume: totalBalanceVol,
+    totalBalanceWeight: totalBalanceWt,
+    totalBalanceForwardVolume: 0,
+    totalBalanceForwardWeight: 0,
   };
 }

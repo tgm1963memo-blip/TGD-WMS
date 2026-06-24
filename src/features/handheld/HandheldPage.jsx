@@ -6,6 +6,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   recordDepositLineActualReceipt,
+  updateDepositLineLocation,
   upsertCustomerDepositRequestLine,
 } from '../../services/customerDepositRequestService.js';
 import {
@@ -116,6 +117,15 @@ function useCameraScanner(onScanned) {
 
 // ── Print sticker ─────────────────────────────────────────────
 function printSticker({ customerName, productName, lotNo, mfgDate, expDate, locationCode, locationDetail }) {
+  const qrData = JSON.stringify({
+    c: customerName,
+    p: productName,
+    l: lotNo,
+    e: expDate,
+    loc: locationCode
+  });
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -124,27 +134,34 @@ function printSticker({ customerName, productName, lotNo, mfgDate, expDate, loca
 <style>
   @page { size: 100mm 60mm; margin: 4mm; }
   body { font-family: sans-serif; font-size: 10px; margin: 0; padding: 0; }
-  .sticker { border: 1px solid #000; padding: 4mm; width: 92mm; box-sizing: border-box; }
+  .sticker { border: 1px solid #000; padding: 4mm; width: 92mm; height: 52mm; box-sizing: border-box; display: flex; gap: 4mm; }
+  .info-col { flex: 1; display: flex; flex-direction: column; }
+  .qr-col { width: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .title { font-size: 13px; font-weight: 900; margin-bottom: 3mm; border-bottom: 1px solid #000; padding-bottom: 2mm; }
-  .row { display: flex; gap: 4px; margin-bottom: 2mm; }
-  .label { font-weight: 700; min-width: 22mm; color: #555; }
-  .val { font-weight: 600; }
-  .location-box { margin-top: 3mm; padding: 2mm; border: 2px solid #000; border-radius: 2mm; text-align: center; }
-  .loc-main { font-size: 18px; font-weight: 900; letter-spacing: 2px; }
+  .row { display: flex; gap: 4px; margin-bottom: 1mm; }
+  .label { font-weight: 700; min-width: 18mm; color: #555; }
+  .val { font-weight: 600; font-size: 11px; }
+  .location-box { margin-top: auto; padding: 1mm; border: 2px solid #000; border-radius: 2mm; text-align: center; }
+  .loc-main { font-size: 16px; font-weight: 900; letter-spacing: 1px; }
   .loc-detail { font-size: 9px; color: #666; }
 </style>
 </head>
 <body>
 <div class="sticker">
-  <div class="title">TGC Cold Storage — สติ๊กเกอร์จัดเก็บ</div>
-  <div class="row"><span class="label">ลูกค้า:</span><span class="val">${customerName ?? '-'}</span></div>
-  <div class="row"><span class="label">สินค้า:</span><span class="val">${productName ?? '-'}</span></div>
-  ${lotNo ? `<div class="row"><span class="label">LOT:</span><span class="val">${lotNo}</span></div>` : ''}
-  ${mfgDate ? `<div class="row"><span class="label">วันผลิต:</span><span class="val">${mfgDate}</span></div>` : ''}
-  ${expDate ? `<div class="row"><span class="label">วันหมดอายุ:</span><span class="val">${expDate}</span></div>` : ''}
-  <div class="location-box">
-    <div class="loc-main">${locationCode ?? '-'}</div>
-    ${locationDetail ? `<div class="loc-detail">${locationDetail}</div>` : ''}
+  <div class="info-col">
+    <div class="title">TGC Cold Storage — สติ๊กเกอร์จัดเก็บ</div>
+    <div class="row"><span class="label">ลูกค้า:</span><span class="val">${customerName ?? '-'}</span></div>
+    <div class="row"><span class="label">สินค้า:</span><span class="val">${productName ?? '-'}</span></div>
+    ${lotNo ? `<div class="row"><span class="label">LOT:</span><span class="val">${lotNo}</span></div>` : ''}
+    ${mfgDate ? `<div class="row"><span class="label">ผลิต:</span><span class="val">${mfgDate}</span></div>` : ''}
+    ${expDate ? `<div class="row"><span class="label">หมดอายุ:</span><span class="val">${expDate}</span></div>` : ''}
+    <div class="location-box">
+      <div class="loc-main">${locationCode ?? '-'}</div>
+      ${locationDetail ? `<div class="loc-detail">${locationDetail}</div>` : ''}
+    </div>
+  </div>
+  <div class="qr-col">
+    <img src="${qrUrl}" alt="QR Code" style="width: 25mm; height: 25mm; margin-bottom: 2mm;" />
   </div>
 </div>
 </body>
@@ -153,7 +170,7 @@ function printSticker({ customerName, productName, lotNo, mfgDate, expDate, loca
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
-  win.onload = () => { win.print(); };
+  win.onload = () => { setTimeout(() => win.print(), 500); };
 }
 
 // ── Status pill ───────────────────────────────────────────────
@@ -377,7 +394,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const [matchedLine, setMatchedLine] = useState(null);
   const [boxes, setBoxes] = useState('');
   const [weight, setWeight] = useState('');
-  const [palletScan, setPalletScan] = useState('');
+
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [locations, setLocations] = useState([]);
   const [locZone, setLocZone] = useState('');
@@ -445,7 +462,6 @@ function ReceivingWorkflow({ onBack, t }) {
   }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
-  const { trigger: cameraPallet, el: cameraPalletEl } = useCameraScanner((v) => setPalletScan(v));
 
   useEffect(() => {
     listCustomerDepositRequests({ statusIn: ['WAREHOUSE_RECEIVING', 'ADMIN_ACCEPTED'] }).then((r) => {
@@ -518,7 +534,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
     triggerSuccessFeedback();
     const confirmedItem = {
-      line: matchedLine, boxes, weight, palletId: palletScan, location: selectedLocation,
+      line: matchedLine, boxes, weight, location: selectedLocation,
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
       confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       customerName: selectedDoc?.contact_name ?? '',
@@ -528,7 +544,7 @@ function ReceivingWorkflow({ onBack, t }) {
       ? { ...l, actual_boxes: Number(boxes) || null, actual_weight: Number(weight) || null } : l));
 
     setStickerItem(confirmedItem);
-    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setPalletScan('');
+    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
     setSelectedLocation(null); setMismatchWarned(false);
     setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
     setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
@@ -598,7 +614,7 @@ function ReceivingWorkflow({ onBack, t }) {
       <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
       <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 24px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 10px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
             <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
           ) : docs.length === 0 ? (
@@ -638,7 +654,7 @@ function ReceivingWorkflow({ onBack, t }) {
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
     <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {cameraItemEl}{cameraPalletEl}
+      {cameraItemEl}
 
       <TopBar
         title={selectedDoc.request_no}
@@ -666,7 +682,7 @@ function ReceivingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 320px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 10px 320px', background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (
@@ -718,6 +734,7 @@ function ReceivingWorkflow({ onBack, t }) {
           }}>
             <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 16, color: C.text }}>พิมพ์สติ๊กเกอร์</div>
             <div style={{ background: C.blueLight, borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 13 }}>
+              <div><strong>ลูกค้า:</strong> {stickerItem.customerName || '-'}</div>
               <div><strong>สินค้า:</strong> {stickerItem.line?.product_name}</div>
               <div><strong>LOT:</strong> {stickerItem.lotNo || '-'}</div>
               <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'} / <strong>หมดอายุ:</strong> {stickerItem.expDate || '-'}</div>
@@ -733,7 +750,7 @@ function ReceivingWorkflow({ onBack, t }) {
                     mfgDate: stickerItem.mfgDate,
                     expDate: stickerItem.expDate,
                     locationCode: stickerItem.location?.code,
-                    locationDetail: stickerItem.location ? `Section: ${stickerItem.location.sectionCode ?? '-'}` : '',
+                    locationDetail: stickerItem.location ? `${stickerItem.location.sectionName ?? stickerItem.location.sectionCode ?? '-'}` : '',
                   });
                 }}
                 style={{ flex: 1, padding: '16px', borderRadius: 16, background: C.primary, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>
@@ -758,7 +775,7 @@ function ReceivingWorkflow({ onBack, t }) {
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
-        padding: '20px 24px 32px',
+        padding: '20px 10px 32px',
         zIndex: 100,
         maxHeight: '60vh',
         overflowY: 'auto',
@@ -824,24 +841,7 @@ function ReceivingWorkflow({ onBack, t }) {
               </div>
             )}
 
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Pallet ID (ถ้ามี)</div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <input type="text" value={palletScan} onChange={(e) => setPalletScan(e.target.value)}
-                  placeholder="สแกนหรือพิมพ์ Pallet ID"
-                  style={{
-                    flex: 1, background: C.inputBg,
-                    border: `2px solid ${palletScan ? C.primary : C.border}`,
-                    borderRadius: 16, padding: '14px 16px', color: C.text, fontSize: 15, fontWeight: 700, outline: 'none',
-                  }} />
-                <button type="button" onClick={cameraPallet}
-                  style={{
-                    background: C.primary, border: 'none', borderRadius: 16,
-                    padding: '0 20px', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(14,165,233,0.3)',
-                  }}>สแกน</button>
-              </div>
-            </div>
+            <div style={{ marginBottom: 16 }} />
 
             {locations.length > 0 && (
               <div style={{ marginBottom: 20 }}>
@@ -966,13 +966,13 @@ function ReceivingWorkflow({ onBack, t }) {
             <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
               style={{
                 width: '100%', padding: '20px', borderRadius: 20,
-                background: (!boxes && !weight) ? C.border : (mismatchWarned ? '#f59e0b' : C.green),
+                background: (!boxes && !weight) ? C.border : (mismatchWarned ? '#f59e0b' : (matchedLine?.actual_boxes != null ? '#1d6fcf' : C.green)),
                 color: (!boxes && !weight) ? C.muted : '#ffffff',
                 border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer',
-                boxShadow: (!boxes && !weight) ? 'none' : (mismatchWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(16,185,129,0.4)'),
+                boxShadow: (!boxes && !weight) ? 'none' : (mismatchWarned ? '0 8px 24px rgba(245,158,11,0.4)' : (matchedLine?.actual_boxes != null ? '0 8px 24px rgba(29,111,207,0.4)' : '0 8px 24px rgba(16,185,129,0.4)')),
                 transition: 'all 0.2s',
               }}>
-              {saving ? '⏳ กำลังบันทึก...' : (mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : '✓ ยืนยันรับสินค้า')}
+              {saving ? '⏳ กำลังบันทึก...' : (mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : (matchedLine?.actual_boxes != null ? '✎ แก้ไขยอดรับเข้า' : '✓ ยืนยันรับสินค้า'))}
             </button>
           </div>
         ) : (
@@ -1383,6 +1383,297 @@ function PickingWorkflow({ onBack, t }) {
   );
 }
 
+// ── Location Update workflow ──────────────────────────────────
+function LocationUpdateWorkflow({ onBack, t }) {
+  const [docs, setDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [lines, setLines] = useState([]);
+  const [linesLoading, setLinesLoading] = useState(false);
+  const [selectedLine, setSelectedLine] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [locZone, setLocZone] = useState('');
+  const [locSide, setLocSide] = useState('');
+  const [locRow, setLocRow] = useState('');
+  const [locLevel, setLocLevel] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [updated, setUpdated] = useState([]);
+
+  function parseLocCode(code) {
+    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4] } : null;
+  }
+  const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })), [locations]);
+  const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
+
+  const availableZones = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed).map((l) => l.parsed.zone))].sort(), [parsedLocs]);
+  const availableSides = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone).map((l) => l.parsed.side))].sort(), [parsedLocs, locZone]);
+  const availableRows = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort(), [parsedLocs, locZone, locSide]);
+  const availableLevels = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone && l.parsed?.side === locSide && l.parsed?.row === locRow).map((l) => l.parsed.level))].sort(), [parsedLocs, locZone, locSide, locRow]);
+
+  useEffect(() => {
+    if (locZone && locSide && locRow && locLevel && useHierarchy) {
+      const match = parsedLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow && l.parsed.level === locLevel);
+      setSelectedLocation(match ?? null);
+    } else if (useHierarchy) {
+      setSelectedLocation(null);
+    }
+  }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
+
+  useEffect(() => {
+    listCustomerDepositRequests({ statusIn: ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'] }).then((r) => {
+      setDocs(r.data ?? []);
+      setDocsLoading(false);
+    });
+    getActiveLocations().then(({ data }) => setLocations(data ?? []));
+  }, []);
+
+  function pickDoc(doc) {
+    setSelectedDoc(doc);
+    setLinesLoading(true);
+    listCustomerDepositRequestLines(doc.id).then((r) => {
+      setLines(r.data ?? []);
+      setLinesLoading(false);
+      setSelectedLine(null);
+    });
+  }
+
+  async function handleSaveLocation() {
+    if (!selectedLine) return;
+    setSaving(true); setSaveError('');
+    const r = await updateDepositLineLocation(selectedLine.id, selectedLocation?.id || null, selectedLine);
+    setSaving(false);
+    if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+    triggerSuccessFeedback();
+    setLines((prev) => prev.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation?.id ?? null } : l));
+    setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
+    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
+  }
+
+  const pendingCount = lines.filter((l) => !l.location_id).length;
+
+  if (!selectedDoc) {
+    return (
+      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+        <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
+        <div style={{ padding: '24px 10px', flex: 1, overflowY: 'auto' }}>
+          {docsLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
+          ) : docs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 24px', background: C.card, borderRadius: 24, marginTop: 8, border: `1px solid ${C.border}`, boxShadow: C.shadow }}>
+              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>📍</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รับแล้ว</div>
+              <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับแล้ว" จะปรากฏที่นี่</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
+              </div>
+              {docs.map((doc) => (
+                <DocCard key={doc.id} onClick={() => pickDoc(doc)}
+                  docNo={doc.request_no}
+                  statusLabel={getDepositStatusLabel(doc.status, t)}
+                  statusColor="#6366f1"
+                  dateStr={doc.expected_arrival_date ?? '-'}
+                  subText={doc.contact_name}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <TopBar
+        title={selectedDoc.request_no}
+        subtitle={`📍 รอระบุ Location ${pendingCount}/${lines.length} รายการ`}
+        onBack={() => { setSelectedDoc(null); setLines([]); setSelectedLine(null); setUpdated([]); }}
+      />
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 10px 280px', background: C.bg }}>
+        {linesLoading ? (
+          <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
+        ) : (
+          <>
+            {updated.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ color: C.green, fontSize: 13, fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>อัปเดตแล้ว ({updated.length})</div>
+                {updated.slice(0, 3).map((item, i) => (
+                  <div key={i} style={{ background: C.greenLight, borderRadius: 14, padding: '10px 14px', marginBottom: 8, border: `1px solid ${C.greenBorder}`, fontSize: 13 }}>
+                    <span style={{ fontWeight: 800, color: C.green }}>✓ {item.line.product_name}</span>
+                    {' → '}
+                    <span style={{ color: C.textSec }}>{item.location?.code ?? 'ไม่ระบุ'}</span>
+                    <span style={{ color: C.muted, marginLeft: 8 }}>{item.at}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {lines.map((l, i) => {
+              const hasloc = !!l.location_id;
+              return (
+                <div key={l.id}
+                  onClick={() => { if (!hasloc) { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); } }}
+                  style={{
+                    background: hasloc ? C.greenLight : C.surface,
+                    border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
+                    borderRadius: 18, padding: '16px', marginBottom: 12,
+                    cursor: hasloc ? 'default' : 'pointer',
+                    boxShadow: C.shadow, transition: 'border-color 0.15s',
+                  }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2 }}>{l.product_name ?? l.customer_product_code}</div>
+                      <div style={{ fontSize: 12, color: C.textSec }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      {hasloc ? (
+                        <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {l.location_id}</span>
+                      ) : (
+                        <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13 }}>📍 ระบุ Location</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {selectedLine && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: 720,
+          background: C.surface, borderTop: `1px solid ${C.borderLight}`,
+          borderTopLeftRadius: 32, borderTopRightRadius: 32,
+          boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
+          padding: '20px 10px 32px',
+          zIndex: 100, maxHeight: '65vh', overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontWeight: 900, fontSize: 18, color: C.text }}>ระบุ Location</div>
+            <button type="button" onClick={() => setSelectedLine(null)}
+              style={{ background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36, fontSize: 20, color: C.textSec, cursor: 'pointer' }}>✕</button>
+          </div>
+          <div style={{ background: C.blueLight, borderRadius: 14, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
+            <div style={{ fontWeight: 800, color: C.text }}>{selectedLine.product_name}</div>
+            <div style={{ color: C.textSec, marginTop: 2 }}>LOT: {selectedLine.lot_no ?? '-'} · รับจริง: {selectedLine.actual_boxes ?? selectedLine.expected_boxes ?? '-'} กล่อง {selectedLine.actual_weight != null ? `· ${selectedLine.actual_weight} กก.` : ''}</div>
+            <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>ยอดรับไม่สามารถแก้ไขได้</div>
+          </div>
+
+          {saveError && (
+            <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>{saveError}</div>
+          )}
+
+          {locations.length > 0 ? (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                📍 เลือก Location จัดเก็บ
+                {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>✓ {selectedLocation.code}</span>}
+              </div>
+              {useHierarchy ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ห้อง / โซน</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {availableZones.map((z) => (
+                        <button key={z} type="button"
+                          onClick={() => { setLocZone(z === locZone ? '' : z); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                          style={{ padding: '10px 18px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locZone === z ? '#6366f1' : C.border}`, background: locZone === z ? '#6366f1' : C.surfaceSolid, color: locZone === z ? '#fff' : C.text }}>
+                          {z}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {locZone && availableSides.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ฝั่ง (Side)</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {availableSides.map((s) => (
+                          <button key={s} type="button"
+                            onClick={() => { setLocSide(s === locSide ? '' : s); setLocRow(''); setLocLevel(''); }}
+                            style={{ padding: '10px 24px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locSide === s ? '#6366f1' : C.border}`, background: locSide === s ? '#6366f1' : C.surfaceSolid, color: locSide === s ? '#fff' : C.text }}>
+                            {s === 'L' ? 'ซ้าย (L)' : s === 'R' ? 'ขวา (R)' : s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {locSide && availableRows.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>แถว (Row)</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {availableRows.map((r) => (
+                          <button key={r} type="button"
+                            onClick={() => { setLocRow(r === locRow ? '' : r); setLocLevel(''); }}
+                            style={{ width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locRow === r ? '#6366f1' : C.border}`, background: locRow === r ? '#6366f1' : C.surfaceSolid, color: locRow === r ? '#fff' : C.text }}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {locRow && availableLevels.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ชั้น (Level)</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {availableLevels.map((lv) => (
+                          <button key={lv} type="button"
+                            onClick={() => setLocLevel(lv === locLevel ? '' : lv)}
+                            style={{ width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locLevel === lv ? C.green : C.border}`, background: locLevel === lv ? C.greenLight : C.surfaceSolid, color: locLevel === lv ? C.green : C.text }}>
+                            {lv}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {locations.map((loc) => {
+                    const isSel = selectedLocation?.id === loc.id;
+                    return (
+                      <button key={loc.id} type="button" onClick={() => setSelectedLocation(isSel ? null : loc)}
+                        style={{ padding: '10px 14px', borderRadius: 14, border: `2px solid ${isSel ? C.green : C.border}`, background: isSel ? C.greenLight : C.surfaceSolid, color: isSel ? C.green : C.textSec, fontSize: 14, fontWeight: isSel ? 800 : 600, cursor: 'pointer' }}>
+                        {loc.sectionCode} · {loc.code}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>ไม่มีข้อมูล Location ในระบบ</div>
+          )}
+
+          <button type="button" disabled={!selectedLocation || saving} onClick={handleSaveLocation}
+            style={{
+              width: '100%', padding: '20px', borderRadius: 20,
+              background: !selectedLocation ? C.border : '#6366f1',
+              color: !selectedLocation ? C.muted : '#fff',
+              border: 'none', fontSize: 18, fontWeight: 900, cursor: !selectedLocation ? 'not-allowed' : 'pointer',
+              boxShadow: !selectedLocation ? 'none' : '0 8px 24px rgba(99,102,241,0.4)',
+              transition: 'all 0.2s',
+            }}>
+            {saving ? '⏳ กำลังบันทึก...' : '📍 บันทึก Location'}
+          </button>
+        </div>
+      )}
+    </div>
+    </div>
+  );
+}
+
 // ── Mode select home ──────────────────────────────────────────
 function ModeSelect({ onSelect }) {
   const { activeProfile, logout } = useHandheldAuth();
@@ -1459,7 +1750,7 @@ function ModeSelect({ onSelect }) {
             background: C.surface, border: `2px solid ${C.border}`,
             borderRadius: 20, padding: '28px 24px',
             textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 36, overflow: 'hidden',
+            marginBottom: 16, overflow: 'hidden',
             boxShadow: C.shadow,
             transition: 'border-color 0.15s, box-shadow 0.15s',
           }}
@@ -1469,6 +1760,27 @@ function ModeSelect({ onSelect }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>เบิกออก (Picking)</div>
             <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>หยิบสินค้าตามใบขอเบิก</div>
+          </div>
+        </button>
+
+        {/* Location Update button */}
+        <button type="button" onClick={() => onSelect('location')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 16,
+            width: '100%', boxSizing: 'border-box',
+            background: C.surface, border: `2px solid ${C.border}`,
+            borderRadius: 20, padding: '28px 24px',
+            textAlign: 'left', cursor: 'pointer', color: C.text,
+            marginBottom: 36, overflow: 'hidden',
+            boxShadow: C.shadow,
+            transition: 'border-color 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = `0 4px 16px rgba(99,102,241,0.25)`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
+          >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>📍 ระบุที่จัดเก็บ (Location)</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>ระบุตำแหน่งสินค้าที่รับเข้าแล้ว</div>
           </div>
         </button>
 
@@ -1515,6 +1827,7 @@ function HandheldApp() {
 
   if (mode === 'receive') return <ReceivingWorkflow onBack={() => setMode(null)} t={t} />;
   if (mode === 'pick') return <PickingWorkflow onBack={() => setMode(null)} t={t} />;
+  if (mode === 'location') return <LocationUpdateWorkflow onBack={() => setMode(null)} t={t} />;
   return <ModeSelect onSelect={setMode} />;
 }
 

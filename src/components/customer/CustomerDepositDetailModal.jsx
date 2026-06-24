@@ -10,6 +10,7 @@ import {
   listCustomerDepositRequestLines,
   reviewCustomerDepositRequest,
   recordDepositLineActualReceipt,
+  updateDepositLineLocation,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -28,6 +29,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [recountLine, setRecountLine] = useState(null);
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountQty, setRecountQty] = useState('');
+  const [locationLine, setLocationLine] = useState(null);
+  const [locationValue, setLocationValue] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -146,6 +149,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setRecountLine(null);
   }
 
+  async function handleSaveLocation() {
+    if (!locationLine) return;
+    setSubmitting(true); setError('');
+    const r = await updateDepositLineLocation(locationLine.id, locationValue || null, locationLine);
+    setSubmitting(false);
+    if (r.error) { setError(r.error.message ?? 'Save location failed'); return; }
+    setLines((prev) => prev.map((l) =>
+      l.id === locationLine.id ? { ...l, location_id: locationValue || null } : l,
+    ));
+    setActionMsg('อัปเดต Location เรียบร้อยแล้ว');
+    setLocationLine(null);
+  }
+
   return (
     <>
       <Modal
@@ -203,54 +219,71 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             <div style={{ marginBottom: 16 }}>
               <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
               <div className="responsive-table">
-                <table className="data-table">
+                <table className="data-table" style={{ fontSize: 13 }}>
                   <thead>
                     <tr>
                       <th>#</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
-                      <th>{t('customer_col_weight_per_box')}</th>
-                      <th>{t('customer_col_total_deposit_weight')}</th>
-                      <th>{t('customer_col_box_count')}</th>
-                      <th>{t('admin_received_qty')}</th>
+                      <th style={{ textAlign: 'center' }}>LOT</th>
+                      <th style={{ textAlign: 'right' }}>แจ้งฝาก (กล่อง)</th>
+                      <th style={{ textAlign: 'right' }}>แจ้งฝาก (กก.)</th>
+                      <th style={{ textAlign: 'right' }}>รับจริง (กล่อง)</th>
+                      <th style={{ textAlign: 'right' }}>รับจริง (กก.)</th>
+                      <th>Location</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.length ? lines.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.line_no}</td>
-                        <td>{line.customer_product_code ?? '-'}</td>
-                        <td>{line.product_name ?? '-'}</td>
-                        <td>{line.weight_per_box ?? '-'}</td>
-                        <td>{line.expected_weight ?? '-'}</td>
-                        <td>{line.expected_boxes ?? '-'}</td>
-                        <td>
-                          {line.actual_boxes != null ? (
-                            <span style={{ fontWeight: 600, color: 'var(--tgd-success)' }}>
-                              {line.actual_boxes} กล่อง
-                              {line.actual_weight != null ? ` · ${line.actual_weight} กก.` : ''}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12 }}>ยังไม่ได้บันทึก</span>
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            type="button"
-                            onClick={() => {
-                              setRecountLine(line);
-                              setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
-                              setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
-                            }}
-                          >
-                            {t('admin_recount_button')}
-                          </button>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
+                    {lines.length ? lines.map((line) => {
+                      const isConfirmed = header.status === 'RECEIVED_CONFIRMED';
+                      const hasVariance = line.actual_boxes != null &&
+                        (line.actual_boxes !== line.expected_boxes || String(line.actual_weight) !== String(line.expected_weight));
+                      return (
+                        <tr key={line.id} style={hasVariance ? { background: '#fff9e6' } : {}}>
+                          <td>{line.line_no}</td>
+                          <td>{line.customer_product_code ?? '-'}</td>
+                          <td>{line.product_name ?? '-'}</td>
+                          <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>
+                          <td style={{ textAlign: 'right' }}>{line.expected_boxes ?? '-'}</td>
+                          <td style={{ textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
+                          <td style={{ textAlign: 'right', fontWeight: line.actual_boxes != null ? 600 : 400, color: hasVariance ? 'var(--tgd-warning)' : (line.actual_boxes != null ? 'var(--tgd-success)' : 'var(--tgd-danger)') }}>
+                            {line.actual_boxes != null ? line.actual_boxes : <small>ยังไม่บันทึก</small>}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: line.actual_weight != null ? 600 : 400 }}>
+                            {line.actual_weight != null ? line.actual_weight : '-'}
+                          </td>
+                          <td style={{ fontSize: 12, color: line.location_id ? 'var(--tgd-success)' : 'var(--tgd-muted-text)' }}>
+                            {line.location_id ?? <small>ยังไม่ระบุ</small>}
+                          </td>
+                          <td>
+                            {isConfirmed ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                type="button"
+                                title="อัปเดตตำแหน่งจัดเก็บ (แก้ไขยอดรับไม่ได้)"
+                                onClick={() => { setLocationLine(line); setLocationValue(line.location_id ?? ''); }}
+                              >
+                                📍 Location
+                              </button>
+                            ) : (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                type="button"
+                                onClick={() => {
+                                  setRecountLine(line);
+                                  setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
+                                  setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
+                                }}
+                              >
+                                {t('admin_recount_button')}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -373,6 +406,45 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <input className="form-control" type="number" min={0} value={recountQty} onChange={(e) => setRecountQty(e.target.value)} />
               </label>
             </div>
+          </>
+        ) : null}
+      </Modal>
+
+      {/* Location update modal — only for RECEIVED_CONFIRMED lines */}
+      <Modal
+        isOpen={!!locationLine}
+        onClose={() => setLocationLine(null)}
+        title="อัปเดต Location"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-primary" disabled={submitting} type="button" onClick={handleSaveLocation}>
+              {t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setLocationLine(null)} type="button">{t('cancel')}</button>
+          </div>
+        )}
+      >
+        {locationLine ? (
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{locationLine.product_name ?? locationLine.customer_product_code}</strong>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', margin: '0 0 12px' }}>
+              ยอดรับ: {locationLine.actual_boxes ?? locationLine.expected_boxes} กล่อง
+              {locationLine.actual_weight != null ? ` · ${locationLine.actual_weight} กก.` : ''}
+              {' '}(แก้ไขยอดรับไม่ได้)
+            </p>
+            <label className="form-field">
+              <span>Location ID</span>
+              <input
+                className="form-control"
+                value={locationValue}
+                onChange={(e) => setLocationValue(e.target.value)}
+                placeholder="เช่น A1-01, B2-03..."
+                autoFocus
+              />
+            </label>
           </>
         ) : null}
       </Modal>
