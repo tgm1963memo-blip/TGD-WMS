@@ -11,11 +11,13 @@ import {
   getCustomerWithdrawalRequest,
   listCustomerWithdrawalRequestLines,
   upsertCustomerWithdrawalRequestLine,
+  updateCustomerWithdrawalRequestDraft,
+  deleteCustomerWithdrawalRequestLine,
+  submitCustomerWithdrawalRequest,
 } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
-  listCustomerDepositRequests,
-  listCustomerDepositRequestLines,
+  getDepositInventoryLines,
 } from '../../services/customerDepositRequestService.js';
 import {
   mapWithdrawalHeaderForCopy,
@@ -44,18 +46,21 @@ export function CustomerWithdrawalRequestCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copyFromId = searchParams.get('copyFrom');
+  const editId = searchParams.get('editId');
+  const isEditMode = Boolean(editId);
   const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialWithdrawalLines());
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
+  const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [depositOptions, setDepositOptions] = useState([]);
   const [depositLinesMap, setDepositLinesMap] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
-  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId));
+  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId) || Boolean(editId));
   const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
@@ -120,28 +125,95 @@ export function CustomerWithdrawalRequestCreatePage() {
 
   useEffect(() => {
     let active = true;
+
+    if (!editId) return undefined;
+
+    setCopyLoading(true);
+    setCopyError('');
+
+    (async () => {
+      try {
+        const headerResult = await getCustomerWithdrawalRequest(editId);
+        if (!active) return;
+
+        if (headerResult.error || !headerResult.data) {
+          setCopyError(headerResult.error?.message ?? 'ไม่สามารถโหลดข้อมูลได้');
+          setCopyLoading(false);
+          return;
+        }
+
+        if (isRequestProxy) setProxyCustomerId(headerResult.data.customer_id ?? '');
+
+        const linesResult = await listCustomerWithdrawalRequestLines(editId);
+        if (!active) return;
+
+        const sourceLines = linesResult.data ?? [];
+        setHeader(mapWithdrawalHeaderForCopy(headerResult.data));
+
+        const editLines = sourceLines.map((line, index) => ({
+          key: index + 1,
+          lineId: line.id,
+          customer_product_code: line.customer_product_code ?? '',
+          product_code: line.internal_product_code ?? '',
+          product_name: line.product_name ?? '',
+          source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
+          lot_no: line.source_lot_no ?? line.lot_no ?? '',
+          mfg_date: line.mfg_date ?? '',
+          exp_date: line.exp_date ?? '',
+          requested_qty: String(line.requested_qty ?? ''),
+          requested_boxes: String(line.requested_boxes ?? ''),
+          requested_weight: String(line.requested_weight ?? ''),
+          picking_rule: line.picking_rule ?? 'FEFO',
+        }));
+
+        const padded = [...editLines];
+        for (let i = editLines.length; i < Math.max(WITHDRAWAL_LINE_DEFAULT_COUNT, editLines.length); i += 1) {
+          padded.push(createEmptyWithdrawalLine(i + 1));
+        }
+
+        setEditOriginalLineIds(sourceLines.map((l) => l.id));
+        setLines(padded);
+        setNextLineKey(padded.length + 1);
+        setCopyLoading(false);
+      } catch (err) {
+        if (!active) return;
+        setCopyError(err?.message ?? 'ไม่สามารถโหลดข้อมูลได้');
+        setCopyLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [editId, isRequestProxy]);
+
+  useEffect(() => {
+    let active = true;
     if (!effectiveCustomerId) {
       setDepositOptions([]);
       setDepositLinesMap({});
       return undefined;
     }
 
-    const RECEIVED_STATUSES = ['WAREHOUSE_RECEIVED', 'ADMIN_RECEIVING_REVIEW', 'COMPLETED'];
-    listCustomerDepositRequests({ customerId: effectiveCustomerId, statusIn: RECEIVED_STATUSES }).then(async (result) => {
+    getDepositInventoryLines({ customerId: effectiveCustomerId }).then((result) => {
       if (!active) return;
-      const deposits = result.data ?? [];
-      const opts = deposits.map((d) => ({
-        id: d.id,
-        label: `${d.request_no} (${d.expected_arrival_date ?? '-'})`,
-      }));
-      setDepositOptions(opts);
-
+      const allLines = result.data ?? [];
+      
       const linesByDeposit = {};
-      await Promise.all(deposits.map(async (d) => {
-        const linesResult = await listCustomerDepositRequestLines(d.id);
-        if (active) linesByDeposit[d.id] = linesResult.data ?? [];
-      }));
-      if (active) setDepositLinesMap(linesByDeposit);
+      const depositMap = {};
+
+      allLines.forEach((l) => {
+        if (!linesByDeposit[l.deposit_request_id]) linesByDeposit[l.deposit_request_id] = [];
+        linesByDeposit[l.deposit_request_id].push(l);
+
+        if (l.request) {
+          depositMap[l.deposit_request_id] = {
+            id: l.deposit_request_id,
+            label: `${l.request.request_no} (${l.request.expected_arrival_date ?? '-'})`,
+          };
+        }
+      });
+
+      setDepositOptions(Object.values(depositMap));
+      setDepositLinesMap(linesByDeposit);
     });
 
     return () => { active = false; };
@@ -200,26 +272,47 @@ export function CustomerWithdrawalRequestCreatePage() {
 
     setSubmitting(true);
 
-    const createResult = await createCustomerWithdrawalRequest({
-      requestedDispatchDate: header.requested_dispatch_date,
-      deliveryType: header.delivery_type,
-      pickupContact: header.pickup_contact,
-      destination: header.destination,
-      note: header.note,
-      customerId: isRequestProxy ? proxyCustomerId : null,
-    });
+    let requestId;
 
-    if (createResult.error) {
-      setSubmitting(false);
-      setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
-      return;
+    if (isEditMode) {
+      const updateResult = await updateCustomerWithdrawalRequestDraft(editId, {
+        requestedDispatchDate: header.requested_dispatch_date,
+        deliveryType: header.delivery_type,
+        pickupContact: header.pickup_contact,
+        destination: header.destination,
+        note: header.note,
+      });
+
+      if (updateResult.error) {
+        setSubmitting(false);
+        setSubmitError(updateResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+
+      requestId = editId;
+    } else {
+      const createResult = await createCustomerWithdrawalRequest({
+        requestedDispatchDate: header.requested_dispatch_date,
+        deliveryType: header.delivery_type,
+        pickupContact: header.pickup_contact,
+        destination: header.destination,
+        note: header.note,
+        customerId: isRequestProxy ? proxyCustomerId : null,
+      });
+
+      if (createResult.error) {
+        setSubmitting(false);
+        setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+
+      requestId = createResult.data?.id;
     }
-
-    const requestId = createResult.data?.id;
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
       const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
+        lineId: line.lineId ?? null,
         lineNo: index + 1,
         sourceDepositRequestId: line.source_deposit_request_id || null,
         sourceLotNo: line.lot_no,
@@ -243,15 +336,30 @@ export function CustomerWithdrawalRequestCreatePage() {
       }
     }
 
+    if (isEditMode) {
+      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
+      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
+      for (const deletedId of toDelete) {
+        await deleteCustomerWithdrawalRequestLine(requestId, deletedId);
+      }
+    }
+
+    const submitResult = await submitCustomerWithdrawalRequest(requestId);
     setSubmitting(false);
+
+    if (submitResult.error) {
+      setSubmitError(submitResult.error.message ?? t('customer_portal_load_error'));
+      return;
+    }
+
     navigate('/customer/withdrawal-request');
   }
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-create-page">
       <PageHeader
-        title={t('customer_withdrawal_create_title')}
-        description={t('customer_withdrawal_description')}
+        title={isEditMode ? 'แก้ไขร่างใบแจ้งเบิก' : t('customer_withdrawal_create_title')}
+        description={isEditMode ? undefined : t('customer_withdrawal_description')}
         actions={(
           <Link className="btn btn-secondary" data-testid="customer-withdrawal-back-to-list" to="/customer/withdrawal-request">
             {t('customer_withdrawal_back_to_list')}
@@ -311,14 +419,7 @@ export function CustomerWithdrawalRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_requested_dispatch_date')}</span>
-            <input className="form-control" data-testid="customer-withdrawal-dispatch-date" onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required type="date" value={header.requested_dispatch_date} />
-          </label>
-          <label className="form-field">
-            <span>{t('customer_field_delivery_type')}</span>
-            <select className="form-control" onChange={(e) => updateHeaderField('delivery_type', e.target.value)} value={header.delivery_type}>
-              <option value="PICKUP">PICKUP</option>
-              <option value="DELIVERY">DELIVERY</option>
-            </select>
+            <input className="form-control" data-testid="customer-withdrawal-dispatch-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required type="date" value={header.requested_dispatch_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_pickup_contact')}</span>

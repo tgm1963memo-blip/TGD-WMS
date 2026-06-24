@@ -20,7 +20,7 @@ export function CustomerRequestPolicyAdminPage() {
     getCustomerRequestPolicy().then((result) => {
       if (!active) return;
       if (result.error) {
-        setError(result.error.message ?? t('customer_request_policy_load_error'));
+        setError(result.error.message ?? 'ไม่สามารถโหลดข้อมูลนโยบายได้');
       } else if (result.data) {
         setDepositLeadDays(String(result.data.deposit_cancel_lead_days ?? 3));
         setWithdrawalLeadDays(String(result.data.withdrawal_cancel_lead_days ?? 3));
@@ -31,7 +31,7 @@ export function CustomerRequestPolicyAdminPage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, []);
 
   async function handleSave(event) {
     event.preventDefault();

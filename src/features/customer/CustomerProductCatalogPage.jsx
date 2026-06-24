@@ -149,6 +149,7 @@ export function CustomerProductCatalogPage() {
 
     const result = await upsertCustomerProduct({
       productId: form.productId || null,
+      customerId,
       customerProductCode: form.customerProductCode.trim(),
       productName: form.productName.trim(),
       internalProductCode: resolveBarcodeCode(form.customerProductCode, form.barcodeCode),
@@ -219,6 +220,7 @@ export function CustomerProductCatalogPage() {
       let imported = 0;
       for (const row of rows) {
         const result = await upsertCustomerProduct({
+          customerId,
           customerProductCode: row.customerProductCode,
           productName: row.productName,
           internalProductCode: row.internalProductCode,

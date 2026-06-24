@@ -57,7 +57,7 @@ export function CustomerDepositLinesTable({
   }
 
   return (
-    <div className="responsive-table customer-deposit-lines-table-wrap" data-testid={testId}>
+    <div className="responsive-table customer-deposit-lines-table-wrap" data-testid={testId} style={{ overflowX: 'auto', width: '100%', whiteSpace: 'nowrap' }}>
       <table className="data-table customer-deposit-lines-table">
         <thead>
           <tr>

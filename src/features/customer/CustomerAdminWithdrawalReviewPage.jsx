@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer/CustomerWithdrawalRequestLinesDisplay.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
@@ -13,12 +12,13 @@ import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
   reviewCustomerWithdrawalRequest,
+  cancelCustomerWithdrawalRequest,
   enqueueCustomerWithdrawalNotification,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
-const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED'];
+const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
@@ -29,6 +29,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [comment, setComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelComment, setCancelComment] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyNote, setNotifyNote] = useState('');
   const [recountLine, setRecountLine] = useState(null);
@@ -80,8 +82,10 @@ export function CustomerAdminWithdrawalReviewPage() {
   const branding = getDocumentBrandingConfig();
 
   const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
-  const canConfirmWithdrawal = selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'].includes(selected.status);
-  const canReject = selected && !['REJECTED', 'COMPLETED', 'DISPATCHED'].includes(selected.status);
+  const canSendToHandheld = selected && selected.status === 'ADMIN_ACCEPTED';
+  const canConfirmWithdrawal = selected && selected.status === 'WAREHOUSE_PICKING';
+  const canReject = selected && !['ADMIN_REJECTED', 'REJECTED', 'COMPLETED', 'DISPATCHED', 'CANCELLED'].includes(selected.status);
+  const canCancel = selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
 
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
@@ -106,6 +110,23 @@ export function CustomerAdminWithdrawalReviewPage() {
     }
     const newStatus = acceptResult.data?.status ?? 'ADMIN_ACCEPTED';
     setActionMsg(t('admin_work_order_opened'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  async function handleSendToHandheld() {
+    if (!selectedId || !selected) return;
+    setSubmitting(true);
+    setError('');
+    setActionMsg('');
+
+    const result = await reviewCustomerWithdrawalRequest(selectedId, 'SEND_TO_PICKING', comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Send to handheld failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'WAREHOUSE_PICKING';
+    setActionMsg(t('admin_sent_to_handheld'));
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
   }
 
@@ -145,6 +166,23 @@ export function CustomerAdminWithdrawalReviewPage() {
     setRejectReason('');
   }
 
+  async function handleCancel() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    const result = await cancelCustomerWithdrawalRequest(selectedId, cancelComment || null);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Cancel failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'CANCELLED';
+    setActionMsg('ยกเลิกเอกสารแล้ว');
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setCancelOpen(false);
+    setCancelComment('');
+  }
+
   async function handleNotifyCustomer() {
     if (!selected) return;
     setNotifying(true);
@@ -178,11 +216,6 @@ export function CustomerAdminWithdrawalReviewPage() {
       <PageHeader
         title={t('admin_withdrawal_review_title')}
         description={t('admin_withdrawal_review_description')}
-        actions={(
-          <Link className="btn btn-secondary" to="/handheld">
-            {t('handheld_mode_pick')}
-          </Link>
-        )}
       />
       <CustomerPortalLiveBanner />
       {actionMsg ? <div className="alert-success-panel" role="status">{actionMsg}</div> : null}
@@ -346,26 +379,40 @@ export function CustomerAdminWithdrawalReviewPage() {
               {canOpenWorkOrder ? (
                 <button
                   className="btn btn-primary"
+                  data-testid="btn-open-work-order"
                   disabled={submitting}
                   onClick={handleOpenWorkOrder}
                   type="button"
                 >
-                  {t('admin_open_work_order')}
+                  {submitting ? '...' : t('admin_open_work_order')}
+                </button>
+              ) : null}
+              {canSendToHandheld ? (
+                <button
+                  className="btn btn-primary"
+                  data-testid="btn-send-to-handheld"
+                  disabled={submitting}
+                  onClick={handleSendToHandheld}
+                  type="button"
+                >
+                  {submitting ? '...' : t('admin_send_to_handheld')}
                 </button>
               ) : null}
               {canConfirmWithdrawal ? (
                 <button
                   className="btn btn-primary"
+                  data-testid="btn-confirm-withdrawal"
                   disabled={submitting}
                   onClick={handleConfirmWithdrawal}
                   type="button"
                 >
-                  {t('admin_confirm_withdrawal')}
+                  {submitting ? '...' : t('admin_confirm_withdrawal')}
                 </button>
               ) : null}
               {canReject ? (
                 <button
                   className="btn btn-danger"
+                  data-testid="btn-reject-withdrawal"
                   disabled={submitting}
                   onClick={() => setRejectOpen(true)}
                   type="button"
@@ -373,9 +420,49 @@ export function CustomerAdminWithdrawalReviewPage() {
                   {t('admin_reject_request')}
                 </button>
               ) : null}
+              {canCancel ? (
+                <button
+                  className="btn btn-secondary"
+                  disabled={submitting}
+                  onClick={() => { setCancelComment(''); setCancelOpen(true); }}
+                  type="button"
+                >
+                  ยกเลิกเอกสาร
+                </button>
+              ) : null}
             </div>
           </>
         ) : null}
+      </Modal>
+
+      {/* Cancel modal */}
+      <Modal
+        isOpen={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="ยกเลิกเอกสาร"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-danger" disabled={submitting} onClick={handleCancel} type="button">
+              ยืนยันยกเลิก
+            </button>
+            <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>เอกสารจะถูกยกเลิกและไม่สามารถนำกลับมาใช้ได้</p>
+        <label className="form-field">
+          <span>หมายเหตุ (ไม่บังคับ)</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={cancelComment}
+            onChange={(e) => setCancelComment(e.target.value)}
+            placeholder="ระบุสาเหตุการยกเลิก..."
+          />
+        </label>
       </Modal>
 
       {/* Reject modal */}

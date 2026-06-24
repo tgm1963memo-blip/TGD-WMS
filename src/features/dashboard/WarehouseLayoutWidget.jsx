@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSectionsWithOccupancy } from '../../services/warehouseLayoutService.js';
+import { getSectionsWithOccupancy, getStockAtLocation } from '../../services/warehouseLayoutService.js';
+import { getCustomers, getProducts } from '../../services/masterDataService.js';
 
 function pctColor(pct) {
   if (pct >= 80) return '#e74c3c';
@@ -27,7 +28,7 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500'
   );
 }
 
-function SectionGrid({ section }) {
+function SectionGrid({ section, onLocClick }) {
   const [hovered, setHovered] = useState(null);
   const { rows, cols, locations, gridInfo } = section;
   const total = rows * cols;
@@ -58,13 +59,14 @@ function SectionGrid({ section }) {
           key={code}
           onMouseEnter={() => setHovered({ code, row: r, col: c, isOccupied })}
           onMouseLeave={() => setHovered(null)}
+          onClick={() => isOccupied && loc && onLocClick?.(loc.id, code)}
           title={code}
           style={{
             width: 14, height: 14,
             borderRadius: '50%',
             background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
             boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-            cursor: 'default',
+            cursor: isOccupied ? 'pointer' : 'default',
             transition: 'transform 0.2s, opacity 0.2s',
             transform: hovered?.code === code ? 'scale(1.5)' : 'scale(1)',
             opacity: hovered && hovered.code !== code ? 0.6 : 1,
@@ -145,12 +147,13 @@ function SectionGrid({ section }) {
               key={`L-${idx}`}
               onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
               onMouseLeave={() => setHovered(null)}
+              onClick={() => isOccupied && loc && onLocClick?.(loc.id, loc.location_code)}
               title={loc?.location_code ?? `R${row}C${col}`}
               style={{
                 width: 14, height: 14, borderRadius: '50%',
                 background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
                 boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-                cursor: 'default',
+                cursor: isOccupied ? 'pointer' : 'default',
                 transition: 'transform 0.2s, opacity 0.2s',
                 transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
                 opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
@@ -174,12 +177,13 @@ function SectionGrid({ section }) {
               key={`R-${idx}`}
               onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
               onMouseLeave={() => setHovered(null)}
+              onClick={() => isOccupied && loc && onLocClick?.(loc.id, loc.location_code)}
               title={loc?.location_code ?? `R${row}C${col}`}
               style={{
                 width: 14, height: 14, borderRadius: '50%',
                 background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
                 boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-                cursor: 'default',
+                cursor: isOccupied ? 'pointer' : 'default',
                 transition: 'transform 0.2s, opacity 0.2s',
                 transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
                 opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
@@ -219,13 +223,39 @@ export function WarehouseLayoutWidget() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
 
+  const [customerMap, setCustomerMap] = useState({});
+  const [productMap, setProductMap] = useState({});
+  const [stockModal, setStockModal] = useState(null); // { locId, locCode }
+  const [stockItems, setStockItems] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
+
   useEffect(() => {
     getSectionsWithOccupancy().then(({ data }) => {
       setSections(data ?? []);
       if (data?.length) setSelectedId(data[0].id);
       setLoading(false);
     });
+    Promise.all([getCustomers({ isActive: true }), getProducts({ isActive: true })]).then(
+      ([cRes, pRes]) => {
+        const cMap = {};
+        for (const c of cRes.data ?? []) cMap[c.id] = c.customer_name ?? c.customer_code ?? c.id;
+        const pMap = {};
+        for (const p of pRes.data ?? []) pMap[p.id] = p.product_name ?? p.sku ?? p.id;
+        setCustomerMap(cMap);
+        setProductMap(pMap);
+      }
+    );
   }, []);
+
+  function handleLocClick(locId, locCode) {
+    setStockModal({ locId, locCode });
+    setStockItems([]);
+    setStockLoading(true);
+    getStockAtLocation(locId).then(({ data }) => {
+      setStockItems(data ?? []);
+      setStockLoading(false);
+    });
+  }
 
   const selected = sections.find((s) => s.id === selectedId) ?? sections[0];
 
@@ -317,7 +347,7 @@ export function WarehouseLayoutWidget() {
         {/* Grid */}
         <div style={{ background: '#f8fafb', borderRadius: 12, padding: 14, border: '1px solid #e5e7eb', marginBottom: 20 }}>
           {selected.total > 0 ? (
-            <SectionGrid section={selected} />
+            <SectionGrid section={selected} onLocClick={handleLocClick} />
           ) : (
             <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>
               Section นี้ยังไม่มี Location
@@ -438,6 +468,92 @@ export function WarehouseLayoutWidget() {
           ⚙ ตั้งค่า Location
         </button>
       </div>
+
+      {/* Stock detail modal */}
+      {stockModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setStockModal(null)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 16, padding: 28,
+              minWidth: 360, maxWidth: 520, width: '90vw',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+              maxHeight: '80vh', overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>รายละเอียดสินค้าใน Location</div>
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>{stockModal.locCode}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStockModal(null)}
+                style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 18, color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {stockLoading ? (
+              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>กำลังโหลด...</div>
+            ) : stockItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>ไม่มีสินค้าใน Location นี้</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {stockItems.map((item) => (
+                  <div key={item.id} style={{ background: '#f8fafb', borderRadius: 12, padding: '14px 16px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 8 }}>
+                      {productMap[item.product_id] ?? item.product_id}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
+                      <div style={{ color: '#64748b' }}>ลูกค้า</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{customerMap[item.customer_id] ?? item.customer_id}</div>
+                      <div style={{ color: '#64748b' }}>จำนวนคงเหลือ</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.qty_on_hand} {item.uom}</div>
+                      <div style={{ color: '#64748b' }}>จำนวนพร้อมจ่าย</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.qty_available} {item.uom}</div>
+                      {item.weight != null && (
+                        <>
+                          <div style={{ color: '#64748b' }}>น้ำหนัก</div>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.weight} kg</div>
+                        </>
+                      )}
+                      {item.tgd_lots?.lot_number && (
+                        <>
+                          <div style={{ color: '#64748b' }}>Lot</div>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.tgd_lots.lot_number}</div>
+                        </>
+                      )}
+                      {item.tgd_lots?.expiry_date && (
+                        <>
+                          <div style={{ color: '#64748b' }}>วันหมดอายุ</div>
+                          <div style={{ fontWeight: 600, color: '#e07b00' }}>
+                            {new Date(item.tgd_lots.expiry_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          </div>
+                        </>
+                      )}
+                      {item.pallet_id && (
+                        <>
+                          <div style={{ color: '#64748b' }}>Pallet</div>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.pallet_id}</div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

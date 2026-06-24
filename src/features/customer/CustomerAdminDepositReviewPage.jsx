@@ -14,6 +14,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   reviewCustomerDepositRequest,
+  cancelCustomerDepositRequest,
   recordDepositLineActualReceipt,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
@@ -30,6 +31,7 @@ const REVIEW_STATUSES = [
   'ADMIN_RECOUNT_REQUESTED',
   'RECEIVED_CONFIRMED',
   'CUSTOMER_NOTIFIED',
+  'CANCELLED',
 ];
 
 export function CustomerAdminDepositReviewPage() {
@@ -42,6 +44,8 @@ export function CustomerAdminDepositReviewPage() {
   const [comment, setComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelComment, setCancelComment] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyNote, setNotifyNote] = useState('');
   const [recountLine, setRecountLine] = useState(null);
@@ -110,6 +114,7 @@ export function CustomerAdminDepositReviewPage() {
     ? 'กรุณาบันทึกจำนวนรับจริงทุกรายการก่อนยืนยัน'
     : '';
   const canReject = selected && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(selected.status);
+  const canCancel = selected && !['COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED', 'REJECTED'].includes(selected.status);
 
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
@@ -171,6 +176,23 @@ export function CustomerAdminDepositReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
     setRejectOpen(false);
     setRejectReason('');
+  }
+
+  async function handleCancel() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    const result = await cancelCustomerDepositRequest(selectedId, cancelComment || null);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Cancel failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'CANCELLED';
+    setActionMsg('ยกเลิกเอกสารแล้ว');
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    setCancelOpen(false);
+    setCancelComment('');
   }
 
   async function handleNotifyCustomer() {
@@ -423,6 +445,16 @@ export function CustomerAdminDepositReviewPage() {
                   {t('admin_reject_request')}
                 </button>
               ) : null}
+              {canCancel ? (
+                <button
+                  className="btn btn-secondary"
+                  disabled={submitting}
+                  onClick={() => { setCancelComment(''); setCancelOpen(true); }}
+                  type="button"
+                >
+                  ยกเลิกเอกสาร
+                </button>
+              ) : null}
             </div>
 
             {/* Persistent email notification section */}
@@ -507,6 +539,36 @@ export function CustomerAdminDepositReviewPage() {
             value={notifyNote}
             onChange={(e) => setNotifyNote(e.target.value)}
             placeholder={t('admin_notify_customer_note_placeholder')}
+          />
+        </label>
+      </Modal>
+
+      {/* Cancel modal */}
+      <Modal
+        isOpen={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="ยกเลิกเอกสาร"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-danger" disabled={submitting} onClick={handleCancel} type="button">
+              ยืนยันยกเลิก
+            </button>
+            <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>เอกสารจะถูกยกเลิกและไม่สามารถนำกลับมาใช้ได้</p>
+        <label className="form-field">
+          <span>หมายเหตุ (ไม่บังคับ)</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={cancelComment}
+            onChange={(e) => setCancelComment(e.target.value)}
+            placeholder="ระบุสาเหตุการยกเลิก..."
           />
         </label>
       </Modal>

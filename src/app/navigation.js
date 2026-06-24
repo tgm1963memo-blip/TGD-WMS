@@ -30,7 +30,7 @@ export const navigationGroups = [
     label: 'Outbound Management',
     key: 'outbound_management',
     items: [
-      { label: 'การเบิกสินค้า', key: 'withdrawal_request', path: '/operations/withdrawal-requests' },
+      { label: 'การเบิกสินค้า', key: 'withdrawal_request', path: '/customer/admin/withdrawal-review' },
     ],
   },
   {

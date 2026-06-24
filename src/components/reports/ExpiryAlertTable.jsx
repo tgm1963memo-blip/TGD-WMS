@@ -6,7 +6,7 @@ export function ExpiryAlertTable({ data, loading, error }) {
       data={data}
       loading={loading}
       error={error}
-      emptyMessage="No near-expiry or expired customer-owned lots found."
+      emptyMessage="ไม่พบสินค้าใกล้หมดอายุหรือหมดอายุแล้ว"
     />
   );
 }

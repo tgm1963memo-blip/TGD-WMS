@@ -16,6 +16,8 @@ import {
   listCustomerDepositRequestLines,
   submitCustomerDepositRequest,
   upsertCustomerDepositRequestLine,
+  updateCustomerDepositRequestDraft,
+  deleteCustomerDepositRequestLine,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import {
@@ -57,12 +59,15 @@ export function CustomerDepositRequestCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copyFromId = searchParams.get('copyFrom');
+  const editId = searchParams.get('editId');
+  const isEditMode = Boolean(editId);
   const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [header, setHeader] = useState(INITIAL_HEADER);
   const [lines, setLines] = useState(() => createInitialDepositLines());
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
+  const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
@@ -71,7 +76,7 @@ export function CustomerDepositRequestCreatePage() {
   const [importing, setImporting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [copySourceNo, setCopySourceNo] = useState('');
-  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId));
+  const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId) || Boolean(editId));
   const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
@@ -138,8 +143,79 @@ export function CustomerDepositRequestCreatePage() {
 
   useEffect(() => {
     let active = true;
-    if (!effectiveCustomerId || copyFromId) {
-      if (!copyFromId) setCatalogProducts([]);
+
+    if (!editId) return undefined;
+
+    setCopyLoading(true);
+    setCopyError('');
+
+    (async () => {
+      try {
+        const headerResult = await getCustomerDepositRequest(editId);
+        if (!active) return;
+
+        if (headerResult.error || !headerResult.data) {
+          setCopyError(headerResult.error?.message ?? 'ไม่สามารถโหลดข้อมูลได้');
+          setCopyLoading(false);
+          return;
+        }
+
+        if (isRequestProxy) setProxyCustomerId(headerResult.data.customer_id ?? '');
+
+        const sourceCustomerId = headerResult.data.customer_id;
+        const [linesResult, catalogResult] = await Promise.all([
+          listCustomerDepositRequestLines(editId),
+          listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+        ]);
+
+        if (!active) return;
+
+        const catalogRows = catalogResult.data ?? [];
+        const sourceLines = linesResult.data ?? [];
+        setCatalogProducts(catalogRows);
+        setHeader(mapDepositHeaderForCopy(headerResult.data));
+
+        const editLines = sourceLines.map((line, index) => ({
+          key: index + 1,
+          lineId: line.id,
+          customer_product_code: line.customer_product_code ?? '',
+          product_code: line.internal_product_code ?? '',
+          product_name: line.product_name ?? '',
+          weight_per_box: String(line.weight_per_box ?? ''),
+          expected_boxes: String(line.expected_boxes ?? ''),
+          expected_weight: String(line.expected_weight ?? ''),
+          pack_entry_mode: 'BOXES',
+          line_note: line.note ?? '',
+          lot_no: line.lot_no ?? '',
+          mfg_date: line.mfg_date ?? '',
+          exp_date: line.exp_date ?? '',
+          temperature_type: line.temperature_type ?? 'FROZEN',
+          catalog_product_id: line.product_id ?? '',
+        }));
+
+        const padded = [...editLines];
+        for (let i = editLines.length; i < Math.max(DEPOSIT_LINE_DEFAULT_COUNT, editLines.length); i += 1) {
+          padded.push(createEmptyDepositLine(i + 1));
+        }
+
+        setEditOriginalLineIds(sourceLines.map((l) => l.id));
+        setLines(padded);
+        setNextLineKey(padded.length + 1);
+        setCopyLoading(false);
+      } catch (err) {
+        if (!active) return;
+        setCopyError(err?.message ?? 'ไม่สามารถโหลดข้อมูลได้');
+        setCopyLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [editId, isRequestProxy]);
+
+  useEffect(() => {
+    let active = true;
+    if (!effectiveCustomerId || copyFromId || editId) {
+      if (!copyFromId && !editId) setCatalogProducts([]);
       return undefined;
     }
 
@@ -253,26 +329,47 @@ export function CustomerDepositRequestCreatePage() {
 
     setSubmitting(true);
 
-    const createResult = await createCustomerDepositRequest({
-      expectedArrivalDate: header.expected_arrival_date,
-      contactName: header.contact_name,
-      contactPhone: header.contact_phone,
-      note: header.note,
-      vehicleRegistration: header.vehicle_registration,
-      customerId: isRequestProxy ? proxyCustomerId : null,
-    });
+    let requestId;
 
-    if (createResult.error) {
-      setSubmitting(false);
-      setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
-      return;
+    if (isEditMode) {
+      const updateResult = await updateCustomerDepositRequestDraft(editId, {
+        expectedArrivalDate: header.expected_arrival_date,
+        contactName: header.contact_name,
+        contactPhone: header.contact_phone,
+        note: header.note,
+        vehicleRegistration: header.vehicle_registration,
+      });
+
+      if (updateResult.error) {
+        setSubmitting(false);
+        setSubmitError(updateResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+
+      requestId = editId;
+    } else {
+      const createResult = await createCustomerDepositRequest({
+        expectedArrivalDate: header.expected_arrival_date,
+        contactName: header.contact_name,
+        contactPhone: header.contact_phone,
+        note: header.note,
+        vehicleRegistration: header.vehicle_registration,
+        customerId: isRequestProxy ? proxyCustomerId : null,
+      });
+
+      if (createResult.error) {
+        setSubmitting(false);
+        setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+
+      requestId = createResult.data?.id;
     }
-
-    const requestId = createResult.data?.id;
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
       const lineResult = await upsertCustomerDepositRequestLine(requestId, {
+        lineId: line.lineId ?? null,
         lineNo: index + 1,
         customerProductCode: line.customer_product_code,
         internalProductCode: line.product_code,
@@ -295,6 +392,14 @@ export function CustomerDepositRequestCreatePage() {
       }
     }
 
+    if (isEditMode) {
+      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
+      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
+      for (const deletedId of toDelete) {
+        await deleteCustomerDepositRequestLine(deletedId);
+      }
+    }
+
     const submitResult = await submitCustomerDepositRequest(requestId);
     setSubmitting(false);
 
@@ -310,8 +415,8 @@ export function CustomerDepositRequestCreatePage() {
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-create-page">
       <PageHeader
-        title={t('customer_deposit_create_title')}
-        description={t('customer_deposit_description')}
+        title={isEditMode ? 'แก้ไขร่างใบแจ้งฝาก' : t('customer_deposit_create_title')}
+        description={isEditMode ? undefined : t('customer_deposit_description')}
         actions={(
           <Link className="btn btn-secondary" data-testid="customer-deposit-back-to-list" to="/customer/deposit-request">
             {t('customer_deposit_back_to_list')}
@@ -396,7 +501,7 @@ export function CustomerDepositRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_expected_arrival_date')} <span className="field-required">*</span></span>
-            <input className="form-control" data-testid="customer-deposit-expected-arrival-date" onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required type="date" value={header.expected_arrival_date} />
+            <input className="form-control" data-testid="customer-deposit-expected-arrival-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required type="date" value={header.expected_arrival_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_contact_name')} <span className="field-required">*</span></span>

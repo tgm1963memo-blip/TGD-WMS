@@ -183,7 +183,7 @@ export function CustomerStockBalancePage() {
                       display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                       textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
                       border: 'none', borderBottom: '1px solid var(--tgd-border)',
-                      padding: '14px 16px', cursor: 'pointer', color: 'var(--tgd-text)',
+                      padding: '24px 16px', cursor: 'pointer', color: 'var(--tgd-text)',
                       transition: 'background 0.15s',
                     }}
                   >

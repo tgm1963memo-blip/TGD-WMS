@@ -99,6 +99,11 @@ export function CustomerDepositRequestDetailPage() {
         description={header.request_no}
         actions={(
           <>
+            {(header.status === 'DRAFT' || header.status === 'DEPOSIT_DRAFT') && (
+              <Link className="btn btn-primary" to={`/customer/deposit-request/new?editId=${header.id}`}>
+                แก้ไขร่าง
+              </Link>
+            )}
             <ReportPrintActions
               disabled={!header}
               renderReport={(reportLanguage) => (

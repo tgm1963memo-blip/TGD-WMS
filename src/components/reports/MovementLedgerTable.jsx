@@ -14,7 +14,7 @@ function DetailField({ label, value }) {
 const summaryColumns = [
   {
     key: 'created_at',
-    header: 'Date',
+    header: 'วันที่',
     render: (row) => (
       <span className="table-meta-text">
         {formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false })}
@@ -23,28 +23,37 @@ const summaryColumns = [
   },
   {
     key: 'movement_type',
-    header: 'Type',
+    header: 'ประเภท',
     render: (row) => <StatusBadge value={row.movement_type} />,
   },
   {
     key: 'product_id',
-    header: 'Product',
-    render: (row) => (
-      <span className="compact-cell-text">
-        {formatCompactText(row.source_document_no ?? row.product_id, 20)}
-      </span>
-    ),
-    title: (row) => row.product_id,
+    header: 'สินค้า',
+    render: (row) => {
+      const code = row.product_code ?? row.customer_product_code ?? '';
+      const name = row.product_name ?? row.source_document_no ?? row.product_id ?? '';
+      const display = code ? `${code} - ${name}` : name;
+      return (
+        <span className="compact-cell-text" title={display}>
+          {formatCompactText(display, 32)}
+        </span>
+      );
+    },
+    title: (row) => {
+      const code = row.product_code ?? row.customer_product_code ?? '';
+      const name = row.product_name ?? row.product_id ?? '';
+      return code ? `${code} - ${name}` : name;
+    },
   },
   {
     key: 'customer_id',
-    header: 'Customer',
-    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_id, 16)}</span>,
-    title: (row) => row.customer_id,
+    header: 'ลูกค้า',
+    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_name ?? row.customer_id, 24)}</span>,
+    title: (row) => row.customer_name ?? row.customer_id,
   },
   {
     key: 'qty',
-    header: 'Qty',
+    header: 'จำนวน',
     render: (row) => {
       const qty = Number(row.qty ?? 0);
       return <span className="compact-cell-qty">{qty > 0 ? `+${qty}` : qty}</span>;
@@ -52,7 +61,7 @@ const summaryColumns = [
   },
   {
     key: 'reference_no',
-    header: 'Ref',
+    header: 'อ้างอิง',
     render: (row) => (
       <span className="compact-cell-text">
         {formatCompactText(row.reference_no ?? row.reference_id, 16)}
@@ -65,19 +74,19 @@ const summaryColumns = [
 function renderMovementDetail(row) {
   return (
     <>
-      <DetailField label="Movement Date" value={formatDocumentDate(row.movement_date ?? row.created_at)} />
-      <DetailField label="Movement Type" value={row.movement_type} />
-      <DetailField label="Product ID" value={row.product_id} />
-      <DetailField label="Customer ID" value={row.customer_id} />
-      <DetailField label="Lot ID" value={row.lot_id} />
-      <DetailField label="Source Location" value={row.from_location_id} />
-      <DetailField label="Target Location" value={row.to_location_id} />
-      <DetailField label="Qty" value={row.qty} />
-      <DetailField label="UOM" value={row.uom} />
-      <DetailField label="Reference Type" value={row.reference_type} />
-      <DetailField label="Reference No" value={row.reference_no} />
-      <DetailField label="Document ID" value={row.reference_id} />
-      <DetailField label="Created At" value={formatDocumentDate(row.created_at)} />
+      <DetailField label="วันที่เคลื่อนไหว" value={formatDocumentDate(row.movement_date ?? row.created_at)} />
+      <DetailField label="ประเภท" value={row.movement_type} />
+      <DetailField label="สินค้า" value={row.product_name ?? row.product_id} />
+      <DetailField label="ลูกค้า" value={row.customer_name ?? row.customer_id} />
+      <DetailField label="ล็อต" value={row.lot_id} />
+      <DetailField label="ตำแหน่งต้นทาง" value={row.from_location_id} />
+      <DetailField label="ตำแหน่งปลายทาง" value={row.to_location_id} />
+      <DetailField label="จำนวน" value={row.qty} />
+      <DetailField label="หน่วย" value={row.uom} />
+      <DetailField label="ประเภทอ้างอิง" value={row.reference_type} />
+      <DetailField label="เลขที่อ้างอิง" value={row.reference_no} />
+      <DetailField label="เอกสารอ้างอิง" value={row.reference_id} />
+      <DetailField label="วันที่สร้าง" value={formatDocumentDate(row.created_at)} />
     </>
   );
 }
@@ -91,7 +100,7 @@ export function MovementLedgerTable({ data = [], loading = false, error = null }
       renderDetail={renderMovementDetail}
       loading={loading}
       error={error}
-      emptyMessage="No movement ledger rows found."
+      emptyMessage="ไม่พบข้อมูลรายการเคลื่อนไหว"
       tableTestId="movement-ledger-table"
     />
   );

@@ -5,11 +5,12 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerPortalDashboardSummary } from '../../services/customerPortalDashboardService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
+import { AdminCustomerPortalSwitcher } from '../../components/customer/AdminCustomerPortalSwitcher.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerPortalDashboardPage() {
   const t = useTranslation();
-  const { customerId, loading: profileLoading, error: profileError } = useCustomerPortalProfile();
+  const { customerId, isRequestProxy, loading: profileLoading, error: profileError } = useCustomerPortalProfile();
   const [state, setState] = useState({ summary: null, loading: true, error: null });
 
   useEffect(() => {
@@ -58,7 +59,12 @@ export function CustomerPortalDashboardPage() {
       <PageHeader
         title={t('customer_portal_title')}
         description={t('customer_portal_description')}
-        actions={<span className="status-badge status-badge--open">{t('customer_portal_live_badge')}</span>}
+        actions={
+          <>
+            {isRequestProxy && <AdminCustomerPortalSwitcher />}
+            <span className="status-badge status-badge--open">{t('customer_portal_live_badge')}</span>
+          </>
+        }
       />
 
       <CustomerPortalLiveBanner />

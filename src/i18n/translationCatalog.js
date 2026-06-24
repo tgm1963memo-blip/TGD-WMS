@@ -956,10 +956,12 @@ export function getTranslation(key, language) {
 
 Object.assign(TRANSLATION_CATALOG, {
   // Admin deposit / withdrawal new action buttons
-  admin_open_work_order: { th: 'เปิดใบงาน', en: 'Open Work Order' },
+  admin_open_work_order: { th: 'อนุมัติ / เปิดใบงาน', en: 'Approve / Open Work Order' },
+  admin_send_to_handheld: { th: 'ส่งเข้า Handheld', en: 'Send to Handheld' },
+  admin_sent_to_handheld: { th: 'ส่งเข้า Handheld เรียบร้อยแล้ว', en: 'Sent to handheld successfully.' },
   admin_confirm_receiving: { th: 'ยืนยันการรับเข้า', en: 'Confirm Receiving' },
   admin_confirm_withdrawal: { th: 'ยืนยันเบิกสินค้า', en: 'Confirm Withdrawal' },
-  admin_work_order_opened: { th: 'เปิดใบงานแล้ว — ส่งไปยัง Handheld เพื่อรับสินค้า', en: 'Work order opened — sent to handheld for receiving.' },
+  admin_work_order_opened: { th: 'เปิดใบงานแล้ว', en: 'Work order opened.' },
   admin_receiving_confirmed: { th: 'ยืนยันการรับสินค้าเรียบร้อย', en: 'Receiving confirmed.' },
   admin_withdrawal_confirmed: { th: 'ยืนยันการเบิกสินค้าเรียบร้อย', en: 'Withdrawal confirmed.' },
   admin_reject_reason_label: { th: 'เหตุผลการปฏิเสธ', en: 'Rejection reason' },

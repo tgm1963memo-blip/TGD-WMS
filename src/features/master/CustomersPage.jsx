@@ -11,6 +11,8 @@ const EMPTY_FORM = {
   id: null,
   customerCode: '',
   customerName: '',
+  branchType: 'NONE',
+  branchName: '',
   customerType: '',
   taxId: '',
   contactName: '',
@@ -38,6 +40,16 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handleTaxIdBlur() {
+    let digits = form.taxId.replace(/\D/g, '');
+    if (digits.length === 13) {
+      set('taxId', `${digits.slice(0, 1)}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10, 12)}-${digits.slice(12, 13)}`);
+    } else if (digits.length > 0) {
+      // Just set digits if they didn't finish typing
+      set('taxId', digits);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.customerCode.trim() || !form.customerName.trim()) {
@@ -46,7 +58,20 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
     }
     setSaving(true);
     setError('');
-    const { data, error: err } = await upsertCustomer(form);
+
+    let finalName = form.customerName.trim();
+    if (form.branchType === 'HEAD_OFFICE') {
+      finalName += ' (สำนักงานใหญ่)';
+    } else if (form.branchType === 'BRANCH' && form.branchName.trim()) {
+      finalName += ` (สาขา ${form.branchName.trim()})`;
+    }
+
+    const submitForm = {
+      ...form,
+      customerName: finalName,
+    };
+
+    const { data, error: err } = await upsertCustomer(submitForm);
     setSaving(false);
     if (err) {
       setError(err.message ?? 'บันทึกไม่สำเร็จ');
@@ -81,11 +106,11 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
 
         {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 14 }}>{error}</div> : null}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <label className="form-field" style={{ margin: 0 }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>
-                รหัสลูกค้า <span style={{ color: '#ef4444' }}>*</span>
+        <form className="form-card" onSubmit={handleSubmit} style={{ padding: 0, border: 'none', boxShadow: 'none' }}>
+          <div className="form-grid">
+            <label className="form-field">
+              <span>
+                รหัสลูกค้า <span className="field-required">*</span>
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
@@ -119,66 +144,95 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                 )}
               </div>
             </label>
-            <label className="form-field" style={{ margin: 0 }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>ประเภทลูกค้า</span>
+            <label className="form-field">
+              <span>ประเภทลูกค้า</span>
               <select className="form-control" value={form.customerType} onChange={(e) => set('customerType', e.target.value)}>
                 <option value="">-- ไม่ระบุ --</option>
                 {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
-          </div>
-
-          <label className="form-field" style={{ margin: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>
-              ชื่อลูกค้า <span style={{ color: '#ef4444' }}>*</span>
-            </span>
-            <input
-              className="form-control"
-              type="text"
-              value={form.customerName}
-              onChange={(e) => set('customerName', e.target.value)}
-              placeholder="ชื่อบริษัท / ชื่อลูกค้า"
-            />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <label className="form-field" style={{ margin: 0 }}>
-              <span>เลขประจำตัวผู้เสียภาษี</span>
-              <input className="form-control" type="text" value={form.taxId} onChange={(e) => set('taxId', e.target.value)} placeholder="0-0000-00000-00-0" />
+            <label className="form-field">
+              <span>
+                ชื่อลูกค้า <span className="field-required">*</span>
+              </span>
+              <input
+                className="form-control"
+                type="text"
+                value={form.customerName}
+                onChange={(e) => set('customerName', e.target.value)}
+                placeholder="ชื่อบริษัท / ชื่อลูกค้า"
+              />
             </label>
-            <label className="form-field" style={{ margin: 0 }}>
+
+            <div className="form-field">
+              <span>สาขา / สำนักงานใหญ่</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select
+                  className="form-control"
+                  value={form.branchType}
+                  onChange={(e) => set('branchType', e.target.value)}
+                  style={{ flex: form.branchType === 'BRANCH' ? '0 0 140px' : '1' }}
+                >
+                  <option value="NONE">-- ไม่ระบุ --</option>
+                  <option value="HEAD_OFFICE">สำนักงานใหญ่</option>
+                  <option value="BRANCH">สาขา</option>
+                </select>
+                {form.branchType === 'BRANCH' && (
+                  <input
+                    className="form-control"
+                    type="text"
+                    value={form.branchName}
+                    onChange={(e) => set('branchName', e.target.value)}
+                    placeholder="ระบุสาขา"
+                    style={{ flex: 1 }}
+                  />
+                )}
+              </div>
+            </div>
+            <label className="form-field">
+              <span>เลขประจำตัวผู้เสียภาษี</span>
+              <input className="form-control" type="text" value={form.taxId} onChange={(e) => set('taxId', e.target.value)} onBlur={handleTaxIdBlur} placeholder="กรอกตัวเลขเรียงติดกัน" />
+            </label>
+            <label className="form-field">
               <span>ชื่อผู้ติดต่อ</span>
               <input className="form-control" type="text" value={form.contactName} onChange={(e) => set('contactName', e.target.value)} />
             </label>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <label className="form-field" style={{ margin: 0 }}>
+            <label className="form-field">
               <span>โทรศัพท์</span>
               <input className="form-control" type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
             </label>
-            <label className="form-field" style={{ margin: 0 }}>
+            <label className="form-field">
               <span>อีเมล</span>
               <input className="form-control" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
             </label>
+
+            <label className="form-field form-field-span-2">
+              <span>ที่อยู่</span>
+              <textarea
+                className="form-control"
+                rows={3}
+                value={form.address}
+                onChange={(e) => set('address', e.target.value)}
+                style={{ resize: 'vertical' }}
+              />
+            </label>
           </div>
 
-          <label className="form-field" style={{ margin: 0 }}>
-            <span>ที่อยู่</span>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={form.address}
-              onChange={(e) => set('address', e.target.value)}
-              style={{ resize: 'vertical' }}
-            />
-          </label>
-
           {isEdit && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />
-              <span>ใช้งานอยู่ (Active)</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, marginBottom: 8, paddingRight: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(e) => set('isActive', e.target.checked)}
+                  style={{ width: 24, height: 24, accentColor: '#2563eb', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                  ใช้งานอยู่
+                  <span style={{fontSize: 12, color: '#6b7280'}}>(Active)</span>
+                </span>
+              </label>
+            </div>
           )}
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
@@ -219,10 +273,25 @@ export function CustomersPage() {
   }
 
   function openEdit(customer) {
+    let baseName = customer.customer_name ?? '';
+    let bType = 'NONE';
+    let bName = '';
+    
+    if (baseName.endsWith(' (สำนักงานใหญ่)')) {
+      bType = 'HEAD_OFFICE';
+      baseName = baseName.replace(' (สำนักงานใหญ่)', '');
+    } else if (baseName.match(/ \(สาขา (.*?)\)$/)) {
+      bType = 'BRANCH';
+      bName = baseName.match(/ \(สาขา (.*?)\)$/)[1];
+      baseName = baseName.replace(/ \(สาขา .*?\)$/, '');
+    }
+
     setModal({
       id: customer.id,
       customerCode: customer.customer_code ?? '',
-      customerName: customer.customer_name ?? '',
+      customerName: baseName,
+      branchType: bType,
+      branchName: bName,
       customerType: customer.customer_type ?? '',
       taxId: customer.tax_id ?? '',
       contactName: customer.contact_name ?? '',
@@ -292,7 +361,7 @@ export function CustomersPage() {
       ) : filtered.length === 0 ? (
         <p style={{ color: 'var(--tgd-muted-text)' }}>ไม่พบข้อมูลลูกค้าที่ตรงกับเงื่อนไข</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="responsive-table">
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>

@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
+import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer/CustomerWithdrawalRequestLinesDisplay.jsx';
+import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
+import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
+import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
-import { listCustomerWithdrawalRequests } from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines } from '../../services/customerWithdrawalRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -16,6 +21,10 @@ export function CustomerWithdrawalRequestListPage() {
   const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
+  const [detailRow, setDetailRow] = useState(null);
+  const [detailLines, setDetailLines] = useState([]);
+  const [detailLinesLoading, setDetailLinesLoading] = useState(false);
+  const branding = getDocumentBrandingConfig();
 
   useEffect(() => {
     let active = true;
@@ -45,7 +54,7 @@ export function CustomerWithdrawalRequestListPage() {
         if (!active) return;
         const names = {};
         (result.data ?? []).forEach((customer) => {
-          names[customer.id] = customer.name ?? customer.code ?? customer.id;
+          names[customer.id] = customer.customer_name ?? customer.customer_code ?? customer.id;
         });
         setCustomerNames(names);
       });
@@ -57,6 +66,16 @@ export function CustomerWithdrawalRequestListPage() {
   }, [customerId, profileLoading, isRequestProxy]);
 
   const columnCount = isRequestProxy ? 9 : 8;
+
+  function openDetail(row) {
+    setDetailRow(row);
+    setDetailLines([]);
+    setDetailLinesLoading(true);
+    listCustomerWithdrawalRequestLines(row.id).then((result) => {
+      setDetailLines(result.data ?? []);
+      setDetailLinesLoading(false);
+    });
+  }
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-page">
@@ -122,13 +141,33 @@ export function CustomerWithdrawalRequestListPage() {
                   </td>
                   <td>
                     <div className="action-row action-row--table">
-                      <Link
-                        className="btn btn-secondary btn-sm"
-                        data-testid={`customer-withdrawal-view-${row.id}`}
-                        to={`/customer/withdrawal-request/${row.id}`}
-                      >
-                        {t('customer_request_view_button')}
-                      </Link>
+                      {isRequestProxy ? (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          data-testid={`customer-withdrawal-view-${row.id}`}
+                          onClick={() => openDetail(row)}
+                          type="button"
+                        >
+                          {t('customer_request_view_button')}
+                        </button>
+                      ) : (
+                        <Link
+                          className="btn btn-secondary btn-sm"
+                          data-testid={`customer-withdrawal-view-${row.id}`}
+                          to={`/customer/withdrawal-request/${row.id}`}
+                        >
+                          {t('customer_request_view_button')}
+                        </Link>
+                      )}
+                      {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
+                        <Link
+                          className="btn btn-primary btn-sm"
+                          data-testid={`customer-withdrawal-edit-${row.id}`}
+                          to={`/customer/withdrawal-request/new?editId=${row.id}`}
+                        >
+                          {t('edit') || 'แก้ไข'}
+                        </Link>
+                      ) : null}
                       {canWriteCustomerRequests ? (
                         <Link
                           className="btn btn-secondary btn-sm"
@@ -150,6 +189,76 @@ export function CustomerWithdrawalRequestListPage() {
           </table>
         </div>
       </div>
+
+      {detailRow ? (
+        <Modal
+          isOpen
+          onClose={() => setDetailRow(null)}
+          size="lg"
+          title={detailRow.withdrawal_no ?? t('customer_withdrawal_detail_title')}
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              {(detailRow.status === 'DRAFT' || detailRow.status === 'WITHDRAWAL_DRAFT' || detailRow.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests && (
+                <Link
+                  className="btn btn-primary"
+                  data-testid={`customer-withdrawal-edit-${detailRow.id}`}
+                  to={`/customer/withdrawal-request/new?editId=${detailRow.id}`}
+                >
+                  {t('edit') || 'แก้ไข'}
+                </Link>
+              )}
+              <ReportPrintActions
+                disabled={!detailRow}
+                renderReport={(reportLanguage) => (
+                  <CustomerWithdrawalRequestPrintDocument
+                    branding={branding}
+                    header={detailRow}
+                    language={reportLanguage}
+                    lines={detailLines}
+                  />
+                )}
+                title={detailRow.withdrawal_no}
+              />
+              <button className="btn btn-secondary" onClick={() => setDetailRow(null)} type="button">
+                {t('close') || 'ปิด'}
+              </button>
+            </div>
+          }
+        >
+          <div className="form-grid customer-request-detail-meta" style={{ marginBottom: 16 }}>
+            <div>
+              <div className="form-label">{t('customer_col_customer_name')}</div>
+              <div>{customerNames[detailRow.customer_id] ?? detailRow.customer_id ?? '-'}</div>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_col_status')}</div>
+              <span className={`status-badge status-badge--${getCustomerRequestStatusClass(detailRow.status)}`}>
+                {getWithdrawalStatusLabel(detailRow.status, t)}
+              </span>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
+              <div>{detailRow.requested_dispatch_date ?? '-'}</div>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_field_delivery_type')}</div>
+              <div>{detailRow.delivery_type ?? '-'}</div>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_field_pickup_contact')}</div>
+              <div>{detailRow.pickup_contact ?? '-'}</div>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_col_note')}</div>
+              <div>{detailRow.note || '-'}</div>
+            </div>
+          </div>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>{t('customer_withdrawal_lines_title')}</h4>
+          {detailLinesLoading ? <LoadingState message={t('customer_portal_loading')} /> : (
+            <CustomerWithdrawalRequestLinesDisplay lines={detailLines} />
+          )}
+        </Modal>
+      ) : null}
     </section>
   );
 }

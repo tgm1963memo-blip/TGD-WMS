@@ -8,24 +8,7 @@ import { getPageShellClassName, isProductionPresentationActive } from '../../../
 import { getReceivingDocuments } from '../../../services/receivingService.js';
 import { useTranslation } from '../../../i18n/languageProvider.jsx';
 
-const columns = [
-  {
-    key: 'receiving_no',
-    header: 'Receiving No',
-    render: (row) => documentLink(`/operations/receiving/${row.id}`, row.receiving_no || row.document_no),
-  },
-  { key: 'customer_id', header: 'Customer' },
-  { key: 'warehouse_id', header: 'Warehouse' },
-  { key: 'status', header: 'Status', render: renderStatusBadge },
-  { key: 'receiving_type', header: 'Type' },
-  { key: 'expected_receive_date', header: 'Date' },
-  { key: 'created_at', header: 'Created At' },
-  {
-    key: 'actions',
-    header: 'Actions',
-    render: (row) => <Link className="document-link" to={`/operations/receiving/${row.id}`}>View detail</Link>,
-  },
-];
+
 
 export function ReceivingListPage() {
   const t = useTranslation();
@@ -33,17 +16,7 @@ export function ReceivingListPage() {
   const [state, setState] = useState({ data: [], loading: true, error: null });
 
   useEffect(() => {
-    let isMounted = true;
-
-    getReceivingDocuments().then(({ data, error }) => {
-      if (isMounted) {
-        setState({ data: data ?? [], loading: false, error });
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    // Only kept for potential future use or to avoid empty useEffect
   }, []);
 
   return (
@@ -61,18 +34,7 @@ export function ReceivingListPage() {
 
       <CustomerDepositNotificationsSection />
 
-      <div className="table-card" style={{ marginTop: 24 }}>
-        <div className="table-card-header">
-          <h3>{t('receiving_documents_linked_title') || 'Receiving documents (from customer deposit requests)'}</h3>
-        </div>
-        <DataTable
-          columns={columns}
-          data={state.data}
-          loading={state.loading}
-          error={state.error}
-          emptyMessage={t('receiving_documents_empty') || 'No receiving documents linked to customer deposit requests yet.'}
-        />
-      </div>
+
     </section>
   );
 }

@@ -17,6 +17,7 @@ export function InvoiceDraftListTable({
   data = [],
   loading = false,
   error = null,
+  onView = null,
 }) {
   if (loading) return <LoadingState />;
 
@@ -66,9 +67,11 @@ export function InvoiceDraftListTable({
               <td>{draft.total_amount == null ? '-' : formatNumber(draft.total_amount)}</td>
               <td>{formatDate(draft.created_at)}</td>
               <td>
-                <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>
-                  View
-                </Link>
+                {onView ? (
+                  <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
+                ) : (
+                  <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
+                )}
               </td>
             </tr>
           ))}

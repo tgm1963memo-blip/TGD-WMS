@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { MovementLedgerTable } from '../../components/reports/MovementLedgerTable.jsx';
-import { MovementTypeBreakdown } from '../../components/reports/MovementTypeBreakdown.jsx';
 import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.jsx';
-import { ReportSummaryCard } from '../../components/reports/ReportSummaryCard.jsx';
 import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
@@ -13,102 +11,158 @@ import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
   getMovementLedgerRows,
   summarizeMovements,
-  groupByMovementType,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { getCustomers } from '../../services/masterDataService.js';
+import { getCustomers, getProducts } from '../../services/masterDataService.js';
+import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 
 const initialState = {
   rows: [],
   summary: null,
-  breakdown: [],
-  loading: true,
+  loading: false,
   error: null,
 };
 
 export function MovementLedgerReportPage() {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
-  const [filters, setFilters] = useState({});
+  const [pendingFilters, setPendingFilters] = useState({});
+  const [committedFilters, setCommittedFilters] = useState(null);
   const [state, setState] = useState(initialState);
   const [customerOptions, setCustomerOptions] = useState([]);
+  const [productOptions, setProductOptions] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
 
   useEffect(() => {
-    getCustomers({ isActive: true }).then((result) => {
-      const opts = (result.data ?? []).map((c) => ({
+    Promise.all([
+      getCustomers({ isActive: true }),
+      getProducts({ isActive: true }),
+      getActiveLocations(),
+    ]).then(([customerResult, productResult, locResult]) => {
+      const customersData = customerResult.data ?? [];
+      const productsData = productResult.data ?? [];
+      const locsData = locResult.data ?? [];
+
+      setCustomerOptions(customersData.map((c) => ({
         value: c.id,
         label: c.customer_name ?? c.customer_code ?? c.id,
-      }));
-      setCustomerOptions(opts);
+        address: c.address,
+        phone: c.phone,
+        contact_name: c.contact_name
+      })));
+
+      setProductOptions(productsData.map((p) => ({
+        value: p.id,
+        label: p.product_name ?? p.sku ?? p.id,
+      })));
+
+      setLocationOptions(locsData.map((l) => ({
+        value: l.id,
+        label: l.label ?? l.code ?? l.id,
+      })));
     });
   }, []);
 
   useEffect(() => {
+    if (!committedFilters) return;
+
     let isMounted = true;
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    getMovementLedgerRows(filters).then((result) => {
+    const serviceFilters = {
+      dateFrom: committedFilters.dateFrom || undefined,
+      dateTo: committedFilters.dateTo || undefined,
+      customerId: committedFilters.customerId || undefined,
+      locationId: committedFilters.locationId || undefined,
+      warehouseId: committedFilters.warehouseId || undefined,
+      referenceType: committedFilters.referenceType || undefined,
+    };
+
+    getMovementLedgerRows(serviceFilters).then((result) => {
       if (!isMounted) return;
 
-      const rows = result.data ?? [];
+      let rows = result.data ?? [];
+
+      if (committedFilters.productId) {
+        rows = rows.filter((row) => row.product_id === committedFilters.productId);
+      }
+
+      const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
+      const customerMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
+      rows = rows.map((row) => ({
+        ...row,
+        product_name: row.product_name ?? productMap[row.product_id] ?? row.product_id,
+        customer_name: row.customer_name ?? customerMap[row.customer_id] ?? row.customer_id,
+      }));
+
       setState({
         rows,
         summary: summarizeMovements(rows),
-        breakdown: groupByMovementType(rows),
         loading: false,
         error: result.error ?? null,
       });
     });
 
     return () => { isMounted = false; };
-  }, [filters]);
+  }, [committedFilters]);
 
   const t = (key) => getTranslation(key, language);
 
   return (
     <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
       <PageHeader
-        title={t('movement_ledger_report') || 'Customer Stock Movement Ledger'}
+        title={t('movement_ledger_report', 'รายงานการเคลื่อนไหวสินค้าของลูกค้า (Movement Ledger)')}
         description={goLive
-          ? (t('movement_ledger_report_description_golive') || 'Cold storage movement report — live data for operations review.')
-          : (t('movement_ledger_report_description') || 'Read-only cold storage movement report for operations and audit preparation.')}
+          ? t('movement_ledger_report_description_golive', 'รายงานการเคลื่อนไหวสินค้า — ข้อมูลจริงสำหรับตรวจสอบการปฏิบัติงาน')
+          : t('movement_ledger_report_description', 'รายงานการเคลื่อนไหวสินค้าสำหรับเตรียมการตรวจสอบ')}
       />
-      <div className="section-card operational-report-actions-card">
-        <ReportPrintActions
-          title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
-          disabled={state.loading || !state.rows.length}
-          renderReport={(reportLanguage) => (
-            <InventoryMovementReportTemplate
-              data={mapMovementLedgerToInventoryReportData({
-                rows: state.rows,
-                filters,
-                summary: state.summary,
-              })}
-              language={reportLanguage}
-            />
-          )}
-        />
-      </div>
-      <ReportFilterPanel onChange={setFilters} customerOptions={customerOptions} showMovementType={false} />
 
-      <DashboardSection title={t('movement_stock_summary') || 'Stock Movement Summary'}>
-        <div className="summary-grid summary-grid--4col">
-          <ReportSummaryCard label={t('movement_inbound_qty') || 'Deposit / Inbound Qty'} value={state.summary?.totalInboundQty} />
-          <ReportSummaryCard label={t('movement_outbound_qty') || 'Withdrawal / Outbound Qty'} value={state.summary?.totalOutboundQty} />
-          <ReportSummaryCard label={t('movement_net_qty') || 'Net Movement'} value={state.summary?.netMovementQty} />
-          <ReportSummaryCard label={t('movement_total_rows') || 'Total Rows'} value={state.summary?.totalMovementRows} />
-          <ReportSummaryCard label={t('movement_unique_customers') || 'Customers'} value={state.summary?.uniqueCustomers} />
-          <ReportSummaryCard label={t('movement_unique_lots') || 'Lots'} value={state.summary?.uniqueLots} />
-          <ReportSummaryCard label={t('movement_unique_pallets') || 'Pallets'} value={state.summary?.uniquePallets} />
+      <ReportFilterPanel
+        onChange={setCommittedFilters}
+        customerOptions={customerOptions}
+        productOptions={productOptions}
+        locationOptions={locationOptions}
+        showMovementType={false}
+      />
+
+      {committedFilters && !state.loading && state.rows.length > 0 ? (
+        <div className="section-card operational-report-actions-card" style={{ marginTop: 12 }}>
+          <ReportPrintActions
+            title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
+            disabled={false}
+            renderReport={(reportLanguage) => {
+              const selectedCustomer = customerOptions.find((c) => c.value === committedFilters.customerId);
+              const customerLabel = selectedCustomer?.label ?? committedFilters.customerId ?? 'ทั้งหมด';
+              return (
+                <InventoryMovementReportTemplate
+                  data={mapMovementLedgerToInventoryReportData({
+                    rows: state.rows,
+                    filters: {
+                      ...committedFilters,
+                      customer_name: customerLabel,
+                      customer_address: selectedCustomer?.address,
+                      date_from: committedFilters.dateFrom,
+                      date_to: committedFilters.dateTo,
+                    },
+                    summary: state.summary,
+                  })}
+                  language={reportLanguage}
+                  customerDetails={selectedCustomer}
+                />
+              );
+            }}
+          />
         </div>
-      </DashboardSection>
+      ) : null}
 
-      <DashboardSection title={t('movement_type_breakdown') || 'Movement Type Breakdown'}>
-        <MovementTypeBreakdown data={state.breakdown} loading={state.loading} error={state.error} />
-      </DashboardSection>
-
-      <DashboardSection title={t('movement_ledger') || 'Movement Ledger'}>
-        <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
+      <DashboardSection title={t('movement_ledger', 'รายการเคลื่อนไหว (Movement Ledger)')}>
+        {!committedFilters ? (
+          <div className="section-card" style={{ padding: 24, textAlign: 'center', color: 'var(--tgd-muted-text)' }}>
+            กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูล
+          </div>
+        ) : (
+          <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
+        )}
       </DashboardSection>
 
       {!goLive ? (

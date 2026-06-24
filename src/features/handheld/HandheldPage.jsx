@@ -288,7 +288,7 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
         display: 'flex', alignItems: 'center', gap: 14, width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: isDone ? C.surfaceSolid : C.card,
         border: `1px solid ${isDone ? C.greenBorder : C.border}`,
-        borderRadius: 16, padding: '16px', marginBottom: 10,
+        borderRadius: 16, padding: '24px 16px', marginBottom: 10,
         cursor: 'pointer', color: C.text,
         boxShadow: isDone ? 'none' : C.shadow,
         transition: 'transform 0.2s, box-shadow 0.2s',
@@ -327,24 +327,23 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText })
   return (
     <button type="button" onClick={onClick}
       style={{
-        display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
+        display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 20, padding: '20px', marginBottom: 12,
+        borderRadius: 20, padding: '32px 24px', marginBottom: 16,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
         borderLeft: `6px solid ${statusColor}`,
-        overflow: 'hidden',
         transition: 'transform 0.2s, box-shadow 0.2s',
       }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, width: '100%' }}>
         <span style={{
           fontFamily: 'monospace', fontWeight: 900, fontSize: 15, color: C.text, letterSpacing: '0.02em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, lineHeight: 1.4,
         }}>{docNo}</span>
         <Pill label={statusLabel} color={statusColor} />
       </div>
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
         <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500, lineHeight: 1.5 }}>{dateStr}</span>
         {subText && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, lineHeight: 1.5, wordBreak: 'break-word' }}>· {subText}</span>}
       </div>
@@ -777,7 +776,7 @@ function ReceivingWorkflow({ onBack, t }) {
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
         padding: '20px 10px 32px',
         zIndex: 100,
-        maxHeight: '60vh',
+        maxHeight: '80vh',
         overflowY: 'auto',
       }}>
         {matchedLine ? (
@@ -793,7 +792,7 @@ function ReceivingWorkflow({ onBack, t }) {
             </div>
 
             <div style={{
-              background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
+              background: '#ffffff', borderRadius: 20, padding: '24px 16px', marginBottom: 16,
               border: `2px solid ${C.primary}40`,
             }}>
               <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
@@ -855,91 +854,44 @@ function ReceivingWorkflow({ onBack, t }) {
                 </div>
 
                 {useHierarchy ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {/* Zone row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ห้อง / โซน</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {availableZones.map((z) => (
-                          <button key={z} type="button"
-                            onClick={() => { setLocZone(z === locZone ? '' : z); setLocSide(''); setLocRow(''); setLocLevel(''); }}
-                            style={{
-                              padding: '10px 18px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                              border: `2px solid ${locZone === z ? C.primary : C.border}`,
-                              background: locZone === z ? C.primary : C.surfaceSolid,
-                              color: locZone === z ? '#ffffff' : C.text, transition: 'all 0.15s',
-                            }}>
-                            {z}
-                          </button>
-                        ))}
-                      </div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
+                      <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                        style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 48 }}>
+                        <option value="">— เลือก —</option>
+                        {availableZones.map((z) => <option key={z} value={z}>{z}</option>)}
+                      </select>
                     </div>
-
-                    {/* Side row */}
-                    {locZone && availableSides.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ฝั่ง (Side)</div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          {availableSides.map((s) => (
-                            <button key={s} type="button"
-                              onClick={() => { setLocSide(s === locSide ? '' : s); setLocRow(''); setLocLevel(''); }}
-                              style={{
-                                padding: '10px 24px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                                border: `2px solid ${locSide === s ? C.primary : C.border}`,
-                                background: locSide === s ? C.primary : C.surfaceSolid,
-                                color: locSide === s ? '#ffffff' : C.text, transition: 'all 0.15s',
-                              }}>
-                              {s === 'L' ? 'ซ้าย (L)' : s === 'R' ? 'ขวา (R)' : s}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Row row */}
-                    {locSide && availableRows.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>แถว (Row)</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {availableRows.map((r) => (
-                            <button key={r} type="button"
-                              onClick={() => { setLocRow(r === locRow ? '' : r); setLocLevel(''); }}
-                              style={{
-                                width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                                border: `2px solid ${locRow === r ? C.primary : C.border}`,
-                                background: locRow === r ? C.primary : C.surfaceSolid,
-                                color: locRow === r ? '#ffffff' : C.text, transition: 'all 0.15s',
-                              }}>
-                              {r}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Level row */}
-                    {locRow && availableLevels.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ชั้น (Level)</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {availableLevels.map((lv) => (
-                            <button key={lv} type="button"
-                              onClick={() => setLocLevel(lv === locLevel ? '' : lv)}
-                              style={{
-                                width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                                border: `2px solid ${locLevel === lv ? C.green : C.border}`,
-                                background: locLevel === lv ? C.greenLight : C.surfaceSolid,
-                                color: locLevel === lv ? C.green : C.text, transition: 'all 0.15s',
-                              }}>
-                              {lv}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ฝั่ง</div>
+                      <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }}
+                        disabled={!locZone}
+                        style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                        <option value="">— เลือก —</option>
+                        {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>แถว</div>
+                      <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }}
+                        disabled={!locSide}
+                        style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                        <option value="">— เลือก —</option>
+                        {availableRows.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ชั้น</div>
+                      <select value={locLevel} onChange={(e) => setLocLevel(e.target.value)}
+                        disabled={!locRow}
+                        style={{ width: '100%', boxSizing: 'border-box', background: locRow ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locRow ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                        <option value="">— เลือก —</option>
+                        {availableLevels.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
+                      </select>
+                    </div>
                   </div>
                 ) : (
-                  /* Fallback: flat chip list for non-standard codes */
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {locations.map((loc) => {
                       const isSelected = selectedLocation?.id === loc.id;
@@ -1320,7 +1272,7 @@ function PickingWorkflow({ onBack, t }) {
             </div>
 
             <div style={{
-              background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 16,
+              background: '#ffffff', borderRadius: 20, padding: '24px 16px', marginBottom: 16,
               border: `2px solid ${C.pickAccent}40`,
             }}>
               <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
@@ -1522,12 +1474,12 @@ function LocationUpdateWorkflow({ onBack, t }) {
               const hasloc = !!l.location_id;
               return (
                 <div key={l.id}
-                  onClick={() => { if (!hasloc) { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); } }}
+                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
                   style={{
                     background: hasloc ? C.greenLight : C.surface,
                     border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
-                    borderRadius: 18, padding: '16px', marginBottom: 12,
-                    cursor: hasloc ? 'default' : 'pointer',
+                    borderRadius: 18, padding: '24px 16px', marginBottom: 12,
+                    cursor: 'pointer',
                     boxShadow: C.shadow, transition: 'border-color 0.15s',
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1537,7 +1489,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       {hasloc ? (
-                        <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {l.location_id}</span>
+                        <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
                       ) : (
                         <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13 }}>📍 ระบุ Location</span>
                       )}
@@ -1558,7 +1510,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
           borderTopLeftRadius: 32, borderTopRightRadius: 32,
           boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
           padding: '20px 10px 32px',
-          zIndex: 100, maxHeight: '65vh', overflowY: 'auto',
+          zIndex: 100, maxHeight: '80vh', overflowY: 'auto',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontWeight: 900, fontSize: 18, color: C.text }}>ระบุ Location</div>
@@ -1582,61 +1534,42 @@ function LocationUpdateWorkflow({ onBack, t }) {
                 {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>✓ {selectedLocation.code}</span>}
               </div>
               {useHierarchy ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ห้อง / โซน</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {availableZones.map((z) => (
-                        <button key={z} type="button"
-                          onClick={() => { setLocZone(z === locZone ? '' : z); setLocSide(''); setLocRow(''); setLocLevel(''); }}
-                          style={{ padding: '10px 18px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locZone === z ? '#6366f1' : C.border}`, background: locZone === z ? '#6366f1' : C.surfaceSolid, color: locZone === z ? '#fff' : C.text }}>
-                          {z}
-                        </button>
-                      ))}
-                    </div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
+                    <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                      style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 48 }}>
+                      <option value="">— เลือก —</option>
+                      {availableZones.map((z) => <option key={z} value={z}>{z}</option>)}
+                    </select>
                   </div>
-                  {locZone && availableSides.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ฝั่ง (Side)</div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {availableSides.map((s) => (
-                          <button key={s} type="button"
-                            onClick={() => { setLocSide(s === locSide ? '' : s); setLocRow(''); setLocLevel(''); }}
-                            style={{ padding: '10px 24px', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locSide === s ? '#6366f1' : C.border}`, background: locSide === s ? '#6366f1' : C.surfaceSolid, color: locSide === s ? '#fff' : C.text }}>
-                            {s === 'L' ? 'ซ้าย (L)' : s === 'R' ? 'ขวา (R)' : s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {locSide && availableRows.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>แถว (Row)</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {availableRows.map((r) => (
-                          <button key={r} type="button"
-                            onClick={() => { setLocRow(r === locRow ? '' : r); setLocLevel(''); }}
-                            style={{ width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locRow === r ? '#6366f1' : C.border}`, background: locRow === r ? '#6366f1' : C.surfaceSolid, color: locRow === r ? '#fff' : C.text }}>
-                            {r}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {locRow && availableLevels.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>ชั้น (Level)</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {availableLevels.map((lv) => (
-                          <button key={lv} type="button"
-                            onClick={() => setLocLevel(lv === locLevel ? '' : lv)}
-                            style={{ width: 52, height: 52, borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', border: `2px solid ${locLevel === lv ? C.green : C.border}`, background: locLevel === lv ? C.greenLight : C.surfaceSolid, color: locLevel === lv ? C.green : C.text }}>
-                            {lv}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ฝั่ง</div>
+                    <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }}
+                      disabled={!locZone}
+                      style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                      <option value="">— เลือก —</option>
+                      {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>แถว</div>
+                    <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }}
+                      disabled={!locSide}
+                      style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                      <option value="">— เลือก —</option>
+                      {availableRows.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ชั้น</div>
+                    <select value={locLevel} onChange={(e) => setLocLevel(e.target.value)}
+                      disabled={!locRow}
+                      style={{ width: '100%', boxSizing: 'border-box', background: locRow ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locRow ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                      <option value="">— เลือก —</option>
+                      {availableLevels.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
+                    </select>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

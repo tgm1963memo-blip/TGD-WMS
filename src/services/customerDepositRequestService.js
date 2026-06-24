@@ -23,6 +23,8 @@ const DEPOSIT_HEADER_SELECT = [
   'review_comment',
   'last_action_by_email',
   'last_action_at',
+  'handheld_received_by_email',
+  'web_approved_by_email',
   'created_at',
   'updated_at',
 ].join(', ');

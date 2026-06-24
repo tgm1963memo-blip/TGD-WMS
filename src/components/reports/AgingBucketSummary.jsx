@@ -1,19 +1,19 @@
 export function AgingBucketSummary({ data = [], loading, error, label }) {
-  if (loading) return <p className="sprint-status">Loading {label} aging summary...</p>;
-  if (error) return <p className="sprint-status">Unable to load {label} aging summary.</p>;
-  if (!data.length) return <p className="sprint-status">No {label} aging summary rows found.</p>;
+  if (loading) return <p className="sprint-status">กำลังโหลดข้อมูล {label}...</p>;
+  if (error) return <p className="sprint-status">ไม่สามารถโหลดข้อมูล {label} ได้</p>;
+  if (!data.length) return <p className="sprint-status">ไม่พบข้อมูล {label}</p>;
 
   return (
-    <table>
+    <table className="tgd-table">
       <thead>
         <tr>
           <th>{label}</th>
-          <th>Rows</th>
-          <th>Stock Qty</th>
-          <th>Average Aging Days</th>
-          <th>Chargeable Days</th>
-          <th>Near Expiry Lots</th>
-          <th>Expired Lots</th>
+          <th>รายการ</th>
+          <th>ยอดจัดเก็บ</th>
+          <th>อายุจัดเก็บเฉลี่ย (วัน)</th>
+          <th>จำนวนวันคิดค่าฝาก</th>
+          <th>ใกล้หมดอายุ</th>
+          <th>หมดอายุแล้ว</th>
         </tr>
       </thead>
       <tbody>

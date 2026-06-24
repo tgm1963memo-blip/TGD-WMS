@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const initialFilters = {
   dateFrom: '',
   dateTo: '',
   movementType: '',
   productId: '',
+  productIds: [],
   customerId: '',
   warehouseId: '',
   locationId: '',
@@ -15,19 +16,27 @@ export function ReportFilterPanel({
   value = initialFilters,
   onChange,
   customerOptions = null,
+  productOptions = null,
+  locationOptions = null,
   showMovementType = true,
 }) {
   const [filters, setFilters] = useState({ ...initialFilters, ...value });
 
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, productId: '' }));
+  }, [filters.customerId]);
+
   function updateField(event) {
-    const nextFilters = { ...filters, [event.target.name]: event.target.value };
-    setFilters(nextFilters);
-    onChange?.(nextFilters);
+    setFilters((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   }
 
   function resetFilters() {
     setFilters(initialFilters);
     onChange?.(initialFilters);
+  }
+
+  function handleSearch() {
+    onChange?.(filters);
   }
 
   return (
@@ -38,7 +47,6 @@ export function ReportFilterPanel({
         {showMovementType && (
           <div className="form-group"><label className="form-label">Movement Type<input className="form-control" name="movementType" value={filters.movementType} onChange={updateField} /></label></div>
         )}
-        <div className="form-group"><label className="form-label">Product<input className="form-control" name="productId" value={filters.productId} onChange={updateField} placeholder="Product ID" /></label></div>
         <div className="form-group">
           <label className="form-label">
             ลูกค้า
@@ -54,13 +62,42 @@ export function ReportFilterPanel({
             )}
           </label>
         </div>
+        <div className="form-group">
+          <label className="form-label">
+            สินค้า
+            {productOptions ? (
+              <select className="form-control" name="productId" value={filters.productId} onChange={updateField}>
+                <option value="">— ทั้งหมด —</option>
+                {productOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-control" name="productId" value={filters.productId} onChange={updateField} placeholder="Product ID" />
+            )}
+          </label>
+        </div>
+        <div className="form-group">
+          <label className="form-label">
+            Location
+            {locationOptions ? (
+              <select className="form-control" name="locationId" value={filters.locationId} onChange={updateField}>
+                <option value="">— ทั้งหมด —</option>
+                {locationOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-control" name="locationId" value={filters.locationId} onChange={updateField} placeholder="Location ID" />
+            )}
+          </label>
+        </div>
         <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>
-        <div className="form-group"><label className="form-label">Location<input className="form-control" name="locationId" value={filters.locationId} onChange={updateField} placeholder="Location ID" /></label></div>
         <div className="form-group"><label className="form-label">Reference Type<input className="form-control" name="referenceType" value={filters.referenceType} onChange={updateField} /></label></div>
       </div>
       <div className="filter-toolbar-actions">
         <button type="button" className="btn btn-outline" onClick={resetFilters}>Reset</button>
-        <button type="button" className="btn btn-primary-gold" onClick={() => onChange?.(filters)}>Search</button>
+        <button type="button" className="btn btn-primary-gold" onClick={handleSearch}>Search</button>
         <button type="button" className="btn btn-outline">Export</button>
       </div>
     </section>

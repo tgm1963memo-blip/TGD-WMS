@@ -63,11 +63,14 @@ export function BillingMovementWeightFilterPanel({
             Customer
             <select className="form-control" name="customerId" value={filters.customerId} onChange={updateField}>
               <option value="">All customers</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name ?? customer.customer_name ?? customer.id}
-                </option>
-              ))}
+              {customers.map((customer) => {
+                const cName = customer.name ?? customer.customer_name ?? customer.id;
+                return (
+                  <option key={customer.id} value={customer.id} title={cName}>
+                    {cName}
+                  </option>
+                );
+              })}
             </select>
           </label>
         </div>
@@ -76,11 +79,16 @@ export function BillingMovementWeightFilterPanel({
             Product
             <select className="form-control" name="productId" value={filters.productId} onChange={updateField}>
               <option value="">All products</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.sku ?? product.product_code ?? product.name ?? product.id}
-                </option>
-              ))}
+              {products.map((product) => {
+                const code = product.sku ?? product.product_code ?? product.id;
+                const name = product.name ?? product.product_name ?? '';
+                const pLabel = name ? `${code} - ${name}` : code;
+                return (
+                  <option key={product.id} value={product.id} title={pLabel}>
+                    {pLabel}
+                  </option>
+                );
+              })}
             </select>
           </label>
         </div>

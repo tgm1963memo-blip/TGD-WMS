@@ -221,7 +221,7 @@ export function InventoryBalancePage() {
                         display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                         textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
                         border: 'none', borderBottom: '1px solid var(--tgd-border)',
-                        padding: '12px 16px 12px 32px',
+                        padding: '24px 16px 24px 32px',
                         cursor: 'pointer', color: 'var(--tgd-text)',
                         transition: 'background 0.15s',
                       }}
@@ -257,39 +257,39 @@ export function InventoryBalancePage() {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                           <thead>
                             <tr style={{ background: '#f1f5f9' }}>
-                              <th style={{ padding: '8px 16px 8px 48px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>เลขที่ใบฝาก</th>
-                              <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
-                              <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
-                              <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>กล่อง</th>
-                              <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>น้ำหนัก (กก.)</th>
-                              <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รายละเอียด</th>
+                              <th style={{ padding: '12px 16px 12px 48px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>เลขที่ใบฝาก</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>กล่อง</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>น้ำหนัก (กก.)</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รายละเอียด</th>
                             </tr>
                           </thead>
                           <tbody>
                             {pg.lines.map((l) => (
                               <tr key={l.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                                <td style={{ padding: '10px 16px 10px 48px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
+                                <td style={{ padding: '16px 16px 16px 48px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
                                   {l.request?.request_no ?? '-'}
                                 </td>
-                                <td style={{ padding: '10px 12px', color: 'var(--tgd-text)' }}>
+                                <td style={{ padding: '16px 12px', color: 'var(--tgd-text)' }}>
                                   {l.request?.last_action_at
                                     ? formatDate(l.request.last_action_at)
                                     : formatDate(l.request?.expected_arrival_date)}
                                 </td>
-                                <td style={{ padding: '10px 12px', color: 'var(--tgd-muted-text)', fontFamily: 'monospace' }}>
+                                <td style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', fontFamily: 'monospace' }}>
                                   {l.lot_no ?? '-'}
                                 </td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
                                   {l.actual_boxes?.toLocaleString() ?? (
                                     <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_boxes ?? '-'}</span>
                                   )}
                                 </td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
                                   {l.actual_weight?.toLocaleString() ?? (
                                     <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
                                   )}
                                 </td>
-                                <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                                <td style={{ padding: '16px 16px', textAlign: 'center' }}>
                                   {l.request?.id && (
                                     <button
                                       type="button"

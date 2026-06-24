@@ -42,7 +42,7 @@ const TEMP_COLORS = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' 
 function TempBadge({ type }) {
   const bg = TEMP_COLORS[type] ?? '#888';
   return (
-    <span style={{ display: 'inline-block', background: bg, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+    <span style={{ display: 'inline-block', background: bg, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
       {type ?? '-'}
     </span>
   );

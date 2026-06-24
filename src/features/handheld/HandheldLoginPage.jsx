@@ -129,13 +129,14 @@ export function HandheldLoginPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 16,
-                    padding: '16px 20px',
+                    padding: '20px 24px',
                     background: '#f8fafc',
                     border: '2px solid #e2e8f0',
-                    borderRadius: 16,
+                    borderRadius: 20,
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
+                    minHeight: 80,
                     transition: 'all 0.15s',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; e.currentTarget.style.background = '#f1f5f9'; }}

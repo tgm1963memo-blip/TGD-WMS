@@ -1,8 +1,6 @@
-import { DocumentHeader } from '../documents/DocumentHeader.jsx';
-import { getDefaultDocumentBranding } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
-import { ReportMetaGrid } from './ReportMetaGrid.jsx';
 import { ReportSignatureSection } from './ReportSignatureSection.jsx';
+import { normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 
 function fmtNum(v, decimals = 3) {
   const n = Number(v);
@@ -19,9 +17,11 @@ function fmtQty(v) {
 export function InventoryMovementReportTemplate({
   data,
   language = 'th',
-  branding = getDefaultDocumentBranding(),
+  branding,
+  customerDetails
 }) {
   const t = (key, fallback) => getTranslation(key, language) || fallback;
+  const normalizedBranding = normalizeDocumentBrandingConfig(branding || {});
 
   const metaFields = [
     { label: t('customer', 'Customer'), value: data?.customer },
@@ -40,19 +40,44 @@ export function InventoryMovementReportTemplate({
   const subTotalDeliveryWt = lines.reduce((s, l) => s + (Number(l.deliveryWeight) || 0), 0);
 
   return (
-    <article className="operational-report operational-report-a4" data-testid="inventory-movement-report-template">
-      <DocumentHeader
-        branding={branding}
-        language={language}
-        documentTitle={t('entry_delivery_inventory_report', 'Entry-Delivery Inventory Report')}
-        documentNo={data?.reportMonth !== '-' ? data?.reportMonth : undefined}
-        documentDate={data?.issuedDate}
-      />
+    <article className="operational-report operational-report-a4-landscape" data-testid="inventory-movement-report-template">
+      {/* Custom Header Layout to match Image 2 with TG Cold Logo */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+        {normalizedBranding.logo_url && (
+          <img src={normalizedBranding.logo_url} alt="Logo" style={{ height: 60 }} />
+        )}
+      </div>
 
-      <ReportMetaGrid fields={metaFields} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 16 }}>
+        <div>
+          <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+            CUSTOMER: {data?.customer}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            ADDRESS : {data?.address || '-'}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            TEL : {customerDetails?.phone || '-'} &nbsp;&nbsp;&nbsp;&nbsp; FAX : {customerDetails?.fax || '-'}
+          </div>
+          <div>
+            ATTN : {customerDetails?.contact_name || '-'}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', fontWeight: 'bold' }}>
+          <div style={{ marginBottom: 4 }}>
+            FOR MONTH : {data?.dateFrom} - {data?.dateTo}
+          </div>
+          <div>
+            ISSUED DATE : {data?.issuedDate}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 'bold', marginBottom: 16, borderBottom: '1px solid #ccc', paddingBottom: 8 }}>
+        Entry-Delivery Inventory Report
+      </div>
 
       <section className="operational-report-section">
-        <h2 className="operational-report-section-title">{t('movement_ledger', 'Movement Ledger')}</h2>
         <div style={{ overflowX: 'auto' }}>
           <table className="operational-report-table tgd-table" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
             <thead>

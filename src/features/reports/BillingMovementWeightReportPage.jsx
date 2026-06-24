@@ -82,7 +82,16 @@ export function BillingMovementWeightReportPage() {
         return;
       }
 
-      const rows = result.data ?? [];
+      const rawRows = result.data ?? [];
+      const rows = rawRows.map(row => {
+        const customer = customers.find(c => c.id === row.customer_id);
+        const product = products.find(p => p.id === row.product_id);
+        return {
+          ...row,
+          customer_name: customer ? (customer.customer_name ?? customer.name) : row.customer_name,
+          product_name: product ? (product.product_name ?? product.sku ?? product.name) : row.product_name,
+        };
+      });
       let guardedRows = rows;
 
       if (canCreateDraft) {
@@ -114,7 +123,7 @@ export function BillingMovementWeightReportPage() {
     return () => {
       isMounted = false;
     };
-  }, [canCreateDraft, filters]);
+  }, [canCreateDraft, filters, customers, products]);
 
   useEffect(() => {
     setSelectedMovementIds(new Set());
@@ -316,19 +325,6 @@ export function BillingMovementWeightReportPage() {
           ) : null}
         </div>
       ) : null}
-
-      <DashboardSection title="Billing Movement Weight Summary">
-        <div className="summary-grid">
-          <ReportSummaryCard label="Total Movements" value={summary.totalMovements} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Billable Movements" value={summary.billableMovements} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Excluded Movements" value={summary.excludedMovements} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Total Qty" value={summary.totalQty} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Total Net Weight" value={summary.totalNetWeight} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Total Gross Weight" value={summary.totalGrossWeight} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Total Chargeable Weight" value={summary.totalChargeableWeight} testId="billing-movement-weight-summary-card" />
-          <ReportSummaryCard label="Needs Weight Review" value={summary.needsWeightReviewCount} testId="billing-movement-weight-summary-card" />
-        </div>
-      </DashboardSection>
 
       <DashboardSection title="Billing Movement Weight Detail">
         <BillingMovementWeightTable

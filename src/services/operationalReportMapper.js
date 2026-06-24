@@ -41,6 +41,8 @@ export function mapReceivingDocumentToReportData(document) {
     })),
     totalQty: sumQuantity(lines),
     totalWeight: sumWeight(lines),
+    preparedBy: document?.handheld_confirmed_by ?? '-',
+    approvedBy: document?.web_approved_by ?? '-',
   };
 }
 

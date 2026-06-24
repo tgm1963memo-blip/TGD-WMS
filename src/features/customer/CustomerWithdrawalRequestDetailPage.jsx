@@ -99,6 +99,11 @@ export function CustomerWithdrawalRequestDetailPage() {
         description={header.withdrawal_no}
         actions={(
           <>
+            {header.status === 'WITHDRAWAL_DRAFT' && (
+              <Link className="btn btn-primary" to={`/customer/withdrawal-request/new?editId=${header.id}`}>
+                แก้ไขร่าง
+              </Link>
+            )}
             <ReportPrintActions
               disabled={!header}
               renderReport={(reportLanguage) => (

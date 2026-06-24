@@ -151,7 +151,7 @@ function EditablePermissionMatrix({
                       if (isAdminLocked) {
                         return (
                           <td key={roleCode} style={{ padding: '8px', textAlign: 'center', background: '#fafafa' }}>
-                            <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} />
+                            <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} style={{ width: 24, height: 24, accentColor: '#cbd5e1' }} />
                           </td>
                         );
                       }
@@ -165,8 +165,8 @@ function EditablePermissionMatrix({
                             onChange={(e) => onToggle(roleCode, fn.functionKey, e.target.checked)}
                             aria-label={`${role.display_name} ${fn.label}`}
                             style={{
-                              width: 16,
-                              height: 16,
+                              width: 24,
+                              height: 24,
                               accentColor: isOverride || displayValue !== savedValue ? '#1d6fcf' : '#2d9348',
                               cursor: 'pointer',
                             }}

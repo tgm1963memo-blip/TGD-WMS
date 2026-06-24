@@ -10,6 +10,9 @@ export function ReceivingReportTemplate({
   branding = getDefaultDocumentBranding(),
 }) {
   const t = (key, fallback) => getTranslation(key, language) || fallback;
+  const normalizedBranding = typeof branding === 'object' && !branding?.company_name 
+    ? { ...getDefaultDocumentBranding(), ...branding } 
+    : branding;
 
   const metaFields = [
     { label: t('report_customer_name', 'Customer Name'), value: data?.customerName },
@@ -30,7 +33,7 @@ export function ReceivingReportTemplate({
   return (
     <article className="operational-report operational-report-a4" data-testid="receiving-report-template">
       <DocumentHeader
-        branding={branding}
+        branding={normalizedBranding}
         language={language}
         documentTitle={t('receiving_information_report', 'Receiving Information')}
         documentNo={data?.documentNo}
@@ -42,6 +45,12 @@ export function ReceivingReportTemplate({
       <section className="operational-report-section">
         <h2 className="operational-report-section-title">{t('document_lines', 'Lines')}</h2>
         <table className="operational-report-table tgd-table">
+          <style dangerouslySetInnerHTML={{ __html: `
+            .operational-report-table.tgd-table th,
+            .operational-report-table.tgd-table td {
+              padding: 16px 12px;
+            }
+          `}} />
           <thead>
             <tr>
               <th>{t('lot', 'Lot No')}</th>
@@ -68,7 +77,14 @@ export function ReceivingReportTemplate({
         <div><span>{t('weight', 'Total Weight')}</span><strong>{data?.totalWeight ?? 0}</strong></div>
       </section>
 
-      <ReportSignatureSection branding={branding} language={language} />
+      <ReportSignatureSection 
+        branding={normalizedBranding} 
+        language={language} 
+        preparedBy={data?.preparedBy}
+        approvedBy={data?.approvedBy}
+        receivedByLabel="ISSUED / CHECKED BY"
+        deliveredByLabel="APPROVED BY"
+      />
     </article>
   );
 }

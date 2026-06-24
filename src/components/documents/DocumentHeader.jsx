@@ -32,8 +32,8 @@ export function DocumentHeader({
             {normalized.phone && <span>{normalized.phone}</span>}
             {normalized.email && <span> | {normalized.email}</span>}
             {normalized.website && <span> | {normalized.website}</span>}
+            {normalized.tax_id && <span> | เลขประจำตัวผู้เสียภาษี: {normalized.tax_id}</span>}
           </p>
-          {normalized.tax_id && <p>Tax ID: {normalized.tax_id}</p>}
         </div>
       </div>
       <div className="document-header__meta">

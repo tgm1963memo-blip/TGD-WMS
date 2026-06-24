@@ -10,6 +10,8 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { InvoiceDraftBplusReadinessPanel } from '../../components/billing/InvoiceDraftBplusReadinessPanel.jsx';
+import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
+import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
@@ -53,6 +55,7 @@ export function InvoiceDraftDetailPage() {
   const [readiness, setReadiness] = useState(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [readinessError, setReadinessError] = useState(null);
+  const [printOpen, setPrintOpen] = useState(false);
 
   async function loadDraft() {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -247,6 +250,14 @@ export function InvoiceDraftDetailPage() {
             {cancelling ? 'Cancelling...' : 'Cancel Draft'}
           </button>
         ) : null}
+        <button
+          type="button"
+          className="btn btn-primary-gold"
+          onClick={() => setPrintOpen(true)}
+          disabled={state.loading}
+        >
+          พิมพ์ / Print Invoice
+        </button>
       </div>
 
       {approveSuccess ? (
@@ -326,6 +337,14 @@ export function InvoiceDraftDetailPage() {
         </ul>
       </section>
       </UatOnly>
+
+      <ReportPreviewModal
+        open={printOpen}
+        title={`Invoice Draft — ${draft.draft_no ?? ''}`}
+        onClose={() => setPrintOpen(false)}
+      >
+        <InvoiceDraftPrintTemplate draft={draft} lines={state.lines} />
+      </ReportPreviewModal>
     </section>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { getCustomers } from '../../services/masterDataService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
@@ -36,6 +37,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
   const [locLevel, setLocLevel] = useState('');
+  const [customerData, setCustomerData] = useState(null);
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +59,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       setHeader(hRes.data ?? null);
       setLines(lRes.data ?? []);
       setLoading(false);
+      if (hRes.data?.customer_id) {
+        getCustomers().then((cResult) => {
+          if (!active) return;
+          const cust = (cResult.data ?? []).find((c) => c.id === hRes.data.customer_id);
+          setCustomerData(cust ?? null);
+        });
+      }
     });
 
     return () => { active = false; };
@@ -82,6 +91,18 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     : null;
 
   const branding = getDocumentBrandingConfig();
+
+  const printHeader = header ? {
+    ...header,
+    customer_name: customerData?.customer_name ?? null,
+    customer_address: customerData?.address ?? null,
+    contact_fax: customerData?.fax ?? null,
+    arrival_time: header.reviewed_at
+      ? new Date(header.reviewed_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+      : null,
+    issued_by: header.handheld_received_by_email ?? null,
+    approved_by: header.web_approved_by_email ?? null,
+  } : null;
 
   const canOpenWorkOrder = header && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(header.status);
   const canConfirmReceiving = header &&
@@ -231,7 +252,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 renderReport={(language) => (
                   <CustomerDepositStaffWorkOrderPrint
                     branding={branding}
-                    header={header}
+                    header={printHeader}
                     language={language}
                     lines={lines}
                   />
@@ -279,7 +300,9 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                             {line.actual_weight != null ? line.actual_weight : '-'}
                           </td>
                           <td style={{ fontSize: 12, color: line.location_id ? 'var(--tgd-success)' : 'var(--tgd-muted-text)' }}>
-                            {line.location_id ?? <small>ยังไม่ระบุ</small>}
+                            {line.location_id
+                              ? (allLocations.find((loc) => loc.id === line.location_id)?.code ?? line.location_id)
+                              : <small>ยังไม่ระบุ</small>}
                           </td>
                           <td>
                             {isConfirmed ? (

@@ -38,6 +38,18 @@ export function CustomerWithdrawalLinesTable({
   // Collect all deposit lines across all deposits for LOT lookup
   const allDepositLines = useMemo(() => Object.values(depositLinesMap).flat(), [depositLinesMap]);
 
+  // Filter catalog products to only show those with remaining balance
+  const availableCatalogProducts = useMemo(() => {
+    return catalogProducts.filter((product) => {
+      const pLines = allDepositLines.filter((dl) => 
+        (product.customer_product_code && dl.customer_product_code === product.customer_product_code) ||
+        (product.product_name && dl.product_name === product.product_name)
+      );
+      const balance = pLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
+      return balance > 0;
+    });
+  }, [catalogProducts, allDepositLines]);
+
   function updateLine(lineKey, patch) {
     onChange(lines.map((line) => (line.key === lineKey ? { ...line, ...patch } : line)));
   }
@@ -159,7 +171,7 @@ export function CustomerWithdrawalLinesTable({
                     value={line.catalog_product_id || ''}
                   >
                     <option value="">{noCustomer ? '— เลือกลูกค้าก่อน —' : t('customer_deposit_select_product')}</option>
-                    {catalogProducts.map((product) => (
+                    {availableCatalogProducts.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.customer_product_code} — {product.product_name}
                       </option>
@@ -227,6 +239,17 @@ export function CustomerWithdrawalLinesTable({
                 {/* Weight */}
                 <td>
                   {(() => {
+                    const productAllLines = allDepositLines.filter((dl) =>
+                      (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name)
+                    );
+                    
+                    const lotsBalance = {};
+                    productAllLines.forEach((dl) => {
+                      const l = dl.lot_no || 'ไม่ระบุ';
+                      if (!lotsBalance[l]) lotsBalance[l] = 0;
+                      lotsBalance[l] += (Number(dl.actual_weight) || Number(dl.expected_weight) || 0);
+                    });
+
                     const balanceLines = lotsForSource.length > 0
                       ? sourceDepositLines.filter((dl) => dl.lot_no === line.lot_no || !line.lot_no)
                       : allDepositLines.filter((dl) =>
@@ -247,8 +270,16 @@ export function CustomerWithdrawalLinesTable({
                           value={line.requested_weight}
                         />
                         {exceedsBalance && (
-                          <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
-                            เกินยอดคงเหลือ ({maxBalance.toFixed(2)} กก.)
+                          <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>
+                            <div>เกินยอดคงเหลือ (มี {maxBalance.toFixed(2)} กก.)</div>
+                            {Object.entries(lotsBalance).length > 0 && (
+                              <div style={{ marginTop: 4, padding: '4px', background: '#fee2e2', borderRadius: '4px' }}>
+                                <div style={{ fontWeight: 700, marginBottom: 2 }}>คงเหลือแต่ละ LOT:</div>
+                                {Object.entries(lotsBalance).map(([l, b]) => (
+                                  <div key={l}>- {l}: {b.toFixed(2)} กก.</div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </>

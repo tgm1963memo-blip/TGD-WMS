@@ -42,7 +42,7 @@ export const DEFAULT_DOCUMENT_BRANDING = {
   phone: '',
   email: '',
   website: '',
-  logo_url: '',
+  logo_url: '/brand/tgc-logo.svg',
   document_footer_note_th: 'เอกสารนี้จัดทำจากระบบ TGC WMS เพื่อการปฏิบัติงานคลังเย็น',
   document_footer_note_en: 'This document is prepared from TGC WMS for cold storage operations.',
   prepared_by_label_th: 'จัดทำโดย',

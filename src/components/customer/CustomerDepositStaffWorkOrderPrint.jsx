@@ -162,7 +162,9 @@ export function CustomerDepositStaffWorkOrderPrint({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 32, fontSize: 12 }}>
         <div>
           <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>ISSUED / CHECKED BY</div>
-          <div style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>(CUSTOMER SERVICE)</div>
+          <div style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>
+            {header.issued_by ?? '(CUSTOMER SERVICE)'}
+          </div>
         </div>
         <div>
           <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>APPROVED BY</div>

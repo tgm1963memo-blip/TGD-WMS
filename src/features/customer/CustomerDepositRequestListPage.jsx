@@ -45,7 +45,7 @@ export function CustomerDepositRequestListPage() {
         if (!active) return;
         const names = {};
         (result.data ?? []).forEach((customer) => {
-          names[customer.id] = customer.name ?? customer.code ?? customer.id;
+          names[customer.id] = customer.customer_name ?? customer.customer_code ?? customer.id;
         });
         setCustomerNames(names);
       });
@@ -129,6 +129,15 @@ export function CustomerDepositRequestListPage() {
                       >
                         {t('customer_request_view_button')}
                       </Link>
+                      {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
+                        <Link
+                          className="btn btn-primary btn-sm"
+                          data-testid={`customer-deposit-edit-${row.id}`}
+                          to={`/customer/deposit-request/new?editId=${row.id}`}
+                        >
+                          {t('edit') || 'แก้ไข'}
+                        </Link>
+                      ) : null}
                       {canWriteCustomerRequests ? (
                         <Link
                           className="btn btn-secondary btn-sm"

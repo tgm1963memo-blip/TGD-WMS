@@ -75,61 +75,34 @@ function buildSummaryColumns({
 
   columns.push(
     {
-      key: 'movement_date',
-      header: 'Date',
-      render: (row) => (
-        <span className="table-meta-text">
-          {formatDocumentDate(row.movement_date, { dateOnly: true })}
-        </span>
-      ),
-    },
-    {
-      key: 'movement_type',
-      header: 'Type',
-      render: (row) => <span className="compact-cell-text">{row.movement_type ?? '-'}</span>,
-    },
-    {
       key: 'customer_name',
-      header: 'Customer',
+      header: 'ชื่อลูกค้า',
       render: (row) => (
-        <span className="compact-cell-text">
-          {formatCompactText(row.customer_name ?? row.customer_code ?? row.customer_id, 18)}
+        <span className="compact-cell-text" style={{ whiteSpace: 'normal', minWidth: '150px' }}>
+          {row.customer_name ?? row.customer_code ?? row.customer_id}
         </span>
       ),
       title: (row) => row.customer_name ?? row.customer_code ?? row.customer_id,
     },
     {
-      key: 'product_name',
-      header: 'Product',
-      render: (row) => (
-        <span className="compact-cell-text">
-          {formatCompactText(row.product_name ?? row.product_code ?? row.product_id, 20)}
-        </span>
-      ),
-      title: (row) => row.product_name ?? row.product_code ?? row.product_id,
+      key: 'movement_type',
+      header: 'ประเภทเอกสาร',
+      render: (row) => <span className="compact-cell-text">{row.movement_type ?? '-'}</span>,
     },
     {
       key: 'qty',
-      header: 'Qty',
+      header: 'จำนวน',
       render: (row) => <span className="compact-cell-qty">{formatNumber(row.qty)}</span>,
     },
     {
       key: 'chargeable_weight',
-      header: 'Weight',
+      header: 'น้ำหนัก',
       render: (row) => <span className="table-meta-text">{formatNumber(row.chargeable_weight)}</span>,
     },
     {
       key: 'billing_status',
-      header: 'Status',
+      header: 'สถานะ',
       render: (row) => <BillingStatusBadge status={row.billing_status} />,
-    },
-    {
-      key: 'source_document_no',
-      header: 'Doc',
-      render: (row) => (
-        <span className="compact-cell-text">{formatCompactText(row.source_document_no, 14)}</span>
-      ),
-      title: (row) => row.source_document_no,
     },
   );
 

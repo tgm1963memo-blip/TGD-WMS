@@ -158,7 +158,7 @@ export async function getSectionsWithOccupancy() {
       total,
       used,
       empty: total - used,
-      usedPct: total > 0 ? Math.round((used / total) * 100) : 0,
+      usedPct: total > 0 ? Number(((used / total) * 100).toFixed(2)) : 0,
       locations: locations.map((l) => ({ ...l, isOccupied: occupiedSet.has(l.id) })),
     };
   });
@@ -166,29 +166,39 @@ export async function getSectionsWithOccupancy() {
   return { data: sections, error: null };
 }
 
+export async function getStockAtLocation(locationId) {
+  if (!supabase || !locationId) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('tgd_stock_balances')
+    .select('id, qty_on_hand, qty_allocated, qty_available, uom, weight, customer_id, product_id, lot_id, pallet_id, tgd_lots(lot_number, expiry_date)')
+    .eq('location_id', locationId)
+    .gt('qty_on_hand', 0);
+
+  return { data: data ?? [], error };
+}
+
 export async function getActiveLocations() {
   if (!supabase) return { data: [], error: null };
 
   const { data, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name, is_active))')
-    .eq('is_active', true)
+    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name))')
+    .neq('is_active', false)
     .order('zone_code');
 
   if (error) return { data: [], error };
 
   const locations = (data ?? []).flatMap((zone) =>
     (zone.tgd_rooms ?? []).flatMap((room) =>
-      (room.tgd_locations ?? [])
-        .filter((l) => l.is_active !== false)
-        .map((l) => ({
-          id: l.id,
-          code: l.location_code,
-          name: l.location_name ?? l.location_code,
-          sectionCode: zone.zone_code,
-          sectionName: zone.zone_name,
-          label: `${zone.zone_code} · ${l.location_code}`,
-        }))
+      (room.tgd_locations ?? []).map((l) => ({
+        id: l.id,
+        code: l.location_code,
+        name: l.location_name ?? l.location_code,
+        sectionCode: zone.zone_code,
+        sectionName: zone.zone_name,
+        label: `${zone.zone_code} · ${l.location_code}`,
+      }))
     )
   );
 
