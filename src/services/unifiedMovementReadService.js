@@ -194,7 +194,13 @@ export function mergeUnifiedMovementRows(stockRows = [], inventoryRows = []) {
 function applyUnifiedFilters(rows = [], filters = {}) {
   return rows.filter((row) => {
     if (filters.customerId && row.customer_id !== filters.customerId) return false;
-    if (filters.productId && row.product_id !== filters.productId) return false;
+    if (filters.productId) {
+      if (Array.isArray(filters.productId)) {
+        if (!filters.productId.includes(row.product_id)) return false;
+      } else {
+        if (row.product_id !== filters.productId) return false;
+      }
+    }
     if (filters.movementType) {
       const canonical = normalizeMovementType(filters.movementType);
       if (row.movement_type_canonical !== canonical && row.movement_type_raw !== filters.movementType) return false;
@@ -240,7 +246,13 @@ async function readStockMovements(filters = {}) {
     .order('created_at', { ascending: false });
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.productId) query = query.eq('product_id', filters.productId);
+  if (filters.productId) {
+    if (Array.isArray(filters.productId)) {
+      query = query.in('product_id', filters.productId);
+    } else {
+      query = query.eq('product_id', filters.productId);
+    }
+  }
   if (filters.sourceDocumentId) query = query.eq('source_document_id', filters.sourceDocumentId);
   if (filters.sourceModule) query = query.eq('source_module', filters.sourceModule);
   if (filters.movementType) query = query.eq('movement_type', filters.movementType);
@@ -259,7 +271,13 @@ async function readInventoryMovements(filters = {}) {
     .order('created_at', { ascending: false });
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.productId) query = query.eq('product_id', filters.productId);
+  if (filters.productId) {
+    if (Array.isArray(filters.productId)) {
+      query = query.in('product_id', filters.productId);
+    } else {
+      query = query.eq('product_id', filters.productId);
+    }
+  }
   if (filters.movementType) query = query.eq('movement_type', filters.movementType);
   if (filters.referenceType) query = query.eq('reference_type', filters.referenceType);
   if (filters.referenceNo) query = query.eq('reference_no', filters.referenceNo);
@@ -279,7 +297,13 @@ async function readFromDatabaseView(filters = {}) {
     .order('movement_date', { ascending: false });
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.productId) query = query.eq('product_id', filters.productId);
+  if (filters.productId) {
+    if (Array.isArray(filters.productId)) {
+      query = query.in('product_id', filters.productId);
+    } else {
+      query = query.eq('product_id', filters.productId);
+    }
+  }
   if (filters.sourceDocumentId) query = query.eq('source_document_id', filters.sourceDocumentId);
   if (filters.sourceModule) query = query.eq('source_module', filters.sourceModule);
 

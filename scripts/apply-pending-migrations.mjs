@@ -27,6 +27,9 @@ const MIGRATIONS = [
   '070_tgd_wms_role_function_permissions.sql',
   '071_tgd_wms_withdrawal_review_send_to_picking.sql',
   '072_tgd_wms_confirm_receipt_creates_stock_movements.sql',
+  '074_backfill_stock_balances_from_deposit_lines.sql',
+  '075_fix_stock_balance_quantity_column.sql',
+  '076_tgd_wms_customer_request_proxy_and_signatures.sql'
 ];
 
 function runSql(sql, label) {

@@ -44,7 +44,7 @@ export function StorageAgingReportPage() {
       }
       if (productResult.data) {
         setProductOptions(
-          productResult.data.map((p) => ({ value: p.id, label: `${p.product_code ?? p.sku ?? p.id} — ${p.product_name}`, rawName: p.product_name }))
+          productResult.data.map((p) => ({ value: p.id, label: `${p.sku ?? p.id} — ${p.name}`, rawName: p.name }))
         );
       }
     });

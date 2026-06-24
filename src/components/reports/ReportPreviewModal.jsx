@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
 export function ReportPreviewModal({
@@ -35,7 +36,7 @@ export function ReportPreviewModal({
     window.print();
   };
 
-  return (
+  return createPortal(
     <div className="operational-report-modal-backdrop" role="presentation" onClick={onClose}>
       <div
         className="operational-report-modal"
@@ -62,6 +63,7 @@ export function ReportPreviewModal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

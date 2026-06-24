@@ -53,7 +53,7 @@ export function MovementLedgerReportPage() {
 
       setProductOptions(productsData.map((p) => ({
         value: p.id,
-        label: p.product_name ?? p.sku ?? p.id,
+        label: p.sku ? `${p.sku} — ${p.name}` : (p.name ?? p.id),
       })));
 
       setLocationOptions(locsData.map((l) => ({
@@ -83,8 +83,12 @@ export function MovementLedgerReportPage() {
 
       let rows = result.data ?? [];
 
-      if (committedFilters.productId) {
-        rows = rows.filter((row) => row.product_id === committedFilters.productId);
+      if (committedFilters.productId && committedFilters.productId.length > 0) {
+        if (Array.isArray(committedFilters.productId)) {
+          rows = rows.filter((row) => committedFilters.productId.includes(row.product_id));
+        } else {
+          rows = rows.filter((row) => row.product_id === committedFilters.productId);
+        }
       }
 
       const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
@@ -123,6 +127,7 @@ export function MovementLedgerReportPage() {
         productOptions={productOptions}
         locationOptions={locationOptions}
         showMovementType={false}
+        multiProduct={true}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (

@@ -19,16 +19,23 @@ export function ReportFilterPanel({
   productOptions = null,
   locationOptions = null,
   showMovementType = true,
+  multiProduct = false,
 }) {
-  const [filters, setFilters] = useState({ ...initialFilters, ...value });
+  const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? [] : (value.productId || '') });
 
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, productId: '' }));
+    setFilters((prev) => ({ ...prev, productId: multiProduct ? [] : '' }));
   }, [filters.customerId]);
 
-  function updateField(event) {
-    setFilters((prev) => ({ ...prev, [event.target.name]: event.target.value }));
-  }
+  const updateField = (event) => {
+    const { name, value, type, selectedOptions } = event.target;
+    if (type === 'select-multiple') {
+      const values = Array.from(selectedOptions, option => option.value).filter(Boolean);
+      setFilters((prev) => ({ ...prev, [name]: values }));
+    } else {
+      setFilters((prev) => ({ ...prev, [name]: value }));
+    }
+  };
 
   function resetFilters() {
     setFilters(initialFilters);
@@ -66,8 +73,16 @@ export function ReportFilterPanel({
           <label className="form-label">
             สินค้า
             {productOptions ? (
-              <select className="form-control" name="productId" value={filters.productId} onChange={updateField}>
-                <option value="">— ทั้งหมด —</option>
+              <select
+                className="form-control"
+                name="productId"
+                value={filters.productId}
+                onChange={updateField}
+                multiple={multiProduct}
+                style={multiProduct ? { minHeight: '120px' } : undefined}
+              >
+                {!multiProduct && <option value="">— ทั้งหมด —</option>}
+                {multiProduct && <option value="">— ทั้งหมด —</option>}
                 {productOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
