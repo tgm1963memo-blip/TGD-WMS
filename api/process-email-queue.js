@@ -62,20 +62,65 @@ export default async function handler(req, res) {
   // 3. Process each email
   for (const item of queue) {
     try {
-      const emailHtml = `
-<!DOCTYPE html>
+      const appUrl = cleanValue(process.env.VITE_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tgdwms.vercel.app');
+      const emailHtml = `<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${item.subject}</title>
 </head>
-<body style="font-family:sans-serif;background-color:#f4f5f7;padding:40px;">
-  <div style="background-color:#fff;padding:40px;border-radius:8px;max-width:600px;margin:0 auto;">
-    <h2 style="color:#09090b;">${item.subject}</h2>
-    <p style="color:#374151;font-size:16px;">${item.body_preview}</p>
-    <br/>
-    <p style="color:#6b7280;font-size:14px;">TG Cold Storage WMS</p>
-  </div>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f5f7;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Card wrapper -->
+        <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;border-radius:12px;overflow:hidden;box-shadow:0 4px 32px rgba(9,9,11,0.14);">
+          <!-- HEADER -->
+          <tr>
+            <td style="background-color:#09090b;padding:36px 40px 28px;text-align:center;">
+              <div style="display:inline-block;background-color:#d6a11f;padding:5px 18px;border-radius:5px;margin-bottom:18px;">
+                <span style="color:#09090b;font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;">
+                  TG COLD STORAGE
+                </span>
+              </div>
+              <h1 style="margin:0 0 6px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">
+                ระบบจัดการคลังเย็น
+              </h1>
+              <p style="margin:0;color:#9ca3af;font-size:13px;font-weight:400;">
+                Warehouse Management System
+              </p>
+            </td>
+          </tr>
+          <!-- Gold divider -->
+          <tr>
+            <td style="background-color:#d6a11f;height:3px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <!-- BODY -->
+          <tr>
+            <td style="background-color:#ffffff;padding:40px 40px 32px;">
+              <h2 style="margin:0 0 16px;color:#09090b;font-size:20px;font-weight:700;">
+                ${item.subject}
+              </h2>
+              <p style="margin:0 0 28px;color:#4b5563;font-size:15px;line-height:1.65;white-space:pre-wrap;">${item.body_preview}</p>
+              
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;width:100%;">
+                <tr>
+                  <td align="center">
+                    <a href="${appUrl}" style="display:inline-block;padding:15px 40px;background-color:#d6a11f;color:#09090b;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;letter-spacing:0.3px;">
+                      เข้าสู่ระบบ (Login)
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0;text-align:center;color:#9ca3af;font-size:13px;">หากมีข้อสงสัย กรุณาติดต่อแอดมิน TG Cold Storage</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
