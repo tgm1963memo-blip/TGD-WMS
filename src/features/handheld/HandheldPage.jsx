@@ -47,8 +47,8 @@ const C = {
   receiveAccent: '#09111c',
   pickAccent: '#09111c',
   glassmorphism: {
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    // backdropFilter removed for performance
+    // WebkitBackdropFilter removed for performance
   }
 };
 
@@ -721,12 +721,15 @@ function ReceivingWorkflow({ onBack, t }) {
 
       {/* Sticker print popup */}
       {stickerItem && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 24,
-        }}>
+        <div 
+          role="dialog" 
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}>
           <div style={{
             background: '#fff', borderRadius: 24, padding: '24px 20px',
             width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
@@ -769,8 +772,8 @@ function ReceivingWorkflow({ onBack, t }) {
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 720,
         background: C.surface,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        // backdropFilter removed for performance
+        // WebkitBackdropFilter removed for performance
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
@@ -1249,8 +1252,8 @@ function PickingWorkflow({ onBack, t }) {
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 720,
         background: C.surface,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        // backdropFilter removed for performance
+        // WebkitBackdropFilter removed for performance
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',

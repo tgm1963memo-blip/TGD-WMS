@@ -310,6 +310,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 className="btn btn-secondary btn-sm"
                                 type="button"
                                 title="อัปเดตตำแหน่งจัดเก็บ (แก้ไขยอดรับไม่ได้)"
+                                aria-label="Update Location"
                                 onClick={() => {
                                   setLocationLine(line);
                                   const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
@@ -326,6 +327,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               <button
                                 className="btn btn-secondary btn-sm"
                                 type="button"
+                                aria-label="Edit Item Quantities"
                                 onClick={() => {
                                   setRecountLine(line);
                                   setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
