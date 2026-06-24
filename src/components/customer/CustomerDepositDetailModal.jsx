@@ -14,6 +14,7 @@ import {
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
+import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
@@ -30,7 +31,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountQty, setRecountQty] = useState('');
   const [locationLine, setLocationLine] = useState(null);
-  const [locationValue, setLocationValue] = useState('');
+  const [allLocations, setAllLocations] = useState([]);
+  const [locZone, setLocZone] = useState('');
+  const [locSide, setLocSide] = useState('');
+  const [locRow, setLocRow] = useState('');
+  const [locLevel, setLocLevel] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +61,25 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
     return () => { active = false; };
   }, [requestId, isOpen]);
+
+  useEffect(() => {
+    getActiveLocations().then(({ data }) => setAllLocations(data ?? []));
+  }, []);
+
+  // Parse location code into hierarchy parts
+  function parseLocCode(code) {
+    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4] } : null;
+  }
+
+  const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })).filter((l) => l.parsed);
+  const locZoneOptions = [...new Set(parsedAllLocs.map((l) => l.parsed.zone))].sort();
+  const locSideOptions = locZone ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone).map((l) => l.parsed.side))].sort() : [];
+  const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
+  const locLevelOptions = (locZone && locSide && locRow) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow).map((l) => l.parsed.level))].sort((a, b) => a - b) : [];
+  const selectedLocObj = (locZone && locSide && locRow && locLevel)
+    ? (parsedAllLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel) ?? null)
+    : null;
 
   const branding = getDocumentBrandingConfig();
 
@@ -151,12 +175,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
   async function handleSaveLocation() {
     if (!locationLine) return;
+    const locId = selectedLocObj?.id ?? null;
     setSubmitting(true); setError('');
-    const r = await updateDepositLineLocation(locationLine.id, locationValue || null, locationLine);
+    const r = await updateDepositLineLocation(locationLine.id, locId, locationLine);
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Save location failed'); return; }
     setLines((prev) => prev.map((l) =>
-      l.id === locationLine.id ? { ...l, location_id: locationValue || null } : l,
+      l.id === locationLine.id ? { ...l, location_id: locId } : l,
     ));
     setActionMsg('อัปเดต Location เรียบร้อยแล้ว');
     setLocationLine(null);
@@ -262,7 +287,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 className="btn btn-secondary btn-sm"
                                 type="button"
                                 title="อัปเดตตำแหน่งจัดเก็บ (แก้ไขยอดรับไม่ได้)"
-                                onClick={() => { setLocationLine(line); setLocationValue(line.location_id ?? ''); }}
+                                onClick={() => {
+                                  setLocationLine(line);
+                                  const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
+                                  const p = existingLoc ? parseLocCode(existingLoc.code) : null;
+                                  setLocZone(p?.zone ?? '');
+                                  setLocSide(p?.side ?? '');
+                                  setLocRow(p?.row ? String(p.row) : '');
+                                  setLocLevel(p?.level ? String(p.level) : '');
+                                }}
                               >
                                 📍 Location
                               </button>
@@ -413,12 +446,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       {/* Location update modal — only for RECEIVED_CONFIRMED lines */}
       <Modal
         isOpen={!!locationLine}
-        onClose={() => setLocationLine(null)}
+        onClose={() => { setLocationLine(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
         title="อัปเดต Location"
         size="sm"
         footer={(
           <div className="action-row">
-            <button className="btn btn-primary" disabled={submitting} type="button" onClick={handleSaveLocation}>
+            <button className="btn btn-primary" disabled={submitting || !selectedLocObj} type="button" onClick={handleSaveLocation}>
               {t('save')}
             </button>
             <button className="btn btn-secondary" onClick={() => setLocationLine(null)} type="button">{t('cancel')}</button>
@@ -435,16 +468,46 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               {locationLine.actual_weight != null ? ` · ${locationLine.actual_weight} กก.` : ''}
               {' '}(แก้ไขยอดรับไม่ได้)
             </p>
-            <label className="form-field">
-              <span>Location ID</span>
-              <input
-                className="form-control"
-                value={locationValue}
-                onChange={(e) => setLocationValue(e.target.value)}
-                placeholder="เช่น A1-01, B2-03..."
-                autoFocus
-              />
-            </label>
+            {parsedAllLocs.length === 0 ? (
+              <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>ไม่พบข้อมูล Location ในระบบ</p>
+            ) : (
+              <div className="form-grid" style={{ gap: 10 }}>
+                <label className="form-field">
+                  <span>ห้อง / โซน</span>
+                  <select className="form-control" value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}>
+                    <option value="">-- เลือกห้อง --</option>
+                    {locZoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>ฝั่ง</span>
+                  <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }} disabled={!locZone}>
+                    <option value="">-- เลือกฝั่ง --</option>
+                    {locSideOptions.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>แถว</span>
+                  <select className="form-control" value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }} disabled={!locSide}>
+                    <option value="">-- เลือกแถว --</option>
+                    {locRowOptions.map((r) => <option key={r} value={String(r)}>แถว {r}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>ชั้น</span>
+                  <select className="form-control" value={locLevel} onChange={(e) => setLocLevel(e.target.value)} disabled={!locRow}>
+                    <option value="">-- เลือกชั้น --</option>
+                    {locLevelOptions.map((lv) => <option key={lv} value={String(lv)}>ชั้น {lv}</option>)}
+                  </select>
+                </label>
+                {selectedLocObj && (
+                  <div style={{ gridColumn: '1/-1', background: 'var(--tgd-success-light, #ecfdf5)', border: '1px solid var(--tgd-success)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
+                    <strong style={{ color: 'var(--tgd-success)' }}>✓ {selectedLocObj.code}</strong>
+                    {selectedLocObj.name && <span style={{ color: '#555', marginLeft: 8 }}>{selectedLocObj.name}</span>}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         ) : null}
       </Modal>

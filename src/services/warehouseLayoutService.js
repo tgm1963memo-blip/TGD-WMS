@@ -180,7 +180,7 @@ export async function getActiveLocations() {
   const locations = (data ?? []).flatMap((zone) =>
     (zone.tgd_rooms ?? []).flatMap((room) =>
       (room.tgd_locations ?? [])
-        .filter((l) => l.is_active)
+        .filter((l) => l.is_active !== false)
         .map((l) => ({
           id: l.id,
           code: l.location_code,

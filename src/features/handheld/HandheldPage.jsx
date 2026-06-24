@@ -1456,8 +1456,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '24px 10px', flex: 1, overflowY: 'auto' }}>
           {docsLoading ? (
