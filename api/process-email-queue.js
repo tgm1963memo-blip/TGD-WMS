@@ -99,6 +99,15 @@ export default async function handler(req, res) {
           <!-- BODY -->
           <tr>
             <td style="background-color:#ffffff;padding:40px 40px 32px;">
+              <!-- Delight Icon -->
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px;">
+                <tr>
+                  <td style="width:52px;height:52px;background-color:#eff6ff;border-radius:50%;text-align:center;vertical-align:middle;font-size:24px;line-height:52px;">
+                    🔔
+                  </td>
+                </tr>
+              </table>
+
               <h2 style="margin:0 0 16px;color:#09090b;font-size:20px;font-weight:700;">
                 ${item.subject}
               </h2>
