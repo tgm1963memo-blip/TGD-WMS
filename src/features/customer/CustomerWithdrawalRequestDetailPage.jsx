@@ -89,7 +89,7 @@ export function CustomerWithdrawalRequestDetailPage() {
     );
   }
 
-  const eligibility = getWithdrawalCancelEligibility(header, role, policy);
+  const eligibility = getWithdrawalCancelEligibility(header, role, policy ?? undefined);
   const branding = getDocumentBrandingConfig();
 
   return (

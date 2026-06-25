@@ -31,7 +31,7 @@ export function CustomerFacilityUsageRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
 
   async function loadRows() {
     if (!customerId) {

@@ -32,15 +32,8 @@ function formatDate(iso) {
 }
 
 
-function StockBalanceTable({ lines }) {
-  return (
-    <StockBalanceTable lines={pg.lines} />
-  );
-}
-
 export function CustomerStockBalancePage() {
 
-  
 
   const t = useTranslation();
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();

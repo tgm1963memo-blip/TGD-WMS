@@ -106,6 +106,7 @@ export function CustomerAdminDepositReviewPage() {
   const branding = getDocumentBrandingConfig();
 
   const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  const canRequestRecount = selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'].includes(selected.status);
   const allLinesHaveActualQty = lines.length > 0 && lines.every((l) => l.actual_boxes != null || l.actual_weight != null);
   const canConfirmReceiving = selected &&
     ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
@@ -141,6 +142,23 @@ export function CustomerAdminDepositReviewPage() {
     }
     const newStatus = acceptResult.data?.status ?? 'WAREHOUSE_RECEIVING';
     setActionMsg(t('admin_work_order_opened'));
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  async function handleRequestRecount() {
+    if (!selectedId || !selected) return;
+    setSubmitting(true);
+    setError('');
+    setActionMsg('');
+
+    const result = await reviewCustomerDepositRequest(selectedId, 'COUNT_VARIANCE', comment);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'Request recount failed');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'COUNT_VARIANCE_REVIEW';
+    setActionMsg('เปิดใบงานตรวจนับใหม่แล้ว');
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
   }
 
@@ -424,6 +442,16 @@ export function CustomerAdminDepositReviewPage() {
                   type="button"
                 >
                   {t('admin_open_work_order')}
+                </button>
+              ) : null}
+              {canRequestRecount ? (
+                <button
+                  className="btn btn-warning"
+                  disabled={submitting}
+                  onClick={handleRequestRecount}
+                  type="button"
+                >
+                  ตรวจนับใหม่ หากไม่ตรง
                 </button>
               ) : null}
               {selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) ? (
