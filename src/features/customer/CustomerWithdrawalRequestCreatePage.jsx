@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -59,6 +59,7 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [depositLinesMap, setDepositLinesMap] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [copySourceNo, setCopySourceNo] = useState('');
   const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId) || Boolean(editId));
   const [copyError, setCopyError] = useState('');
@@ -147,16 +148,25 @@ export function CustomerWithdrawalRequestCreatePage() {
 
         setEditStatus(headerResult.data.status ?? null);
 
-        const linesResult = await listCustomerWithdrawalRequestLines(editId);
+        const sourceCustomerId = headerResult.data.customer_id;
+        const [linesResult, catalogResult] = await Promise.all([
+          listCustomerWithdrawalRequestLines(editId),
+          listCustomerProducts({ customerId: sourceCustomerId, activeOnly: true }),
+        ]);
         if (!active) return;
 
         const sourceLines = linesResult.data ?? [];
+        const catalogByCode = {};
+        (catalogResult.data ?? []).forEach((p) => {
+          if (p.customer_product_code) catalogByCode[p.customer_product_code] = p.id;
+        });
+
         setHeader(mapWithdrawalHeaderForCopy(headerResult.data));
 
         const editLines = sourceLines.map((line, index) => ({
           key: index + 1,
           lineId: line.id,
-          catalog_product_id: line.catalog_product_id ?? '',
+          catalog_product_id: catalogByCode[line.customer_product_code] ?? '',
           customer_product_code: line.customer_product_code ?? '',
           product_code: line.internal_product_code ?? '',
           product_id: line.product_id ?? '',
@@ -259,143 +269,142 @@ export function CustomerWithdrawalRequestCreatePage() {
   }
 
   async function saveFormData(shouldSubmit) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitError('');
 
-    if (!canWriteCustomerRequests) {
-      setSubmitError(t('customer_portal_no_customer_scope'));
-      return;
-    }
-
-    if (isRequestProxy && !proxyCustomerId) {
-      setSubmitError(t('customer_request_proxy_customer_required'));
-      return;
-    }
-
-    if (isEditMode && editStatus && editStatus !== 'WITHDRAWAL_DRAFT') {
-      setSubmitError('คำขอนี้ไม่อยู่ในสถานะร่าง ไม่สามารถแก้ไขหรือส่งได้ (สถานะ: ' + editStatus + ')');
-      return;
-    }
-
-    const activeLines = getFilledWithdrawalLines(lines);
-    if (!activeLines.length) {
-      setSubmitError(t('customer_deposit_catalog_required'));
-      return;
-    }
-
-    for (let i = 0; i < activeLines.length; i++) {
-      const line = activeLines[i];
-      const lot = normalizeLotNo(line.lot_no);
-      if (!lot && !line.source_deposit_request_id) {
-        setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่ระบุ LOT กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
-        return;
-      }
-    }
-
-    setSubmitting(true);
-
-    let requestId;
-
-    if (isEditMode) {
-      const updateResult = await updateCustomerWithdrawalRequestDraft(editId, {
-        requestedDispatchDate: header.requested_dispatch_date,
-        deliveryType: header.delivery_type,
-        pickupContact: header.pickup_contact,
-        destination: header.destination,
-        note: header.note,
-      });
-
-      if (updateResult.error) {
-        setSubmitting(false);
-        setSubmitError(updateResult.error.message ?? t('customer_portal_load_error'));
+    try {
+      if (!canWriteCustomerRequests) {
+        setSubmitError(t('customer_portal_no_customer_scope'));
         return;
       }
 
-      requestId = editId;
-    } else {
-      const createResult = await createCustomerWithdrawalRequest({
-        requestedDispatchDate: header.requested_dispatch_date,
-        deliveryType: header.delivery_type,
-        pickupContact: header.pickup_contact,
-        destination: header.destination,
-        note: header.note,
-        customerId: isRequestProxy ? proxyCustomerId : null,
-      });
-
-      if (createResult.error) {
-        setSubmitting(false);
-        setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+      if (isRequestProxy && !proxyCustomerId) {
+        setSubmitError(t('customer_request_proxy_customer_required'));
         return;
       }
 
-      requestId = createResult.data?.id;
-
-      if (!requestId) {
-        setSubmitting(false);
-        setSubmitError('ไม่สามารถสร้างคำขอได้ กรุณาลองใหม่');
-        return;
-      }
-    }
-
-    if (isEditMode) {
-      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
-      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
-      for (const deletedId of toDelete) {
-        await deleteCustomerWithdrawalRequestLine(requestId, deletedId);
-      }
-    }
-
-    for (let index = 0; index < activeLines.length; index += 1) {
-      const line = activeLines[index];
-      const normalizedLot = normalizeLotNo(line.lot_no);
-      const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
-        lineId: line.lineId ?? null,
-        lineNo: index + 1,
-        sourceDepositRequestId: line.source_deposit_request_id || null,
-        sourceLotNo: normalizedLot,
-        customerProductCode: line.customer_product_code,
-        internalProductCode: line.product_code,
-        productName: line.product_name,
-        lotNo: normalizedLot,
-        mfgDate: line.mfg_date || null,
-        expDate: line.exp_date || null,
-        requestedQty: line.requested_qty,
-        requestedBoxes: line.requested_boxes,
-        requestedWeight: line.requested_weight,
-        pickingRule: line.picking_rule,
-        note: header.note,
-      });
-
-      if (lineResult.error) {
-        setSubmitting(false);
-        setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+      if (isEditMode && editStatus && editStatus !== 'WITHDRAWAL_DRAFT') {
+        setSubmitError('คำขอนี้ไม่อยู่ในสถานะร่าง ไม่สามารถแก้ไขหรือส่งได้ (สถานะ: ' + editStatus + ')');
         return;
       }
 
-      if (lineResult.data && lineResult.data.id && !line.lineId) {
-        line.lineId = lineResult.data.id;
-        setLines((current) => current.map((l) => (l.key === line.key ? { ...l, lineId: lineResult.data.id } : l)));
-        setEditOriginalLineIds((current) => {
-          if (!current.includes(lineResult.data.id)) return [...current, lineResult.data.id];
-          return current;
+      const activeLines = getFilledWithdrawalLines(lines);
+      if (!activeLines.length) {
+        setSubmitError(t('customer_deposit_catalog_required'));
+        return;
+      }
+
+      for (let i = 0; i < activeLines.length; i++) {
+        const line = activeLines[i];
+        const lot = normalizeLotNo(line.lot_no);
+        if (!lot && !line.source_deposit_request_id) {
+          setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่ระบุ LOT กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
+          return;
+        }
+      }
+
+      setSubmitting(true);
+
+      let requestId;
+
+      if (isEditMode) {
+        const updateResult = await updateCustomerWithdrawalRequestDraft(editId, {
+          requestedDispatchDate: header.requested_dispatch_date,
+          deliveryType: header.delivery_type,
+          pickupContact: header.pickup_contact,
+          destination: header.destination,
+          note: header.note,
         });
+
+        if (updateResult.error) {
+          setSubmitError(updateResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
+
+        requestId = editId;
+      } else {
+        const createResult = await createCustomerWithdrawalRequest({
+          requestedDispatchDate: header.requested_dispatch_date,
+          deliveryType: header.delivery_type,
+          pickupContact: header.pickup_contact,
+          destination: header.destination,
+          note: header.note,
+          customerId: isRequestProxy ? proxyCustomerId : null,
+        });
+
+        if (createResult.error) {
+          setSubmitError(createResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
+
+        requestId = createResult.data?.id;
+
+        if (!requestId) {
+          setSubmitError('ไม่สามารถสร้างคำขอได้ กรุณาลองใหม่');
+          return;
+        }
       }
-    }
 
-    if (!shouldSubmit) {
+      if (isEditMode) {
+        const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
+        const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
+        for (const deletedId of toDelete) {
+          await deleteCustomerWithdrawalRequestLine(requestId, deletedId);
+        }
+      }
+
+      for (let index = 0; index < activeLines.length; index += 1) {
+        const line = activeLines[index];
+        const normalizedLot = normalizeLotNo(line.lot_no);
+        const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
+          lineId: isEditMode ? (line.lineId ?? null) : null,
+          lineNo: index + 1,
+          sourceDepositRequestId: line.source_deposit_request_id || null,
+          sourceLotNo: normalizedLot,
+          customerProductCode: line.customer_product_code,
+          internalProductCode: line.product_code,
+          productName: line.product_name,
+          lotNo: normalizedLot,
+          mfgDate: line.mfg_date || null,
+          expDate: line.exp_date || null,
+          requestedQty: line.requested_qty,
+          requestedBoxes: line.requested_boxes,
+          requestedWeight: line.requested_weight,
+          pickingRule: line.picking_rule,
+          note: header.note,
+        });
+
+        if (lineResult.error) {
+          setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
+
+        if (lineResult.data?.id) {
+          const newLineId = lineResult.data.id;
+          line.lineId = newLineId;
+          setLines((current) => current.map((l) => (l.key === line.key ? { ...l, lineId: newLineId } : l)));
+          setEditOriginalLineIds((current) => (current.includes(newLineId) ? current : [...current, newLineId]));
+        }
+      }
+
+      if (!shouldSubmit) {
+        navigate(`/customer/withdrawal-request/new?editId=${requestId}`, { replace: true });
+        return;
+      }
+
+      const submitResult = await submitCustomerWithdrawalRequest(requestId);
+
+      if (submitResult.error) {
+        setSubmitError(submitResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+
+      navigate('/customer/withdrawal-request');
+    } finally {
+      submittingRef.current = false;
       setSubmitting(false);
-      navigate(`/customer/withdrawal-request/${requestId}`);
-      return;
     }
-
-    const submitResult = await submitCustomerWithdrawalRequest(requestId);
-    setSubmitting(false);
-
-    if (submitResult.error) {
-      setSubmitError(submitResult.error.message ?? t('customer_portal_load_error'));
-      return;
-    }
-
-    navigate('/customer/withdrawal-request');
   }
 
   async function handleSaveDraft(event) {

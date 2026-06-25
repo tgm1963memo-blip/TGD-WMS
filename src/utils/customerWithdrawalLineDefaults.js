@@ -31,6 +31,8 @@ export function isCatalogWithdrawalLineSelected(line) {
 
 export function getFilledWithdrawalLines(lines) {
   return (lines ?? []).filter(
-    (line) => isCatalogWithdrawalLineSelected(line) && String(line.requested_weight ?? '').trim() !== '',
+    (line) =>
+      (isCatalogWithdrawalLineSelected(line) || Boolean(String(line?.product_name ?? '').trim())) &&
+      String(line.requested_weight ?? '').trim() !== '',
   );
 }

@@ -44,26 +44,34 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
       </div>
 
       {/* Lines Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '14%' }} /> {/* เอกสารอ้างอิง */}
+          <col style={{ width: '30%' }} /> {/* สินค้า */}
+          <col style={{ width: '16%' }} /> {/* ประเภท */}
+          <col style={{ width: '13%' }} /> {/* วันที่ */}
+          <col style={{ width: '12%' }} /> {/* จำนวน */}
+          <col style={{ width: '15%' }} /> {/* น้ำหนักชาร์จ */}
+        </colgroup>
         <thead>
           <tr style={{ background: '#f1fdf4' }}>
-            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#1e293b' }}>เอกสารอ้างอิง</th>
+            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>เอกสารอ้างอิง</th>
             <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#1e293b' }}>สินค้า</th>
-            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#1e293b' }}>ประเภท</th>
-            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#1e293b' }}>วันที่</th>
-            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>จำนวน</th>
-            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>น้ำหนักชาร์จ (kg)</th>
+            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>ประเภท</th>
+            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>วันที่</th>
+            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>จำนวน</th>
+            <th style={{ border: '1px solid #d1fae5', padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>น้ำหนักชาร์จ (kg)</th>
           </tr>
         </thead>
         <tbody>
           {lines.length ? lines.map((line, i) => (
             <tr key={line.id ?? i} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafb' }}>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px' }}>{line.source_document_no ?? '-'}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px' }}>{line.product_name ?? line.product_code ?? '-'}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center' }}>{line.movement_type ?? '-'}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center' }}>{fmtDate(line.movement_date)}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right' }}>{line.qty != null ? Number(line.qty).toLocaleString('th-TH') : '-'} {line.uom ?? ''}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right' }}>{line.chargeable_weight != null ? fmt(line.chargeable_weight) : '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{line.source_document_no ?? '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={line.product_name ?? line.product_code ?? '-'}>{line.product_name ?? line.product_code ?? '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap', fontSize: 11 }}>{line.movement_type ?? '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.movement_date)}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.qty != null ? Number(line.qty).toLocaleString('th-TH') : '-'} {line.uom ?? ''}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.chargeable_weight != null ? fmt(line.chargeable_weight) : '-'}</td>
             </tr>
           )) : (
             <tr>

@@ -1,7 +1,6 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
-import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer/CustomerWithdrawalRequestLinesDisplay.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -121,13 +120,22 @@ export function CustomerAdminWithdrawalReviewPage() {
     }
 
     const acceptResult = await reviewCustomerWithdrawalRequest(selectedId, 'ACCEPT', comment);
-    setSubmitting(false);
     if (acceptResult.error) {
       setError(acceptResult.error.message ?? 'Open work order failed');
+      setSubmitting(false);
       return;
     }
-    const newStatus = acceptResult.data?.status ?? 'ADMIN_ACCEPTED';
-    setActionMsg(t('admin_work_order_opened'));
+
+    // Auto send to handheld (WAREHOUSE_PICKING) immediately after accepting
+    const pickResult = await reviewCustomerWithdrawalRequest(selectedId, 'SEND_TO_PICKING');
+    setSubmitting(false);
+    if (pickResult.error) {
+      setError(pickResult.error.message ?? 'Send to handheld failed');
+      setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: acceptResult.data?.status ?? 'ADMIN_ACCEPTED' } : r)));
+      return;
+    }
+    const newStatus = pickResult.data?.status ?? 'WAREHOUSE_PICKING';
+    setActionMsg(`${t('admin_work_order_opened')} — ${t('admin_sent_to_handheld')}`);
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
   }
 

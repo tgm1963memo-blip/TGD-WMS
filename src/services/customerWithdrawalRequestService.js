@@ -34,7 +34,6 @@ const WITHDRAWAL_LINE_SELECT = [
   'line_no',
   'source_customer_deposit_request_id',
   'source_lot_no',
-  'catalog_product_id',
   'customer_product_code',
   'internal_product_code',
   'product_id',

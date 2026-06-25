@@ -22,7 +22,7 @@ export function CustomerWithdrawalRequestDetailPage() {
   const t = useTranslation();
   const navigate = useNavigate();
   const { requestId } = useParams();
-  const { role } = useCustomerPortalProfile();
+  const { role, isRequestProxy } = useCustomerPortalProfile();
   const [header, setHeader] = useState(null);
   const [lines, setLines] = useState([]);
   const [policy, setPolicy] = useState(null);
