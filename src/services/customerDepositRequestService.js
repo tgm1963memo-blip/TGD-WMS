@@ -98,6 +98,29 @@ export async function getCustomerStockBalance(customerId) {
   return { data: rows, error: null };
 }
 
+export async function getAllCustomerStockBalances() {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_get_all_customer_stock_balances');
+  if (error) return { data: null, error };
+
+  const rows = (Array.isArray(data) ? data : []).map((r) => ({
+    ...r,
+    id: r.deposit_line_id,
+    request: {
+      id: r.deposit_request_id,
+      request_no: r.request_no,
+      customer_id: r.customer_id,
+      last_action_at: r.received_at,
+      expected_arrival_date: r.received_at,
+    },
+    actual_boxes: r.balance_boxes,
+    actual_weight: r.balance_weight,
+  }));
+
+  return { data: rows, error: null };
+}
+
 export async function getDepositInventoryLines(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 

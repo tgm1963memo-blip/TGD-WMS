@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
-import { getDepositInventoryLines } from '../../services/customerDepositRequestService.js';
+import { getAllCustomerStockBalances } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 
@@ -60,12 +60,12 @@ export function InventoryBalancePage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getDepositInventoryLines(selectedCustomerId ? { customerId: selectedCustomerId } : {}).then(({ data, error: err }) => {
+    getAllCustomerStockBalances().then(({ data, error: err }) => {
       setLines(data ?? []);
       setError(err ?? null);
       setLoading(false);
     });
-  }, [selectedCustomerId]);
+  }, []);
 
   function toggleKey(key) {
     setExpandedKeys((prev) => {
@@ -75,8 +75,9 @@ export function InventoryBalancePage() {
     });
   }
 
-  // Filter
+  // Filter (customer filter is client-side now that all data is loaded at once)
   const filtered = lines.filter((l) => {
+    if (selectedCustomerId && l.request?.customer_id !== selectedCustomerId) return false;
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return (
@@ -128,7 +129,7 @@ export function InventoryBalancePage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="ยอดคงเหลือสินค้า"
-        description="สินค้าที่รับเข้าคลังแล้ว (ใบฝากที่ยืนยันรับแล้ว)"
+        description="สินค้าที่รับเข้าคลังแล้ว หักการเบิกที่ยืนยันแล้ว (เฉพาะรายการที่มียอดคงเหลือ)"
       />
 
       {/* Filters */}
@@ -175,8 +176,8 @@ export function InventoryBalancePage() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
           <StatCard label="ลูกค้า" value={customerGroups.length} unit="ราย" color="#3b82f6" />
           <StatCard label="ประเภทสินค้า" value={uniqueProducts} unit="รายการ" color="#8b5cf6" />
-          <StatCard label="กล่องรับจริงรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" color="#22c55e" />
-          <StatCard label="น้ำหนักรับจริงรวม" value={grandTotalWeight.toLocaleString()} unit="กก." color="#f59e0b" />
+          <StatCard label="กล่องคงเหลือรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" color="#22c55e" />
+          <StatCard label="น้ำหนักคงเหลือรวม" value={grandTotalWeight.toLocaleString()} unit="กก." color="#f59e0b" />
         </div>
       )}
 
@@ -260,8 +261,8 @@ export function InventoryBalancePage() {
                               <th style={{ padding: '12px 16px 12px 48px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>เลขที่ใบฝาก</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>กล่อง</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>น้ำหนัก (กก.)</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กล่อง)</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กก.)</th>
                               <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รายละเอียด</th>
                             </tr>
                           </thead>
@@ -313,7 +314,7 @@ export function InventoryBalancePage() {
           ))}
 
           <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
-            แสดง {filtered.length} รายการ (เฉพาะใบฝากที่ยืนยันรับแล้ว)
+            แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ — หักการเบิกสินค้าที่ยืนยันแล้ว)
           </p>
         </div>
       )}
