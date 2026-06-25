@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer/CustomerWithdrawalRequestLinesDisplay.jsx';
@@ -21,6 +22,8 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
 export function CustomerAdminWithdrawalReviewPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
+
   const t = useTranslation();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
@@ -78,7 +81,7 @@ export function CustomerAdminWithdrawalReviewPage() {
     setDetailOpen(true);
   }
 
-  const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const selected = sortedData.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
   const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
@@ -230,15 +233,15 @@ export function CustomerAdminWithdrawalReviewPage() {
           <table className="data-table" data-testid="admin-withdrawal-review-table">
             <thead>
               <tr>
-                <th>{t('customer_col_request_no')}</th>
-                <th>{t('customer_col_status')}</th>
+                <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
+                <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th>{t('customer_field_requested_dispatch_date')}</th>
                 <th>{t('customer_field_delivery_type')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length ? rows.map((row) => (
+              {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.withdrawal_no}</td>
                   <td>
@@ -371,7 +374,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             {/* Admin comment */}
             <label className="form-field" style={{ marginBottom: 16 }}>
               <span>{t('admin_review_comment_label')}</span>
-              <textarea className="form-control" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
+              <textarea className="form-control" sortedData={2} value={comment} onChange={(e) => setComment(e.target.value)} />
             </label>
 
             {/* Action buttons */}
@@ -457,7 +460,7 @@ export function CustomerAdminWithdrawalReviewPage() {
           <span>หมายเหตุ (ไม่บังคับ)</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={cancelComment}
             onChange={(e) => setCancelComment(e.target.value)}
             placeholder="ระบุสาเหตุการยกเลิก..."
@@ -486,7 +489,7 @@ export function CustomerAdminWithdrawalReviewPage() {
           <span>{t('admin_reject_reason_label')}</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder={t('admin_reject_reason_placeholder')}
@@ -516,7 +519,7 @@ export function CustomerAdminWithdrawalReviewPage() {
           <span>{t('admin_notify_customer_note_label')}</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={notifyNote}
             onChange={(e) => setNotifyNote(e.target.value)}
             placeholder={t('admin_notify_customer_note_placeholder')}

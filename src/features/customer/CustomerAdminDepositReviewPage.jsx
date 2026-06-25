@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -35,6 +36,8 @@ const REVIEW_STATUSES = [
 ];
 
 export function CustomerAdminDepositReviewPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
+
   const t = useTranslation();
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
@@ -77,8 +80,8 @@ export function CustomerAdminDepositReviewPage() {
   }, [routeRequestId]);
 
   useEffect(() => {
-    if (!selectedId && rows.length) setSelectedId(rows[0].id);
-  }, [rows, selectedId]);
+    if (!selectedId && sortedData.length) setSelectedId(sortedData[0].id);
+  }, [sortedData, selectedId]);
 
   useEffect(() => {
     let active = true;
@@ -100,7 +103,7 @@ export function CustomerAdminDepositReviewPage() {
     setDetailOpen(true);
   }
 
-  const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const selected = sortedData.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
   const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
@@ -247,15 +250,15 @@ export function CustomerAdminDepositReviewPage() {
           <table className="data-table" data-testid="admin-deposit-review-table">
             <thead>
               <tr>
-                <th>{t('customer_col_request_no')}</th>
-                <th>{t('customer_col_status')}</th>
-                <th>{t('customer_field_expected_arrival_date')}</th>
+                <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
+                <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
+                <th onClick={() => requestSort('expected_arrival_date')} style={{ cursor: 'pointer' }}>{t('customer_field_expected_arrival_date')} {getSortIndicator('expected_arrival_date')}</th>
                 <th>{t('customer_field_contact_name')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length ? rows.map((row) => (
+              {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
                   <td>
@@ -402,7 +405,7 @@ export function CustomerAdminDepositReviewPage() {
             {/* Admin comment */}
             <label className="form-field" style={{ marginBottom: 16 }}>
               <span>{t('admin_review_comment_label')}</span>
-              <textarea className="form-control" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
+              <textarea className="form-control" sortedData={2} value={comment} onChange={(e) => setComment(e.target.value)} />
             </label>
 
             {/* Warning when confirm is blocked */}
@@ -505,7 +508,7 @@ export function CustomerAdminDepositReviewPage() {
           <span>{t('admin_reject_reason_label')}</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder={t('admin_reject_reason_placeholder')}
@@ -535,7 +538,7 @@ export function CustomerAdminDepositReviewPage() {
           <span>{t('admin_notify_customer_note_label')}</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={notifyNote}
             onChange={(e) => setNotifyNote(e.target.value)}
             placeholder={t('admin_notify_customer_note_placeholder')}
@@ -565,7 +568,7 @@ export function CustomerAdminDepositReviewPage() {
           <span>หมายเหตุ (ไม่บังคับ)</span>
           <textarea
             className="form-control"
-            rows={3}
+            sortedData={3}
             value={cancelComment}
             onChange={(e) => setCancelComment(e.target.value)}
             placeholder="ระบุสาเหตุการยกเลิก..."

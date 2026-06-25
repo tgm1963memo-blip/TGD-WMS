@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatRequestWeight } from '../../utils/customerRequestCancelUtils.js';
 
@@ -12,6 +13,8 @@ export function CustomerDepositRequestLinesDisplay({
   lines = [],
   testId = 'customer-deposit-lines-display-table',
 }) {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
+
   const t = useTranslation();
 
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
@@ -22,22 +25,22 @@ export function CustomerDepositRequestLinesDisplay({
       <table className="data-table" data-testid={testId}>
         <thead>
           <tr>
-            <th>#</th>
-            <th>{t('catalog_col_customer_code')}</th>
-            <th>{t('catalog_col_product_name')}</th>
-            <th>{t('customer_col_weight_per_box')}</th>
-            <th>{t('customer_col_total_deposit_weight')}</th>
-            <th>{t('customer_col_box_count')}</th>
-            {hasLot && <th>เลข LOT</th>}
-            {hasLot && <th>วันผลิต</th>}
-            {hasLot && <th>วันหมดอายุ</th>}
-            {hasActual && <th>รับจริง (กล่อง)</th>}
-            {hasActual && <th>รับจริง (กก.)</th>}
-            <th>{t('customer_col_line_note')}</th>
+            <th onClick={() => requestSort('line_no')} style={{ cursor: 'pointer' }}># {getSortIndicator('line_no')}</th>
+            <th onClick={() => requestSort('customer_product_code')} style={{ cursor: 'pointer' }}>{t('catalog_col_customer_code')} {getSortIndicator('customer_product_code')}</th>
+            <th onClick={() => requestSort('product_name')} style={{ cursor: 'pointer' }}>{t('catalog_col_product_name')} {getSortIndicator('product_name')}</th>
+            <th onClick={() => requestSort('weight_per_box')} style={{ cursor: 'pointer' }}>{t('customer_col_weight_per_box')} {getSortIndicator('weight_per_box')}</th>
+            <th onClick={() => requestSort('expected_weight')} style={{ cursor: 'pointer' }}>{t('customer_col_total_deposit_weight')} {getSortIndicator('expected_weight')}</th>
+            <th onClick={() => requestSort('expected_boxes')} style={{ cursor: 'pointer' }}>{t('customer_col_box_count')} {getSortIndicator('expected_boxes')}</th>
+            {hasLot && <th onClick={() => requestSort('lot_no')} style={{ cursor: 'pointer' }}>เลข LOT {getSortIndicator('lot_no')}</th>}
+            {hasLot && <th onClick={() => requestSort('mfg_date')} style={{ cursor: 'pointer' }}>วันผลิต {getSortIndicator('mfg_date')}</th>}
+            {hasLot && <th onClick={() => requestSort('exp_date')} style={{ cursor: 'pointer' }}>วันหมดอายุ {getSortIndicator('exp_date')}</th>}
+            {hasActual && <th onClick={() => requestSort('actual_boxes')} style={{ cursor: 'pointer' }}>รับจริง (กล่อง) {getSortIndicator('actual_boxes')}</th>}
+            {hasActual && <th onClick={() => requestSort('actual_weight')} style={{ cursor: 'pointer' }}>รับจริง (กก.) {getSortIndicator('actual_weight')}</th>}
+            <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>{t('customer_col_line_note')} {getSortIndicator('note')}</th>
           </tr>
         </thead>
         <tbody>
-          {lines.length ? lines.map((line) => (
+          {sortedData.length ? sortedData.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td>{line.line_no}</td>
               <td>{line.customer_product_code ?? '-'}</td>

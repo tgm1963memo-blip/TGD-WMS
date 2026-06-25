@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatRequestWeight } from '../../utils/customerRequestCancelUtils.js';
 
@@ -5,6 +6,8 @@ export function CustomerWithdrawalRequestLinesDisplay({
   lines = [],
   testId = 'customer-withdrawal-lines-display-table',
 }) {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
+
   const t = useTranslation();
 
   return (
@@ -12,9 +15,9 @@ export function CustomerWithdrawalRequestLinesDisplay({
       <table className="data-table" data-testid={testId}>
         <thead>
           <tr>
-            <th>#</th>
+            <th onClick={() => requestSort('line_no')} style={{ cursor: 'pointer' }}># {getSortIndicator('line_no')}</th>
             <th>{t('catalog_col_customer_code')}</th>
-            <th>{t('catalog_col_product_name')}</th>
+            <th onClick={() => requestSort('product_name')} style={{ cursor: 'pointer' }}>{t('catalog_col_product_name')} {getSortIndicator('product_name')}</th>
             <th>{t('customer_col_requested_qty')}</th>
             <th>{t('customer_col_requested_boxes')}</th>
             <th>{t('customer_col_requested_weight')}</th>
@@ -22,7 +25,7 @@ export function CustomerWithdrawalRequestLinesDisplay({
           </tr>
         </thead>
         <tbody>
-          {lines.length ? lines.map((line) => (
+          {sortedData.length ? sortedData.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td>{line.line_no}</td>
               <td>{line.customer_product_code ?? '-'}</td>
