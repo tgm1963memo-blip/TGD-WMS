@@ -15,6 +15,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -198,6 +199,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     if (!locationLine) return;
     const locId = selectedLocObj?.id ?? null;
     setSubmitting(true); setError('');
+
+    if (locId) {
+      const hasStock = await checkLocationHasInventory(locId);
+      if (hasStock) {
+        if (!window.confirm('Location นี้มีสินค้าอยู่แล้ว คุณแน่ใจหรือไม่ที่จะจัดเก็บสินค้าเพิ่มที่นี่?')) {
+          setSubmitting(false);
+          return;
+        }
+      }
+    }
+
     const r = await updateDepositLineLocation(locationLine.id, locId, locationLine);
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Save location failed'); return; }

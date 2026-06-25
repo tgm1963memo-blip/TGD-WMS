@@ -81,3 +81,11 @@ export async function getStockBalances(filters = {}) {
   return query;
 }
 
+export async function checkLocationHasInventory(locationId) {
+  if (!locationId) return false;
+  const { data } = await getStockBalances({ locationId });
+  if (!data) return false;
+  return data.some(s => s.quantity_boxes > 0 || s.quantity_weight > 0);
+}
+
+

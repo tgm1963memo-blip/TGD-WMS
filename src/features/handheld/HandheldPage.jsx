@@ -14,6 +14,7 @@ import {
   listCustomerWithdrawalRequestLines,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
@@ -1398,6 +1399,17 @@ function LocationUpdateWorkflow({ onBack, t }) {
   async function handleSaveLocation() {
     if (!selectedLine) return;
     setSaving(true); setSaveError('');
+    
+    if (selectedLocation?.id) {
+      const hasStock = await checkLocationHasInventory(selectedLocation.id);
+      if (hasStock) {
+        if (!window.confirm('Location นี้มีสินค้าอยู่แล้ว คุณแน่ใจหรือไม่ที่จะจัดเก็บสินค้าเพิ่มที่นี่?')) {
+          setSaving(false);
+          return;
+        }
+      }
+    }
+
     const r = await updateDepositLineLocation(selectedLine.id, selectedLocation?.id || null, selectedLine);
     setSaving(false);
     if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
