@@ -15,6 +15,7 @@ import {
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { EmptyState } from '../../components/ui/EmptyState.jsx';
 
 const initialState = {
   rows: [],
@@ -165,9 +166,7 @@ export function MovementLedgerReportPage() {
 
       <DashboardSection title={t('movement_ledger', 'รายการเคลื่อนไหว (Movement Ledger)')}>
         {!committedFilters ? (
-          <div className="section-card" style={{ padding: 24, textAlign: 'center', color: 'var(--tgd-muted-text)' }}>
-            กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูล
-          </div>
+          <EmptyState message="รอการค้นหา" description="กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูลรายการเคลื่อนไหว" />
         ) : (
           <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
         )}

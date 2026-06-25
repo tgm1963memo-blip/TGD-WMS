@@ -48,7 +48,7 @@ export function ReportFilterPanel({
 
   return (
     <section className="filter-toolbar" aria-label="Report filters">
-      <div className="filter-toolbar-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', width: '100%', flex: 1 }}>
+      <div className="filter-toolbar-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', width: '100%', flex: 1, alignItems: 'start' }}>
         <div className="form-group"><label className="form-label">Date From<input className="form-control" name="dateFrom" type="date" value={filters.dateFrom} onChange={updateField} /></label></div>
         <div className="form-group"><label className="form-label">Date To<input className="form-control" name="dateTo" type="date" value={filters.dateTo} onChange={updateField} /></label></div>
         {showMovementType && (
@@ -79,7 +79,8 @@ export function ReportFilterPanel({
                 value={filters.productId}
                 onChange={updateField}
                 multiple={multiProduct}
-                style={multiProduct ? { minHeight: '120px' } : undefined}
+                size={multiProduct ? 3 : undefined}
+                style={multiProduct ? { height: 'auto', minHeight: '84px' } : undefined}
               >
                 {!multiProduct && <option value="">— ทั้งหมด —</option>}
                 {multiProduct && <option value="">— ทั้งหมด —</option>}
