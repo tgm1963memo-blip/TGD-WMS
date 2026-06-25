@@ -1500,7 +1500,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2 }}>{l.product_name ?? l.customer_product_code}</div>
-                      <div style={{ fontSize: 12, color: C.textSec }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง</div>
+                      <div style={{ fontSize: 12, color: C.textSec }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง · วันที่รับ: {selectedDoc.expected_arrival_date ?? '-'}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       {hasloc ? (

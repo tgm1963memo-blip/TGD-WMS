@@ -35,7 +35,7 @@ const summaryColumns = [
       const display = code ? `${code} - ${name}` : name;
       return (
         <span className="compact-cell-text" title={display}>
-          {formatCompactText(display, 32)}
+          {formatCompactText(display, 64)}
         </span>
       );
     },
@@ -48,7 +48,7 @@ const summaryColumns = [
   {
     key: 'customer_id',
     header: 'ลูกค้า',
-    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_name ?? row.customer_id, 24)}</span>,
+    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_name ?? row.customer_id, 48)}</span>,
     title: (row) => row.customer_name ?? row.customer_id,
   },
   {
@@ -64,10 +64,10 @@ const summaryColumns = [
     header: 'อ้างอิง',
     render: (row) => (
       <span className="compact-cell-text">
-        {formatCompactText(row.reference_no ?? row.reference_id, 16)}
+        {formatCompactText(row.source_document_no ?? row.reference_no ?? row.reference_id, 24)}
       </span>
     ),
-    title: (row) => row.reference_no ?? row.reference_id,
+    title: (row) => row.source_document_no ?? row.reference_no ?? row.reference_id,
   },
 ];
 

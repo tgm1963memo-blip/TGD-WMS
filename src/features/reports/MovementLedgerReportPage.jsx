@@ -90,12 +90,10 @@ export function MovementLedgerReportPage() {
     ]).then(([result, depositResult]) => {
       if (!isMounted) return;
 
-      // Keep only outbound/neutral movements from stock movements (deposit lines cover all inbound)
+      // Keep outbound/neutral movements; exclude draft and inbound (deposit lines cover all inbound)
       let outboundRows = (result.data ?? []).filter((r) => {
         const movType = String(r.movement_type_raw || '').toUpperCase();
-        return r.ledger_source === 'stock_ledger' &&
-          !movType.includes('DRAFT') &&
-          !INBOUND_SKIP.has(movType);
+        return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
       });
 
       let depositRows = depositResult.data ?? [];

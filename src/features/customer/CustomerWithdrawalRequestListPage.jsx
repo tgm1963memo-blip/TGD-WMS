@@ -27,6 +27,7 @@ export function CustomerWithdrawalRequestListPage() {
   const [detailLinesLoading, setDetailLinesLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
   const branding = getDocumentBrandingConfig();
 
@@ -125,6 +126,16 @@ export function CustomerWithdrawalRequestListPage() {
       <div className="table-card">
         <div className="table-card-header">
           <h3>{t('customer_withdrawal_list_title')}</h3>
+          <div style={{ marginLeft: 'auto' }}>
+            <input
+              className="form-input"
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="ค้นหาเลขที่ / สถานะ / หมายเหตุ..."
+              style={{ minWidth: 220 }}
+              type="text"
+              value={searchText}
+            />
+          </div>
         </div>
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
@@ -143,7 +154,20 @@ export function CustomerWithdrawalRequestListPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedData.length ? sortedData.map((row) => (
+              {(() => {
+                const q = searchText.trim().toLowerCase();
+                const filtered = q
+                  ? sortedData.filter((row) => {
+                      const customerName = (customerNames[row.customer_id] ?? '').toLowerCase();
+                      return (
+                        (row.withdrawal_no ?? '').toLowerCase().includes(q) ||
+                        (row.status ?? '').toLowerCase().includes(q) ||
+                        (row.note ?? '').toLowerCase().includes(q) ||
+                        customerName.includes(q)
+                      );
+                    })
+                  : sortedData;
+                return filtered.length ? filtered.map((row) => (
                 <tr key={row.id}>
                   <td>{row.withdrawal_no}</td>
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
@@ -160,63 +184,66 @@ export function CustomerWithdrawalRequestListPage() {
                     <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
                   </td>
                   <td>
-                    <div className="action-row action-row--table">
-                      {isRequestProxy ? (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          data-testid={`customer-withdrawal-view-${row.id}`}
-                          onClick={() => openDetail(row)}
-                          type="button"
-                        >
-                          {t('customer_request_view_button')}
-                        </button>
+                    <div className="action-row action-row--table" style={{ flexWrap: 'nowrap' }}>
+                      {deleteConfirmId === row.id ? (
+                        <>
+                          <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
+                            {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                          </button>
+                          <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
+                        </>
                       ) : (
-                        <Link
-                          className="btn btn-secondary btn-sm"
-                          data-testid={`customer-withdrawal-view-${row.id}`}
-                          to={`/customer/withdrawal-request/${row.id}`}
-                        >
-                          {t('customer_request_view_button')}
-                        </Link>
-                      )}
-                      {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
-                        <Link
-                          className="btn btn-primary btn-sm"
-                          data-testid={`customer-withdrawal-edit-${row.id}`}
-                          to={`/customer/withdrawal-request/new?editId=${row.id}`}
-                        >
-                          {t('edit') || 'แก้ไข'}
-                        </Link>
-                      ) : null}
-                      {canWriteCustomerRequests ? (
-                        <Link
-                          className="btn btn-secondary btn-sm"
-                          data-testid={`customer-withdrawal-copy-${row.id}`}
-                          to={buildCustomerRequestCopyPath('/customer/withdrawal-request/new', row.id)}
-                        >
-                          {t('customer_request_copy_button')}
-                        </Link>
-                      ) : null}
-                      {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
-                        deleteConfirmId === row.id ? (
-                          <>
-                            <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
-                              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                        <>
+                          {isRequestProxy ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-withdrawal-view-${row.id}`}
+                              onClick={() => openDetail(row)}
+                              type="button"
+                            >
+                              {t('customer_request_view_button')}
                             </button>
-                            <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
-                          </>
-                        ) : (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
-                        )
-                      ) : null}
+                          ) : (
+                            <Link
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-withdrawal-view-${row.id}`}
+                              to={`/customer/withdrawal-request/${row.id}`}
+                            >
+                              {t('customer_request_view_button')}
+                            </Link>
+                          )}
+                          {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
+                            <Link
+                              className="btn btn-primary btn-sm"
+                              data-testid={`customer-withdrawal-edit-${row.id}`}
+                              to={`/customer/withdrawal-request/new?editId=${row.id}`}
+                            >
+                              {t('edit') || 'แก้ไข'}
+                            </Link>
+                          ) : null}
+                          {canWriteCustomerRequests ? (
+                            <Link
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-withdrawal-copy-${row.id}`}
+                              to={buildCustomerRequestCopyPath('/customer/withdrawal-request/new', row.id)}
+                            >
+                              {t('customer_request_copy_button')}
+                            </Link>
+                          ) : null}
+                          {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
+                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
-              )) : (
-                <tr>
-                  <td colSpan={columnCount}>{t('customer_withdrawal_list_empty')}</td>
-                </tr>
-              )}
+                )) : (
+                  <tr>
+                    <td colSpan={columnCount}>{t('customer_withdrawal_list_empty')}</td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
         </div>

@@ -10,8 +10,8 @@ export function ReceivingReportTemplate({
   branding = getDefaultDocumentBranding(),
 }) {
   const t = (key, fallback) => getTranslation(key, language) || fallback;
-  const normalizedBranding = typeof branding === 'object' && !branding?.company_name 
-    ? { ...getDefaultDocumentBranding(), ...branding } 
+  const normalizedBranding = typeof branding === 'object' && !branding?.company_name
+    ? { ...getDefaultDocumentBranding(), ...branding }
     : branding;
 
   const metaFields = [
@@ -30,61 +30,82 @@ export function ReceivingReportTemplate({
     { label: t('report_remark', 'Remark'), value: data?.remark },
   ];
 
+  const NCOLS = 4;
+
   return (
-    <article className="operational-report operational-report-a4" data-testid="receiving-report-template">
-      <DocumentHeader
-        branding={normalizedBranding}
-        language={language}
-        documentTitle={t('receiving_information_report', 'Receiving Information')}
-        documentNo={data?.documentNo}
-        documentDate={data?.receiveDate}
-      />
+    <article className="operational-report operational-report-a4" data-testid="receiving-report-template" style={{ padding: 0 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '15%' }} />
+          <col style={{ width: '40%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '25%' }} />
+        </colgroup>
 
-      <ReportMetaGrid fields={metaFields} />
+        <thead>
+          {/* Document header + meta — repeats on every page */}
+          <tr>
+            <td colSpan={NCOLS} style={{ padding: '8mm', borderBottom: '2px solid #ddd' }}>
+              <DocumentHeader
+                branding={normalizedBranding}
+                language={language}
+                documentTitle={t('receiving_information_report', 'Receiving Information')}
+                documentNo={data?.documentNo}
+                documentDate={data?.receiveDate}
+              />
+              <ReportMetaGrid fields={metaFields} />
+              <h2 style={{ fontSize: 13, margin: '8px 0 4px', borderTop: '1px solid #eee', paddingTop: 8 }}>
+                {t('document_lines', 'Lines')}
+              </h2>
+            </td>
+          </tr>
+          {/* Column headers */}
+          <tr>
+            <th style={{ border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 }}>
+              {t('lot', 'Lot No')}
+            </th>
+            <th style={{ border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 }}>
+              {t('report_customer_product', 'Customer Product')}
+            </th>
+            <th style={{ border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 }}>
+              {t('report_code', 'Code')}
+            </th>
+            <th style={{ border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 }}>
+              {t('quantity', 'Qty')}
+            </th>
+          </tr>
+        </thead>
 
-      <section className="operational-report-section">
-        <h2 className="operational-report-section-title">{t('document_lines', 'Lines')}</h2>
-        <table className="operational-report-table tgd-table">
-          <style dangerouslySetInnerHTML={{ __html: `
-            .operational-report-table.tgd-table th,
-            .operational-report-table.tgd-table td {
-              padding: 16px 12px;
-            }
-          `}} />
-          <thead>
-            <tr>
-              <th>{t('lot', 'Lot No')}</th>
-              <th>{t('report_customer_product', 'Customer Product')}</th>
-              <th>{t('report_code', 'Code')}</th>
-              <th>{t('quantity', 'Qty')}</th>
+        <tbody>
+          {(data?.lines ?? []).map((line) => (
+            <tr key={line.id}>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.lotNo}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.customerProduct}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.code}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.qty}</td>
             </tr>
-          </thead>
-          <tbody>
-            {(data?.lines ?? []).map((line) => (
-              <tr key={line.id}>
-                <td>{line.lotNo}</td>
-                <td>{line.customerProduct}</td>
-                <td>{line.code}</td>
-                <td>{line.qty}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+          ))}
+        </tbody>
 
-      <section className="operational-report-totals" data-testid="report-totals-section">
-        <div><span>{t('report_total_qty', 'Total Qty')}</span><strong>{data?.totalQty ?? 0}</strong></div>
-        <div><span>{t('weight', 'Total Weight')}</span><strong>{data?.totalWeight ?? 0}</strong></div>
-      </section>
-
-      <ReportSignatureSection 
-        branding={normalizedBranding} 
-        language={language} 
-        preparedBy={data?.preparedBy}
-        approvedBy={data?.approvedBy}
-        receivedByLabel="ISSUED / CHECKED BY"
-        deliveredByLabel="APPROVED BY"
-      />
+        <tfoot>
+          <tr>
+            <td colSpan={NCOLS} style={{ border: 'none', padding: '8px' }}>
+              <section className="operational-report-totals" data-testid="report-totals-section">
+                <div><span>{t('report_total_qty', 'Total Qty')}</span><strong>{data?.totalQty ?? 0}</strong></div>
+                <div><span>{t('weight', 'Total Weight')}</span><strong>{data?.totalWeight ?? 0}</strong></div>
+              </section>
+              <ReportSignatureSection
+                branding={normalizedBranding}
+                language={language}
+                preparedBy={data?.preparedBy}
+                approvedBy={data?.approvedBy}
+                receivedByLabel="ISSUED / CHECKED BY"
+                deliveredByLabel="APPROVED BY"
+              />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </article>
   );
 }

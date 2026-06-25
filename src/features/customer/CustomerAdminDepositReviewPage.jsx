@@ -57,7 +57,23 @@ export function CustomerAdminDepositReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
+  const [globalSearchText, setGlobalSearchText] = useState('');
+
+  const filteredRows = rows.filter((row) => {
+    if (!globalSearchText) return true;
+    const lower = globalSearchText.toLowerCase();
+    const custName = row.customer?.name_th || row.customer?.name_en || row.customer_id;
+    return (
+      (row.request_no || '').toLowerCase().includes(lower) ||
+      (row.status || '').toLowerCase().includes(lower) ||
+      (row.vehicle_registration || '').toLowerCase().includes(lower) ||
+      (row.contact_name || '').toLowerCase().includes(lower) ||
+      (row.contact_phone || '').toLowerCase().includes(lower) ||
+      (custName || '').toLowerCase().includes(lower)
+    );
+  });
+
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(filteredRows);
 
   useEffect(() => {
     let active = true;
@@ -260,14 +276,24 @@ export function CustomerAdminDepositReviewPage() {
 
       {/* List table — hidden when accessed via direct requestId link (prevents duplicate list) */}
       <div className="table-card" style={{ display: routeRequestId ? 'none' : undefined }}>
-        <div className="table-card-header">
-          <h3>{t('admin_deposit_review_table_title')}</h3>
+        <div className="table-card-header" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ margin: 0 }}>{t('admin_deposit_review_table_title')}</h3>
+          <div style={{ flex: '1 1 200px', maxWidth: '300px' }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="ค้นหา (ทุกคอลัมน์)..."
+              value={globalSearchText}
+              onChange={(e) => setGlobalSearchText(e.target.value)}
+            />
+          </div>
         </div>
         <div className="responsive-table">
           <table className="data-table" data-testid="admin-deposit-review-table">
             <thead>
               <tr>
                 <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
+                <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>ลูกค้า {getSortIndicator('customer_id')}</th>
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th onClick={() => requestSort('expected_arrival_date')} style={{ cursor: 'pointer' }}>{t('customer_field_expected_arrival_date')} {getSortIndicator('expected_arrival_date')}</th>
                 <th>{t('customer_field_contact_name')}</th>
@@ -278,6 +304,7 @@ export function CustomerAdminDepositReviewPage() {
               {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
+                  <td>{row.customer?.name_th || row.customer?.name_en || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getDepositStatusLabel(row.status, t)}

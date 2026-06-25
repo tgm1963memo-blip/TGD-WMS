@@ -24,54 +24,84 @@ export function DeliverySlipTemplate({
     { label: t('report_remark', 'Remark'), value: data?.remark },
   ];
 
+  const NCOLS = 7;
+  const TH = { border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 };
+  const TD = { border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 };
+
   return (
-    <article className="operational-report operational-report-a4" data-testid="delivery-slip-template">
-      <DocumentHeader
-        branding={branding}
-        language={language}
-        documentTitle={t('delivery_slip_report', 'Delivery Slip')}
-        documentNo={data?.documentNo}
-        documentDate={data?.documentDate}
-      />
+    <article className="operational-report operational-report-a4" data-testid="delivery-slip-template" style={{ padding: 0 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '28%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '12%' }} />
+        </colgroup>
 
-      <ReportMetaGrid fields={metaFields} />
+        <thead>
+          {/* Document header + meta — repeats on every page */}
+          <tr>
+            <td colSpan={NCOLS} style={{ padding: '8mm', borderBottom: '2px solid #ddd' }}>
+              <DocumentHeader
+                branding={branding}
+                language={language}
+                documentTitle={t('delivery_slip_report', 'Delivery Slip')}
+                documentNo={data?.documentNo}
+                documentDate={data?.documentDate}
+              />
+              <ReportMetaGrid fields={metaFields} />
+              <h2 style={{ fontSize: 13, margin: '8px 0 4px', borderTop: '1px solid #eee', paddingTop: 8 }}>
+                {t('document_lines', 'Lines')}
+              </h2>
+            </td>
+          </tr>
+          {/* Column headers */}
+          <tr>
+            <th style={TH}>{t('lot', 'Lot No')}</th>
+            <th style={TH}>{t('location', 'Location')}</th>
+            <th style={TH}>{t('report_customer_product', 'Customer Product')}</th>
+            <th style={TH}>{t('report_item_code', 'Item Code')}</th>
+            <th style={TH}>{t('report_batch_no', 'Batch No')}</th>
+            <th style={{ ...TH, textAlign: 'right' }}>{t('report_total_weight_kg', 'Total Weight (kg)')}</th>
+            <th style={{ ...TH, textAlign: 'right' }}>{t('report_balance_total', 'Balance Total')}</th>
+          </tr>
+        </thead>
 
-      <section className="operational-report-section">
-        <h2 className="operational-report-section-title">{t('document_lines', 'Lines')}</h2>
-        <table className="operational-report-table tgd-table">
-          <thead>
-            <tr>
-              <th>{t('lot', 'Lot No')}</th>
-              <th>{t('location', 'Location')}</th>
-              <th>{t('report_customer_product', 'Customer Product')}</th>
-              <th>{t('report_item_code', 'Item Code')}</th>
-              <th>{t('report_batch_no', 'Batch No')}</th>
-              <th>{t('report_total_weight_kg', 'Total Weight (kg)')}</th>
-              <th>{t('report_balance_total', 'Balance Total')}</th>
+        <tbody>
+          {(data?.lines ?? []).map((line) => (
+            <tr key={line.id}>
+              <td style={TD}>{line.lotNo}</td>
+              <td style={TD}>{line.location}</td>
+              <td style={TD}>{line.customerProduct}</td>
+              <td style={TD}>{line.itemCode}</td>
+              <td style={TD}>{line.batchNo}</td>
+              <td style={{ ...TD, textAlign: 'right' }}>{line.totalWeightKg}</td>
+              <td style={{ ...TD, textAlign: 'right' }}>{line.balanceTotal}</td>
             </tr>
-          </thead>
-          <tbody>
-            {(data?.lines ?? []).map((line) => (
-              <tr key={line.id}>
-                <td>{line.lotNo}</td>
-                <td>{line.location}</td>
-                <td>{line.customerProduct}</td>
-                <td>{line.itemCode}</td>
-                <td>{line.batchNo}</td>
-                <td>{line.totalWeightKg}</td>
-                <td>{line.balanceTotal}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+          ))}
+        </tbody>
 
-      <section className="operational-report-totals" data-testid="report-totals-section">
-        <div><span>{t('report_total_weight_kg', 'Total Weight (kg)')}</span><strong>{data?.totalWeightKg ?? 0}</strong></div>
-        <div><span>{t('report_balance_total', 'Balance Total')}</span><strong>{data?.balanceTotal ?? 0}</strong></div>
-      </section>
-
-      <ReportSignatureSection branding={branding} language={language} />
+        <tfoot>
+          <tr>
+            <td colSpan={NCOLS} style={{ border: 'none', padding: '8px' }}>
+              <section className="operational-report-totals" data-testid="report-totals-section">
+                <div>
+                  <span>{t('report_total_weight_kg', 'Total Weight (kg)')}</span>
+                  <strong>{data?.totalWeightKg ?? 0}</strong>
+                </div>
+                <div>
+                  <span>{t('report_balance_total', 'Balance Total')}</span>
+                  <strong>{data?.balanceTotal ?? 0}</strong>
+                </div>
+              </section>
+              <ReportSignatureSection branding={branding} language={language} />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </article>
   );
 }

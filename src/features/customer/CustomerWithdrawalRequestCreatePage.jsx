@@ -62,6 +62,7 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [copySourceNo, setCopySourceNo] = useState('');
   const [copyLoading, setCopyLoading] = useState(Boolean(copyFromId) || Boolean(editId));
   const [copyError, setCopyError] = useState('');
+  const [editStatus, setEditStatus] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +145,8 @@ export function CustomerWithdrawalRequestCreatePage() {
 
         if (isRequestProxy) setProxyCustomerId(headerResult.data.customer_id ?? '');
 
+        setEditStatus(headerResult.data.status ?? null);
+
         const linesResult = await listCustomerWithdrawalRequestLines(editId);
         if (!active) return;
 
@@ -153,8 +156,10 @@ export function CustomerWithdrawalRequestCreatePage() {
         const editLines = sourceLines.map((line, index) => ({
           key: index + 1,
           lineId: line.id,
+          catalog_product_id: line.catalog_product_id ?? '',
           customer_product_code: line.customer_product_code ?? '',
           product_code: line.internal_product_code ?? '',
+          product_id: line.product_id ?? '',
           product_name: line.product_name ?? '',
           source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
           lot_no: line.source_lot_no ?? line.lot_no ?? '',
@@ -266,6 +271,11 @@ export function CustomerWithdrawalRequestCreatePage() {
       return;
     }
 
+    if (isEditMode && editStatus && editStatus !== 'WITHDRAWAL_DRAFT') {
+      setSubmitError('คำขอนี้ไม่อยู่ในสถานะร่าง ไม่สามารถแก้ไขหรือส่งได้ (สถานะ: ' + editStatus + ')');
+      return;
+    }
+
     const activeLines = getFilledWithdrawalLines(lines);
     if (!activeLines.length) {
       setSubmitError(t('customer_deposit_catalog_required'));
@@ -309,6 +319,12 @@ export function CustomerWithdrawalRequestCreatePage() {
       }
 
       requestId = createResult.data?.id;
+
+      if (!requestId) {
+        setSubmitting(false);
+        setSubmitError('ไม่สามารถสร้างคำขอได้ กรุณาลองใหม่');
+        return;
+      }
     }
 
     for (let index = 0; index < activeLines.length; index += 1) {

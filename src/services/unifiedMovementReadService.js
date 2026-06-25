@@ -39,6 +39,7 @@ const INVENTORY_MOVEMENT_SELECT = `
   customer_id,
   product_id,
   lot_id,
+  tgd_lots(lot_number),
   from_warehouse_id,
   from_location_id,
   from_pallet_id,

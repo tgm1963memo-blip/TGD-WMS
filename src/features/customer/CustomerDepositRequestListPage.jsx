@@ -20,6 +20,7 @@ export function CustomerDepositRequestListPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const PAGE_SIZE = 5;
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
@@ -63,8 +64,20 @@ export function CustomerDepositRequestListPage() {
   }, [customerId, profileLoading, isRequestProxy]);
 
   const columnCount = isRequestProxy ? 9 : 8;
-  const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
-  const pagedData = sortedData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const q = searchText.trim().toLowerCase();
+  const filteredData = q
+    ? sortedData.filter((row) => {
+        const customerName = (customerNames[row.customer_id] ?? '').toLowerCase();
+        return (
+          (row.request_no ?? '').toLowerCase().includes(q) ||
+          (row.status ?? '').toLowerCase().includes(q) ||
+          (row.note ?? '').toLowerCase().includes(q) ||
+          customerName.includes(q)
+        );
+      })
+    : sortedData;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+  const pagedData = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
 
@@ -111,6 +124,16 @@ export function CustomerDepositRequestListPage() {
       <div className="table-card">
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
+          <div style={{ marginLeft: 'auto' }}>
+            <input
+              className="form-input"
+              onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
+              placeholder="ค้นหาเลขที่ / สถานะ / หมายเหตุ..."
+              style={{ minWidth: 220 }}
+              type="text"
+              value={searchText}
+            />
+          </div>
         </div>
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
@@ -146,44 +169,46 @@ export function CustomerDepositRequestListPage() {
                     <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
                   </td>
                   <td>
-                    <div className="action-row action-row--table">
-                      <Link
-                        className="btn btn-secondary btn-sm"
-                        data-testid={`customer-deposit-view-${row.id}`}
-                        to={`/customer/deposit-request/${row.id}`}
-                      >
-                        {t('customer_request_view_button')}
-                      </Link>
-                      {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
-                        <Link
-                          className="btn btn-primary btn-sm"
-                          data-testid={`customer-deposit-edit-${row.id}`}
-                          to={`/customer/deposit-request/new?editId=${row.id}`}
-                        >
-                          {t('edit') || 'แก้ไข'}
-                        </Link>
-                      ) : null}
-                      {canWriteCustomerRequests ? (
-                        <Link
-                          className="btn btn-secondary btn-sm"
-                          data-testid={`customer-deposit-copy-${row.id}`}
-                          to={buildCustomerRequestCopyPath('/customer/deposit-request/new', row.id)}
-                        >
-                          {t('customer_request_copy_button')}
-                        </Link>
-                      ) : null}
-                      {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
-                        deleteConfirmId === row.id ? (
-                          <>
-                            <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
-                              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
-                            </button>
-                            <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
-                          </>
-                        ) : (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
-                        )
-                      ) : null}
+                    <div className="action-row action-row--table" style={{ flexWrap: 'nowrap' }}>
+                      {deleteConfirmId === row.id ? (
+                        <>
+                          <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
+                            {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                          </button>
+                          <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            className="btn btn-secondary btn-sm"
+                            data-testid={`customer-deposit-view-${row.id}`}
+                            to={`/customer/deposit-request/${row.id}`}
+                          >
+                            {t('customer_request_view_button')}
+                          </Link>
+                          {(row.status === 'DRAFT' || row.status === 'WITHDRAWAL_DRAFT' || row.status === 'DEPOSIT_DRAFT') && canWriteCustomerRequests ? (
+                            <Link
+                              className="btn btn-primary btn-sm"
+                              data-testid={`customer-deposit-edit-${row.id}`}
+                              to={`/customer/deposit-request/new?editId=${row.id}`}
+                            >
+                              {t('edit') || 'แก้ไข'}
+                            </Link>
+                          ) : null}
+                          {canWriteCustomerRequests ? (
+                            <Link
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-deposit-copy-${row.id}`}
+                              to={buildCustomerRequestCopyPath('/customer/deposit-request/new', row.id)}
+                            >
+                              {t('customer_request_copy_button')}
+                            </Link>
+                          ) : null}
+                          {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
+                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -198,7 +223,7 @@ export function CustomerDepositRequestListPage() {
         {totalPages > 1 && (
           <div className="action-row" style={{ justifyContent: 'center', padding: '12px 0', gap: 8 }}>
             <button className="btn btn-secondary btn-sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)} type="button">‹ ก่อนหน้า</button>
-            <span style={{ fontSize: 13, padding: '4px 8px' }}>{currentPage} / {totalPages} (ทั้งหมด {sortedData.length} รายการ)</span>
+            <span style={{ fontSize: 13, padding: '4px 8px' }}>{currentPage} / {totalPages} (ทั้งหมด {filteredData.length} รายการ)</span>
             <button className="btn btn-secondary btn-sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} type="button">ถัดไป ›</button>
           </div>
         )}

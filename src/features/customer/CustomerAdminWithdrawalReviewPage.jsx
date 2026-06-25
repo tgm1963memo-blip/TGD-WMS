@@ -42,7 +42,23 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
+  const [globalSearchText, setGlobalSearchText] = useState('');
+
+  const filteredRows = rows.filter((row) => {
+    if (!globalSearchText) return true;
+    const lower = globalSearchText.toLowerCase();
+    const custName = row.customer?.name_th || row.customer?.name_en || row.customer_id;
+    return (
+      (row.withdrawal_no || '').toLowerCase().includes(lower) ||
+      (row.status || '').toLowerCase().includes(lower) ||
+      (row.delivery_type || '').toLowerCase().includes(lower) ||
+      (row.pickup_contact || '').toLowerCase().includes(lower) ||
+      (row.destination || '').toLowerCase().includes(lower) ||
+      (custName || '').toLowerCase().includes(lower)
+    );
+  });
+
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(filteredRows);
 
   useEffect(() => {
     let active = true;
@@ -225,14 +241,24 @@ export function CustomerAdminWithdrawalReviewPage() {
 
       {/* List table */}
       <div className="table-card">
-        <div className="table-card-header">
-          <h3>{t('admin_withdrawal_review_table_title')}</h3>
+        <div className="table-card-header" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ margin: 0 }}>{t('admin_withdrawal_review_table_title')}</h3>
+          <div style={{ flex: '1 1 200px', maxWidth: '300px' }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="ค้นหา (ทุกคอลัมน์)..."
+              value={globalSearchText}
+              onChange={(e) => setGlobalSearchText(e.target.value)}
+            />
+          </div>
         </div>
         <div className="responsive-table">
           <table className="data-table" data-testid="admin-withdrawal-review-table">
             <thead>
               <tr>
-                <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
+                <th onClick={() => requestSort('withdrawal_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('withdrawal_no')}</th>
+                <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>ลูกค้า {getSortIndicator('customer_id')}</th>
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th>{t('customer_field_requested_dispatch_date')}</th>
                 <th>{t('customer_field_delivery_type')}</th>
@@ -243,6 +269,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.withdrawal_no}</td>
+                  <td>{row.customer?.name_th || row.customer?.name_en || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getWithdrawalStatusLabel(row.status, t)}

@@ -725,6 +725,15 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
   background: var(--tgm-gray-light);
 }
 
+@page {
+  @bottom-right {
+    content: "หน้า " counter(page);
+    font-size: 8pt;
+    font-family: sans-serif;
+    color: #555;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -755,12 +764,28 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
     box-shadow: none;
     margin: 0;
     max-width: none;
-    page-break-after: always;
+    padding: 8mm;
     width: 100%;
   }
 
+  /* Allow table to break across pages; thead repeats automatically */
   .operational-report-table {
+    page-break-inside: auto;
+    overflow: visible;
+  }
+
+  .operational-report-table thead {
+    display: table-header-group;
+  }
+
+  .operational-report-table tbody tr {
     page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Hide overflow wrappers in print - table must scale to page */
+  .operational-report-section > div[style*="overflow"] {
+    overflow: visible !important;
   }
 }
 
@@ -1718,14 +1743,43 @@ table .status-badge,
 @media print {
   @page {
     size: A4 landscape;
-    margin: 5mm;
+    margin: 8mm;
+    @bottom-right {
+      content: "หน้า " counter(page);
+      font-size: 8pt;
+      font-family: sans-serif;
+      color: #555;
+    }
   }
+
   .operational-report-a4-landscape {
     box-shadow: none;
     margin: 0;
     max-width: none;
-    page-break-after: always;
+    padding: 0;
     width: 100%;
+  }
+
+  .operational-report-a4-landscape .report-print-table {
+    font-size: 8pt;
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .operational-report-a4-landscape .report-print-table th,
+  .operational-report-a4-landscape .report-print-table td {
+    padding: 2px 3px;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .operational-report-a4-landscape .report-print-table thead {
+    display: table-header-group;
+  }
+
+  .operational-report-a4-landscape .report-print-table tbody tr {
+    page-break-inside: avoid;
   }
 }
 

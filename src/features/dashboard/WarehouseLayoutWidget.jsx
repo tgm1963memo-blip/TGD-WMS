@@ -222,6 +222,7 @@ export function WarehouseLayoutWidget() {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [customerMap, setCustomerMap] = useState({});
   const [productMap, setProductMap] = useState({});
@@ -230,9 +231,10 @@ export function WarehouseLayoutWidget() {
   const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     getSectionsWithOccupancy().then(({ data }) => {
       setSections(data ?? []);
-      if (data?.length) setSelectedId(data[0].id);
+      if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
       setLoading(false);
     });
     Promise.all([getCustomers({ isActive: true }), getProducts({ isActive: true })]).then(
@@ -245,7 +247,7 @@ export function WarehouseLayoutWidget() {
         setProductMap(pMap);
       }
     );
-  }, []);
+  }, [refreshKey]);
 
   function handleLocClick(locId, locCode) {
     setStockModal({ locId, locCode });
@@ -259,7 +261,7 @@ export function WarehouseLayoutWidget() {
 
   const selected = sections.find((s) => s.id === selectedId) ?? sections[0];
 
-  if (loading) {
+  if (loading && sections.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>กำลังโหลดผังคลัง...</div>
     );
@@ -311,17 +313,30 @@ export function WarehouseLayoutWidget() {
               {sec.name}
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => navigate('/admin/warehouse-locations')}
-            style={{
-              padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
-              background: '#fff', cursor: 'pointer', fontSize: 12, color: '#64748b',
-              marginLeft: 'auto',
-            }}
-          >
-            ⚙ ตั้งค่า Location
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              disabled={loading}
+              style={{
+                padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
+                background: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: '#64748b',
+              }}
+              title="รีเฟรชผังคลัง"
+            >
+              {loading ? '⟳ กำลังโหลด...' : '⟳ รีเฟรช'}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/warehouse-locations')}
+              style={{
+                padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
+                background: '#fff', cursor: 'pointer', fontSize: 12, color: '#64748b',
+              }}
+            >
+              ⚙ ตั้งค่า Location
+            </button>
+          </div>
         </div>
 
         {/* Date + legend */}

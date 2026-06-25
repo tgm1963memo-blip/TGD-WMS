@@ -34,7 +34,7 @@ export function mapReceivingDocumentToReportData(document) {
     documentNo: document?.document_no ?? document?.receiving_no ?? document?.id ?? '-',
     lines: lines.map((line, index) => ({
       id: line.id ?? `line-${index}`,
-      lotNo: line.lot_no ?? line.lot_id ?? '-',
+      lotNo: line.lot_no || '-',
       customerProduct: line.customer_product ?? line.product_name ?? line.product_id ?? '-',
       code: line.product_code ?? line.code ?? line.product_id ?? '-',
       qty: line.quantity ?? line.received_qty ?? line.expected_qty ?? '-',
@@ -59,7 +59,7 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
     documentDate: formatDate(document.requested_ship_date ?? document.created_at),
     lines: lines.map((line, index) => ({
       id: line.id ?? `line-${index}`,
-      lotNo: line.lot_no ?? line.lot_id ?? '-',
+      lotNo: line.lot_no || '-',
       location: line.location_id ?? line.from_location_id ?? '-',
       customerProduct: line.customer_product ?? line.product_name ?? line.product_id ?? '-',
       itemCode: line.product_code ?? line.product_id ?? '-',
@@ -92,7 +92,7 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
       date: formatDate(row.movement_date ?? row.created_at),
       receivedDate: isInbound ? formatDate(row.movement_date ?? row.created_at) : '-',
       deliveryDate: isOutbound ? formatDate(row.movement_date ?? row.created_at) : '-',
-      lotNo: row.lot_no ?? row.lot_id ?? '-',
+      lotNo: row.lot_no || '-',
       customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
       descCode: row.product_code ?? row.customer_product_code ?? '-',
       weightKg: weight || '-',
