@@ -881,6 +881,8 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_withdrawal_status_submitted: { th: 'ลูกค้าส่งแล้ว', en: 'Submitted' },
   customer_withdrawal_status_admin_reviewing: { th: 'ธุรการตรวจสอบ', en: 'Admin reviewing' },
   customer_withdrawal_status_admin_accepted: { th: 'ธุรการอนุมัติแล้ว', en: 'Approved' },
+  customer_withdrawal_status_warehouse_picking: { th: 'กำลังจัดสินค้า', en: 'Picking' },
+  customer_withdrawal_status_admin_rejected: { th: 'ถูกปฏิเสธ', en: 'Rejected' },
   customer_withdrawal_status_dispatched: { th: 'จัดส่งแล้ว', en: 'Dispatched' },
   customer_withdrawal_status_completed: { th: 'เสร็จสิ้น', en: 'Completed' },
   customer_withdrawal_status_cancelled: { th: 'ยกเลิก', en: 'Cancelled' },

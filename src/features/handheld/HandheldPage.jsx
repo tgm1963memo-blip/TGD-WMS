@@ -1286,7 +1286,7 @@ function PickingWorkflow({ onBack, t }) {
                   color: C.pickAccent, fontSize: 13, fontWeight: 800, marginBottom: 12,
                   textTransform: 'uppercase', letterSpacing: '0.08em'
                 }}>
-                  หยิบแล้วล่าสุด ({confirmed.length})
+                  จัดแล้วล่าสุด ({confirmed.length})
                 </div>
                 {confirmed.slice(0, 3).map((item, i) => <ConfirmedChip key={i} item={item} />)}
               </div>
@@ -1297,7 +1297,7 @@ function PickingWorkflow({ onBack, t }) {
             {sortedLines.map((l, i) => {
               const done = isDone(l);
               const pickedLabel = done
-                ? `หยิบแล้ว${l.picked_boxes != null ? ` · ${l.picked_boxes} กล่อง` : ''}${l.picked_weight != null ? ` / ${l.picked_weight} กก.` : ''}`
+                ? `จัดแล้ว${l.picked_boxes != null ? ` · ${l.picked_boxes} กล่อง` : ''}${l.picked_weight != null ? ` / ${Number(l.picked_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.` : ''}`
                 : '';
               return (
                 <LineListItem key={l.id} line={l} index={i} isDone={done}

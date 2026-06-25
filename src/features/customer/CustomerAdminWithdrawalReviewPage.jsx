@@ -398,6 +398,9 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td style={{ textAlign: 'right' }}>
                           {line.picked_at != null ? (
                             <div style={{ lineHeight: 1.6 }}>
+                              <div style={{ display: 'inline-block', background: '#ecfdf5', color: '#059669', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800, marginBottom: 4 }}>
+                                ✓ จัดแล้ว
+                              </div>
                               {line.picked_boxes != null && (
                                 <div style={{ fontWeight: 700, color: '#059669' }}>
                                   {line.picked_boxes} กล่อง
@@ -416,7 +419,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </div>
                           ) : (
                             <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
-                              {t('pending')}
+                              รอดำเนินการ
                             </span>
                           )}
                         </td>
