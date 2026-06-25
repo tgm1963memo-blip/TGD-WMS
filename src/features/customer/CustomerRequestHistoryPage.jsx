@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -100,6 +101,8 @@ function getRequestDetailPath(row) {
 }
 
 export function CustomerRequestHistoryPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
+
   const t = useTranslation();
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
@@ -138,8 +141,8 @@ export function CustomerRequestHistoryPage() {
   }, [customerId, profileLoading]);
 
   const filteredRows = useMemo(
-    () => filterRequestHistoryRows(state.rows, filters),
-    [state.rows, filters],
+    () => filterRequestHistoryRows(sortedData, filters),
+    [sortedData, filters],
   );
 
   function updateFilter(field, value) {
@@ -247,7 +250,7 @@ export function CustomerRequestHistoryPage() {
               {t('filter_reset')}
             </button>
             <span className="form-helper" data-testid="customer-history-filter-count">
-              {filteredRows.length} / {state.rows.length} {t('customer_history_results_label')}
+              {filteredRows.length} / {sortedData.length} {t('customer_history_results_label')}
             </span>
           </div>
         </div>
@@ -256,12 +259,12 @@ export function CustomerRequestHistoryPage() {
           <table className="data-table" data-testid="customer-request-history-table">
             <thead>
               <tr>
-                <th>{t('customer_col_request_no')}</th>
+                <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
                 <th>{t('customer_col_request_type')}</th>
-                <th>{t('customer_col_status')}</th>
+                <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th>{t('customer_col_requested_date')}</th>
-                <th>{t('customer_col_note')}</th>
-                <th>{t('customer_history_latest_action')}</th>
+                <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>{t('customer_col_note')} {getSortIndicator('note')}</th>
+                <th onClick={() => requestSort('updated_at')} style={{ cursor: 'pointer' }}>{t('customer_history_latest_action')} {getSortIndicator('updated_at')}</th>
                 <th>{t('customer_history_status_timeline')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>

@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -31,6 +32,8 @@ function formatDate(iso) {
 }
 
 export function CustomerStockBalancePage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
+
   const t = useTranslation();
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
   const [lines, setLines] = useState([]);

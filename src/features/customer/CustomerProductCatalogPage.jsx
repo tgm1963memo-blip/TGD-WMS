@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DataTable } from '../../components/ui/DataTable.jsx';
@@ -42,6 +43,8 @@ function RequiredLabel({ children }) {
 }
 
 export function CustomerProductCatalogPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
+
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [products, setProducts] = useState([]);

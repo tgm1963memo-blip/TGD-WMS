@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -12,6 +13,8 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerDepositRequestListPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
+
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
@@ -92,19 +95,19 @@ export function CustomerDepositRequestListPage() {
           <table className="data-table" data-testid="customer-deposit-list-table">
             <thead>
               <tr>
-                <th>{t('customer_col_request_no')}</th>
-                {isRequestProxy ? <th>{t('customer_col_customer_name')}</th> : null}
-                <th>{t('customer_col_status')}</th>
-                <th>{t('customer_field_expected_arrival_date')}</th>
-                <th>{t('customer_field_contact_name')}</th>
-                <th>{t('customer_field_contact_phone')}</th>
-                <th>{t('customer_col_note')}</th>
-                <th>{t('customer_history_latest_action')}</th>
+                <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
+                {isRequestProxy ? <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>{t('customer_col_customer_name')} {getSortIndicator('customer_id')}</th> : null}
+                <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
+                <th onClick={() => requestSort('expected_arrival_date')} style={{ cursor: 'pointer' }}>{t('customer_field_expected_arrival_date')} {getSortIndicator('expected_arrival_date')}</th>
+                <th onClick={() => requestSort('contact_name')} style={{ cursor: 'pointer' }}>{t('customer_field_contact_name')} {getSortIndicator('contact_name')}</th>
+                <th onClick={() => requestSort('contact_phone')} style={{ cursor: 'pointer' }}>{t('customer_field_contact_phone')} {getSortIndicator('contact_phone')}</th>
+                <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>{t('customer_col_note')} {getSortIndicator('note')}</th>
+                <th onClick={() => requestSort('updated_at')} style={{ cursor: 'pointer' }}>{t('customer_history_latest_action')} {getSortIndicator('updated_at')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {state.rows.length ? state.rows.map((row) => (
+              {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}

@@ -1,3 +1,4 @@
+import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -22,6 +23,8 @@ const INITIAL_FORM = {
 };
 
 export function CustomerFacilityUsageRequestPage() {
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
+
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [rows, setRows] = useState([]);

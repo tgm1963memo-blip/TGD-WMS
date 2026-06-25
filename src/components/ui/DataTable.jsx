@@ -3,6 +3,7 @@ import { ErrorState } from './ErrorState.jsx';
 import { LoadingState } from './LoadingState.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate, isDateColumnKey, isMetaColumnKey, shouldUseDateOnlyFormat } from '../../utils/documentDisplayUtils.js';
+import { useTableSort } from '../../hooks/useTableSort.js';
 
 function renderDefaultCell(column, row) {
   const value = row[column.key];
@@ -32,6 +33,7 @@ function renderDefaultCell(column, row) {
 
 export function DataTable({ columns, data = [], loading = false, error = null, emptyMessage = 'No records found.', testId }) {
   const t = useTranslation();
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(data);
 
   if (loading) {
     return <LoadingState />;
@@ -53,12 +55,16 @@ export function DataTable({ columns, data = [], loading = false, error = null, e
             {columns.map((column) => {
               const fallbackKey = column.header.toLowerCase().replace(/ /g, '_');
               const headerLabel = t(column.key) || t(fallbackKey) || column.header;
-              return <th key={column.key}>{headerLabel}</th>;
+              return (
+                <th key={column.key} onClick={() => requestSort(column.key)} style={{ cursor: 'pointer' }}>
+                  {headerLabel} {getSortIndicator(column.key)}
+                </th>
+              );
             })}
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
+          {sortedData.map((row) => (
             <tr key={row.id}>
               {columns.map((column) => (
                 <td key={column.key} className={column.truncate ? 'cell-nowrap' : undefined}>
