@@ -82,7 +82,7 @@ export function InventoryMovementReportTemplate({
           <table className="operational-report-table tgd-table" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
             <thead>
               <tr>
-                <th rowSpan={2} style={{ textAlign: 'center' }}>{t('date', 'DATE')}</th>
+                <th rowSpan={2} style={{ textAlign: 'center' }}>{t('no', 'NO.')}</th>
                 <th rowSpan={2} style={{ textAlign: 'center' }}>{t('report_received_date', 'RECEIVED\nDATE')}</th>
                 <th rowSpan={2} style={{ textAlign: 'center' }}>{t('report_delivery_date', 'DELIVERY\nDATE')}</th>
                 <th rowSpan={2}>{t('lot', 'LOT-NO')}</th>
@@ -108,9 +108,9 @@ export function InventoryMovementReportTemplate({
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
+              {lines.map((line, index) => (
                 <tr key={line.id}>
-                  <td style={{ textAlign: 'center' }}>{line.date}</td>
+                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
                   <td style={{ textAlign: 'center' }}>{line.receivedDate}</td>
                   <td style={{ textAlign: 'center' }}>{line.deliveryDate}</td>
                   <td>{line.lotNo}</td>
