@@ -11,7 +11,7 @@ import { ReportPrintActions } from '../../components/reports/ReportPrintActions.
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
-import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines } from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines, cancelCustomerWithdrawalRequest } from '../../services/customerWithdrawalRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -25,6 +25,8 @@ export function CustomerWithdrawalRequestListPage() {
   const [detailRow, setDetailRow] = useState(null);
   const [detailLines, setDetailLines] = useState([]);
   const [detailLinesLoading, setDetailLinesLoading] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
   const branding = getDocumentBrandingConfig();
 
@@ -68,6 +70,22 @@ export function CustomerWithdrawalRequestListPage() {
   }, [customerId, profileLoading, isRequestProxy]);
 
   const columnCount = isRequestProxy ? 9 : 8;
+  const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
+
+  async function handleDelete(requestId) {
+    setDeleting(true);
+    const result = await cancelCustomerWithdrawalRequest(requestId, 'ลบโดยผู้ใช้งาน');
+    setDeleting(false);
+    setDeleteConfirmId(null);
+    if (result.error) {
+      setState((current) => ({ ...current, error: result.error }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'CANCELLED' } : r),
+    }));
+  }
 
   function openDetail(row) {
     setDetailRow(row);
@@ -178,6 +196,18 @@ export function CustomerWithdrawalRequestListPage() {
                         >
                           {t('customer_request_copy_button')}
                         </Link>
+                      ) : null}
+                      {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
+                        deleteConfirmId === row.id ? (
+                          <>
+                            <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
+                              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                            </button>
+                            <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
+                        )
                       ) : null}
                     </div>
                   </td>

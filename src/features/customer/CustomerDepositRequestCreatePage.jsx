@@ -307,8 +307,7 @@ export function CustomerDepositRequestCreatePage() {
     }
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  async function saveFormData(shouldSubmit) {
     setSubmitError('');
 
     if (!canWriteCustomerRequests) {
@@ -400,6 +399,12 @@ export function CustomerDepositRequestCreatePage() {
       }
     }
 
+    if (!shouldSubmit) {
+      setSubmitting(false);
+      navigate(`/customer/deposit-request/${requestId}`);
+      return;
+    }
+
     const submitResult = await submitCustomerDepositRequest(requestId);
     setSubmitting(false);
 
@@ -410,6 +415,16 @@ export function CustomerDepositRequestCreatePage() {
 
     setSubmitted(true);
     setTimeout(() => navigate('/customer/deposit-request'), 2500);
+  }
+
+  async function handleSaveDraft(event) {
+    event.preventDefault();
+    await saveFormData(false);
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    await saveFormData(true);
   }
 
   return (
@@ -555,9 +570,11 @@ export function CustomerDepositRequestCreatePage() {
 
         <div className="action-row customer-portal-form-actions">
           <Link className="btn btn-secondary" to="/customer/deposit-request">{t('close')}</Link>
-          <button className="btn btn-secondary" onClick={resetForm} type="button">{t('filter_reset')}</button>
+          <button className="btn btn-secondary" data-testid="customer-deposit-save-draft-button" disabled={submitting || importing} onClick={handleSaveDraft} type="button">
+            {submitting ? t('customer_deposit_submitting') : 'บันทึกร่าง'}
+          </button>
           <button className="btn btn-primary" data-testid="customer-deposit-submit-button" disabled={submitting || importing} type="submit">
-            {submitting ? t('customer_deposit_submitting') : t('customer_deposit_submit')}
+            {submitting ? t('customer_deposit_submitting') : 'ส่งยืนยันการแจ้งฝาก'}
           </button>
         </div>
       </form>

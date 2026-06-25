@@ -249,10 +249,12 @@ export function CustomerWithdrawalRequestCreatePage() {
     setSubmitError('');
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitError('');
+  function normalizeLotNo(rawLot) {
+    return rawLot === '__null_lot__' ? '' : (rawLot || null);
+  }
 
+  async function saveFormData(shouldSubmit) {
+    setSubmitError('');
 
     if (!canWriteCustomerRequests) {
       setSubmitError(t('customer_portal_no_customer_scope'));
@@ -311,15 +313,16 @@ export function CustomerWithdrawalRequestCreatePage() {
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
+      const normalizedLot = normalizeLotNo(line.lot_no);
       const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
         lineId: line.lineId ?? null,
         lineNo: index + 1,
         sourceDepositRequestId: line.source_deposit_request_id || null,
-        sourceLotNo: line.lot_no,
+        sourceLotNo: normalizedLot,
         customerProductCode: line.customer_product_code,
         internalProductCode: line.product_code,
         productName: line.product_name,
-        lotNo: line.lot_no,
+        lotNo: normalizedLot,
         mfgDate: line.mfg_date || null,
         expDate: line.exp_date || null,
         requestedQty: line.requested_qty,
@@ -344,6 +347,12 @@ export function CustomerWithdrawalRequestCreatePage() {
       }
     }
 
+    if (!shouldSubmit) {
+      setSubmitting(false);
+      navigate(`/customer/withdrawal-request/${requestId}`);
+      return;
+    }
+
     const submitResult = await submitCustomerWithdrawalRequest(requestId);
     setSubmitting(false);
 
@@ -353,6 +362,16 @@ export function CustomerWithdrawalRequestCreatePage() {
     }
 
     navigate('/customer/withdrawal-request');
+  }
+
+  async function handleSaveDraft(event) {
+    event.preventDefault();
+    await saveFormData(false);
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    await saveFormData(true);
   }
 
   return (
@@ -436,8 +455,11 @@ export function CustomerWithdrawalRequestCreatePage() {
         </div>
         <div className="action-row customer-portal-form-actions">
           <Link className="btn btn-secondary" to="/customer/withdrawal-request">{t('close')}</Link>
+          <button className="btn btn-secondary" data-testid="customer-withdrawal-save-draft-button" disabled={submitting} onClick={handleSaveDraft} type="button">
+            {submitting ? t('customer_withdrawal_submitting') : 'บันทึกร่าง'}
+          </button>
           <button className="btn btn-primary" data-testid="customer-withdrawal-submit-button" disabled={submitting} type="submit">
-            {submitting ? t('customer_withdrawal_submitting') : t('customer_withdrawal_submit')}
+            {submitting ? t('customer_withdrawal_submitting') : 'ส่งยืนยันการแจ้งเบิก'}
           </button>
         </div>
       </form>

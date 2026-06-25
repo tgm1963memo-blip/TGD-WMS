@@ -3,6 +3,8 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
+const NULL_LOT_SENTINEL = '__null_lot__';
+
 export function CustomerWithdrawalLinesTable({
   customerId,
   depositOptions = [],
@@ -35,15 +37,13 @@ export function CustomerWithdrawalLinesTable({
     };
   }, [customerId]);
 
-  // Collect all deposit lines across all deposits for LOT lookup
   const allDepositLines = useMemo(() => Object.values(depositLinesMap).flat(), [depositLinesMap]);
 
-  // Filter catalog products to only show those with remaining balance
   const availableCatalogProducts = useMemo(() => {
     return catalogProducts.filter((product) => {
-      const pLines = allDepositLines.filter((dl) => 
+      const pLines = allDepositLines.filter((dl) =>
         (product.customer_product_code && dl.customer_product_code === product.customer_product_code) ||
-        (product.product_name && dl.product_name === product.product_name)
+        (product.product_name && dl.product_name === product.product_name),
       );
       const balance = pLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
       return balance > 0;
@@ -81,17 +81,19 @@ export function CustomerWithdrawalLinesTable({
     });
   }
 
-  function selectLotFromBalance(line, lotNo) {
-    if (!lotNo) {
+  function selectLotFromBalance(line, lotValue) {
+    if (!lotValue) {
       updateLine(line.key, { lot_no: '', mfg_date: '', exp_date: '' });
       return;
     }
+    const isNullLot = lotValue === NULL_LOT_SENTINEL;
     const matchedDepositLine = allDepositLines.find(
-      (dl) => dl.lot_no === lotNo &&
+      (dl) =>
+        (isNullLot ? !dl.lot_no : dl.lot_no === lotValue) &&
         (dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name),
     );
     updateLine(line.key, {
-      lot_no: lotNo,
+      lot_no: lotValue,
       mfg_date: matchedDepositLine?.mfg_date ?? '',
       exp_date: matchedDepositLine?.exp_date ?? '',
     });
@@ -138,24 +140,23 @@ export function CustomerWithdrawalLinesTable({
           {lines.map((line, index) => {
             const rowTestId = index === 0 ? 'customer-withdrawal-line-0' : `customer-withdrawal-line-${line.key}`;
 
-            // Available LOTs for this line's product from all deposit lines
-            const availableLots = allDepositLines.filter(
-              (dl) => dl.lot_no &&
-                (dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name),
-            );
-            const uniqueLots = [...new Set(availableLots.map((dl) => dl.lot_no))];
-
-            // Available deposits filtered by source_deposit_request_id if set
+            // Source deposit lines (filtered by selected deposit or all)
             const sourceDepositLines = line.source_deposit_request_id
               ? (depositLinesMap[line.source_deposit_request_id] ?? [])
               : allDepositLines;
-            const lotsForSource = [...new Set(
-              sourceDepositLines
-                .filter((dl) => dl.lot_no &&
-                  (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name))
-                .map((dl) => dl.lot_no),
-            )];
-            const displayLots = lotsForSource.length > 0 ? lotsForSource : uniqueLots;
+
+            // Product-matching lines including null-lot entries
+            const productMatchedLines = sourceDepositLines.filter((dl) =>
+              !line.customer_product_code ||
+              dl.customer_product_code === line.customer_product_code ||
+              dl.product_name === line.product_name,
+            );
+
+            const hasNullLot = productMatchedLines.some((dl) => !dl.lot_no);
+            const displayLots = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
+
+            const effectiveLotNo = line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '');
+            const isNullLotSelected = line.lot_no === NULL_LOT_SENTINEL;
 
             return (
               <tr data-testid={rowTestId} key={line.key}>
@@ -190,9 +191,9 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
-                {/* LOT dropdown from balance */}
+                {/* LOT dropdown including null-lot deposits */}
                 <td>
-                  {displayLots.length > 0 ? (
+                  {displayLots.length > 0 || hasNullLot ? (
                     <select
                       className="form-control form-control-table"
                       data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
@@ -200,6 +201,9 @@ export function CustomerWithdrawalLinesTable({
                       onChange={(e) => selectLotFromBalance(line, e.target.value)}
                     >
                       <option value="">— เลือก LOT —</option>
+                      {hasNullLot && (
+                        <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
+                      )}
                       {displayLots.map((lot) => (
                         <option key={lot} value={lot}>{lot}</option>
                       ))}
@@ -210,13 +214,13 @@ export function CustomerWithdrawalLinesTable({
                       data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
                       type="text"
                       placeholder="เลข LOT"
-                      value={line.lot_no || ''}
+                      value={line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '')}
                       onChange={(e) => updateLine(line.key, { lot_no: e.target.value })}
                     />
                   )}
                 </td>
 
-                {/* Mfg date (auto-filled or editable) */}
+                {/* Mfg date */}
                 <td>
                   <input
                     className="form-control form-control-table"
@@ -226,7 +230,7 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
-                {/* Exp date (auto-filled or editable) */}
+                {/* Exp date */}
                 <td>
                   <input
                     className="form-control form-control-table"
@@ -236,25 +240,21 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
-                {/* Weight */}
+                {/* Weight with balance validation */}
                 <td>
                   {(() => {
-                    const productAllLines = allDepositLines.filter((dl) =>
-                      (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name)
-                    );
-                    
                     const lotsBalance = {};
-                    productAllLines.forEach((dl) => {
+                    productMatchedLines.forEach((dl) => {
                       const l = dl.lot_no || 'ไม่ระบุ';
                       if (!lotsBalance[l]) lotsBalance[l] = 0;
                       lotsBalance[l] += (Number(dl.actual_weight) || Number(dl.expected_weight) || 0);
                     });
 
-                    const balanceLines = lotsForSource.length > 0
-                      ? sourceDepositLines.filter((dl) => dl.lot_no === line.lot_no || !line.lot_no)
-                      : allDepositLines.filter((dl) =>
-                          (!line.customer_product_code || dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name) &&
-                          (!line.lot_no || dl.lot_no === line.lot_no));
+                    const balanceLines = productMatchedLines.filter((dl) => {
+                      if (isNullLotSelected) return !dl.lot_no;
+                      if (!effectiveLotNo) return true;
+                      return dl.lot_no === effectiveLotNo;
+                    });
                     const maxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
                     const exceedsBalance = maxBalance > 0 && Number(line.requested_weight) > maxBalance;
                     return (
@@ -272,7 +272,7 @@ export function CustomerWithdrawalLinesTable({
                         {exceedsBalance && (
                           <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>
                             <div>เกินยอดคงเหลือ (มี {maxBalance.toFixed(2)} กก.)</div>
-                            {Object.entries(lotsBalance).length > 0 && (
+                            {Object.keys(lotsBalance).length > 0 && (
                               <div style={{ marginTop: 4, padding: '4px', background: '#fee2e2', borderRadius: '4px' }}>
                                 <div style={{ fontWeight: 700, marginBottom: 2 }}>คงเหลือแต่ละ LOT:</div>
                                 {Object.entries(lotsBalance).map(([l, b]) => (

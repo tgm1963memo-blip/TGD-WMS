@@ -1,4 +1,5 @@
 import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
+import { supabase } from './supabaseClient.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -100,6 +101,64 @@ export async function getMovementTypeBreakdown(filters = {}) {
   }
 
   return { data: groupByMovementType(data ?? []), error: null };
+}
+
+export async function getConfirmedDepositReceiptRows(filters = {}) {
+  if (!supabase) return { data: [], error: null };
+
+  let query = supabase
+    .from('tgd_customer_deposit_requests')
+    .select(`
+      id, request_no, customer_id, status, expected_arrival_date, last_action_at,
+      tgd_customer_deposit_request_lines(
+        id, line_no, product_id, customer_product_code, product_name, lot_no,
+        actual_boxes, actual_weight, location_id
+      )
+    `)
+    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
+
+  if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+  if (filters.dateFrom) query = query.gte('expected_arrival_date', filters.dateFrom);
+  if (filters.dateTo) query = query.lte('expected_arrival_date', filters.dateTo);
+
+  const { data, error } = await query;
+  if (error) return { data: [], error };
+
+  const rows = [];
+  for (const req of (data ?? [])) {
+    const receiptDate = req.expected_arrival_date ??
+      (req.last_action_at ? req.last_action_at.split('T')[0] : null);
+
+    const confirmedLines = (req.tgd_customer_deposit_request_lines ?? [])
+      .filter((l) => l.actual_boxes != null && Number(l.actual_boxes) > 0);
+
+    for (const line of confirmedLines) {
+      rows.push({
+        id: `deposit-${line.id}`,
+        ledger_source: 'stock_ledger',
+        movement_type: 'RECEIVE_CONFIRM',
+        movement_type_raw: 'RECEIVE_CONFIRM',
+        movement_type_canonical: 'RECEIVE_CONFIRM',
+        movement_date: receiptDate,
+        customer_id: req.customer_id,
+        product_id: line.product_id ?? null,
+        lot_id: null,
+        lot_no: line.lot_no ?? null,
+        qty: Number(line.actual_boxes),
+        quantity: Number(line.actual_boxes),
+        weight: Number(line.actual_weight ?? 0),
+        uom: 'กล่อง',
+        product_name: line.product_name ?? line.customer_product_code ?? null,
+        customer_product_code: line.customer_product_code ?? null,
+        from_warehouse_id: null,
+        to_warehouse_id: 'RECEIVE',
+        source_document_no: req.request_no,
+        remark: req.request_no,
+      });
+    }
+  }
+
+  return { data: rows, error: null };
 }
 
 export async function getMovementByReference(filters = {}) {

@@ -6,7 +6,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { listCustomerDepositRequests } from '../../services/customerDepositRequestService.js';
+import { listCustomerDepositRequests, cancelCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -17,6 +17,10 @@ export function CustomerDepositRequestListPage() {
   const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const PAGE_SIZE = 5;
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
   useEffect(() => {
@@ -59,6 +63,25 @@ export function CustomerDepositRequestListPage() {
   }, [customerId, profileLoading, isRequestProxy]);
 
   const columnCount = isRequestProxy ? 9 : 8;
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
+  const pagedData = sortedData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
+
+  async function handleDelete(requestId) {
+    setDeleting(true);
+    const result = await cancelCustomerDepositRequest(requestId, 'ลบโดยผู้ใช้งาน');
+    setDeleting(false);
+    setDeleteConfirmId(null);
+    if (result.error) {
+      setState((current) => ({ ...current, error: result.error }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'CANCELLED' } : r),
+    }));
+  }
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-deposit-request-page">
@@ -106,7 +129,7 @@ export function CustomerDepositRequestListPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedData.length ? sortedData.map((row) => (
+              {pagedData.length ? pagedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
@@ -149,6 +172,18 @@ export function CustomerDepositRequestListPage() {
                           {t('customer_request_copy_button')}
                         </Link>
                       ) : null}
+                      {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
+                        deleteConfirmId === row.id ? (
+                          <>
+                            <button className="btn btn-danger btn-sm" disabled={deleting} onClick={() => handleDelete(row.id)} type="button">
+                              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                            </button>
+                            <button className="btn btn-secondary btn-sm" disabled={deleting} onClick={() => setDeleteConfirmId(null)} type="button">ยกเลิก</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>
+                        )
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -160,6 +195,13 @@ export function CustomerDepositRequestListPage() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="action-row" style={{ justifyContent: 'center', padding: '12px 0', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)} type="button">‹ ก่อนหน้า</button>
+            <span style={{ fontSize: 13, padding: '4px 8px' }}>{currentPage} / {totalPages} (ทั้งหมด {sortedData.length} รายการ)</span>
+            <button className="btn btn-secondary btn-sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} type="button">ถัดไป ›</button>
+          </div>
+        )}
       </div>
     </section>
   );

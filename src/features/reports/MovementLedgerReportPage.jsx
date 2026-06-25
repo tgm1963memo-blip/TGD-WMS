@@ -10,6 +10,7 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
   getMovementLedgerRows,
+  getConfirmedDepositReceiptRows,
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
@@ -79,30 +80,58 @@ export function MovementLedgerReportPage() {
       referenceType: committedFilters.referenceType || undefined,
     };
 
-    getMovementLedgerRows(serviceFilters).then((result) => {
+    // Inbound receipts from confirmed deposit lines (authoritative source with correct lot_no)
+    // Outbound movements from stock_movements (DISPATCH, DELIVERY, etc.)
+    const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
+
+    Promise.all([
+      getMovementLedgerRows(serviceFilters),
+      getConfirmedDepositReceiptRows(serviceFilters),
+    ]).then(([result, depositResult]) => {
       if (!isMounted) return;
 
-      let rows = result.data ?? [];
+      // Keep only outbound/neutral movements from stock movements (deposit lines cover all inbound)
+      let outboundRows = (result.data ?? []).filter((r) => {
+        const movType = String(r.movement_type_raw || '').toUpperCase();
+        return r.ledger_source === 'stock_ledger' &&
+          !movType.includes('DRAFT') &&
+          !INBOUND_SKIP.has(movType);
+      });
 
-      // User requested to only show confirmed transactions, avoid duplicates from inventory_ledger
-      rows = rows.filter(r => r.ledger_source === "stock_ledger" && !String(r.movement_type_raw || '').toUpperCase().includes('DRAFT') && !String(r.movement_type_raw || '').toUpperCase().includes('RECEIVE_PENDING'));
+      let depositRows = depositResult.data ?? [];
 
+      // Apply product filter
       if (committedFilters.productId && committedFilters.productId.length > 0) {
-        if (Array.isArray(committedFilters.productId)) {
-          rows = rows.filter((row) => committedFilters.productId.includes(row.product_id));
-        } else {
-          rows = rows.filter((row) => row.product_id === committedFilters.productId);
-        }
+        const applyProd = (rowSet) => Array.isArray(committedFilters.productId)
+          ? rowSet.filter((r) => committedFilters.productId.includes(r.product_id))
+          : rowSet.filter((r) => r.product_id === committedFilters.productId);
+        outboundRows = applyProd(outboundRows);
+        depositRows = applyProd(depositRows);
       }
 
+      // Apply location filter
       if (committedFilters.locationId && committedFilters.locationId.length > 0) {
         if (Array.isArray(committedFilters.locationId)) {
-          rows = rows.filter((row) => committedFilters.locationId.includes(row.location_id) || committedFilters.locationId.includes(row.to_location_id) || committedFilters.locationId.includes(row.from_location_id));
+          outboundRows = outboundRows.filter((r) =>
+            committedFilters.locationId.includes(r.location_id) ||
+            committedFilters.locationId.includes(r.to_location_id) ||
+            committedFilters.locationId.includes(r.from_location_id));
         } else {
-          rows = rows.filter((row) => row.location_id === committedFilters.locationId || row.to_location_id === committedFilters.locationId || row.from_location_id === committedFilters.locationId);
+          outboundRows = outboundRows.filter((r) =>
+            r.location_id === committedFilters.locationId ||
+            r.to_location_id === committedFilters.locationId ||
+            r.from_location_id === committedFilters.locationId);
         }
       }
 
+      // Merge and sort by movement_date ascending (ledger order)
+      let rows = [...depositRows, ...outboundRows].sort((a, b) => {
+        const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
+        const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
+        return aTime - bTime;
+      });
+
+      // Enrich with display names
       const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
       const customerMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
       rows = rows.map((row) => ({
