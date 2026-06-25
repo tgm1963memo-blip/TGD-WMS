@@ -123,7 +123,7 @@ async function readFromBillingDatabaseView(filters = {}) {
 
   if (filters.dateFrom) query = query.gte('movement_date', filters.dateFrom);
 
-  if (filters.dateTo) query = query.lte('movement_date', filters.dateTo);
+  if (filters.dateTo) query = query.lte('movement_date', filters.dateTo + 'T23:59:59.999Z');
 
 
 

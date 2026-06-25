@@ -83,9 +83,27 @@ export async function getStockBalances(filters = {}) {
 
 export async function checkLocationHasInventory(locationId) {
   if (!locationId) return false;
-  const { data } = await getStockBalances({ locationId });
-  if (!data) return false;
-  return data.some(s => s.quantity_boxes > 0 || s.quantity_weight > 0);
+
+  // Check confirmed stock balance first
+  const { data: balances } = await getStockBalances({ locationId });
+  if (balances && balances.some(s => s.quantity_boxes > 0 || s.quantity_weight > 0)) {
+    return true;
+  }
+
+  // Check unconfirmed deposit lines
+  if (!supabase) return false;
+  const { data: lines, error } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, tgd_customer_deposit_requests!inner(status)')
+    .eq('location_id', locationId)
+    .in('tgd_customer_deposit_requests.status', ['DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'])
+    .limit(1);
+
+  if (!error && lines && lines.length > 0) {
+    return true;
+  }
+
+  return false;
 }
 
 

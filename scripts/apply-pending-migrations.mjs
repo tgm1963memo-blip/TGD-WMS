@@ -29,7 +29,11 @@ const MIGRATIONS = [
   '072_tgd_wms_confirm_receipt_creates_stock_movements.sql',
   '074_backfill_stock_balances_from_deposit_lines.sql',
   '075_fix_stock_balance_quantity_column.sql',
-  '076_tgd_wms_customer_request_proxy_and_signatures.sql'
+  '076_tgd_wms_customer_request_proxy_and_signatures.sql',
+  '077_add_count_variance_decision_to_deposit_review.sql',
+  '078_fix_stock_balance_occupancy_backfill.sql',
+  '079_fix_withdrawal_draft_submission.sql',
+  '080_patch_withdrawal_drafts.sql'
 ];
 
 function runSql(sql, label) {
