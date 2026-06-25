@@ -74,7 +74,7 @@ export function MovementLedgerReportPage() {
       dateFrom: committedFilters.dateFrom || undefined,
       dateTo: committedFilters.dateTo || undefined,
       customerId: committedFilters.customerId || undefined,
-      locationId: committedFilters.locationId || undefined,
+      locationId: (Array.isArray(committedFilters.locationId) || !committedFilters.locationId) ? undefined : committedFilters.locationId,
       warehouseId: committedFilters.warehouseId || undefined,
       referenceType: committedFilters.referenceType || undefined,
     };
@@ -84,14 +84,22 @@ export function MovementLedgerReportPage() {
 
       let rows = result.data ?? [];
 
-      // User requested to only show confirmed receipt/dispatch transactions
-      rows = rows.filter(r => r.ledger_source === "inventory_ledger");
+      // User requested to only show confirmed transactions, avoid duplicates from inventory_ledger
+      rows = rows.filter(r => r.ledger_source === "stock_ledger" && !String(r.movement_type_raw || '').toUpperCase().includes('DRAFT') && !String(r.movement_type_raw || '').toUpperCase().includes('RECEIVE_PENDING'));
 
       if (committedFilters.productId && committedFilters.productId.length > 0) {
         if (Array.isArray(committedFilters.productId)) {
           rows = rows.filter((row) => committedFilters.productId.includes(row.product_id));
         } else {
           rows = rows.filter((row) => row.product_id === committedFilters.productId);
+        }
+      }
+
+      if (committedFilters.locationId && committedFilters.locationId.length > 0) {
+        if (Array.isArray(committedFilters.locationId)) {
+          rows = rows.filter((row) => committedFilters.locationId.includes(row.location_id) || committedFilters.locationId.includes(row.to_location_id) || committedFilters.locationId.includes(row.from_location_id));
+        } else {
+          rows = rows.filter((row) => row.location_id === committedFilters.locationId || row.to_location_id === committedFilters.locationId || row.from_location_id === committedFilters.locationId);
         }
       }
 
@@ -132,6 +140,7 @@ export function MovementLedgerReportPage() {
         locationOptions={locationOptions}
         showMovementType={false}
         multiProduct={true}
+        multiLocation={true}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (

@@ -32,6 +32,7 @@ export const APPROVABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
 
 export const BILLABLE_SOURCE_BILLING_STATUSES = Object.freeze([
   BILLING_STATUS_FOUNDATION.READY_FOR_PREVIEW,
+  'READY',
 ]);
 
 const toNumber = (value) => {

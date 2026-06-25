@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MultiSelectDropdown } from '../ui/MultiSelectDropdown.jsx';
 
 const initialFilters = {
   dateFrom: '',
@@ -20,11 +21,12 @@ export function ReportFilterPanel({
   locationOptions = null,
   showMovementType = true,
   multiProduct = false,
+  multiLocation = false,
 }) {
-  const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? [] : (value.productId || '') });
+  const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || '') });
 
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, productId: multiProduct ? [] : '' }));
+    setFilters((prev) => ({ ...prev, productId: multiProduct ? [] : '', locationId: multiLocation ? [] : '' }));
   }, [filters.customerId]);
 
   const updateField = (event) => {
@@ -73,21 +75,27 @@ export function ReportFilterPanel({
           <label className="form-label">
             สินค้า
             {productOptions ? (
-              <select
-                className="form-control"
-                name="productId"
-                value={filters.productId}
-                onChange={updateField}
-                multiple={multiProduct}
-                size={multiProduct ? 3 : undefined}
-                style={multiProduct ? { height: 'auto', minHeight: '84px' } : undefined}
-              >
-                {!multiProduct && <option value="">— ทั้งหมด —</option>}
-                {multiProduct && <option value="">— ทั้งหมด —</option>}
-                {productOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              multiProduct ? (
+                <MultiSelectDropdown
+                  name="productId"
+                  options={productOptions}
+                  value={filters.productId}
+                  onChange={(val) => setFilters((prev) => ({ ...prev, productId: val }))}
+                  placeholder="— ทั้งหมด —"
+                />
+              ) : (
+                <select
+                  className="form-control"
+                  name="productId"
+                  value={filters.productId}
+                  onChange={updateField}
+                >
+                  <option value="">— ทั้งหมด —</option>
+                  {productOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              )
             ) : (
               <input className="form-control" name="productId" value={filters.productId} onChange={updateField} placeholder="Product ID" />
             )}
@@ -97,12 +105,22 @@ export function ReportFilterPanel({
           <label className="form-label">
             Location
             {locationOptions ? (
-              <select className="form-control" name="locationId" value={filters.locationId} onChange={updateField}>
-                <option value="">— ทั้งหมด —</option>
-                {locationOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              multiLocation ? (
+                <MultiSelectDropdown
+                  name="locationId"
+                  options={locationOptions}
+                  value={filters.locationId}
+                  onChange={(val) => setFilters((prev) => ({ ...prev, locationId: val }))}
+                  placeholder="— ทั้งหมด —"
+                />
+              ) : (
+                <select className="form-control" name="locationId" value={filters.locationId} onChange={updateField}>
+                  <option value="">— ทั้งหมด —</option>
+                  {locationOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              )
             ) : (
               <input className="form-control" name="locationId" value={filters.locationId} onChange={updateField} placeholder="Location ID" />
             )}

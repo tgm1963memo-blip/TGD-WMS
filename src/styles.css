@@ -370,7 +370,8 @@ button, .btn {
 
 .form-group { margin-bottom: 6px; }
 label, .form-label { font-size: 11px; font-weight: 600; margin-bottom: 2px; display: block; color: var(--tgd-main-text); }
-input, select, textarea, .form-control {
+input[type="checkbox"], input[type="radio"] { width: auto; height: auto; cursor: pointer; margin: 0; display: inline-block; }
+input:not([type="checkbox"]):not([type="radio"]), select, textarea, .form-control {
   display: block;
   width: 100%;
   height: 30px;
@@ -1642,7 +1643,7 @@ table .status-badge,
   .page-header-actions, .doc-actions { justify-content: flex-start; flex-wrap: wrap; }
 
   /* ── Touch targets ── */
-  input, select, textarea, .form-control { height: 44px; font-size: 14px; padding: 8px 12px; border-radius: 8px; }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea, .form-control { height: 44px; font-size: 14px; padding: 8px 12px; border-radius: 8px; }
   textarea.form-control { height: auto; min-height: 80px; }
   button, .btn, .btn-primary, .btn-primary-gold, .btn-secondary, .btn-danger, .btn-accent, .btn-outline {
     height: 44px;
