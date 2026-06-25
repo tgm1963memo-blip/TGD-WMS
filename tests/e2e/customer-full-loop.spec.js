@@ -4,7 +4,7 @@ import { login } from './helpers/uatAuth.js';
 test.describe('Customer to Admin Full Loop UAT', () => {
   test.setTimeout(180_000);
 
-  const customerEmail = process.env.UAT_CUSTOMER_EMAIL || 'tgm1963.memo@gmail.com';
+  const customerEmail = process.env.UAT_CUSTOMER_EMAIL || 'customer.test@tgd-wms.local';
   const adminEmail = process.env.UAT_EMAIL || 'thitiwat.tan@tgm.co.th';
   const password = process.env.UAT_PASSWORD || 'password123';
   const baseUrl = process.env.UAT_BASE_URL || 'http://localhost:5173'; // fallback for local dev
@@ -15,7 +15,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 1. Customer logs in and creates a Deposit Request
     // ---------------------------------------------------------
     console.log('--- Step 1: Customer Login ---');
-    await login(page, { email: 'tgm1963.memo@gmail.com', password: 'password123' });
+    await login(page, { email: customerEmail, password: 'password123' });
 
     // Wait for portal dashboard
     await page.waitForURL('**/customer', { timeout: 15000 }).catch(() => {});

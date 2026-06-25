@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar.jsx';
 
 export function MainLayout() {
   return (
-    <div className="app-layout">
+    <div className="app-layout" data-testid="app-shell">
       <Header />
       <div className="app-body">
         <Sidebar />
