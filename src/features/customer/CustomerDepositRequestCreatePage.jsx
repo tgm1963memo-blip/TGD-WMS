@@ -365,6 +365,14 @@ export function CustomerDepositRequestCreatePage() {
       requestId = createResult.data?.id;
     }
 
+    if (isEditMode) {
+      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
+      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
+      for (const deletedId of toDelete) {
+        await deleteCustomerDepositRequestLine(deletedId);
+      }
+    }
+
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
       const lineResult = await upsertCustomerDepositRequestLine(requestId, {
@@ -388,14 +396,6 @@ export function CustomerDepositRequestCreatePage() {
         setSubmitting(false);
         setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
         return;
-      }
-    }
-
-    if (isEditMode) {
-      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
-      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
-      for (const deletedId of toDelete) {
-        await deleteCustomerDepositRequestLine(deletedId);
       }
     }
 

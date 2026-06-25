@@ -336,6 +336,14 @@ export function CustomerWithdrawalRequestCreatePage() {
       }
     }
 
+    if (isEditMode) {
+      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
+      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
+      for (const deletedId of toDelete) {
+        await deleteCustomerWithdrawalRequestLine(requestId, deletedId);
+      }
+    }
+
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
       const normalizedLot = normalizeLotNo(line.lot_no);
@@ -361,14 +369,6 @@ export function CustomerWithdrawalRequestCreatePage() {
         setSubmitting(false);
         setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
         return;
-      }
-    }
-
-    if (isEditMode) {
-      const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
-      const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
-      for (const deletedId of toDelete) {
-        await deleteCustomerWithdrawalRequestLine(requestId, deletedId);
       }
     }
 
