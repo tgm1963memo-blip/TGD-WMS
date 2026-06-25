@@ -110,15 +110,22 @@ export function CustomerAdminWithdrawalReviewPage() {
     setError('');
     setActionMsg('');
 
+    // Step 1: REVIEWING — only if React state thinks it's still SUBMITTED_BY_CUSTOMER.
+    // If DB has already moved to ADMIN_REVIEWING (stale React state), the call fails with
+    // "ADMIN_REVIEWING" in the error message — we ignore that and continue to ACCEPT.
     if (selected.status === 'SUBMITTED_BY_CUSTOMER') {
       const reviewResult = await reviewCustomerWithdrawalRequest(selectedId, 'REVIEWING', comment);
       if (reviewResult.error) {
-        setError(reviewResult.error.message ?? 'Review step failed');
-        setSubmitting(false);
-        return;
+        const alreadyReviewing = reviewResult.error.message?.includes('ADMIN_REVIEWING');
+        if (!alreadyReviewing) {
+          setError(reviewResult.error.message ?? 'Review step failed');
+          setSubmitting(false);
+          return;
+        }
       }
     }
 
+    // Step 2: ACCEPT
     const acceptResult = await reviewCustomerWithdrawalRequest(selectedId, 'ACCEPT', comment);
     if (acceptResult.error) {
       setError(acceptResult.error.message ?? 'Open work order failed');
@@ -126,7 +133,7 @@ export function CustomerAdminWithdrawalReviewPage() {
       return;
     }
 
-    // Auto send to handheld (WAREHOUSE_PICKING) immediately after accepting
+    // Step 3: SEND_TO_PICKING — auto-send to handheld immediately after accepting
     const pickResult = await reviewCustomerWithdrawalRequest(selectedId, 'SEND_TO_PICKING');
     setSubmitting(false);
     if (pickResult.error) {

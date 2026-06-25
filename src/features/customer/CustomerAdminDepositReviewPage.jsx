@@ -141,15 +141,22 @@ export function CustomerAdminDepositReviewPage() {
     setError('');
     setActionMsg('');
 
+    // Step 1: REVIEWING — only if React state thinks it's still SUBMITTED_BY_CUSTOMER.
+    // If DB has already moved to ADMIN_REVIEWING (stale React state), the call fails with
+    // "ADMIN_REVIEWING" in the error message — we ignore that and continue to ACCEPT.
     if (selected.status === 'SUBMITTED_BY_CUSTOMER') {
       const reviewResult = await reviewCustomerDepositRequest(selectedId, 'REVIEWING', comment);
       if (reviewResult.error) {
-        setError(reviewResult.error.message ?? 'Review step failed');
-        setSubmitting(false);
-        return;
+        const alreadyReviewing = reviewResult.error.message?.includes('ADMIN_REVIEWING');
+        if (!alreadyReviewing) {
+          setError(reviewResult.error.message ?? 'Review step failed');
+          setSubmitting(false);
+          return;
+        }
       }
     }
 
+    // Step 2: ACCEPT
     const acceptResult = await reviewCustomerDepositRequest(selectedId, 'ACCEPT', comment);
     setSubmitting(false);
     if (acceptResult.error) {
