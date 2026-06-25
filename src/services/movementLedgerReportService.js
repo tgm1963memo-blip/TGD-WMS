@@ -161,6 +161,63 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   return { data: rows, error: null };
 }
 
+// Returns COMPLETED customer withdrawal lines as outbound movement rows.
+// These are not in tgd_stock_movements, so they must be fetched separately.
+export async function getConfirmedWithdrawalRows(filters = {}) {
+  if (!supabase) return { data: [], error: null };
+
+  let query = supabase
+    .from('tgd_customer_withdrawal_requests')
+    .select(`
+      id, withdrawal_no, customer_id, status, last_action_at,
+      tgd_customer_withdrawal_request_lines(
+        id, line_no, customer_product_code, product_name, lot_no,
+        picked_boxes, picked_weight, picked_at, picked_by_email
+      )
+    `)
+    .eq('status', 'COMPLETED');
+
+  if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+  if (filters.dateFrom) query = query.gte('last_action_at', filters.dateFrom);
+  if (filters.dateTo) query = query.lte('last_action_at', `${filters.dateTo}T23:59:59`);
+
+  const { data, error } = await query;
+  if (error) return { data: [], error };
+
+  const rows = [];
+  for (const req of (data ?? [])) {
+    const lines = (req.tgd_customer_withdrawal_request_lines ?? [])
+      .filter((l) => l.picked_boxes != null && Number(l.picked_boxes) > 0);
+
+    for (const line of lines) {
+      rows.push({
+        id: `withdrawal-${line.id}`,
+        ledger_source: 'stock_ledger',
+        movement_type: 'DISPATCH',
+        movement_type_raw: 'CUSTOMER_WITHDRAWAL',
+        movement_type_canonical: 'DISPATCH',
+        movement_date: line.picked_at ?? req.last_action_at,
+        customer_id: req.customer_id,
+        product_id: null,
+        lot_id: null,
+        lot_no: line.lot_no ?? null,
+        qty: Number(line.picked_boxes),
+        quantity: Number(line.picked_boxes),
+        weight: Number(line.picked_weight ?? 0),
+        uom: 'กล่อง',
+        product_name: line.product_name ?? line.customer_product_code ?? null,
+        customer_product_code: line.customer_product_code ?? null,
+        from_warehouse_id: 'DISPATCH',
+        to_warehouse_id: null,
+        source_document_no: req.withdrawal_no,
+        remark: req.withdrawal_no,
+      });
+    }
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function getMovementByReference(filters = {}) {
   const result = await getUnifiedMovementRows(filters);
   if (result.error) {

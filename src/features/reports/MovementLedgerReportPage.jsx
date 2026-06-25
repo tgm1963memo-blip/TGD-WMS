@@ -11,6 +11,7 @@ import { useLanguage } from '../../i18n/languageProvider.jsx';
 import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
+  getConfirmedWithdrawalRows,
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
@@ -87,7 +88,8 @@ export function MovementLedgerReportPage() {
     Promise.all([
       getMovementLedgerRows(serviceFilters),
       getConfirmedDepositReceiptRows(serviceFilters),
-    ]).then(([result, depositResult]) => {
+      getConfirmedWithdrawalRows(serviceFilters),
+    ]).then(([result, depositResult, withdrawalResult]) => {
       if (!isMounted) return;
 
       // Keep outbound/neutral movements; exclude draft and inbound (deposit lines cover all inbound)
@@ -97,6 +99,7 @@ export function MovementLedgerReportPage() {
       });
 
       let depositRows = depositResult.data ?? [];
+      let withdrawalRows = withdrawalResult.data ?? [];
 
       // Apply product filter
       if (committedFilters.productId && committedFilters.productId.length > 0) {
@@ -123,7 +126,7 @@ export function MovementLedgerReportPage() {
       }
 
       // Merge and sort by movement_date ascending (ledger order)
-      let rows = [...depositRows, ...outboundRows].sort((a, b) => {
+      let rows = [...depositRows, ...withdrawalRows, ...outboundRows].sort((a, b) => {
         const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
         const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
         return aTime - bTime;
