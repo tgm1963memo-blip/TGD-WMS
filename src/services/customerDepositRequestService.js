@@ -71,12 +71,38 @@ export async function listCustomerDepositRequests(filters = {}) {
   return query;
 }
 
+export async function getCustomerStockBalance(customerId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId) return { data: [], error: null };
+
+  const { data, error } = await supabase.rpc('tgd_get_customer_stock_balance', {
+    p_customer_id: customerId,
+  });
+
+  if (error) return { data: null, error };
+
+  // Wrap each row so it has a `request` object matching the shape CustomerStockBalancePage expects
+  const rows = (Array.isArray(data) ? data : []).map((r) => ({
+    ...r,
+    id: r.deposit_line_id,
+    request: {
+      request_no: r.request_no,
+      last_action_at: r.received_at,
+      expected_arrival_date: r.received_at,
+    },
+    // expose balance values as the display columns
+    actual_boxes: r.balance_boxes,
+    actual_weight: r.balance_weight,
+  }));
+
+  return { data: rows, error: null };
+}
+
 export async function getDepositInventoryLines(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
   const RECEIVED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'];
 
-  // Step 1: load received CDR headers (optionally filtered by customer)
   let hdrQuery = supabase
     .from('tgd_customer_deposit_requests')
     .select('id, request_no, customer_id, status, expected_arrival_date, reviewed_at, last_action_at')
@@ -92,7 +118,6 @@ export async function getDepositInventoryLines(filters = {}) {
 
   const ids = headers.map((h) => h.id);
 
-  // Step 2: load all lines for those CDRs
   const { data: lines, error: lErr } = await supabase
     .from('tgd_customer_deposit_request_lines')
     .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type')
@@ -101,7 +126,6 @@ export async function getDepositInventoryLines(filters = {}) {
 
   if (lErr) return { data: null, error: lErr };
 
-  // Step 3: join in-memory
   const headerMap = Object.fromEntries(headers.map((h) => [h.id, h]));
   const enriched = (lines ?? []).map((l) => ({
     ...l,

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
-import { getDepositInventoryLines } from '../../services/customerDepositRequestService.js';
+import { getCustomerStockBalance } from '../../services/customerDepositRequestService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
@@ -52,7 +52,7 @@ export function CustomerStockBalancePage() {
     setLoading(true);
     setError(null);
 
-    getDepositInventoryLines({ customerId }).then(({ data, error: err }) => {
+    getCustomerStockBalance(customerId).then(({ data, error: err }) => {
       if (!active) return;
       setLines(data ?? []);
       setError(err ?? null);
@@ -139,11 +139,11 @@ export function CustomerStockBalancePage() {
               <div style={{ fontSize: 22, fontWeight: 700 }}>{productGroups.length} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
             </div>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #22c55e' }}>
-              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>กล่องรับจริงรวม</div>
+              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>กล่องคงเหลือรวม</div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{grandBoxes.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กล่อง</span></div>
             </div>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #f59e0b' }}>
-              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>น้ำหนักรับจริงรวม</div>
+              <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>น้ำหนักคงเหลือรวม</div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{grandWeight.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กก.</span></div>
             </div>
           </div>
@@ -225,8 +225,8 @@ export function CustomerStockBalancePage() {
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>LOT</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันผลิต</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันหมดอายุ</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>กล่อง</th>
-                            <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>น้ำหนัก (กก.)</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กล่อง)</th>
+                            <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กก.)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -265,7 +265,7 @@ export function CustomerStockBalancePage() {
 
             {productGroups.length > 0 && (
               <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
-                แสดง {filtered.length} รายการ (เฉพาะใบฝากที่ยืนยันรับแล้ว)
+                แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ — หักการเบิกสินค้าแล้ว)
               </p>
             )}
           </div>
