@@ -108,6 +108,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
           <thead>
             <tr>
               <th>{t('customer_col_request_no')}</th>
+              <th>{t('customer_col_customer_name') ?? 'ลูกค้า'}</th>
               <th>{t('customer_col_status')}</th>
               <th>{t('customer_field_expected_arrival_date')}</th>
               <th>{t('customer_field_contact_name')}</th>
@@ -119,7 +120,13 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
           <tbody>
             {filteredRows.length ? filteredRows.map((row) => (
               <tr key={row.id}>
-                <td>{row.request_no}</td>
+                <td>
+                  <a className="table-action-link" href={`/customer/deposit-request/${row.id}`} onClick={(e) => {
+                    e.preventDefault();
+                    setDetailId(row.id);
+                  }}>{row.request_no}</a>
+                </td>
+                <td>{row.customer?.customer_name || row.customer?.name || row.customer_id || '-'}</td>
                 <td>
                   <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                     {getDepositStatusLabel(row.status, t)}

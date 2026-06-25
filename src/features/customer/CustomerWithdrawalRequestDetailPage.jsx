@@ -112,6 +112,7 @@ export function CustomerWithdrawalRequestDetailPage() {
                   header={header}
                   language={reportLanguage}
                   lines={lines}
+                  hideCustomerName={!isRequestProxy}
                 />
               )}
               title={header.withdrawal_no}

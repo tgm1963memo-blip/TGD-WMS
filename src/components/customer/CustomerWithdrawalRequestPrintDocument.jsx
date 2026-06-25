@@ -18,6 +18,7 @@ export function CustomerWithdrawalRequestPrintDocument({
   lines = [],
   language = 'th',
   branding,
+  hideCustomerName = false,
 }) {
   if (!header) return null;
 
@@ -66,8 +67,14 @@ export function CustomerWithdrawalRequestPrintDocument({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 8 }}>
                 <tbody>
                   <tr>
-                    <td style={{ ...META_KEY, width: '18%' }}>CUSTOMER NAME</td>
-                    <td style={META_VAL}>{fmt(header.customer_name)}</td>
+                    {!hideCustomerName ? (
+                      <>
+                        <td style={{ ...META_KEY, width: '18%' }}>CUSTOMER NAME</td>
+                        <td style={META_VAL}>{fmt(header.customer_name)}</td>
+                      </>
+                    ) : (
+                      <td colSpan={2} style={{ border: 'none' }}></td>
+                    )}
                     <td style={{ ...META_KEY, width: '10%' }}>DATE</td>
                     <td style={{ ...META_VAL, width: '20%' }}>{fmt(docDate)}</td>
                   </tr>

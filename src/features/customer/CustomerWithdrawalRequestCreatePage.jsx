@@ -282,6 +282,15 @@ export function CustomerWithdrawalRequestCreatePage() {
       return;
     }
 
+    for (let i = 0; i < activeLines.length; i++) {
+      const line = activeLines[i];
+      const lot = normalizeLotNo(line.lot_no);
+      if (!lot && !line.source_deposit_request_id) {
+        setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่ระบุ LOT กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     let requestId;

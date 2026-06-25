@@ -127,7 +127,6 @@ export function CustomerWithdrawalLinesTable({
           <tr>
             <th style={{ width: 36 }}>#</th>
             <th style={{ minWidth: 200 }}>รหัสสินค้า <span className="field-required">*</span></th>
-            <th style={{ minWidth: 160 }}>ชื่อสินค้า</th>
             <th style={{ minWidth: 180 }}>LOT (จากยอดคงเหลือ)</th>
             <th style={{ minWidth: 110 }}>วันผลิต</th>
             <th style={{ minWidth: 110 }}>วันหมดอายุ</th>
@@ -178,17 +177,6 @@ export function CustomerWithdrawalLinesTable({
                       </option>
                     ))}
                   </select>
-                </td>
-
-                {/* Product name (auto-filled) */}
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    disabled
-                    readOnly
-                    placeholder="ชื่อสินค้า"
-                    value={line.product_name}
-                  />
                 </td>
 
                 {/* LOT dropdown including null-lot deposits */}
