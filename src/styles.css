@@ -2,15 +2,15 @@
 
 :root {
   --tgm-black: #050505;
-  --tgm-white: var(--tgm-white);
-  --tgm-dark: var(--tgm-dark);
-  --tgm-gray: var(--tgm-gray);
-  --tgm-gray-light: var(--tgm-gray-light);
+  --tgm-white: #ffffff;
+  --tgm-dark: #333333;
+  --tgm-gray: #c9c9c9;
+  --tgm-gray-light: #e5e7eb;
   --tgm-gold: #e2b336;
   --tgm-gold-soft: #fff4cc;
   --tgm-red: #c1121f;
   --tgm-red-soft: #ffe5e8;
-  --tgm-border: var(--tgm-gray-light);
+  --tgm-border: #e5e7eb;
   --tgm-card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
   --tgd-sidebar-bg: #09111c;
   --tgd-sidebar-soft: #111a26;
