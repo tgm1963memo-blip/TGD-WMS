@@ -10,7 +10,7 @@ const WITHDRAWAL_HEADER_SELECT = [
   'id',
   'withdrawal_no',
   'customer_id',
-  'customer:tgd_customers(name_th, name_en)',
+  'customer:tgd_customers(customer_code, customer_name, name)',
   'status',
   'requested_dispatch_date',
   'delivery_type',

@@ -10,7 +10,7 @@ const DEPOSIT_HEADER_SELECT = [
   'id',
   'request_no',
   'customer_id',
-  'customer:tgd_customers(name_th, name_en)',
+  'customer:tgd_customers(customer_code, customer_name, name)',
   'status',
   'expected_arrival_date',
   'contact_name',

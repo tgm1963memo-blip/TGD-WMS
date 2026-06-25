@@ -62,7 +62,7 @@ export function CustomerAdminDepositReviewPage() {
   const filteredRows = rows.filter((row) => {
     if (!globalSearchText) return true;
     const lower = globalSearchText.toLowerCase();
-    const custName = row.customer?.name_th || row.customer?.name_en || row.customer_id;
+    const custName = row.customer?.customer_name || row.customer?.name || row.customer_id;
     return (
       (row.request_no || '').toLowerCase().includes(lower) ||
       (row.status || '').toLowerCase().includes(lower) ||
@@ -304,7 +304,7 @@ export function CustomerAdminDepositReviewPage() {
               {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
-                  <td>{row.customer?.name_th || row.customer?.name_en || row.customer_id}</td>
+                  <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getDepositStatusLabel(row.status, t)}
