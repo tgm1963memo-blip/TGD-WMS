@@ -33,7 +33,6 @@ function formatDate(iso) {
 
 
 function StockBalanceTable({ lines }) {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
   return (
     <StockBalanceTable lines={pg.lines} />
   );
@@ -50,6 +49,7 @@ export function CustomerStockBalancePage() {
   const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
 
   useEffect(() => {
     let active = true;

@@ -18,8 +18,6 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerWithdrawalRequestListPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
-
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
@@ -27,6 +25,7 @@ export function CustomerWithdrawalRequestListPage() {
   const [detailRow, setDetailRow] = useState(null);
   const [detailLines, setDetailLines] = useState([]);
   const [detailLinesLoading, setDetailLinesLoading] = useState(false);
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
   const branding = getDocumentBrandingConfig();
 
   useEffect(() => {

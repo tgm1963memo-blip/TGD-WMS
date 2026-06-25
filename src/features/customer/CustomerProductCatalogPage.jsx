@@ -43,8 +43,6 @@ function RequiredLabel({ children }) {
 }
 
 export function CustomerProductCatalogPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
-
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [products, setProducts] = useState([]);
@@ -54,6 +52,7 @@ export function CustomerProductCatalogPage() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(products);
 
   const columns = [
     { key: 'customer_product_code', header: t('catalog_col_customer_code') },

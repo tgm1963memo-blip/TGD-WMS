@@ -36,8 +36,6 @@ const REVIEW_STATUSES = [
 ];
 
 export function CustomerAdminDepositReviewPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
-
   const t = useTranslation();
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
@@ -59,6 +57,7 @@ export function CustomerAdminDepositReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(rows);
 
   useEffect(() => {
     let active = true;

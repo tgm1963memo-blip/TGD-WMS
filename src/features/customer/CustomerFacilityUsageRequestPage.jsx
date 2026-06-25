@@ -23,8 +23,6 @@ const INITIAL_FORM = {
 };
 
 export function CustomerFacilityUsageRequestPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
-
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [rows, setRows] = useState([]);
@@ -33,6 +31,7 @@ export function CustomerFacilityUsageRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
   async function loadRows() {
     if (!customerId) {

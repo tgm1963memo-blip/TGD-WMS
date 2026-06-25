@@ -13,12 +13,11 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 export function CustomerDepositRequestListPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
-
   const t = useTranslation();
   const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
   useEffect(() => {
     let active = true;

@@ -29,6 +29,7 @@ function statusBadgeClass(status) {
 
 function RequestTimelineCell({ documentType, documentId }) {
   const [events, setEvents] = useState([]);
+  const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
   useEffect(() => {
     let active = true;
@@ -101,8 +102,6 @@ function getRequestDetailPath(row) {
 }
 
 export function CustomerRequestHistoryPage() {
-  const { sortedData, requestSort, getSortIndicator } = useTableSort(sortedData);
-
   const t = useTranslation();
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
