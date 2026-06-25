@@ -80,8 +80,7 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
   const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
 
-  const filteredRows = rows.filter(row => row.ledger_source === "INVENTORY");
-  const mappedLines = filteredRows.map((row, index) => {
+  const mappedLines = rows.map((row, index) => {
     const movType = (row.movement_type ?? row.movement_type_raw ?? '').toUpperCase();
     const isInbound = INBOUND_TYPES.some((t) => movType.includes(t));
     const isOutbound = OUTBOUND_TYPES.some((t) => movType.includes(t));

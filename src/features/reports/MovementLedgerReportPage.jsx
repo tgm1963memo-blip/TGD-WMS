@@ -83,6 +83,9 @@ export function MovementLedgerReportPage() {
 
       let rows = result.data ?? [];
 
+      // User requested to only show confirmed receipt/dispatch transactions
+      rows = rows.filter(r => r.ledger_source === "inventory_ledger");
+
       if (committedFilters.productId && committedFilters.productId.length > 0) {
         if (Array.isArray(committedFilters.productId)) {
           rows = rows.filter((row) => committedFilters.productId.includes(row.product_id));
