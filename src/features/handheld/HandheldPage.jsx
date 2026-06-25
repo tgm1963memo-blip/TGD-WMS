@@ -12,6 +12,8 @@ import {
 import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
+  reviewCustomerWithdrawalRequest,
+  recordWithdrawalLinePick,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
@@ -1072,6 +1074,12 @@ function PickingWorkflow({ onBack, t }) {
   const [weight, setWeight] = useState('');
   const [confirmed, setConfirmed] = useState([]);
   const [sortType, setSortType] = useState('pending');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [editWarned, setEditWarned] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+  const [docCompleted, setDocCompleted] = useState(false);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
 
@@ -1085,8 +1093,15 @@ function PickingWorkflow({ onBack, t }) {
   function pickDoc(doc) {
     setSelectedDoc(doc);
     setLinesLoading(true);
+    setDocCompleted(false);
+    setCompleteError('');
     listCustomerWithdrawalRequestLines(doc.id).then((r) => {
-      setLines(r.data ?? []);
+      const mapped = (r.data ?? []).map((l) => ({
+        ...l,
+        expected_boxes: l.requested_boxes,
+        expected_weight: l.requested_weight,
+      }));
+      setLines(mapped);
       setLinesLoading(false);
       setScanValue(''); setMatchedLine(null);
     });
@@ -1094,6 +1109,7 @@ function PickingWorkflow({ onBack, t }) {
 
   function handleScan(val) {
     setScanValue(val);
+    setEditWarned(false);
     const q = val.trim().toLowerCase();
     const match = lines.find((l) =>
       (l.customer_product_code ?? '').toLowerCase() === q ||
@@ -1104,36 +1120,77 @@ function PickingWorkflow({ onBack, t }) {
       triggerSuccessFeedback();
       setMatchedLine(match);
       setBoxes(match.requested_boxes?.toString() ?? '');
-      setWeight(match.requested_qty?.toString() ?? '');
+      setWeight(match.requested_weight?.toString() ?? '');
+      setEditWarned(false);
     } else { setMatchedLine(null); }
   }
 
-  function handleConfirm() {
-    if (!matchedLine) return;
-    triggerSuccessFeedback();
-    setConfirmed((prev) => [{
-      line: matchedLine, boxes, weight,
-      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-    }, ...prev]);
-    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
+  function isDone(line) {
+    return confirmed.some((c) => c.line.id === line.id) || line.picked_at != null;
   }
 
-  const doneCount = confirmed.length;
+  async function handleConfirm() {
+    if (!matchedLine) return;
+    const alreadyDone = isDone(matchedLine);
+    if (alreadyDone && !editWarned) {
+      setEditWarned(true);
+      return;
+    }
+    setSaving(true);
+    setSaveError('');
+    const result = await recordWithdrawalLinePick(
+      matchedLine.id,
+      boxes ? Number(boxes) : null,
+      weight ? Number(weight) : null,
+    );
+    setSaving(false);
+    if (result.error) {
+      setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+      return;
+    }
+    triggerSuccessFeedback();
+    const confirmedItem = {
+      line: matchedLine, boxes, weight,
+      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setConfirmed((prev) =>
+      alreadyDone
+        ? prev.map((c) => (c.line.id === matchedLine.id ? confirmedItem : c))
+        : [confirmedItem, ...prev]
+    );
+    setLines((prev) => prev.map((l) => l.id === matchedLine.id
+      ? { ...l, picked_boxes: boxes ? Number(boxes) : null, picked_weight: weight ? Number(weight) : null, picked_at: new Date().toISOString() }
+      : l));
+    setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setEditWarned(false);
+  }
+
+  async function handleCompleteJob() {
+    if (!selectedDoc) return;
+    setCompleting(true);
+    setCompleteError('');
+    const result = await reviewCustomerWithdrawalRequest(selectedDoc.id, 'CONFIRM_DISPATCH');
+    setCompleting(false);
+    if (result.error) {
+      setCompleteError(result.error.message ?? 'ปิดใบงานไม่สำเร็จ');
+      return;
+    }
+    triggerSuccessFeedback();
+    setDocCompleted(true);
+  }
+
+  const doneCount = lines.filter(isDone).length;
+  const allDone = lines.length > 0 && doneCount >= lines.length;
 
   const sortedLines = useMemo(() => {
     return [...lines].sort((a, b) => {
       if (sortType === 'pending') {
-        const aDone = confirmed.some(c => c.line.id === a.id);
-        const bDone = confirmed.some(c => c.line.id === b.id);
+        const aDone = confirmed.some((c) => c.line.id === a.id) || a.picked_at != null;
+        const bDone = confirmed.some((c) => c.line.id === b.id) || b.picked_at != null;
         if (aDone !== bDone) return aDone ? 1 : -1;
       } else if (sortType === 'name') {
-        const aName = a.product_name ?? '';
-        const bName = b.product_name ?? '';
-        return aName.localeCompare(bName, 'th');
+        return (a.product_name ?? '').localeCompare(b.product_name ?? '', 'th');
       } else if (sortType === 'code') {
-        const aCode = a.customer_product_code ?? '';
-        const bCode = b.customer_product_code ?? '';
-        return aCode.localeCompare(bCode);
+        return (a.customer_product_code ?? '').localeCompare(b.customer_product_code ?? '');
       }
       return 0;
     });
@@ -1203,7 +1260,7 @@ function PickingWorkflow({ onBack, t }) {
       {lines.length > 0 && (
         <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>
           <div style={{
-            height: '100%', background: C.pickAccent,
+            height: '100%', background: allDone ? C.green : C.pickAccent,
             width: `${(doneCount / lines.length) * 100}%`,
             transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
@@ -1211,11 +1268,18 @@ function PickingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 280px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 300px', background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (
           <>
+            {docCompleted && (
+              <div style={{ padding: '16px 20px', background: C.greenLight, borderRadius: 20, border: `2px solid ${C.greenBorder}`, marginBottom: 20, textAlign: 'center' }}>
+                <div style={{ color: C.green, fontWeight: 900, fontSize: 18 }}>✓ ปิดใบงานเรียบร้อยแล้ว</div>
+                <div style={{ color: C.textSec, fontSize: 13, marginTop: 4 }}>{selectedDoc.withdrawal_no} — สถานะ: เสร็จสิ้น</div>
+              </div>
+            )}
+
             {confirmed.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <div style={{
@@ -1231,15 +1295,19 @@ function PickingWorkflow({ onBack, t }) {
             <SortDropdown sortType={sortType} setSortType={setSortType} />
 
             {sortedLines.map((l, i) => {
-              const done = confirmed.some((c) => c.line.id === l.id);
+              const done = isDone(l);
+              const pickedLabel = done
+                ? `หยิบแล้ว${l.picked_boxes != null ? ` · ${l.picked_boxes} กล่อง` : ''}${l.picked_weight != null ? ` / ${l.picked_weight} กก.` : ''}`
+                : '';
               return (
                 <LineListItem key={l.id} line={l} index={i} isDone={done}
-                  doneLabel={done ? 'หยิบแล้ว' : ''}
+                  doneLabel={pickedLabel}
                   onSelect={() => {
                     setMatchedLine(l);
                     setScanValue(l.customer_product_code ?? l.product_name ?? '');
                     setBoxes(l.requested_boxes?.toString() ?? '');
-                    setWeight(l.requested_qty?.toString() ?? '');
+                    setWeight(l.requested_weight?.toString() ?? '');
+                    setEditWarned(false);
                     triggerSuccessFeedback();
                   }} />
               );
@@ -1253,21 +1321,19 @@ function PickingWorkflow({ onBack, t }) {
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 720,
         background: C.surface,
-        // backdropFilter removed for performance
-        // WebkitBackdropFilter removed for performance
         borderTop: `1px solid ${C.borderLight}`,
         borderTopLeftRadius: 32, borderTopRightRadius: 32,
         boxShadow: '0 -10px 40px rgba(0,0,0,0.08)',
         padding: '20px 24px 32px',
         zIndex: 100,
-        maxHeight: '60vh',
+        maxHeight: '65vh',
         overflowY: 'auto',
       }}>
         {matchedLine ? (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ color: C.pickAccent, fontWeight: 900, fontSize: 20 }}>ยืนยันหยิบสินค้า</div>
-              <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
+              <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); setEditWarned(false); }}
                 style={{
                   background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1275,35 +1341,90 @@ function PickingWorkflow({ onBack, t }) {
                 }}>✕</button>
             </div>
 
+            {/* Product card with requested qty */}
             <div style={{
-              background: '#ffffff', borderRadius: 20, padding: '24px 16px', marginBottom: 16,
+              background: '#ffffff', borderRadius: 20, padding: '16px', marginBottom: 12,
               border: `2px solid ${C.pickAccent}40`,
             }}>
-              <div style={{ color: C.text, fontWeight: 800, fontSize: 16, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 15, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {matchedLine.product_name ?? matchedLine.customer_product_code ?? '—'}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, overflowWrap: 'break-word', wordBreak: 'break-all' }}>รหัส {matchedLine.customer_product_code}</span>
                 {matchedLine.lot_no && <span style={{ background: '#f3f4f6', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
               </div>
+              <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กล่อง)</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#0369a1' }}>{matchedLine.requested_boxes ?? '-'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กก.)</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#0369a1' }}>
+                    {matchedLine.requested_weight != null
+                      ? Number(matchedLine.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '-'}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {saveError && (
+              <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                {saveError}
+              </div>
+            )}
+
+            {editWarned && (
+              <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12 }}>
+                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 2 }}>⚠ รายการนี้ยืนยันแล้ว</div>
+                <div style={{ color: '#78350f', fontSize: 13 }}>กดยืนยันการแก้ไขอีกครั้งเพื่อบันทึกค่าใหม่</div>
+              </div>
+            )}
 
             <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
 
-            <button type="button" disabled={!boxes && !weight} onClick={handleConfirm}
+            <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
               style={{
                 width: '100%', padding: '20px', borderRadius: 20,
-                background: (!boxes && !weight) ? C.border : C.pickAccent,
+                background: (!boxes && !weight) ? C.border : (editWarned ? '#f59e0b' : C.pickAccent),
                 color: (!boxes && !weight) ? C.muted : '#ffffff',
-                border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer',
-                boxShadow: (!boxes && !weight) ? 'none' : '0 8px 24px rgba(245,158,11,0.4)',
+                border: 'none', fontSize: 18, fontWeight: 900, cursor: (!boxes && !weight) ? 'not-allowed' : 'pointer',
+                boxShadow: (!boxes && !weight) ? 'none' : (editWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(9,17,28,0.3)'),
                 transition: 'all 0.2s',
               }}>
-              ✓ ยืนยันหยิบสินค้า
+              {saving ? '⏳ กำลังบันทึก...' : (editWarned ? '⚠ ยืนยันการแก้ไข' : '✓ ยืนยันหยิบสินค้า')}
             </button>
           </div>
         ) : (
           <div>
+            {allDone && !docCompleted && (
+              <div style={{ marginBottom: 14 }}>
+                {completeError && (
+                  <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                    {completeError}
+                  </div>
+                )}
+                <button type="button" disabled={completing} onClick={handleCompleteJob}
+                  style={{
+                    width: '100%', padding: '20px', borderRadius: 20,
+                    background: completing ? C.border : C.green,
+                    color: completing ? C.muted : '#ffffff',
+                    border: 'none', fontSize: 18, fontWeight: 900, cursor: completing ? 'not-allowed' : 'pointer',
+                    boxShadow: completing ? 'none' : '0 8px 24px rgba(5,150,105,0.4)',
+                    transition: 'all 0.2s',
+                  }}>
+                  {completing ? '⏳ กำลังปิดใบงาน...' : '✓ ปิดใบงาน (หยิบครบแล้ว)'}
+                </button>
+              </div>
+            )}
+
+            {docCompleted && (
+              <div style={{ padding: '14px', background: C.greenLight, borderRadius: 16, border: `2px solid ${C.greenBorder}`, marginBottom: 14, textAlign: 'center' }}>
+                <div style={{ color: C.green, fontWeight: 900, fontSize: 15 }}>✓ ปิดใบงานเรียบร้อยแล้ว</div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div style={{
                 flex: 1, position: 'relative', borderRadius: 20,

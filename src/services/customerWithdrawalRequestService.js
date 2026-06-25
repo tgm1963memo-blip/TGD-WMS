@@ -47,6 +47,10 @@ const WITHDRAWAL_LINE_SELECT = [
   'uom',
   'picking_rule',
   'note',
+  'picked_boxes',
+  'picked_weight',
+  'picked_at',
+  'picked_by_email',
   'created_at',
 ].join(', ');
 
@@ -199,6 +203,18 @@ export async function cancelCustomerWithdrawalRequest(requestId, comment = null)
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+export async function recordWithdrawalLinePick(lineId, pickedBoxes, pickedWeight) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_record_withdrawal_line_pick', {
+    p_line_id: lineId,
+    p_picked_boxes: pickedBoxes != null ? Number(pickedBoxes) : null,
+    p_picked_weight: pickedWeight != null ? Number(pickedWeight) : null,
+  });
+
+  return { data, error };
 }
 
 export async function enqueueCustomerWithdrawalNotification(requestId, customerId, documentNo, submitterEmail = null, note = null) {

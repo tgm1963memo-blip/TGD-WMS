@@ -395,10 +395,30 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td style={{ textAlign: 'right' }}>
                           {line.requested_qty != null ? `${line.requested_qty} ${line.uom ?? ''}`.trim() : '-'}
                         </td>
-                        <td>
-                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
-                            {t('pending')}
-                          </span>
+                        <td style={{ textAlign: 'right' }}>
+                          {line.picked_at != null ? (
+                            <div style={{ lineHeight: 1.6 }}>
+                              {line.picked_boxes != null && (
+                                <div style={{ fontWeight: 700, color: '#059669' }}>
+                                  {line.picked_boxes} กล่อง
+                                </div>
+                              )}
+                              {line.picked_weight != null && (
+                                <div style={{ fontWeight: 700, color: '#059669' }}>
+                                  {Number(line.picked_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                                </div>
+                              )}
+                              {line.picked_by_email && (
+                                <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>
+                                  {line.picked_by_email}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
+                              {t('pending')}
+                            </span>
+                          )}
                         </td>
                         <td>
                           <button
