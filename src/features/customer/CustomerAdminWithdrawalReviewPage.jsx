@@ -365,7 +365,9 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th>{t('lot')}</th>
-                      <th>{t('requested_qty')}</th>
+                      <th>น้ำหนักที่ขอ (กก.)</th>
+                      <th>กล่องที่ขอ</th>
+                      <th>จำนวนที่ขอ</th>
                       <th>{t('admin_picked_qty')}</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
@@ -377,7 +379,15 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.lot_no ?? '-'}</td>
-                        <td>{line.requested_qty ?? '-'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {line.requested_weight != null
+                            ? Number(line.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : '-'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>{line.requested_boxes ?? '-'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {line.requested_qty != null ? `${line.requested_qty} ${line.uom ?? ''}`.trim() : '-'}
+                        </td>
                         <td>
                           <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
                             {t('pending')}
@@ -398,7 +408,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
