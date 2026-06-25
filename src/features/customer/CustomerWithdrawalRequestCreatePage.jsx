@@ -370,6 +370,15 @@ export function CustomerWithdrawalRequestCreatePage() {
         setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
         return;
       }
+
+      if (lineResult.data && lineResult.data.id && !line.lineId) {
+        line.lineId = lineResult.data.id;
+        setLines((current) => current.map((l) => (l.key === line.key ? { ...l, lineId: lineResult.data.id } : l)));
+        setEditOriginalLineIds((current) => {
+          if (!current.includes(lineResult.data.id)) return [...current, lineResult.data.id];
+          return current;
+        });
+      }
     }
 
     if (!shouldSubmit) {
