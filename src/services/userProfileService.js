@@ -46,7 +46,7 @@ export async function getUserProfiles(filters = {}) {
 
   let query = supabase
     .from('tgd_user_profiles')
-    .select('id, auth_user_id, email, display_name, role, customer_id, is_active, created_at, updated_at')
+    .select('id, auth_user_id, email, display_name, first_name, last_name, role, customer_id, is_active, pin_code, created_at, updated_at')
     .order('email', { ascending: true });
 
   if (filters.role) {
@@ -82,4 +82,16 @@ export async function hasAnyRole(roles) {
   }
 
   return roles.includes(data.role);
+}
+
+export async function updateOwnProfile({ firstName, lastName, displayName, pinCode } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_update_own_profile', {
+    p_first_name:   firstName   ?? null,
+    p_last_name:    lastName    ?? null,
+    p_display_name: displayName ?? null,
+    p_pin_code:     pinCode     ?? null,
+  });
+  if (error) return { data: null, error };
+  return { data, error: null };
 }

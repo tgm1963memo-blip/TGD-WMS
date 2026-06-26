@@ -168,26 +168,23 @@ export function CustomerDepositStaffWorkOrderPrint({
 
       {/* Signature section */}
       {(() => {
+        const reporterBy = header.created_by_email ?? null;
+        const reporterAt = fmtDT(header.submitted_at ?? header.created_at);
         const issuedBy = header.handheld_received_by_email ?? header.last_action_by_email ?? header.created_by_email ?? null;
-        const issuedAt = fmtDT(header.last_action_at ?? header.submitted_at ?? header.created_at);
+        const issuedAt = fmtDT(header.last_action_at);
         const approvedBy = header.web_approved_by_email ?? null;
-        const approvedAt = fmtDT(header.reviewed_at);
+        const SigBox = ({ label, name, dt }) => (
+          <div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center', fontWeight: 700 }}>{label}</div>
+            <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>{name ?? '____________________'}</div>
+            {dt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{dt}</div>}
+          </div>
+        );
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 32, fontSize: 12 }}>
-            <div>
-              <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>ISSUED / CHECKED BY</div>
-              <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>
-                {issuedBy ?? '(CUSTOMER SERVICE)'}
-              </div>
-              {issuedAt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{issuedAt}</div>}
-            </div>
-            <div>
-              <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>APPROVED BY</div>
-              <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>
-                {approvedBy ?? '(SUPV / ASST.MGR / MGR)'}
-              </div>
-              {approvedAt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{approvedAt}</div>}
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginTop: 32, fontSize: 12 }}>
+            <SigBox label="ผู้แจ้งฝาก" name={reporterBy} dt={reporterAt} />
+            <SigBox label="ISSUED / CHECKED BY" name={issuedBy ?? '(CUSTOMER SERVICE)'} dt={issuedAt} />
+            <SigBox label="APPROVED BY" name={approvedBy ?? '(SUPV / ASST.MGR / MGR)'} dt={null} />
           </div>
         );
       })()}

@@ -20,6 +20,8 @@ import { useAuth } from '../auth/AuthContext.jsx';
 const EMPTY_FORM = {
   profileId: '',
   email: '',
+  firstName: '',
+  lastName: '',
   displayName: '',
   password: '',
   role: 'warehouse_staff',
@@ -135,6 +137,8 @@ export function UserManagementPage() {
     setForm({
       profileId: row.id,
       email: row.email ?? '',
+      firstName: row.first_name ?? '',
+      lastName: row.last_name ?? '',
       displayName: row.display_name ?? '',
       password: '',
       role: row.role ?? 'warehouse_staff',
@@ -183,14 +187,16 @@ export function UserManagementPage() {
     }
 
     const result = await upsertUserProfile({
-      profileId: form.profileId || null,
-      email: form.email,
-      displayName: form.displayName,
-      role: form.role,
-      customerId: CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
+      profileId:   form.profileId  || null,
+      email:       form.email,
+      firstName:   form.firstName  || null,
+      lastName:    form.lastName   || null,
+      displayName: form.displayName || null,
+      role:        form.role,
+      customerId:  CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
       authUserId,
-      pinCode: form.pinCode || null,
-      isActive: form.isActive,
+      pinCode:     form.pinCode    || null,
+      isActive:    form.isActive,
     });
 
     setSaving(false);
@@ -284,11 +290,21 @@ export function UserManagementPage() {
             />
           </label>
           <label className="form-field">
-            <span>{t('user_mgmt_col_display_name')}</span>
+            <span>{language === 'th' ? 'ชื่อ' : 'First Name'}</span>
             <input
               className="form-control"
-              onChange={(e) => updateField('displayName', e.target.value)}
-              value={form.displayName}
+              onChange={(e) => updateField('firstName', e.target.value)}
+              placeholder={language === 'th' ? 'ชื่อจริง' : 'First name'}
+              value={form.firstName}
+            />
+          </label>
+          <label className="form-field">
+            <span>{language === 'th' ? 'นามสกุล' : 'Last Name'}</span>
+            <input
+              className="form-control"
+              onChange={(e) => updateField('lastName', e.target.value)}
+              placeholder={language === 'th' ? 'นามสกุล' : 'Last name'}
+              value={form.lastName}
             />
           </label>
           <label className="form-field">

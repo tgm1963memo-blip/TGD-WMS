@@ -79,14 +79,16 @@ export async function upsertUserProfile(payload = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
   const { data, error } = await supabase.rpc('tgd_admin_upsert_user_profile', {
-    p_profile_id: payload.profileId ?? null,
-    p_email: toNullableText(payload.email),
+    p_profile_id:   payload.profileId   ?? null,
+    p_email:        toNullableText(payload.email),
     p_display_name: toNullableText(payload.displayName),
-    p_role: toNullableText(payload.role),
-    p_customer_id: payload.customerId ?? null,
-    p_auth_user_id: payload.authUserId ?? null,
-    p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
-    p_pin_code: payload.pinCode ?? null,
+    p_first_name:   toNullableText(payload.firstName),
+    p_last_name:    toNullableText(payload.lastName),
+    p_role:         toNullableText(payload.role),
+    p_customer_id:  payload.customerId  ?? null,
+    p_auth_user_id: payload.authUserId  ?? null,
+    p_is_active:    typeof payload.isActive === 'boolean' ? payload.isActive : true,
+    p_pin_code:     payload.pinCode     ?? null,
   });
 
   if (error) return { data: null, error };

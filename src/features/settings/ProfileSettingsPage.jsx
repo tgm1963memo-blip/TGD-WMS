@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { getCurrentUserProfile } from '../../services/userProfileService.js';
+import { getCurrentUserProfile, updateOwnProfile } from '../../services/userProfileService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 function formatCustomerScope(customerId, t) {
@@ -15,24 +15,56 @@ export function ProfileSettingsPage() {
   const { session } = useAuth();
   const t = useTranslation();
   const [state, setState] = useState({ profile: null, loading: true, error: null });
+  const [form, setForm] = useState({ firstName: '', lastName: '', pinCode: '' });
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     let active = true;
-    setState((current) => ({ ...current, loading: true, error: null }));
-
+    setState((cur) => ({ ...cur, loading: true, error: null }));
     getCurrentUserProfile(session?.user?.id).then((result) => {
       if (!active) return;
-      setState({
-        profile: result.data ?? null,
-        loading: false,
-        error: result.error ?? null,
-      });
+      const p = result.data ?? null;
+      setState({ profile: p, loading: false, error: result.error ?? null });
+      if (p) {
+        setForm({
+          firstName: p.first_name ?? '',
+          lastName:  p.last_name  ?? '',
+          pinCode:   p.pin_code   ?? '',
+        });
+      }
     });
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [session?.user?.id]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    setSaveMsg('');
+    setSaveError('');
+    const result = await updateOwnProfile({
+      firstName:   form.firstName  || null,
+      lastName:    form.lastName   || null,
+      pinCode:     form.pinCode    || null,
+    });
+    setSaving(false);
+    if (result.error) {
+      setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+    } else {
+      setSaveMsg('บันทึกข้อมูลสำเร็จ');
+      setState((cur) => ({
+        ...cur,
+        profile: cur.profile ? {
+          ...cur.profile,
+          first_name:   form.firstName || cur.profile.first_name,
+          last_name:    form.lastName  || cur.profile.last_name,
+          display_name: [form.firstName, form.lastName].filter(Boolean).join(' ') || cur.profile.display_name,
+          pin_code:     form.pinCode   || cur.profile.pin_code,
+        } : cur.profile,
+      }));
+    }
+  }
 
   if (state.loading) {
     return (
@@ -58,6 +90,7 @@ export function ProfileSettingsPage() {
       ) : null}
 
       <div className="profile-settings-grid">
+        {/* Read-only summary */}
         <div className="section-card profile-settings-card" data-testid="profile-settings-summary">
           <h3 className="section-card-title">{t('profile_settings_title')}</h3>
           <dl className="profile-settings-dl">
@@ -86,6 +119,53 @@ export function ProfileSettingsPage() {
               <dd data-testid="profile-settings-display-name">{profile?.display_name ?? '-'}</dd>
             </div>
           </dl>
+        </div>
+
+        {/* Editable fields */}
+        <div className="section-card profile-settings-card" data-testid="profile-edit-card">
+          <h3 className="section-card-title">{'แก้ไขข้อมูลส่วนตัว'}</h3>
+          {saveMsg ? <div className="alert-success-panel" role="status">{saveMsg}</div> : null}
+          {saveError ? <div className="banner banner-danger" role="alert">{saveError}</div> : null}
+          <form onSubmit={handleSave}>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>{'ชื่อ'}</span>
+                <input
+                  className="form-control"
+                  placeholder="ชื่อจริง"
+                  value={form.firstName}
+                  onChange={(e) => { setForm((f) => ({ ...f, firstName: e.target.value })); setSaveMsg(''); }}
+                />
+              </label>
+              <label className="form-field">
+                <span>{'นามสกุล'}</span>
+                <input
+                  className="form-control"
+                  placeholder="นามสกุล"
+                  value={form.lastName}
+                  onChange={(e) => { setForm((f) => ({ ...f, lastName: e.target.value })); setSaveMsg(''); }}
+                />
+              </label>
+              <label className="form-field">
+                <span>{'รหัส PIN (Handheld)'}</span>
+                <input
+                  className="form-control"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="e.g. 1234"
+                  value={form.pinCode}
+                  onChange={(e) => { setForm((f) => ({ ...f, pinCode: e.target.value })); setSaveMsg(''); }}
+                />
+              </label>
+            </div>
+            <div className="action-row" style={{ marginTop: 16 }}>
+              <button className="btn btn-primary" disabled={saving} type="submit">
+                {saving ? 'กำลังบันทึก...' : t('save')}
+              </button>
+            </div>
+          </form>
         </div>
 
         <div className="section-card profile-settings-card" data-testid="profile-change-password-card">
