@@ -48,23 +48,13 @@ async function getActiveStockBalanceCount() {
 }
 
 async function getStockQuantityTotal() {
-  const quantityResult = await supabase
+  const { data, error } = await supabase
     .from('tgd_stock_balances')
-    .select('quantity');
+    .select('qty_on_hand')
+    .gt('qty_on_hand', 0);
 
-  if (!quantityResult.error) {
-    return (quantityResult.data ?? []).reduce((total, row) => total + resolveQuantity(row), 0);
-  }
-
-  const legacyResult = await supabase
-    .from('tgd_stock_balances')
-    .select('qty_on_hand');
-
-  if (legacyResult.error) {
-    throw legacyResult.error;
-  }
-
-  return (legacyResult.data ?? []).reduce((total, row) => total + resolveQuantity(row), 0);
+  if (error) throw error;
+  return (data ?? []).reduce((total, row) => total + (Number(row.qty_on_hand) || 0), 0);
 }
 
 async function getActiveLocationCount() {

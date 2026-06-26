@@ -261,6 +261,12 @@ export function WarehouseLayoutWidget() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Polling fallback — refreshes map every 30 s even when Supabase Realtime is not enabled
+  useEffect(() => {
+    const interval = setInterval(() => setRefreshKey((k) => k + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   function handleLocClick(locId, locCode) {
     setStockModal({ locId, locCode });
     setStockItems([]);

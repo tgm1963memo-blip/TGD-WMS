@@ -65,6 +65,13 @@ export function DashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [session]);
 
+  // Polling fallback — fires every 30 s even when Supabase Realtime is not enabled
+  useEffect(() => {
+    if (!session?.user) return;
+    const interval = setInterval(() => setRefreshKey((k) => k + 1), 30000);
+    return () => clearInterval(interval);
+  }, [session]);
+
   const d = state.data;
   const loadingLabel = state.loading ? '...' : '—';
 
