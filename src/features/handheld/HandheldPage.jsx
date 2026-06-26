@@ -329,13 +329,16 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
 
 // ── Doc card ──────────────────────────────────────────────────
 function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, customerName, lotText, expText }) {
+  const hasBadges = Boolean(lotText || expText);
   return (
     <button type="button" onClick={onClick}
       style={{
-        display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box', textAlign: 'left',
+        display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 20, padding: '20px 24px', marginBottom: 16,
+        borderRadius: 20,
+        padding: hasBadges ? '20px 24px 22px' : '20px 24px',
+        marginBottom: 16,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
         borderLeft: `6px solid ${statusColor}`,
@@ -355,10 +358,10 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, c
         <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500, lineHeight: 1.5 }}>{dateStr}</span>
         {subText && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, lineHeight: 1.5, wordBreak: 'break-word' }}>· {subText}</span>}
       </div>
-      {(lotText || expText) && (
-        <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-          {lotText && <span style={{ fontSize: 12, color: C.textSec, fontWeight: 600, background: C.blueLight, borderRadius: 8, padding: '2px 8px' }}>LOT: {lotText}</span>}
-          {expText && <span style={{ fontSize: 12, color: C.amber, fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '2px 8px' }}>หมดอายุ: {expText}</span>}
+      {hasBadges && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {lotText && <span style={{ display: 'inline-block', fontSize: 12, color: C.textSec, fontWeight: 600, background: C.blueLight, borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>LOT: {lotText}</span>}
+          {expText && <span style={{ display: 'inline-block', fontSize: 12, color: C.amber, fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>หมดอายุ: {expText}</span>}
         </div>
       )}
     </button>
