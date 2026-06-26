@@ -211,7 +211,9 @@ export function CustomerDepositRequestListPage() {
                           <Link
                             className="btn btn-secondary btn-sm"
                             data-testid={`customer-deposit-view-${row.id}`}
-                            to={`/customer/deposit-request/${row.id}`}
+                            to={isRequestProxy
+                              ? `/customer/admin/deposit-review/${row.id}`
+                              : `/customer/deposit-request/${row.id}`}
                           >
                             {t('customer_request_view_button')}
                           </Link>

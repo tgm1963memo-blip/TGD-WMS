@@ -137,18 +137,12 @@ export async function getSectionsWithOccupancy() {
 
   const { data: stockRows } = await supabase
     .from('tgd_stock_balances')
-    .select('location_id, qty_on_hand, qty_allocated, qty_available')
+    .select('location_id, qty_on_hand, qty_allocated')
     .gt('qty_on_hand', 0);
 
-  // Occupied = net qty > 0 (prefer DB qty_available column; fall back to computed)
   const occupiedSet = new Set(
     (stockRows ?? [])
-      .filter((s) => {
-        const net = s.qty_available != null
-          ? Number(s.qty_available)
-          : Number(s.qty_on_hand || 0) - Number(s.qty_allocated || 0);
-        return s.location_id && net > 0;
-      })
+      .filter((s) => s.location_id && (Number(s.qty_on_hand || 0) - Number(s.qty_allocated || 0)) > 0)
       .map((s) => s.location_id)
   );
 
