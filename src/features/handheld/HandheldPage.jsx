@@ -436,6 +436,8 @@ function ReceivingWorkflow({ onBack, t }) {
   const [editMfgDate, setEditMfgDate] = useState('');
   const [editExpDate, setEditExpDate] = useState('');
   const [stickerItem, setStickerItem] = useState(null);
+  const [locationOccupied, setLocationOccupied] = useState(null);
+  const [locationCheckLoading, setLocationCheckLoading] = useState(false);
   const [addExtraOpen, setAddExtraOpen] = useState(false);
   const [extraProductName, setExtraProductName] = useState('');
   const [extraProductCode, setExtraProductCode] = useState('');
@@ -486,6 +488,16 @@ function ReceivingWorkflow({ onBack, t }) {
     );
     setSelectedLocation(match ?? null);
   }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
+
+  useEffect(() => {
+    setLocationOccupied(null);
+    if (!selectedLocation?.id) return;
+    setLocationCheckLoading(true);
+    checkLocationHasInventory(selectedLocation.id).then((occupied) => {
+      setLocationOccupied(occupied);
+      setLocationCheckLoading(false);
+    });
+  }, [selectedLocation?.id]);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
 
@@ -574,7 +586,7 @@ function ReceivingWorkflow({ onBack, t }) {
       line: matchedLine, boxes, weight, location: selectedLocation,
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
       confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      customerName: selectedDoc?.contact_name ?? '',
+      customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
     };
     setConfirmed((prev) => [confirmedItem, ...prev]);
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
@@ -582,7 +594,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
     setStickerItem(confirmedItem);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
-    setSelectedLocation(null); setMismatchWarned(false);
+    setSelectedLocation(null); setMismatchWarned(false); setLocationOccupied(null);
     setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
     setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
   }
@@ -997,6 +1009,19 @@ function ReceivingWorkflow({ onBack, t }) {
               </div>
             )}
 
+            {selectedLocation && locationOccupied && (
+              <div style={{ background: '#fef9c3', border: '1.5px solid #f59e0b', borderRadius: 14, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div>
+                  <div style={{ fontWeight: 800, color: '#92400e', fontSize: 14 }}>Location นี้มีสินค้าอยู่แล้ว</div>
+                  <div style={{ color: '#a16207', fontSize: 12, marginTop: 2 }}>Location <strong>{selectedLocation.code}</strong> มีสินค้าจัดเก็บอยู่แล้ว กรุณาตรวจสอบก่อนยืนยัน</div>
+                </div>
+              </div>
+            )}
+            {selectedLocation && locationCheckLoading && (
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 12, paddingLeft: 4 }}>กำลังตรวจสอบ location...</div>
+            )}
+
             <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
               style={{
                 width: '100%', padding: '20px', borderRadius: 20,
@@ -1201,12 +1226,32 @@ function PickingWorkflow({ onBack, t }) {
   function handleScan(val) {
     setScanValue(val);
     setEditWarned(false);
-    const q = val.trim().toLowerCase();
-    const match = lines.find((l) =>
-      (l.customer_product_code ?? '').toLowerCase() === q ||
-      (l.product_name ?? '').toLowerCase().includes(q) ||
-      (l.lot_no ?? '').toLowerCase() === q,
-    );
+    const raw = val.trim();
+
+    // Try to parse sticker QR JSON: {"c":customer,"p":product,"l":lot,"e":expiry,"loc":locationCode}
+    let qrData = null;
+    if (raw.startsWith('{')) {
+      try { qrData = JSON.parse(raw); } catch { /* not JSON */ }
+    }
+
+    let match = null;
+    if (qrData) {
+      const qrLot = (qrData.l ?? '').toLowerCase();
+      const qrProduct = (qrData.p ?? '').toLowerCase();
+      const qrLoc = (qrData.loc ?? '').toLowerCase();
+      // Match by lot first (most specific), then by location code, then by product name
+      match = lines.find((l) => qrLot && (l.lot_no ?? '').toLowerCase() === qrLot)
+        ?? lines.find((l) => qrLoc && (l.location ?? '').toLowerCase() === qrLoc)
+        ?? lines.find((l) => qrProduct && (l.product_name ?? '').toLowerCase().includes(qrProduct));
+    } else {
+      const q = raw.toLowerCase();
+      match = lines.find((l) =>
+        (l.customer_product_code ?? '').toLowerCase() === q ||
+        (l.product_name ?? '').toLowerCase().includes(q) ||
+        (l.lot_no ?? '').toLowerCase() === q,
+      );
+    }
+
     if (match) {
       triggerSuccessFeedback();
       setMatchedLine(match);
