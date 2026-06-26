@@ -39,22 +39,31 @@ async function getRowCount(tableName) {
 }
 
 async function getActiveStockBalanceCount() {
+  // Use qty_on_hand for count-only queries — PostgREST doesn't support filtering on
+  // generated columns when using count:exact + head:true
   const { count, error } = await supabase
     .from('tgd_stock_balances')
     .select('*', { count: 'exact', head: true })
-    .gt('qty_available', 0);
+    .gt('qty_on_hand', 0);
   if (error) throw error;
   return count ?? 0;
 }
 
 async function getStockQuantityTotal() {
+  // Select both columns explicitly; qty_available = qty_on_hand - qty_allocated (DB column)
   const { data, error } = await supabase
     .from('tgd_stock_balances')
-    .select('qty_available')
-    .gt('qty_available', 0);
+    .select('qty_on_hand, qty_allocated, qty_available')
+    .gt('qty_on_hand', 0);
 
   if (error) throw error;
-  return (data ?? []).reduce((total, row) => total + Math.max(0, Number(row.qty_available || 0)), 0);
+  return (data ?? []).reduce((total, row) => {
+    // Prefer qty_available if present in the result, otherwise compute net
+    const net = row.qty_available != null
+      ? Number(row.qty_available)
+      : Number(row.qty_on_hand || 0) - Number(row.qty_allocated || 0);
+    return total + Math.max(0, net);
+  }, 0);
 }
 
 async function getActiveLocationCount() {

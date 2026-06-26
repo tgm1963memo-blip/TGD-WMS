@@ -668,14 +668,14 @@ function ReceivingWorkflow({ onBack, t }) {
           {/* Filters */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
             <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
-              style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+              style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }}>
               <option value="">ลูกค้าทุกราย</option>
               {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
-              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
             <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
-              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
             {hasFilter && (
               <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
                 style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
@@ -1310,14 +1310,14 @@ function PickingWorkflow({ onBack, t }) {
               <>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                   <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
-                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }}>
                     <option value="">ลูกค้าทุกราย</option>
                     {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
-                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
-                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   {hasFilter && (
                     <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
                       style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
@@ -1714,14 +1714,14 @@ function LocationUpdateWorkflow({ onBack, t }) {
               <>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                   <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
-                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }}>
                     <option value="">ลูกค้าทุกราย</option>
                     {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
-                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
-                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   {hasFilter && (
                     <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
                       style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
