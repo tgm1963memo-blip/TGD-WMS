@@ -25,7 +25,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Git Commit** | _(set after final commit)_ |
+| **Git Commit** | `9af962f23b73238b881e517d9401b47d5ac06346` |
 | **Release Tag** | `v1.0.0` |
 | **Production URL** | https://tgc-wms.vercel.app |
 | **Supabase Project** | lievvsqbosvrolkrftna |

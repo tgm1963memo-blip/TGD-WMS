@@ -97,10 +97,9 @@ test.describe('Master Loop 1: Withdrawal Status Machine', () => {
   test('L1-01 — Admin review page is accessible', async ({ page }) => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/customer/admin/withdrawal-review`);
-    const visible = await page.locator('[data-testid="customer-admin-withdrawal-review-page"]')
-      .isVisible({ timeout: 20000 });
-    loop.steps.push({ step: 'L1-01', status: visible ? 'PASS' : 'FAIL', note: 'Admin review page load' });
-    expect(visible).toBe(true);
+    const reviewPage = page.locator('[data-testid="customer-admin-withdrawal-review-page"]');
+    await expect(reviewPage).toBeVisible({ timeout: 20000 });
+    loop.steps.push({ step: 'L1-01', status: 'PASS', note: 'Admin review page load' });
     await screenshot(page, 'L1-01-review-page.png');
   });
 
@@ -377,9 +376,8 @@ test.describe('Master Loop 5: Handheld Picking Smoke', () => {
   test('L5-01 — Handheld page renders', async ({ page }) => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/handheld`);
-    const visible = await page.locator('[data-testid="handheld-page"]').isVisible({ timeout: 20000 });
-    loop.steps.push({ step: 'L5-01', status: visible ? 'PASS' : 'FAIL', note: 'Handheld page render' });
-    expect(visible).toBe(true);
+    await expect(page.locator('[data-testid="handheld-page"]')).toBeVisible({ timeout: 20000 });
+    loop.steps.push({ step: 'L5-01', status: 'PASS', note: 'Handheld page render' });
     await screenshot(page, 'L5-01-handheld.png');
   });
 
@@ -424,10 +422,9 @@ test.describe('Master Loop 6: Role Permission Guard', () => {
   test('L6-01 — Admin can access withdrawal review page', async ({ page }) => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/customer/admin/withdrawal-review`);
-    const visible = await page.locator('[data-testid="customer-admin-withdrawal-review-page"]')
-      .isVisible({ timeout: 20000 });
-    loop.steps.push({ step: 'L6-01', status: visible ? 'PASS' : 'FAIL', note: 'Admin access withdrawal review' });
-    expect(visible).toBe(true);
+    await expect(page.locator('[data-testid="customer-admin-withdrawal-review-page"]'))
+      .toBeVisible({ timeout: 20000 });
+    loop.steps.push({ step: 'L6-01', status: 'PASS', note: 'Admin access withdrawal review' });
     await screenshot(page, 'L6-01-admin-access.png');
   });
 
@@ -435,9 +432,8 @@ test.describe('Master Loop 6: Role Permission Guard', () => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/inventory`);
     await page.waitForLoadState('domcontentloaded');
-    const pageShell = await page.locator('.page-shell').isVisible({ timeout: 15000 });
-    loop.steps.push({ step: 'L6-02', status: pageShell ? 'PASS' : 'FAIL', note: 'Admin access inventory' });
-    expect(pageShell).toBe(true);
+    await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 15000 });
+    loop.steps.push({ step: 'L6-02', status: 'PASS', note: 'Admin access inventory' });
     await screenshot(page, 'L6-02-admin-inventory.png');
   });
 
@@ -445,9 +441,8 @@ test.describe('Master Loop 6: Role Permission Guard', () => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/reports/movement-ledger`);
     await page.waitForLoadState('domcontentloaded');
-    const pageShell = await page.locator('.page-shell').isVisible({ timeout: 15000 });
-    loop.steps.push({ step: 'L6-03', status: pageShell ? 'PASS' : 'FAIL', note: 'Admin access ledger' });
-    expect(pageShell).toBe(true);
+    await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 15000 });
+    loop.steps.push({ step: 'L6-03', status: 'PASS', note: 'Admin access ledger' });
     await screenshot(page, 'L6-03-admin-ledger.png');
   });
 

@@ -1,0 +1,14 @@
+const fs = require('fs');
+const readline = require('readline');
+async function processLineByLine() {
+  const fileStream = fs.createReadStream('test-results/temp_trace_10/0-trace.trace');
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    const evt = JSON.parse(line);
+    if (evt.type === 'console') {
+      console.log(evt.type, evt.text || evt.message || evt);
+    }
+  }
+}
+processLineByLine();

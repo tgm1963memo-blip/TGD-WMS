@@ -23,7 +23,7 @@ export async function logout(page) {
   const baseUrl = getBaseUrl();
   const logoutButton = page.locator('[data-testid="logout-button"]');
 
-  if (await logoutButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+  if (await isVisibleWithTimeout(logoutButton, 3000)) {
     await logoutButton.click();
     await page.waitForURL(/\/login(?:\?.*)?$/, { timeout: 20000 });
     await waitForLoginForm(page);
@@ -43,7 +43,7 @@ export async function login(page, credentials = {}) {
   const appShell = page.locator('[data-testid="app-shell"]');
   const sessionEmail = page.locator('[data-testid="user-session-email"]');
 
-  if (await appShell.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await isVisibleWithTimeout(appShell, 2000)) {
     const currentEmail = (await sessionEmail.textContent().catch(() => ''))?.trim();
     if (currentEmail === email) {
       return;
@@ -84,6 +84,15 @@ export async function login(page, credentials = {}) {
   await page.waitForResponse(res => res.url().includes('tgd_user_profiles'), { timeout: 5000 }).catch(() => {});
   await page.waitForResponse(res => res.url().includes('tgd_role_definitions'), { timeout: 5000 }).catch(() => {});
   await page.waitForLoadState('networkidle').catch(() => {});
+}
+
+export async function isVisibleWithTimeout(locator, timeout = 5000) {
+  try {
+    await expect(locator).toBeVisible({ timeout });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function gotoUrl(page, url) {
