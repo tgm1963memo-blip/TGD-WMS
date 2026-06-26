@@ -5,6 +5,7 @@ import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLa
 import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
+  listDepositLineSummariesForDocs,
   recordDepositLineActualReceipt,
   updateDepositLineLocation,
   upsertCustomerDepositRequestLine,
@@ -12,6 +13,7 @@ import {
 import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
+  listWithdrawalLineSummariesForDocs,
   reviewCustomerWithdrawalRequest,
   recordWithdrawalLinePick,
 } from '../../services/customerWithdrawalRequestService.js';
@@ -326,30 +328,39 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
 }
 
 // ── Doc card ──────────────────────────────────────────────────
-function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText }) {
+function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, customerName, lotText, expText }) {
   return (
     <button type="button" onClick={onClick}
       style={{
         display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 20, padding: '32px 24px', marginBottom: 16,
+        borderRadius: 20, padding: '20px 24px', marginBottom: 16,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
         borderLeft: `6px solid ${statusColor}`,
         transition: 'transform 0.2s, box-shadow 0.2s',
       }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8, width: '100%' }}>
         <span style={{
           fontFamily: 'monospace', fontWeight: 900, fontSize: 15, color: C.text, letterSpacing: '0.02em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, lineHeight: 1.4,
         }}>{docNo}</span>
         <Pill label={statusLabel} color={statusColor} />
       </div>
+      {customerName && (
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 700, marginBottom: 4, lineHeight: 1.5 }}>{customerName}</div>
+      )}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
         <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500, lineHeight: 1.5 }}>{dateStr}</span>
         {subText && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, lineHeight: 1.5, wordBreak: 'break-word' }}>· {subText}</span>}
       </div>
+      {(lotText || expText) && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+          {lotText && <span style={{ fontSize: 12, color: C.textSec, fontWeight: 600, background: C.blueLight, borderRadius: 8, padding: '2px 8px' }}>LOT: {lotText}</span>}
+          {expText && <span style={{ fontSize: 12, color: C.amber, fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '2px 8px' }}>หมดอายุ: {expText}</span>}
+        </div>
+      )}
     </button>
   );
 }
@@ -389,6 +400,10 @@ function SortDropdown({ sortType, setSortType }) {
 function ReceivingWorkflow({ onBack, t }) {
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [docLineSummary, setDocLineSummary] = useState({});
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
@@ -467,8 +482,19 @@ function ReceivingWorkflow({ onBack, t }) {
 
   useEffect(() => {
     listCustomerDepositRequests({ statusIn: ['WAREHOUSE_RECEIVING', 'ADMIN_ACCEPTED'] }).then((r) => {
-      setDocs(r.data ?? []);
+      const loaded = r.data ?? [];
+      setDocs(loaded);
       setDocsLoading(false);
+      const ids = loaded.map((d) => d.id);
+      listDepositLineSummariesForDocs(ids).then((sr) => {
+        const map = {};
+        (sr.data ?? []).forEach((l) => {
+          if (!map[l.deposit_request_id]) map[l.deposit_request_id] = { lots: [], exps: [] };
+          if (l.lot_no) map[l.deposit_request_id].lots.push(l.lot_no);
+          if (l.exp_date) map[l.deposit_request_id].exps.push(l.exp_date);
+        });
+        setDocLineSummary(map);
+      });
     });
     getActiveLocations().then(({ data }) => setLocations(data ?? []));
   }, []);
@@ -612,39 +638,80 @@ function ReceivingWorkflow({ onBack, t }) {
   }, [lines, sortType]);
 
   if (!selectedDoc) {
+    const customerOptions = [...new Map(
+      docs.map((d) => ({ id: d.customer_id, name: d.customer?.customer_name || d.customer?.name || d.customer_id }))
+        .filter((c) => c.id)
+        .map((c) => [c.id, c])
+    ).values()];
+    const filteredDocs = docs.filter((d) => {
+      if (filterCustomer && d.customer_id !== filterCustomer) return false;
+      const date = d.expected_arrival_date ?? '';
+      if (filterDateFrom && date < filterDateFrom) return false;
+      if (filterDateTo && date > filterDateTo) return false;
+      return true;
+    });
+    const hasFilter = filterCustomer || filterDateFrom || filterDateTo;
     return (
       <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
       <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 10px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
+              style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+              <option value="">ลูกค้าทุกราย</option>
+              {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+            <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+              style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+            {hasFilter && (
+              <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
+                ล้าง
+              </button>
+            )}
+          </div>
           {docsLoading ? (
             <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
-          ) : docs.length === 0 ? (
+          ) : filteredDocs.length === 0 ? (
             <div style={{
               textAlign: 'center', padding: '60px 24px',
               background: C.card, borderRadius: 24, marginTop: 8,
               border: `1px solid ${C.border}`, boxShadow: C.shadow,
             }}>
               <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>{`{ }`}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอรับสินค้า</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>{hasFilter ? 'ไม่พบใบงานที่ตรงกับเงื่อนไข' : 'ไม่มีใบงานที่รอรับสินค้า'}</div>
               <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับเข้าคลัง" จะปรากฏที่นี่</div>
             </div>
           ) : (
             <>
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
+                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {filteredDocs.length} ใบงาน</span>
               </div>
-              {docs.map((doc) => (
-                <DocCard
-                  key={doc.id}
-                  onClick={() => pickDoc(doc)}
-                  docNo={doc.request_no}
-                  statusLabel={getDepositStatusLabel(doc.status, t)}
-                  statusColor={doc.status === 'ADMIN_ACCEPTED' ? C.receiveAccent : C.green}
-                  dateStr={doc.expected_arrival_date ?? '-'}
-                  subText={doc.contact_name}
-                />
-              ))}
+              {filteredDocs.map((doc) => {
+                const summary = docLineSummary[doc.id];
+                const lots = summary?.lots ?? [];
+                const exps = summary?.exps ?? [];
+                const uniqueLots = [...new Set(lots)];
+                const uniqueExps = [...new Set(exps)].sort();
+                return (
+                  <DocCard
+                    key={doc.id}
+                    onClick={() => pickDoc(doc)}
+                    docNo={doc.request_no}
+                    statusLabel={getDepositStatusLabel(doc.status, t)}
+                    statusColor={doc.status === 'ADMIN_ACCEPTED' ? C.receiveAccent : C.green}
+                    dateStr={doc.expected_arrival_date ?? '-'}
+                    subText={doc.contact_name}
+                    customerName={doc.customer?.customer_name || doc.customer?.name || null}
+                    lotText={uniqueLots.length ? uniqueLots.join(', ') : null}
+                    expText={uniqueExps.length ? uniqueExps[0] + (uniqueExps.length > 1 ? ` +${uniqueExps.length - 1}` : '') : null}
+                  />
+                );
+              })}
             </>
           )}
         </div>
@@ -1065,6 +1132,10 @@ function ReceivingWorkflow({ onBack, t }) {
 function PickingWorkflow({ onBack, t }) {
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [docLineSummary, setDocLineSummary] = useState({});
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
@@ -1085,8 +1156,19 @@ function PickingWorkflow({ onBack, t }) {
 
   useEffect(() => {
     listCustomerWithdrawalRequests({ statusIn: ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'] }).then((r) => {
-      setDocs(r.data ?? []);
+      const loaded = r.data ?? [];
+      setDocs(loaded);
       setDocsLoading(false);
+      const ids = loaded.map((d) => d.id);
+      listWithdrawalLineSummariesForDocs(ids).then((sr) => {
+        const map = {};
+        (sr.data ?? []).forEach((l) => {
+          if (!map[l.withdrawal_request_id]) map[l.withdrawal_request_id] = { lots: [], exps: [] };
+          if (l.lot_no) map[l.withdrawal_request_id].lots.push(l.lot_no);
+          if (l.exp_date) map[l.withdrawal_request_id].exps.push(l.exp_date);
+        });
+        setDocLineSummary(map);
+      });
     });
   }, []);
 
@@ -1201,37 +1283,80 @@ function PickingWorkflow({ onBack, t }) {
       <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 24px', flex: 1, overflowY: 'auto' }}>
-          {docsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
-          ) : docs.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: '60px 24px',
-              background: C.card, borderRadius: 24, marginTop: 8,
-              border: `1px solid ${C.border}`, boxShadow: C.shadow,
-            }}>
-              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>{`{ }`}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รอหยิบสินค้า</div>
-              <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "หยิบสินค้า" จะปรากฏที่นี่</div>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
-              </div>
-              {docs.map((doc) => (
-                <DocCard
-                  key={doc.id}
-                  onClick={() => pickDoc(doc)}
-                  docNo={doc.withdrawal_no}
-                  statusLabel={getWithdrawalStatusLabel(doc.status, t)}
-                  statusColor={C.pickAccent}
-                  dateStr={doc.requested_dispatch_date ?? '-'}
-                  subText={doc.delivery_type}
-                />
-              ))}
-            </>
-          )}
+        <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>
+          {(() => {
+            const customerOptions = [...new Map(
+              docs.map((d) => ({ id: d.customer_id, name: d.customer?.customer_name || d.customer?.name || d.customer_id }))
+                .filter((c) => c.id).map((c) => [c.id, c])
+            ).values()];
+            const filteredDocs = docs.filter((d) => {
+              if (filterCustomer && d.customer_id !== filterCustomer) return false;
+              const date = d.requested_dispatch_date ?? '';
+              if (filterDateFrom && date < filterDateFrom) return false;
+              if (filterDateTo && date > filterDateTo) return false;
+              return true;
+            });
+            const hasFilter = filterCustomer || filterDateFrom || filterDateTo;
+            return (
+              <>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
+                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+                    <option value="">ลูกค้าทุกราย</option>
+                    {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                  <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                  {hasFilter && (
+                    <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                      style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
+                      ล้าง
+                    </button>
+                  )}
+                </div>
+                {docsLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
+                ) : filteredDocs.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center', padding: '60px 24px',
+                    background: C.card, borderRadius: 24, marginTop: 8,
+                    border: `1px solid ${C.border}`, boxShadow: C.shadow,
+                  }}>
+                    <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>{`{ }`}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>{hasFilter ? 'ไม่พบใบงานที่ตรงกับเงื่อนไข' : 'ไม่มีใบงานที่รอหยิบสินค้า'}</div>
+                    <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "หยิบสินค้า" จะปรากฏที่นี่</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {filteredDocs.length} ใบงาน</span>
+                    </div>
+                    {filteredDocs.map((doc) => {
+                      const summary = docLineSummary[doc.id];
+                      const uniqueLots = [...new Set(summary?.lots ?? [])];
+                      const uniqueExps = [...new Set(summary?.exps ?? [])].sort();
+                      return (
+                        <DocCard
+                          key={doc.id}
+                          onClick={() => pickDoc(doc)}
+                          docNo={doc.withdrawal_no}
+                          statusLabel={getWithdrawalStatusLabel(doc.status, t)}
+                          statusColor={C.pickAccent}
+                          dateStr={doc.requested_dispatch_date ?? '-'}
+                          subText={doc.delivery_type}
+                          customerName={doc.customer?.customer_name || doc.customer?.name || null}
+                          lotText={uniqueLots.length ? uniqueLots.join(', ') : null}
+                          expText={uniqueExps.length ? uniqueExps[0] + (uniqueExps.length > 1 ? ` +${uniqueExps.length - 1}` : '') : null}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
       </div>
@@ -1464,6 +1589,10 @@ function PickingWorkflow({ onBack, t }) {
 function LocationUpdateWorkflow({ onBack, t }) {
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [docLineSummary, setDocLineSummary] = useState({});
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
@@ -1501,8 +1630,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   useEffect(() => {
     listCustomerDepositRequests({ statusIn: ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'] }).then((r) => {
-      setDocs(r.data ?? []);
+      const loaded = r.data ?? [];
+      setDocs(loaded);
       setDocsLoading(false);
+      const ids = loaded.map((d) => d.id);
+      listDepositLineSummariesForDocs(ids).then((sr) => {
+        const map = {};
+        (sr.data ?? []).forEach((l) => {
+          if (!map[l.deposit_request_id]) map[l.deposit_request_id] = { lots: [], exps: [] };
+          if (l.lot_no) map[l.deposit_request_id].lots.push(l.lot_no);
+          if (l.exp_date) map[l.deposit_request_id].exps.push(l.exp_date);
+        });
+        setDocLineSummary(map);
+      });
     });
     getActiveLocations().then(({ data }) => setLocations(data ?? []));
   }, []);
@@ -1547,31 +1687,74 @@ function LocationUpdateWorkflow({ onBack, t }) {
       <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
-        <div style={{ padding: '24px 10px', flex: 1, overflowY: 'auto' }}>
-          {docsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
-          ) : docs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 24px', background: C.card, borderRadius: 24, marginTop: 8, border: `1px solid ${C.border}`, boxShadow: C.shadow }}>
-              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>📍</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>ไม่มีใบงานที่รับแล้ว</div>
-              <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับแล้ว" จะปรากฏที่นี่</div>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {docs.length} ใบงาน</span>
-              </div>
-              {docs.map((doc) => (
-                <DocCard key={doc.id} onClick={() => pickDoc(doc)}
-                  docNo={doc.request_no}
-                  statusLabel={getDepositStatusLabel(doc.status, t)}
-                  statusColor="#6366f1"
-                  dateStr={doc.expected_arrival_date ?? '-'}
-                  subText={doc.contact_name}
-                />
-              ))}
-            </>
-          )}
+        <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
+          {(() => {
+            const customerOptions = [...new Map(
+              docs.map((d) => ({ id: d.customer_id, name: d.customer?.customer_name || d.customer?.name || d.customer_id }))
+                .filter((c) => c.id).map((c) => [c.id, c])
+            ).values()];
+            const filteredDocs = docs.filter((d) => {
+              if (filterCustomer && d.customer_id !== filterCustomer) return false;
+              const date = d.expected_arrival_date ?? '';
+              if (filterDateFrom && date < filterDateFrom) return false;
+              if (filterDateTo && date > filterDateTo) return false;
+              return true;
+            });
+            const hasFilter = filterCustomer || filterDateFrom || filterDateTo;
+            return (
+              <>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
+                    style={{ flex: '1 1 160px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text, outline: 'none' }}>
+                    <option value="">ลูกค้าทุกราย</option>
+                    {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                  <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+                    style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                  {hasFilter && (
+                    <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                      style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: C.textSec, cursor: 'pointer' }}>
+                      ล้าง
+                    </button>
+                  )}
+                </div>
+                {docsLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
+                ) : filteredDocs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 24px', background: C.card, borderRadius: 24, marginTop: 8, border: `1px solid ${C.border}`, boxShadow: C.shadow }}>
+                    <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>📍</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>{hasFilter ? 'ไม่พบใบงานที่ตรงกับเงื่อนไข' : 'ไม่มีใบงานที่รับแล้ว'}</div>
+                    <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับแล้ว" จะปรากฏที่นี่</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <span style={{ fontSize: 14, color: C.textSec, fontWeight: 800 }}>พบ {filteredDocs.length} ใบงาน</span>
+                    </div>
+                    {filteredDocs.map((doc) => {
+                      const summary = docLineSummary[doc.id];
+                      const uniqueLots = [...new Set(summary?.lots ?? [])];
+                      const uniqueExps = [...new Set(summary?.exps ?? [])].sort();
+                      return (
+                        <DocCard key={doc.id} onClick={() => pickDoc(doc)}
+                          docNo={doc.request_no}
+                          statusLabel={getDepositStatusLabel(doc.status, t)}
+                          statusColor="#6366f1"
+                          dateStr={doc.expected_arrival_date ?? '-'}
+                          subText={doc.contact_name}
+                          customerName={doc.customer?.customer_name || doc.customer?.name || null}
+                          lotText={uniqueLots.length ? uniqueLots.join(', ') : null}
+                          expText={uniqueExps.length ? uniqueExps[0] + (uniqueExps.length > 1 ? ` +${uniqueExps.length - 1}` : '') : null}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
       </div>

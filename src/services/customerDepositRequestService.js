@@ -178,6 +178,14 @@ export async function listCustomerDepositRequestLines(requestId) {
     .order('line_no', { ascending: true });
 }
 
+export async function listDepositLineSummariesForDocs(docIds) {
+  if (!supabase || !docIds?.length) return { data: [], error: null };
+  return supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('deposit_request_id, lot_no, exp_date')
+    .in('deposit_request_id', docIds);
+}
+
 export async function createCustomerDepositRequest({
   expectedArrivalDate,
   contactName,

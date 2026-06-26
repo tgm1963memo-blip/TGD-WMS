@@ -21,6 +21,9 @@ export function CustomerDepositRequestListPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const PAGE_SIZE = 5;
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
@@ -65,17 +68,21 @@ export function CustomerDepositRequestListPage() {
 
   const columnCount = isRequestProxy ? 9 : 8;
   const q = searchText.trim().toLowerCase();
-  const filteredData = q
-    ? sortedData.filter((row) => {
-        const customerName = (customerNames[row.customer_id] ?? '').toLowerCase();
-        return (
-          (row.request_no ?? '').toLowerCase().includes(q) ||
-          (row.status ?? '').toLowerCase().includes(q) ||
-          (row.note ?? '').toLowerCase().includes(q) ||
-          customerName.includes(q)
-        );
-      })
-    : sortedData;
+  const filteredData = sortedData.filter((row) => {
+    if (q) {
+      const customerName = (customerNames[row.customer_id] ?? '').toLowerCase();
+      const textMatch = (row.request_no ?? '').toLowerCase().includes(q) ||
+        (row.status ?? '').toLowerCase().includes(q) ||
+        (row.note ?? '').toLowerCase().includes(q) ||
+        customerName.includes(q);
+      if (!textMatch) return false;
+    }
+    if (filterCustomer && row.customer_id !== filterCustomer) return false;
+    const date = row.expected_arrival_date ?? '';
+    if (filterDateFrom && date < filterDateFrom) return false;
+    if (filterDateTo && date > filterDateTo) return false;
+    return true;
+  });
   const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
   const pagedData = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -124,16 +131,38 @@ export function CustomerDepositRequestListPage() {
       <div className="table-card">
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
-          <div style={{ marginLeft: 'auto' }}>
-            <input
-              className="form-input"
-              onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
-              placeholder="ค้นหาเลขที่ / สถานะ / หมายเหตุ..."
-              style={{ minWidth: 220 }}
-              type="text"
-              value={searchText}
-            />
-          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 20px 16px' }}>
+          <input
+            className="form-input"
+            onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
+            placeholder="ค้นหาเลขที่ / สถานะ / หมายเหตุ..."
+            style={{ flex: '1 1 200px', minWidth: 180 }}
+            type="text"
+            value={searchText}
+          />
+          {isRequestProxy && (
+            <select className="form-input" value={filterCustomer} onChange={(e) => { setFilterCustomer(e.target.value); setCurrentPage(1); }}
+              style={{ flex: '1 1 160px', minWidth: 160 }}>
+              <option value="">-- ลูกค้าทุกราย --</option>
+              {Object.entries(customerNames).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          )}
+          <input className="form-input" type="date" value={filterDateFrom}
+            onChange={(e) => { setFilterDateFrom(e.target.value); setCurrentPage(1); }}
+            style={{ flex: '1 1 140px', minWidth: 140 }} title="วันที่แจ้งฝาก (ตั้งแต่)" />
+          <input className="form-input" type="date" value={filterDateTo}
+            onChange={(e) => { setFilterDateTo(e.target.value); setCurrentPage(1); }}
+            style={{ flex: '1 1 140px', minWidth: 140 }} title="วันที่แจ้งฝาก (ถึง)" />
+          {(searchText || filterCustomer || filterDateFrom || filterDateTo) && (
+            <button type="button" className="btn"
+              onClick={() => { setSearchText(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); setCurrentPage(1); }}
+              style={{ background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}>
+              ล้างตัวกรอง
+            </button>
+          )}
         </div>
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">

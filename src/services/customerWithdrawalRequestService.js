@@ -90,6 +90,14 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
     .order('line_no', { ascending: true });
 }
 
+export async function listWithdrawalLineSummariesForDocs(docIds) {
+  if (!supabase || !docIds?.length) return { data: [], error: null };
+  return supabase
+    .from('tgd_customer_withdrawal_request_lines')
+    .select('withdrawal_request_id, lot_no, exp_date')
+    .in('withdrawal_request_id', docIds);
+}
+
 export async function createCustomerWithdrawalRequest({
   requestedDispatchDate,
   deliveryType,
