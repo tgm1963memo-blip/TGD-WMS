@@ -6,6 +6,14 @@ function fmtNum(v, decimals = 3) {
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '-';
 }
+function fmtDT(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
+}
 
 const NCOLS = 10;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
@@ -179,19 +187,32 @@ export function CustomerWithdrawalRequestPrintDocument({
           {/* Signatures row */}
           <tr>
             <td colSpan={NCOLS} style={{ border: 'none', padding: '12px 8px 8px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
-                {[
-                  { label: 'ISSUED BY', sub: '(CUSTOMER SERVICE)' },
-                  { label: 'CHECKER', sub: 'DATE ___/___/___' },
-                  { label: 'APPROVED BY', sub: '(SUPV / ASST.MGR / MGR)' },
-                  { label: 'RECEIVED BY', sub: 'DATE ___/___/___' },
-                ].map(({ label, sub }) => (
-                  <div key={label} style={{ textAlign: 'center' }}>
-                    <div style={{ borderTop: '1px solid #000', paddingTop: 4 }}>{label}</div>
-                    <div style={{ color: '#666', fontSize: 9 }}>{sub}</div>
+              {(() => {
+                const issuedBy = header.created_by_email ?? null;
+                const issuedAt = fmtDT(header.submitted_at ?? header.created_at);
+                const checkerBy = header.last_action_by_email ?? null;
+                const checkerAt = fmtDT(header.last_action_at);
+                const approvedAt = fmtDT(header.reviewed_at);
+                const pickedBy = lines.find((l) => l.picked_by_email)?.picked_by_email ?? null;
+                const pickedAt = fmtDT(lines.find((l) => l.picked_at)?.picked_at);
+                const sigs = [
+                  { label: 'ISSUED BY', name: issuedBy ?? '(CUSTOMER SERVICE)', dt: issuedAt },
+                  { label: 'CHECKER', name: checkerBy ?? null, dt: checkerAt },
+                  { label: 'APPROVED BY', name: null, dt: approvedAt },
+                  { label: 'RECEIVED BY', name: pickedBy ?? null, dt: pickedAt },
+                ];
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
+                    {sigs.map(({ label, name, dt }) => (
+                      <div key={label} style={{ textAlign: 'center' }}>
+                        <div style={{ borderTop: '1px solid #000', paddingTop: 4 }}>{label}</div>
+                        <div style={{ color: '#444', fontSize: 9, marginTop: 2 }}>{name ?? '____________________'}</div>
+                        {dt && <div style={{ color: '#888', fontSize: 8 }}>{dt}</div>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', borderTop: '1px solid #ccc', paddingTop: 6, fontSize: 10, flexWrap: 'wrap' }}>
                 {[
                   ['TRUCK NO', 100],

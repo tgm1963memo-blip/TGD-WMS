@@ -3,6 +3,14 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtNum(v) { return v != null && v !== '' ? Number(v).toLocaleString() : '-'; }
+function fmtDT(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
+}
 
 export function CustomerDepositStaffWorkOrderPrint({
   header,
@@ -159,18 +167,30 @@ export function CustomerDepositStaffWorkOrderPrint({
       </p>
 
       {/* Signature section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 32, fontSize: 12 }}>
-        <div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>ISSUED / CHECKED BY</div>
-          <div style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>
-            {header.issued_by ?? '(CUSTOMER SERVICE)'}
+      {(() => {
+        const issuedBy = header.handheld_received_by_email ?? header.last_action_by_email ?? header.created_by_email ?? null;
+        const issuedAt = fmtDT(header.last_action_at ?? header.submitted_at ?? header.created_at);
+        const approvedBy = header.web_approved_by_email ?? null;
+        const approvedAt = fmtDT(header.reviewed_at);
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 32, fontSize: 12 }}>
+            <div>
+              <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>ISSUED / CHECKED BY</div>
+              <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>
+                {issuedBy ?? '(CUSTOMER SERVICE)'}
+              </div>
+              {issuedAt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{issuedAt}</div>}
+            </div>
+            <div>
+              <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>APPROVED BY</div>
+              <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>
+                {approvedBy ?? '(SUPV / ASST.MGR / MGR)'}
+              </div>
+              {approvedAt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{approvedAt}</div>}
+            </div>
           </div>
-        </div>
-        <div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>APPROVED BY</div>
-          <div style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>(SUPV / ASST.MGR / MGR)</div>
-        </div>
-      </div>
+        );
+      })()}
     </article>
   );
 }

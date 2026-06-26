@@ -36,9 +36,9 @@ export const DOCUMENT_BRANDING_LOGO_RULES = Object.freeze({
 export const DEFAULT_DOCUMENT_BRANDING = {
   company_name_th: 'บริษัท ทีจี โคลด์ สตอเรจ จำกัด',
   company_name_en: 'TG Cold Storage Co., Ltd.',
-  company_address_th: 'ที่อยู่บริษัทสำหรับเอกสารคลังเย็น',
-  company_address_en: 'Company address for cold storage documents',
-  tax_id: '',
+  company_address_th: '78/3 หมู่ 2 นิคมอุตสาหกรรมเวลโกรว์ ซอย 8 ถนนเทพรัตน์ (หล.34) ตำบลพิมพา อำเภอบางปะกง จังหวัดฉะเชิงเทรา',
+  company_address_en: '78/3 Moo 2 Wellgrow Industrial Estate Soi 8, Theparat Rd. (Hwy 34), Phimpha, Bang Pakong, Chachoengsao',
+  tax_id: '0105569101151',
   phone: '',
   email: '',
   website: '',
