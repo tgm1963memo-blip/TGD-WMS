@@ -29,6 +29,7 @@ function statusBadgeClass(status) {
 
 function RequestTimelineCell({ documentType, documentId }) {
   const [events, setEvents] = useState([]);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -39,21 +40,56 @@ function RequestTimelineCell({ documentType, documentId }) {
       setEvents(result.data ?? []);
     });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [documentId, documentType]);
 
-  if (!events.length) {
-    return <span>-</span>;
-  }
+  if (!events.length) return <span>-</span>;
+
+  const latest = events[events.length - 1];
+  const latestLabel = `${latest.action} (${latest.to_status ?? latest.from_status ?? '-'})`;
 
   return (
-    <ol className="customer-request-mini-timeline" data-testid="customer-request-status-timeline">
-      {events.map((event) => (
-        <li key={event.id}>{event.action} ({event.to_status ?? event.from_status ?? '-'})</li>
-      ))}
-    </ol>
+    <div data-testid="customer-request-status-timeline" style={{ minWidth: 200 }}>
+      {/* Latest step — always visible */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{
+          display: 'inline-block', fontSize: 11, fontWeight: 600,
+          padding: '2px 8px', borderRadius: 20,
+          background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0',
+          whiteSpace: 'nowrap',
+        }}>
+          {events.length}. {latestLabel}
+        </span>
+        {events.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 11, color: '#64748b', padding: '2px 4px',
+              textDecoration: 'underline', whiteSpace: 'nowrap',
+            }}
+          >
+            {expanded ? 'ย่อ' : `ดูทั้งหมด (${events.length})`}
+          </button>
+        )}
+      </div>
+
+      {/* Expanded full timeline */}
+      {expanded && (
+        <ol className="customer-request-mini-timeline" style={{ marginTop: 6 }}>
+          {events.map((event, idx) => (
+            <li key={event.id} style={{
+              fontSize: 11,
+              fontWeight: idx === events.length - 1 ? 700 : 400,
+              color: idx === events.length - 1 ? '#059669' : '#475569',
+            }}>
+              {event.action} ({event.to_status ?? event.from_status ?? '-'})
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 

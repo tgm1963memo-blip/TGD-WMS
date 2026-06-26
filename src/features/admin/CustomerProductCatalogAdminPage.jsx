@@ -192,23 +192,14 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-            <label className="form-field" style={{ margin: 0 }}>
-              <span>อุณหภูมิ</span>
-              <select className="form-control" onChange={(e) => onFieldChange('temperatureType', e.target.value)} value={form.temperatureType}>
-                <option value="FROZEN">FROZEN (แช่แข็ง)</option>
-                <option value="CHILLED">CHILLED (แช่เย็น)</option>
-                <option value="AMBIENT">AMBIENT (อุณหภูมิห้อง)</option>
-              </select>
-            </label>
-            <label className="form-field" style={{ margin: 0 }}>
-              <span>ฐานคิดค่าฝาก</span>
-              <select className="form-control" onChange={(e) => onFieldChange('storageChargeBasis', e.target.value)} value={form.storageChargeBasis}>
-                <option value="WEIGHT">น้ำหนัก (WEIGHT)</option>
-                <option value="PALLET">พาเลท (PALLET)</option>
-              </select>
-            </label>
-          </div>
+          <label className="form-field" style={{ margin: '0 0 14px' }}>
+            <span>อุณหภูมิ</span>
+            <select className="form-control" onChange={(e) => onFieldChange('temperatureType', e.target.value)} value={form.temperatureType}>
+              <option value="FROZEN">FROZEN (แช่แข็ง)</option>
+              <option value="CHILLED">CHILLED (แช่เย็น)</option>
+              <option value="AMBIENT">AMBIENT (อุณหภูมิห้อง)</option>
+            </select>
+          </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <label className="form-field" style={{ margin: 0 }}>

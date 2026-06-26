@@ -9,6 +9,7 @@ import {
   listProductServiceRates,
   upsertProductServiceRate,
 } from '../../services/productServiceRatesService.js';
+import { upsertCustomerProduct } from '../../services/customerProductCatalogService.js';
 
 const EMPTY_FORM = {
   rateId: '',
@@ -52,6 +53,8 @@ export function CustomerProductServiceRatesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [storageChargeBasis, setStorageChargeBasis] = useState('WEIGHT');
+  const [basisSaving, setBasisSaving] = useState(false);
 
   useEffect(() => {
     getCustomers().then((r) => setCustomers(r.data ?? []));
@@ -68,6 +71,8 @@ export function CustomerProductServiceRatesPage() {
   useEffect(() => {
     setRates([]);
     if (!productId) return;
+    const found = products.find((p) => p.id === productId);
+    setStorageChargeBasis(found?.storage_charge_basis ?? 'WEIGHT');
     loadRates();
   }, [productId]);
 
@@ -75,6 +80,34 @@ export function CustomerProductServiceRatesPage() {
     if (!productId) return;
     const { data } = await listProductServiceRates(productId);
     setRates(data ?? []);
+  }
+
+  async function handleBasisChange(newBasis) {
+    if (!selectedProduct) return;
+    setStorageChargeBasis(newBasis);
+    setBasisSaving(true);
+    setError('');
+    const result = await upsertCustomerProduct({
+      productId: selectedProduct.id,
+      customerId: selectedProduct.customer_id,
+      customerProductCode: selectedProduct.customer_product_code,
+      productName: selectedProduct.product_name,
+      internalProductCode: selectedProduct.internal_product_code ?? '',
+      uom: selectedProduct.uom ?? '',
+      packWeightKg: selectedProduct.pack_weight_kg ?? null,
+      temperatureType: selectedProduct.temperature_type ?? 'FROZEN',
+      argentType: selectedProduct.argent_type ?? 'NON_ARGENT',
+      storageChargeBasis: newBasis,
+      allergen: selectedProduct.allergen ?? '',
+      note: selectedProduct.note ?? '',
+      isActive: selectedProduct.is_active !== false,
+    });
+    setBasisSaving(false);
+    if (result.error) {
+      setError(result.error.message ?? 'บันทึกฐานคิดค่าฝากไม่สำเร็จ');
+    } else {
+      setSuccess('บันทึกฐานคิดค่าฝากเรียบร้อยแล้ว');
+    }
   }
 
   function openCreate() {
@@ -176,6 +209,23 @@ export function CustomerProductServiceRatesPage() {
             {selectedProduct.uom ? `หน่วย: ${selectedProduct.uom}` : ''}
             {selectedProduct.pack_weight_kg ? `  น้ำหนัก: ${selectedProduct.pack_weight_kg} กก./หน่วย` : ''}
           </span>
+
+          {/* ฐานคิดค่าฝาก — inline editable */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', marginLeft: 8 }}>
+            ฐานคิดค่าฝาก:
+            <select
+              className="form-control"
+              value={storageChargeBasis}
+              disabled={basisSaving}
+              onChange={(e) => handleBasisChange(e.target.value)}
+              style={{ padding: '4px 8px', fontSize: 12, height: 30, width: 'auto', minWidth: 150 }}
+            >
+              <option value="WEIGHT">น้ำหนัก (WEIGHT)</option>
+              <option value="PALLET">พาเลท (PALLET)</option>
+            </select>
+            {basisSaving && <span style={{ fontSize: 11, color: '#94a3b8' }}>กำลังบันทึก...</span>}
+          </label>
+
           <button
             type="button"
             className="btn btn-primary"
