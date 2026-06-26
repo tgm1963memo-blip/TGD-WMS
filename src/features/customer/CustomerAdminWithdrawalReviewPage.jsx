@@ -42,19 +42,36 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [globalSearchText, setGlobalSearchText] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+
+  const customerOptions = [...new Map(
+    rows
+      .map((r) => ({ id: r.customer_id, name: r.customer?.customer_name || r.customer?.name || r.customer_id }))
+      .filter((c) => c.id)
+      .map((c) => [c.id, c])
+  ).values()];
 
   const filteredRows = rows.filter((row) => {
-    if (!globalSearchText) return true;
-    const lower = globalSearchText.toLowerCase();
-    const custName = row.customer?.customer_name || row.customer?.name || row.customer_id;
-    return (
-      (row.withdrawal_no || '').toLowerCase().includes(lower) ||
-      (row.status || '').toLowerCase().includes(lower) ||
-      (row.delivery_type || '').toLowerCase().includes(lower) ||
-      (row.pickup_contact || '').toLowerCase().includes(lower) ||
-      (row.destination || '').toLowerCase().includes(lower) ||
-      (custName || '').toLowerCase().includes(lower)
-    );
+    if (globalSearchText) {
+      const lower = globalSearchText.toLowerCase();
+      const custName = row.customer?.customer_name || row.customer?.name || row.customer_id;
+      const textMatch = (
+        (row.withdrawal_no || '').toLowerCase().includes(lower) ||
+        (row.status || '').toLowerCase().includes(lower) ||
+        (row.delivery_type || '').toLowerCase().includes(lower) ||
+        (row.pickup_contact || '').toLowerCase().includes(lower) ||
+        (row.destination || '').toLowerCase().includes(lower) ||
+        (custName || '').toLowerCase().includes(lower)
+      );
+      if (!textMatch) return false;
+    }
+    if (filterCustomer && row.customer_id !== filterCustomer) return false;
+    const dispatchDate = row.requested_dispatch_date ?? '';
+    if (filterDateFrom && dispatchDate && dispatchDate < filterDateFrom) return false;
+    if (filterDateTo && dispatchDate && dispatchDate > filterDateTo) return false;
+    return true;
   });
 
   const { sortedData, requestSort, getSortIndicator } = useTableSort(filteredRows);
@@ -257,16 +274,62 @@ export function CustomerAdminWithdrawalReviewPage() {
 
       {/* List table */}
       <div className="table-card">
-        <div className="table-card-header" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>{t('admin_withdrawal_review_table_title')}</h3>
-          <div style={{ flex: '1 1 200px', maxWidth: '300px' }}>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="ค้นหา (ทุกคอลัมน์)..."
-              value={globalSearchText}
-              onChange={(e) => setGlobalSearchText(e.target.value)}
-            />
+        <div className="table-card-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ margin: 0 }}>{t('admin_withdrawal_review_table_title')}</h3>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 280 }}>
+              {'ค้นหา'}
+              <input
+                type="text"
+                className="form-control"
+                placeholder="ค้นหา (ทุกคอลัมน์)..."
+                value={globalSearchText}
+                onChange={(e) => setGlobalSearchText(e.target.value)}
+              />
+            </label>
+            <label className="form-label" style={{ margin: 0, flex: '1 1 180px', maxWidth: 240 }}>
+              {'ลูกค้า'}
+              <select
+                className="form-control"
+                value={filterCustomer}
+                onChange={(e) => setFilterCustomer(e.target.value)}
+              >
+                <option value="">-- ลูกค้าทุกราย --</option>
+                {customerOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+              {'วันที่แจ้งเบิก (ตั้งแต่)'}
+              <input
+                className="form-control"
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+              {'วันที่แจ้งเบิก (ถึง)'}
+              <input
+                className="form-control"
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+              />
+            </label>
+            {(globalSearchText || filterCustomer || filterDateFrom || filterDateTo) ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => { setGlobalSearchText(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
+              >
+                {'ล้างตัวกรอง'}
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="responsive-table">

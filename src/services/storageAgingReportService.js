@@ -210,6 +210,8 @@ export async function getStorageAgingRows(filters = {}) {
     expiry_date: row.tgd_lots?.expiry_date ?? null,
     lot_number: row.tgd_lots?.lot_number ?? null,
     lot_no: row.tgd_lots?.lot_number ?? null,
+    manufacture_date: null,
+    received_date: null,
   }));
 
   return { data: enrichAgingRows(flat, filters), error: null };

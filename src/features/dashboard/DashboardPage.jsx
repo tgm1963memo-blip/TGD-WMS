@@ -252,7 +252,7 @@ export function DashboardPage() {
       {/* Warehouse Layout Map */}
       <DashboardSection title={language === 'th' ? 'แผนผังคลังสินค้า' : 'Warehouse Layout Map'}>
         <div style={{ margin: '-8px -16px', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--tgd-border)' }}>
-          <WarehouseLayoutWidget />
+          <WarehouseLayoutWidget key={refreshKey} />
         </div>
       </DashboardSection>
 

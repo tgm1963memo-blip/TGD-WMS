@@ -23,6 +23,9 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [filterText, setFilterText] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [detailId, setDetailId] = useState(null);
 
   useEffect(() => {
@@ -47,13 +50,24 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
     return <LoadingState message={t('customer_portal_loading')} />;
   }
 
+  const customerOptions = [...new Map(
+    state.rows
+      .map((r) => ({ id: r.customer_id, name: r.customer?.customer_name || r.customer?.name || r.customer_id }))
+      .filter((c) => c.id)
+      .map((c) => [c.id, c])
+  ).values()];
+
   const filteredRows = state.rows.filter((row) => {
     const text = filterText.toLowerCase();
     const matchText = !text ||
       (row.request_no ?? '').toLowerCase().includes(text) ||
       (row.contact_name ?? '').toLowerCase().includes(text);
     const matchStatus = !filterStatus || row.status === filterStatus;
-    return matchText && matchStatus;
+    const matchCustomer = !filterCustomer || row.customer_id === filterCustomer;
+    const arrivalDate = row.expected_arrival_date ?? '';
+    const matchDateFrom = !filterDateFrom || arrivalDate >= filterDateFrom;
+    const matchDateTo = !filterDateTo || arrivalDate <= filterDateTo;
+    return matchText && matchStatus && matchCustomer && matchDateFrom && matchDateTo;
   });
 
   return (
@@ -64,7 +78,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
       </div>
 
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px' }}>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 360 }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 300 }}>
           {'ค้นหา'}
           <input
             className="form-control"
@@ -74,7 +88,20 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             onChange={(e) => setFilterText(e.target.value)}
           />
         </label>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 180px', maxWidth: 280 }}>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 180px', maxWidth: 240 }}>
+          {'ลูกค้า'}
+          <select
+            className="form-control"
+            value={filterCustomer}
+            onChange={(e) => setFilterCustomer(e.target.value)}
+          >
+            <option value="">-- ลูกค้าทุกราย --</option>
+            {customerOptions.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 160px', maxWidth: 220 }}>
           {'สถานะ'}
           <select
             className="form-control"
@@ -87,11 +114,29 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             ))}
           </select>
         </label>
-        {(filterText || filterStatus) ? (
+        <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+          {'วันที่แจ้งฝาก (ตั้งแต่)'}
+          <input
+            className="form-control"
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+          />
+        </label>
+        <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+          {'วันที่แจ้งฝาก (ถึง)'}
+          <input
+            className="form-control"
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+          />
+        </label>
+        {(filterText || filterStatus || filterCustomer || filterDateFrom || filterDateTo) ? (
           <button
             type="button"
             className="btn"
-            onClick={() => { setFilterText(''); setFilterStatus(''); }}
+            onClick={() => { setFilterText(''); setFilterStatus(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
             style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
           >
             {'ล้างตัวกรอง'}
