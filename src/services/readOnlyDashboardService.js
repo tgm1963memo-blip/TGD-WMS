@@ -50,11 +50,14 @@ async function getActiveStockBalanceCount() {
 async function getStockQuantityTotal() {
   const { data, error } = await supabase
     .from('tgd_stock_balances')
-    .select('qty_on_hand')
+    .select('qty_on_hand, qty_allocated')
     .gt('qty_on_hand', 0);
 
   if (error) throw error;
-  return (data ?? []).reduce((total, row) => total + (Number(row.qty_on_hand) || 0), 0);
+  return (data ?? []).reduce((total, row) => {
+    const net = Number(row.qty_on_hand || 0) - Number(row.qty_allocated || 0);
+    return total + Math.max(0, net);
+  }, 0);
 }
 
 async function getActiveLocationCount() {
