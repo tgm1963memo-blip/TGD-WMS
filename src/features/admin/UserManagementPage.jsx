@@ -9,6 +9,7 @@ import {
   CUSTOMER_PORTAL_ROLES,
   createAuthUser,
   getUserProfiles,
+  resetUserPassword,
   setUserProfileActive,
   upsertUserProfile,
 } from '../../services/userManagementService.js';
@@ -40,6 +41,9 @@ export function UserManagementPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [canManage, setCanManage] = useState(false);
+  const [resetRow, setResetRow] = useState(null);
+  const [resetPwd, setResetPwd] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
@@ -70,6 +74,16 @@ export function UserManagementPage() {
           <button className="btn btn-secondary btn-sm" onClick={() => startEdit(row)} type="button">
             {t('edit')}
           </button>
+          {row.auth_user_id ? (
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={saving || resetting}
+              onClick={() => { setResetRow(row); setResetPwd(''); setError(''); setSuccess(''); }}
+              type="button"
+            >
+              {'รีเซตรหัสผ่าน'}
+            </button>
+          ) : null}
           <button
             className="btn btn-secondary btn-sm"
             disabled={saving}
@@ -208,6 +222,26 @@ export function UserManagementPage() {
     await loadData();
   }
 
+  async function handleResetPassword(event) {
+    event.preventDefault();
+    if (!resetRow?.email || !resetPwd || resetPwd.length < 8) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+      return;
+    }
+    setResetting(true);
+    setError('');
+    setSuccess('');
+    const result = await resetUserPassword(resetRow.email, resetPwd);
+    setResetting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'รีเซตรหัสผ่านไม่สำเร็จ');
+      return;
+    }
+    setSuccess(`รีเซตรหัสผ่านสำเร็จสำหรับ ${resetRow.email}`);
+    setResetRow(null);
+    setResetPwd('');
+  }
+
   if (!loading && !canManage) {
     return (
       <section className="page-shell" data-testid="user-management-page">
@@ -334,6 +368,33 @@ export function UserManagementPage() {
           </button>
         </div>
       </form>
+
+      {resetRow ? (
+        <form className="form-card" onSubmit={handleResetPassword} style={{ border: '2px solid var(--tgd-warning, #d97706)' }}>
+          <h3>{'รีเซตรหัสผ่าน'}</h3>
+          <p className="form-helper">{'ผู้ใช้: '}<strong>{resetRow.email}</strong></p>
+          <div className="form-grid">
+            <label className="form-field">
+              <span>{'รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)'}</span>
+              <input
+                autoFocus
+                className="form-control"
+                minLength={8}
+                onChange={(e) => setResetPwd(e.target.value)}
+                required
+                type="password"
+                value={resetPwd}
+              />
+            </label>
+          </div>
+          <div className="action-row">
+            <button className="btn btn-secondary" onClick={() => setResetRow(null)} type="button">{t('close')}</button>
+            <button className="btn btn-primary" disabled={resetting} type="submit">
+              {resetting ? 'กำลังรีเซต...' : 'ยืนยันรีเซตรหัสผ่าน'}
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       <DataTable
         columns={columns}

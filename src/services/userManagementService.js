@@ -93,6 +93,31 @@ export async function upsertUserProfile(payload = {}) {
   return { data: normalizeCustomerPortalRpcData(data), error: null };
 }
 
+export async function resetUserPassword(email, newPassword) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) return { data: null, error: sessionError };
+
+  const rawToken = sessionData?.session?.access_token;
+  if (!rawToken) return { data: null, error: new Error('Active login session required') };
+
+  const accessToken = stripHiddenChars(rawToken);
+
+  const response = await fetch('/api/admin-create-auth-user', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email: stripHiddenChars(email), password: String(newPassword || '') }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) return { data: null, error: new Error(payload.error || 'Unable to reset password') };
+  return { data: payload, error: null };
+}
+
 export async function setUserProfileActive(profileId, isActive) {
   if (!supabase) return missingSupabaseClientResult();
 

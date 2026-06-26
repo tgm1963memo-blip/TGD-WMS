@@ -203,7 +203,7 @@ export async function getStorageAgingRows(filters = {}) {
     }
   }
 
-  const flat = (data ?? []).map((row) => ({
+  let flat = (data ?? []).map((row) => ({
     ...row,
     location_code: locationMap[row.location_id]?.location_code ?? null,
     location_name: locationMap[row.location_id]?.location_name ?? null,
@@ -213,6 +213,26 @@ export async function getStorageAgingRows(filters = {}) {
     manufacture_date: null,
     received_date: null,
   }));
+
+  // Fallback: rows with no expiry_date in tgd_lots — look up from deposit request lines by lot_no
+  const nullExpLotNos = [...new Set(flat.filter((r) => !r.expiry_date && r.lot_no).map((r) => r.lot_no))];
+  if (nullExpLotNos.length > 0) {
+    const { data: lineData } = await supabase
+      .from('tgd_customer_deposit_request_lines')
+      .select('lot_no, exp_date')
+      .in('lot_no', nullExpLotNos)
+      .not('exp_date', 'is', null);
+    const lotExpMap = {};
+    for (const line of (lineData ?? [])) {
+      if (line.lot_no && line.exp_date && !lotExpMap[line.lot_no]) {
+        lotExpMap[line.lot_no] = line.exp_date;
+      }
+    }
+    flat = flat.map((r) => ({
+      ...r,
+      expiry_date: r.expiry_date ?? lotExpMap[r.lot_no] ?? null,
+    }));
+  }
 
   return { data: enrichAgingRows(flat, filters), error: null };
 }

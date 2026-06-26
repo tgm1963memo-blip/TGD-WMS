@@ -11,6 +11,7 @@ import {
   listCustomerProducts,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import { getCustomers } from '../../services/masterDataService.js';
 import {
   downloadCustomerProductTemplate,
   exportCustomerProductsCsv,
@@ -44,7 +45,7 @@ function RequiredLabel({ children }) {
 
 export function CustomerProductCatalogPage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,8 @@ export function CustomerProductCatalogPage() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [customerList, setCustomerList] = useState([]);
+  const [importCustomerId, setImportCustomerId] = useState('');
   const { sortedData, requestSort, getSortIndicator } = useTableSort(products);
 
   const columns = [
@@ -105,6 +108,14 @@ export function CustomerProductCatalogPage() {
   useEffect(() => {
     loadProducts();
   }, [customerId]);
+
+  useEffect(() => {
+    if (isRequestProxy) {
+      getCustomers({ isActive: true }).then((result) => {
+        setCustomerList(result.data ?? []);
+      });
+    }
+  }, [isRequestProxy]);
 
   function startCreate() {
     setForm(EMPTY_FORM);
@@ -201,6 +212,12 @@ export function CustomerProductCatalogPage() {
       return;
     }
 
+    const targetCustomerId = isRequestProxy ? importCustomerId : customerId;
+    if (!targetCustomerId) {
+      setError('กรุณาเลือกลูกค้าก่อน import สินค้า');
+      return;
+    }
+
     setImporting(true);
     setError('');
     setSuccess('');
@@ -222,7 +239,7 @@ export function CustomerProductCatalogPage() {
       let imported = 0;
       for (const row of rows) {
         const result = await upsertCustomerProduct({
-          customerId,
+          customerId: targetCustomerId,
           customerProductCode: row.customerProductCode,
           productName: row.productName,
           internalProductCode: row.internalProductCode,
@@ -269,15 +286,34 @@ export function CustomerProductCatalogPage() {
       <div className="table-card">
         <div className="table-card-header">
           <h3>{t('catalog_customer_list_title')}</h3>
-          <CsvImportExportToolbar
-            disabled={!canWriteCustomerRequests || importing}
-            exportTestId="catalog-export-button"
-            importTestId="catalog-import-input"
-            onExport={() => exportCustomerProductsCsv(products)}
-            onImportFile={handleImportFile}
-            onTemplate={downloadCustomerProductTemplate}
-            templateTestId="catalog-template-button"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {isRequestProxy && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tgd-text-light)', whiteSpace: 'nowrap' }}>{'Import สำหรับลูกค้า:'}</span>
+                <select
+                  className="form-control"
+                  value={importCustomerId}
+                  onChange={(e) => setImportCustomerId(e.target.value)}
+                  style={{ minWidth: 200 }}
+                  title="เลือกลูกค้าก่อน import"
+                >
+                  <option value="">-- เลือกลูกค้า --</option>
+                  {customerList.map((c) => (
+                    <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <CsvImportExportToolbar
+              disabled={!canWriteCustomerRequests || importing}
+              exportTestId="catalog-export-button"
+              importTestId="catalog-import-input"
+              onExport={() => exportCustomerProductsCsv(products)}
+              onImportFile={handleImportFile}
+              onTemplate={downloadCustomerProductTemplate}
+              templateTestId="catalog-template-button"
+            />
+          </div>
         </div>
         <DataTable
           columns={columns}
