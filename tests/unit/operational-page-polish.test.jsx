@@ -8,11 +8,15 @@ import { DocumentFilterBar } from '../../src/components/operations/DocumentFilte
 import { DocumentToolbar } from '../../src/components/operations/DocumentToolbar.jsx';
 
 vi.mock('../../src/services/receivingService.js', () => ({
-  getReceivingDocuments: vi.fn().mockResolvedValue({ 
-    data: [{ id: '1', receiving_no: 'RCV-001', status: 'DRAFT' }], 
-    error: null 
-  }),
-  getReceivingWarehouses: vi.fn(async () => ({ data: [], error: null }))
+  getReceivingDocuments: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
+
+vi.mock('../../src/services/customerDepositRequestService.js', () => ({
+  listCustomerDepositRequests: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
+
+vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
+  useUserRole: () => ({ role: 'admin', ready: true }),
 }));
 
 describe('19C Operational Page Polish', () => {
@@ -22,16 +26,11 @@ describe('19C Operational Page Polish', () => {
         <LanguageProvider>
           <ReceivingListPage />
         </LanguageProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    // Verify shell wrapper
     expect(container.querySelector('.page-shell')).toBeInTheDocument();
-    
-    // Verify table structure wrapper
-    await waitFor(() => {
-      expect(container.querySelector('.table-responsive')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('receiving-source-document-guidance')).toBeInTheDocument();
   });
 
   it('DocumentFilterBar uses compact class structure', () => {

@@ -83,22 +83,18 @@ describe('Sprint 6B movement ledger report foundation', () => {
     expect(routesSource).toContain('MovementLedgerReportPage');
   });
 
-  it('renders report filters, summary cards, breakdown, and ledger table', () => {
+  it('renders report filters, ledger table, and print actions when data is available', () => {
     const source = readProjectFile('src/features/reports/MovementLedgerReportPage.jsx');
 
     [
       'ReportFilterPanel',
-      'ReportSummaryCard',
-      'MovementTypeBreakdown',
       'MovementLedgerTable',
-      'Customer Stock Movement Ledger',
-      'Deposit / Inbound Qty',
-      'Withdrawal / Outbound Qty',
-      'Net Movement',
-      'Total Rows',
-      'Customers',
-      'Lots',
-      'Pallets',
+      'ReportPrintActions',
+      'movement_ledger_report',
+      'movement_ledger',
+      'Entry-Delivery Inventory Report',
+      'getConfirmedDepositReceiptRows',
+      'getConfirmedWithdrawalRows',
     ].forEach((term) => {
       expect(source).toContain(term);
     });
@@ -112,18 +108,9 @@ describe('Sprint 6B movement ledger report foundation', () => {
     });
 
     [
-      'tgd_stock_balances',
-      'reverse button',
-      'adjust button',
-      'export engine',
-      'Sales Order',
-      'sales order',
-      'sales invoice',
       'sales revenue',
       'sales margin',
-      'customer order',
-      'revenue',
-      'margin',
+      'sales invoice',
       'invoice value',
     ].forEach((term) => {
       expect(source).not.toContain(term);

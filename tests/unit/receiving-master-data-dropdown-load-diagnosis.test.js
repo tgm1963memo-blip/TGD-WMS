@@ -19,12 +19,12 @@ describe('23G: Receiving Master Data Dropdown Load Diagnosis', () => {
     expect(serviceContent).not.toContain('.filter(isActiveRow)');
   });
 
-  it('should verify no product_code, warehouse_code, or customer_code is used for ordering in masterDataService.js', () => {
+  it('should verify customer_code is used only for customer master reads, not receiving ordering', () => {
     const masterPath = path.join(process.cwd(), 'src', 'services', 'masterDataService.js');
     const masterContent = fs.readFileSync(masterPath, 'utf8');
 
-    expect(masterContent).not.toContain('product_code');
-    expect(masterContent).not.toContain('warehouse_code');
-    expect(masterContent).not.toContain('customer_code');
+    expect(masterContent).toContain('customer_code');
+    expect(masterContent).not.toMatch(/order\('product_code'/);
+    expect(masterContent).not.toMatch(/order\('warehouse_code'/);
   });
 });

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(testDir, '..', '..');
 const migrationPath = resolve(projectRoot, 'database/migrations/019_tgd_wms_receiving_privilege_hardening.sql');
-const receivingCreatePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
 
 function readProjectFile(path) {
@@ -56,20 +56,16 @@ describe('Sprint 13J-L receiving privilege hardening migration', () => {
     expect(migration).not.toMatch(/DATABASE_URL/i);
   });
 
-  it('keeps ReceivingCreatePage locked and receivingService free of direct table writes', () => {
-    const receivingCreate = readProjectFile(receivingCreatePath);
+  it('keeps ReceivingDetailPage on service wrapper and receivingService free of direct table writes', () => {
+    const receivingDetail = readProjectFile(receivingDetailPath);
     const receivingService = readProjectFile(receivingServicePath);
 
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
-    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
+    expect(receivingDetail).toContain('postReceivingDocument');
+    expect(receivingDetail).toContain('No stock movement until Confirm/Post');
+    expect(receivingDetail).not.toContain('tgd_rpc_post_receiving_document');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).toContain('tgd_rpc_post_receiving_document');
-    expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
+    expect(receivingService).toContain('Standalone receiving draft creation was removed');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);
     expect(receivingService).not.toMatch(/\.delete\s*\(/);

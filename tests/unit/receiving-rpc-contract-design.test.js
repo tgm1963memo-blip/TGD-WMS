@@ -7,7 +7,7 @@ const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(testDir, '..', '..');
 const contractPath = resolve(projectRoot, 'docs/13J-J_RECEIVING_RPC_CONTRACT.md');
 const receivingGateTestPath = resolve(projectRoot, 'tests/unit/receiving-operational-write-gate.test.jsx');
-const receivingCreatePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 
 function readProjectFile(path) {
   return readFileSync(path, 'utf8');
@@ -71,16 +71,14 @@ describe('Sprint 13J-J receiving RPC contract design', () => {
     expect(contract).not.toMatch(/allow\s+service_role/i);
   });
 
-  it('keeps the existing receiving operational gate test and locked page in place', () => {
+  it('keeps the existing receiving operational gate test and detail page post wrapper in place', () => {
     const gateTest = readProjectFile(receivingGateTestPath);
-    const receivingCreate = readProjectFile(receivingCreatePath);
+    const receivingDetail = readProjectFile(receivingDetailPath);
 
-    expect(gateTest).toContain('Sprint 13J-AI receiving operational write gate');
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
+    expect(gateTest).toContain('Receiving operational write gate (customer deposit driven)');
+    expect(receivingDetail).toContain('postReceivingDocument');
+    expect(receivingDetail).toContain('Confirm/Post Receiving');
+    expect(receivingDetail).toContain('No stock movement until Confirm/Post');
+    expect(receivingDetail).not.toContain('tgd_rpc_post_receiving_document');
   });
 });

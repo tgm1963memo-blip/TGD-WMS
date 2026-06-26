@@ -45,15 +45,15 @@ describe('customerDepositLineExcelUtils', () => {
 });
 
 describe('customerWithdrawalLineDefaults', () => {
-  it('returns only catalog lines with requested qty', () => {
+  it('returns only lines with catalog selection and requested weight', () => {
     const filled = getFilledWithdrawalLines([
-      { catalog_product_id: 'p1', requested_qty: '5' },
-      { catalog_product_id: '', requested_qty: '3' },
-      { catalog_product_id: 'p2', requested_qty: '' },
+      { catalog_product_id: 'p1', requested_qty: '5', requested_weight: '10' },
+      { catalog_product_id: '', requested_qty: '3', requested_weight: '6' },
+      { catalog_product_id: 'p2', requested_qty: '2', requested_weight: '' },
     ]);
 
     expect(filled).toHaveLength(1);
-    expect(filled[0].requested_qty).toBe('5');
+    expect(filled[0].requested_weight).toBe('10');
   });
 });
 

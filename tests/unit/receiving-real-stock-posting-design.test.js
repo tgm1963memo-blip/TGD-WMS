@@ -158,7 +158,7 @@ describe('Receiving Real Stock Posting RPC Design Document', () => {
     expect(lower).not.toContain('migration is applied');
   });
 
-  test('doc does not enable ReceivingCreatePage', () => {
+  test('doc does not enable standalone ReceivingCreatePage', () => {
     expect(lower).not.toContain('receivingcreatepage');
   });
 

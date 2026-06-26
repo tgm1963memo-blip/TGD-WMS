@@ -10,6 +10,7 @@ import {
   getReadOnlyDashboardSummary,
 } from '../../services/readOnlyDashboardService.js';
 import { summarizeSupabaseReadiness } from '../../services/supabaseConnectionReadinessService.js';
+import { supabase } from '../../services/supabaseClient.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const initialState = {
@@ -20,6 +21,7 @@ const initialState = {
 
 export function DashboardPage() {
   const [state, setState] = useState(initialState);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { session } = useAuth();
   const { language } = useLanguage();
   const t = useTranslation();
@@ -50,6 +52,17 @@ export function DashboardPage() {
     });
 
     return () => { isMounted = false; };
+  }, [session, refreshKey]);
+
+  useEffect(() => {
+    if (!supabase || !session?.user) return;
+    const channel = supabase
+      .channel('dashboard-stock-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tgd_stock_balances' }, () => {
+        setRefreshKey((k) => k + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [session]);
 
   const d = state.data;

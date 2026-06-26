@@ -19,7 +19,6 @@ export function AuthProvider({ children }) {
     // supabase-js will immediately fire an INITIAL_SESSION event.
 
     const subscription = subscribeToStagingAuth((nextSession) => {
-      console.log('[AuthContext] subscribeToStagingAuth event', !!nextSession);
       if (!isMounted) return;
       setSession(nextSession);
       setError(null);

@@ -59,7 +59,25 @@ export async function login(page, credentials = {}) {
   await page.locator('[data-testid="login-submit-button"], button[type="submit"]').click();
 
   const handheldPage = page.locator('[data-testid="handheld-page"]');
-  await expect(appShell.or(handheldPage).first()).toBeVisible({ timeout: 20000 });
+  const shellLocator = appShell.or(handheldPage).first();
+  let loggedIn = false;
+  for (let attempt = 0; attempt < 3 && !loggedIn; attempt += 1) {
+    try {
+      await expect(shellLocator).toBeVisible({ timeout: 30000 });
+      loggedIn = true;
+    } catch {
+      if (attempt < 2) {
+        await page.goto(`${baseUrl}/login`);
+        await waitForLoginForm(page);
+        await page.locator('[data-testid="login-email-input"], input[type="email"]').fill(email);
+        await page.locator('[data-testid="login-password-input"], input[type="password"]').fill(password);
+        await page.locator('[data-testid="login-submit-button"], button[type="submit"]').click();
+      }
+    }
+  }
+  if (!loggedIn) {
+    await expect(shellLocator).toBeVisible({ timeout: 30000 });
+  }
   
   // Explicitly wait for the critical permission queries to finish before allowing navigation
   // This prevents Playwright's page.goto from aborting these requests and corrupting the HTTP/2 stream

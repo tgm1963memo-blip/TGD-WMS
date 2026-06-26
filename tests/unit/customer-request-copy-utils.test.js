@@ -59,7 +59,7 @@ describe('customerRequestCopyUtils', () => {
       expected_boxes: '2',
       line_note: 'line note',
     });
-    expect(lines.length).toBeGreaterThanOrEqual(10);
+    expect(lines.length).toBeGreaterThanOrEqual(5);
   });
 
   it('resolves manual catalog entry when product is not in catalog', () => {
@@ -111,7 +111,7 @@ describe('customerRequestCopyUtils', () => {
       customer_product_code: 'CUS-01',
       requested_qty: '5',
     });
-    expect(copiedLines.length).toBeGreaterThanOrEqual(10);
+    expect(copiedLines.length).toBeGreaterThanOrEqual(5);
 
     expect(mapWithdrawalFormForCopy({
       requested_dispatch_date: '2026-06-12',

@@ -101,14 +101,14 @@ describe('admin document branding UI', () => {
     expect(screen.getAllByText(/Prepared by|จัดทำโดย/).length).toBeGreaterThan(0);
   });
 
-  test('/admin/document-branding route exists if route added', () => {
+  test('document branding admin route is intentionally not wired in routes.jsx', () => {
     const routesSource = fs.readFileSync(
       path.resolve(__dirname, '../../src/app/routes.jsx'),
       'utf8',
     );
 
-    expect(routesSource).toContain('/admin/document-branding');
-    expect(routesSource).toContain('DocumentBrandingAdminPage');
+    expect(routesSource).not.toContain('/admin/document-branding');
+    expect(routesSource).not.toContain('DocumentBrandingAdminPage');
   });
 
   test('no database, storage, network, or browser persistence call exists', () => {

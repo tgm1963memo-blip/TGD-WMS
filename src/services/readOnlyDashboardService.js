@@ -38,6 +38,15 @@ async function getRowCount(tableName) {
   return count ?? 0;
 }
 
+async function getActiveStockBalanceCount() {
+  const { count, error } = await supabase
+    .from('tgd_stock_balances')
+    .select('*', { count: 'exact', head: true })
+    .gt('qty_on_hand', 0);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 async function getStockQuantityTotal() {
   const quantityResult = await supabase
     .from('tgd_stock_balances')
@@ -98,7 +107,7 @@ export async function getReadOnlyDashboardSummary() {
       openPickingRows,
       openDispatchRows,
     ] = await Promise.all([
-      getRowCount('tgd_stock_balances'),
+      getActiveStockBalanceCount(),
       getRowCount('tgd_stock_movements'),
       getStockQuantityTotal(),
       getRowCount('tgd_customers'),

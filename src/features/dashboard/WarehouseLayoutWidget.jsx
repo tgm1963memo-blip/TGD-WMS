@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSectionsWithOccupancy, getStockAtLocation } from '../../services/warehouseLayoutService.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
+import { supabase } from '../../services/supabaseClient.js';
 
 function pctColor(pct) {
   if (pct >= 80) return '#e74c3c';
@@ -248,6 +249,17 @@ export function WarehouseLayoutWidget() {
       }
     );
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel('warehouse-map-stock-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tgd_stock_balances' }, () => {
+        setRefreshKey((k) => k + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function handleLocClick(locId, locCode) {
     setStockModal({ locId, locCode });

@@ -116,7 +116,7 @@ describe('Sprint 14O picking workflow draft UI', () => {
     expect(releaseOutboundReservation).not.toHaveBeenCalled();
   });
 
-  it('sidebar navigation includes picking confirmation route', () => {
+  it('sidebar navigation no longer includes removed picking confirmation route', () => {
     render(
       <MemoryRouter>
         <LanguageProvider>
@@ -125,13 +125,11 @@ describe('Sprint 14O picking workflow draft UI', () => {
       </MemoryRouter>,
     );
 
-    // 17B: navigation restructured – 'Picking Confirmation' links to picking
-    // Picking Draft route still exists but is no longer a sidebar item
     const pickingLink = screen
-      .getAllByRole('link')
+      .queryAllByRole('link')
       .find((link) => link.getAttribute('href') === '/operations/picking');
 
-    expect(pickingLink).toBeTruthy();
+    expect(pickingLink).toBeUndefined();
   });
 
   it('does not render forbidden picking or outbound destructive actions', () => {

@@ -26,15 +26,13 @@ describe('23H: Receiving Master Data Runtime Load Errors', () => {
     expect(docContent).toContain('No Sensitive Expsoure');
   });
   
-  it('should verify ReceivingCreatePage.jsx contains the diagnostics panel', () => {
-    const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingCreatePage.jsx');
+  it('should verify ReceivingDetailPage.jsx uses controlled post wrapper', () => {
+    const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingDetailPage.jsx');
     const pageContent = fs.readFileSync(pagePath, 'utf8');
-    
-    expect(pageContent).toContain('UAT Master Data Diagnostics');
-    expect(pageContent).toContain('Products loaded:');
-    expect(pageContent).toContain('Warehouses loaded:');
-    expect(pageContent).toContain('Products error:');
-    expect(pageContent).toContain('Warehouses error:');
+
+    expect(pageContent).toContain('postReceivingDocument');
+    expect(pageContent).toContain('No stock movement until Confirm/Post');
+    expect(pageContent).toContain('Controlled Confirm/Post');
   });
   
   it('should verify transaction-uat-round-1.spec.js captures runtimeDiagnostics', () => {

@@ -83,6 +83,32 @@ vi.mock('../../src/services/customerDepositRequestService.js', () => ({
   createCustomerDepositRequest: createDepositRpc,
   submitCustomerDepositRequest: submitDepositRpc,
   upsertCustomerDepositRequestLine: upsertDepositLineRpc,
+  getCustomerStockBalance: vi.fn(async () => ({
+    data: [{
+      id: 'bal-1',
+      product_id: 'prod-1',
+      lot_id: 'lot-1',
+      qty_available: 10,
+      uom: 'KG',
+    }],
+    error: null,
+  })),
+  getDepositInventoryLines: vi.fn(async () => ({
+    data: [{
+      id: 'dep-line-1',
+      deposit_request_id: 'dep-1',
+      customer_product_code: 'CUS-CHKN-01',
+      product_name: 'Frozen Chicken Breast',
+      lot_no: 'LOT-TEST-01',
+      actual_weight: 100,
+      expected_weight: 100,
+      request: {
+        request_no: 'CDR-20260608-0001',
+        expected_arrival_date: '2026-06-15',
+      },
+    }],
+    error: null,
+  })),
   listCustomerDepositRequests: vi.fn(async () => ({
     data: [{ id: 'dep-1', request_no: 'CDR-20260608-0001', status: 'DRAFT' }],
     error: null,
@@ -94,6 +120,9 @@ vi.mock('../../src/services/customerDepositRequestService.js', () => ({
 vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
   createCustomerWithdrawalRequest: createWithdrawalRpc,
   upsertCustomerWithdrawalRequestLine: upsertWithdrawalLineRpc,
+  submitCustomerWithdrawalRequest: vi.fn(async () => ({ data: { id: 'wd-new', status: 'SUBMITTED_BY_CUSTOMER' }, error: null })),
+  updateCustomerWithdrawalRequestDraft: vi.fn(async () => ({ data: { id: 'wd-new' }, error: null })),
+  getCustomerWithdrawalRequest: vi.fn(async () => ({ data: null, error: null })),
   listCustomerWithdrawalRequests: vi.fn(async () => ({ data: [], error: null })),
   listCustomerWithdrawalRequestLines: vi.fn(async () => ({ data: [], error: null })),
   reviewCustomerWithdrawalRequest: vi.fn(async () => ({ data: { status: 'ADMIN_REVIEWING' }, error: null })),
@@ -164,7 +193,7 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
       data: { id: 'wd-new', withdrawal_no: 'CWR-20260608-0001', status: 'WITHDRAWAL_DRAFT' },
       error: null,
     });
-    upsertWithdrawalLineRpc.mockResolvedValue({ data: { line_id: 'line-2' }, error: null });
+    upsertWithdrawalLineRpc.mockResolvedValue({ data: { id: 'line-2', line_id: 'line-2' }, error: null });
   });
 
   it('renders customer portal dashboard with live banner', async () => {
@@ -207,19 +236,32 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
     await waitFor(() => {
       expect(screen.getByTestId('customer-stock-live-badge')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('customer-stock-balance-table')).toBeInTheDocument();
+    expect(screen.getByTestId('customer-stock-balance-page')).toBeInTheDocument();
   });
 
   it('submits withdrawal draft through RPC services', async () => {
     renderPage(CustomerWithdrawalRequestCreatePage);
     const form = screen.getByTestId('customer-withdrawal-request-form');
     fireEvent.change(screen.getByTestId('customer-withdrawal-dispatch-date'), { target: { value: '2026-06-16' } });
-    await waitFor(() => {
-      expect(screen.getByTestId('customer-withdrawal-product-picker-select')).toBeInTheDocument();
-    });
-    fireEvent.change(screen.getByTestId('customer-withdrawal-product-picker-select'), { target: { value: 'cat-prod-1' } });
-    fireEvent.change(screen.getByTestId('customer-withdrawal-qty'), { target: { value: '5' } });
     fireEvent.change(screen.getByTestId('customer-withdrawal-pickup-contact'), { target: { value: 'Demo Pickup' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('customer-withdrawal-product-picker-select').querySelector('option[value="cat-prod-1"]')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('customer-withdrawal-product-picker-select'), { target: { value: 'cat-prod-1' } });
+
+    await waitFor(() => {
+      const lotSelect = screen.getByTestId('withdrawal-lot-select');
+      expect(lotSelect.tagName).toBe('SELECT');
+      expect(lotSelect.querySelector('option[value="LOT-TEST-01"]')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('withdrawal-lot-select'), { target: { value: 'LOT-TEST-01' } });
+
+    const weightInput = screen.getByTestId('customer-withdrawal-lines-table').querySelector('input[type="number"]');
+    fireEvent.change(weightInput, { target: { value: '5' } });
+
     fireEvent.submit(form);
 
     await waitFor(() => {

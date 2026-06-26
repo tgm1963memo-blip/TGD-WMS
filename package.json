@@ -1,6 +1,6 @@
 {
   "name": "tgd-wms",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -27,7 +27,7 @@
     "uat:sync-vercel-env": "node scripts/sync-vercel-env-from-local.mjs",
     "uat:publish-env-and-deploy": "node scripts/set-local-service-role-key.mjs --from-cli && npm run uat:sync-vercel-env && vercel --prod --yes",
     "db:apply-pending": "node scripts/apply-pending-migrations.mjs",
-    "lint": "echo \"Lint config is intentionally deferred for Sprint 0B\""
+    "lint": "node scripts/lint-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

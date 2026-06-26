@@ -92,7 +92,7 @@ describe('User management + catalog frontend wiring', () => {
     expect(navigation).toContain('user_management');
     expect(navigation).not.toContain("key: 'customer_product_catalog'");
     expect(permissions).toContain("route_path: '/admin/users'");
-    expect(permissions).toContain("route_path: '/customer/products', route_name: 'CustomerProductCatalogPage', permission_area: 'customer_catalog', minimum_role: 'admin'");
+    expect(permissions).toContain("route_path: '/admin/customer-products', route_name: 'CustomerProductCatalogAdminPage', permission_area: 'customer_catalog', minimum_role: 'admin'");
   });
 
   it('wires catalog picker into deposit and withdrawal forms', () => {

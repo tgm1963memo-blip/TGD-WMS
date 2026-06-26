@@ -27,14 +27,12 @@ describe('Phase 23S: Transaction UAT Login Assertion and Deployment Diagnostics'
     expect(content).toContain("DEPENDENCY_BLOCKED: Scenario A did not PASS");
   });
 
-  it('ReceivingCreatePage.jsx exposes 23S diagnostics', () => {
-    const jsxPath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+  it('ReceivingDetailPage.jsx uses controlled post wrapper', () => {
+    const jsxPath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingDetailPage.jsx');
     const content = fs.readFileSync(jsxPath, 'utf8');
 
-    expect(content).toContain('data-testid="receiving-create-diagnostics"');
-    expect(content).toContain('Diagnostic version: 23T');
-    expect(content).toContain('Save draft raw response type:');
-    expect(content).toContain('Normalized draft id:');
-    expect(content).toContain('Save draft RPC error:');
+    expect(content).toContain('postReceivingDocument');
+    expect(content).toContain('No stock movement until Confirm/Post');
+    expect(content).toContain('Controlled Confirm/Post');
   });
 });

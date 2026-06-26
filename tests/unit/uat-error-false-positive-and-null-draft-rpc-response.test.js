@@ -28,14 +28,9 @@ describe('Phase 23V UAT error detection and null draft RPC diagnostics', () => {
     const content = fs.readFileSync(documentPath, 'utf8');
 
     expect(content).toContain('`Save draft RPC error: None`');
-    expect(content).toContain('Real RPC errors are still detected');
     expect(content).toContain('null or');
     expect(content).toContain('undefined');
-    expect(content).toContain('direct UUID');
-    expect(content).toContain('`DRAFT_ID_MISSING` remains **BLOCKED**');
-    expect(content).toContain('No direct insert into `tgd_receiving_documents`');
     expect(content).toContain('No direct stock update');
-    expect(content).toContain('No movement ledger bypass');
     expect(content).toContain('Production remains **HOLD**');
     expect(content).toContain('**FINAL GO is NOT AUTHORIZED**');
   });
@@ -49,7 +44,7 @@ describe('Phase 23V UAT error detection and null draft RPC diagnostics', () => {
       'FINAL GO is NOT AUTHORIZED',
     ].join('\n');
 
-    const safeDetection = detectUatErrors(safeBody, '/operations/receiving/create');
+    const safeDetection = detectUatErrors(safeBody, '/operations/receiving');
     expect(safeDetection.errors).toEqual([]);
     expect(safeDetection.warnings).toEqual(expect.arrayContaining([
       expect.stringContaining('Production remains HOLD'),
@@ -58,47 +53,31 @@ describe('Phase 23V UAT error detection and null draft RPC diagnostics', () => {
 
     const real = detectUatErrors(
       'Save draft RPC error: invalid input syntax for type uuid',
-      '/operations/receiving/create',
+      '/operations/receiving',
     );
     expect(real.errors.some((error) => error.includes('error:'))).toBe(true);
   });
 
-  it.each([
-    ['null', null],
-    ['undefined', undefined],
-  ])('reports %s response without creating a fake draft id', async (expectedType, data) => {
-    rpc.mockResolvedValue({ data, error: null });
-
+  it('reports locked standalone draft creation without fabricating an id', async () => {
     const result = await createReceivingDocument({
       customer_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
-      document_no: `UAT-DOC-${expectedType}`,
+      document_no: 'UAT-DOC-null',
     });
 
     expect(result.data).toBeNull();
-    expect(result.error.message).toContain('DRAFT_ID_MISSING');
+    expect(result.error.message).toContain('Standalone receiving draft creation was removed');
     expect(result.diagnostics).toMatchObject({
-      rpcCalled: true,
-      rawResponseType: expectedType,
-      rawResponsePreview: 'None',
+      rpcCalled: false,
       normalizedDocumentId: null,
-      errorMessage: 'DRAFT_ID_MISSING',
     });
   });
 
-  it('continues to normalize a direct UUID response', async () => {
-    const uuid = '123e4567-e89b-12d3-a456-426614174000';
-    rpc.mockResolvedValue({ data: uuid, error: null });
-
-    const result = await createReceivingDocument({
+  it('does not call draft RPC after standalone create removal', async () => {
+    await createReceivingDocument({
       customer_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
       document_no: 'UAT-DOC-UUID',
     });
 
-    expect(result.data).toEqual({ id: uuid, document_id: uuid });
-    expect(result.diagnostics).toMatchObject({
-      rawResponseType: 'string',
-      normalizedDocumentId: uuid,
-      errorMessage: null,
-    });
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

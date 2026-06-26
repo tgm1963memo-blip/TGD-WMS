@@ -46,8 +46,9 @@ describe('Gate 3B-RLS billing invoice draft permissions', () => {
     expect(listEntry.minimum_role).toBe('accounting');
     expect(detailEntry.minimum_role).toBe('accounting');
     expect(reportEntry.minimum_role).toBe('viewer');
-    expect(listEntry.notes).toContain('Gate 3B-RLS');
-    expect(reportEntry.notes).toContain('Create Draft requires admin/accounting');
+    expect(listEntry.permission_area).toBe('accounting_review');
+    expect(detailEntry.permission_area).toBe('accounting_review');
+    expect(reportEntry.minimum_role).toBe('viewer');
   });
 
   it('allows warehouse_manager route access via role hierarchy for invoice draft pages', () => {

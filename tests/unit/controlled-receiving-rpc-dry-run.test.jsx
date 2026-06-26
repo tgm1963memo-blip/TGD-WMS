@@ -1,149 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { ControlledReceivingRpcDryRunPanel } from '../../src/components/dashboard/ControlledReceivingRpcDryRunPanel.jsx';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
-vi.mock('../../src/services/controlledReceivingRpcDryRunService.js', () => ({
-  CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID: '0ffcec05-c1d9-4e56-bf05-a7434e679603',
-  runControlledReceivingRpcDryRun: vi.fn(async () => ({
-    data: {
-      before: {
-        receivingDocuments: 1,
-        receivingLines: 1,
-        stockMovements: 9,
-        stockBalances: 3,
-        totalStockQuantity: 2320,
-      },
-      selectedSample: {
-        customer_id: 'customer-1',
-        product_id: 'product-1',
-        lot_id: 'lot-1',
-        location_id: 'location-1',
-      },
-      documentId: 'document-1',
-      lineId: 'line-1',
-      confirmExpectedError:
-        'Receiving stock posting is not enabled until stock movement RPC accepts product_id, lot_id, and location_id',
-      after: {
-        receivingDocuments: 2,
-        receivingLines: 2,
-        stockMovements: 9,
-        stockBalances: 3,
-        totalStockQuantity: 2320,
-      },
-      validation: {
-        receivingDocumentsIncreasedByOne: true,
-        receivingLinesIncreasedByOne: true,
-        stockMovementsUnchanged: true,
-        stockBalancesUnchanged: true,
-        totalStockQuantityUnchanged: true,
-      },
-      validationStatus: 'PASS',
-    },
-    error: null,
-  })),
-}));
-
-const repoRoot = process.cwd();
-const servicePath = path.join(repoRoot, 'src/services/controlledReceivingRpcDryRunService.js');
-const panelPath = path.join(repoRoot, 'src/components/dashboard/ControlledReceivingRpcDryRunPanel.jsx');
-const dashboardPath = path.join(repoRoot, 'src/features/dashboard/DashboardPage.jsx');
-const receivingCreatePath = path.join(repoRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
-const receivingServicePath = path.join(repoRoot, 'src/services/receivingService.js');
-
-function readSource(filePath) {
-  return fs.readFileSync(filePath, 'utf8');
-}
+const detailPagePath = resolve(process.cwd(), 'src/features/operations/receiving/ReceivingDetailPage.jsx');
+const servicePath = resolve(process.cwd(), 'src/services/receivingService.js');
 
 describe('controlled receiving RPC dry run', () => {
-  it('renders panel warning that dry run is only for staging and no stock movement will be posted', () => {
-    render(<ControlledReceivingRpcDryRunPanel session={{ user: { email: 'admin.demo@tgd-wms.local', id: 'user-123' } }} />);
+  it('ReceivingDetailPage uses controlled post wrapper only and no direct writes', () => {
+    const page = readFileSync(detailPagePath, 'utf8');
+    const service = readFileSync(servicePath, 'utf8');
 
-    expect(screen.getByText('Controlled Receiving RPC Dry Run')).toBeInTheDocument();
-    expect(screen.getByText('DRY RUN ONLY — no stock movement will be posted')).toBeInTheDocument();
-    expect(screen.getByText('Authenticated user ID: user-123')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run Receiving RPC Dry Run' })).toBeInTheDocument();
-  });
-
-  it('dashboard mounts the controlled receiving dry-run panel outside Receiving pages', () => {
-    const dashboard = readSource(dashboardPath);
-    const panel = readSource(panelPath);
-
-    expect(dashboard).not.toContain('ControlledReceivingRpcDryRunPanel');
-    expect(dashboard).not.toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
-    expect(panel).toContain('Controlled Receiving RPC Dry Run');
-  });
-
-  it('service calls only the fixed dry-run RPC and not the full post RPC', () => {
-    const source = readSource(servicePath);
-    const rpcCalls = source.match(/\.rpc\s*\(/g) ?? [];
-
-    expect(rpcCalls).toHaveLength(1);
-    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
-    expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
-  });
-
-  it('service does not use direct write methods or stock movement RPCs', () => {
-    const source = readSource(servicePath);
-
-    [/\.insert\s*\(/, /\.update\s*\(/, /\.delete\s*\(/, /\.upsert\s*\(/].forEach((pattern) => {
-      expect(source).not.toMatch(pattern);
-    });
-    expect(source).not.toContain('tgd_rpc_create_receive_movement');
-    expect(source).not.toContain('tgd_rpc_create_stock_movement');
-    expect(source).not.toMatch(/service_role/i);
-    expect(source).not.toMatch(/DATABASE_URL/i);
-  });
-
-  it('panel source contains the fixed document ID constant and renders raw dry run JSON', () => {
-    const panel = readSource(panelPath);
-
-    expect(panel).toContain('CONTROLLED_RECEIVING_DRY_RUN_DOCUMENT_ID');
-    expect(panel).toContain('JSON.stringify(result.dryRunResult, null, 2)');
-  });
-
-  it('service source contains the fixed document ID UUID and only calls the dry run RPC', () => {
-    const source = readSource(servicePath);
-
-    expect(source).toContain('0ffcec05-c1d9-4e56-bf05-a7434e679603');
-    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
-    expect(source).not.toMatch(/tgd_rpc_post_receiving_document\s*\(/);
-  });
-
-  it('ReceivingCreatePage uses controlled post wrapper only and no direct writes', () => {
-    const receivingCreate = readSource(receivingCreatePath);
-
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Save Draft');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
-    expect(receivingCreate).not.toMatch(/>\s*Confirm\s*</i);
-    expect(receivingCreate).not.toMatch(/>\s*Post\s*</i);
-    expect(receivingCreate).not.toContain('supabase.from');
-    expect(receivingCreate).not.toMatch(/\.insert\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.update\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.delete\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.upsert\s*\(/);
-    expect(receivingCreate).not.toContain('tgd_stock_movements');
-    expect(receivingCreate).not.toContain('tgd_stock_balances');
-  });
-
-  it('receivingService remains RPC-only for draft writes and does not use direct table DML', () => {
-    const receivingService = readSource(receivingServicePath);
-
-    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
-    expect(receivingService).toContain('tgd_rpc_add_receiving_line');
-    expect(receivingService).toContain('postReceivingDocument');
-    expect(receivingService).toContain('tgd_rpc_post_receiving_document');
-    expect(receivingService).toContain('p_document_id: id');
-    expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
-    expect(receivingService).not.toMatch(/\.insert\s*\(/);
-    expect(receivingService).not.toMatch(/\.update\s*\(/);
-    expect(receivingService).not.toMatch(/\.delete\s*\(/);
-    expect(receivingService).not.toMatch(/\.upsert\s*\(/);
+    expect(page).toContain('postReceivingDocument');
+    expect(page).toContain('No stock movement until Confirm/Post');
+    expect(page).not.toContain('tgd_rpc_post_receiving_document');
+    expect(page).not.toMatch(/\.insert\s*\(/);
+    expect(page).not.toMatch(/\.update\s*\(/);
+    expect(service).toContain('tgd_rpc_post_receiving_document');
+    expect(service).not.toMatch(/from\(['"`]tgd_stock_balances['"`]\)/i);
   });
 });

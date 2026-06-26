@@ -14,29 +14,23 @@ describe('Sprint 5B inbound UI structure', () => {
   const inboundUiFiles = [
     'src/app/routes.jsx',
     'src/features/operations/ReceivingPage.jsx',
-    'src/features/operations/PutawayPage.jsx',
     'src/features/operations/receiving/ReceivingListPage.jsx',
     'src/features/operations/receiving/ReceivingDetailPage.jsx',
-    'src/features/operations/receiving/ReceivingCreatePage.jsx',
-    'src/features/operations/putaway/PutawayListPage.jsx',
-    'src/features/operations/putaway/PutawayDetailPage.jsx',
-    'src/features/operations/putaway/PutawayCreatePage.jsx',
     'src/components/operations/DocumentStatusCard.jsx',
     'src/components/operations/DocumentLineTable.jsx',
     'src/components/operations/ReadOnlyField.jsx',
   ];
 
-  it('creates receiving and putaway list/detail/create pages', () => {
+  it('creates receiving list and detail pages only', () => {
     [
       'src/features/operations/receiving/ReceivingListPage.jsx',
       'src/features/operations/receiving/ReceivingDetailPage.jsx',
-      'src/features/operations/receiving/ReceivingCreatePage.jsx',
-      'src/features/operations/putaway/PutawayListPage.jsx',
-      'src/features/operations/putaway/PutawayDetailPage.jsx',
-      'src/features/operations/putaway/PutawayCreatePage.jsx',
     ].forEach((path) => {
       expect(statSync(resolve(projectRoot, path)).isFile()).toBe(true);
     });
+
+    expect(existsSync(resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx'))).toBe(false);
+    expect(existsSync(resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx'))).toBe(false);
   });
 
   it('creates inbound shared operation components', () => {
@@ -49,56 +43,39 @@ describe('Sprint 5B inbound UI structure', () => {
     });
   });
 
-  it('routes receiving and putaway list, new, and detail pages', () => {
+  it('routes receiving list and detail pages', () => {
     const routesSource = readProjectFile('src/app/routes.jsx');
 
     [
       '/operations/receiving',
-      '/operations/receiving/new',
       '/operations/receiving/:id',
-      '/operations/putaway',
-      '/operations/putaway/new',
-      '/operations/putaway/:id',
     ].forEach((routePath) => {
       expect(routesSource).toContain(routePath);
     });
+
+    expect(routesSource).not.toContain('/operations/receiving/new');
+    expect(routesSource).not.toContain('/operations/putaway');
   });
 
-  it('keeps inbound UI free of posting and stock update behavior', () => {
+  it('keeps inbound UI free of direct stock table writes', () => {
     const source = inboundUiFiles.map(readProjectFile).join('\n');
 
-    [
-      'tgd_post_receiving_document',
-      'tgd_post_putaway_document',
-      'tgd_post_inventory_movement',
-      'tgd_post_adjustment_document',
-      'tgd_stock_balances',
-      'PICK_CONFIRM',
-      'PICK_ALLOCATE',
-    ].forEach((term) => {
-      expect(source).not.toContain(term);
-    });
-
+    expect(source).not.toContain('tgd_stock_balances');
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
+    expect(source).not.toMatch(/from\(['"`]tgd_stock_balances['"`]\)/i);
   });
 
   it('uses services for data access and keeps direct post RPC out of pages', () => {
-    const receivingCreate = readProjectFile('src/features/operations/receiving/ReceivingCreatePage.jsx');
-    const putawayCreate = readProjectFile('src/features/operations/putaway/PutawayCreatePage.jsx');
+    const receivingDetail = readProjectFile('src/features/operations/receiving/ReceivingDetailPage.jsx');
     const receivingList = readProjectFile('src/features/operations/receiving/ReceivingListPage.jsx');
-    const putawayList = readProjectFile('src/features/operations/putaway/PutawayListPage.jsx');
+    const receivingService = readProjectFile('src/services/receivingService.js');
 
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
-    expect(putawayCreate).toContain('createPutawayDocument');
-    expect(receivingList).toContain('getReceivingDocuments');
-    expect(putawayList).toContain('getPutawayDocuments');
-    expect(receivingCreate).toContain("status: 'DRAFT'");
-    expect(putawayCreate).toContain("status: 'DRAFT'");
+    expect(receivingDetail).toContain('postReceivingDocument');
+    expect(receivingDetail).toContain('No stock movement until Confirm/Post');
+    expect(receivingDetail).not.toContain('tgd_rpc_post_receiving_document');
+    expect(receivingList).toContain('CustomerDepositNotificationsSection');
+    expect(receivingService).toContain('tgd_rpc_post_receiving_document');
+    expect(receivingService).not.toMatch(/from\(['"`]tgd_stock_balances['"`]\)/i);
   });
 
   it('does not create database, legacy, or Express sync artifacts', () => {

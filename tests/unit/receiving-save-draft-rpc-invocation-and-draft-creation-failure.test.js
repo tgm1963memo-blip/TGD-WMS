@@ -18,15 +18,14 @@ describe('Phase 23T: Diagnose Receiving Save Draft RPC Invocation and Draft Crea
     expect(content).toContain('**FINAL GO is NOT AUTHORIZED**');
   });
 
-  it('ReceivingCreatePage.jsx exposes 23T diagnostics', () => {
-    const jsxPath = path.resolve(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+  it('receivingService.js createReceivingDocument returns locked draft diagnostics', () => {
+    const jsxPath = path.resolve(process.cwd(), 'src/services/receivingService.js');
     const content = fs.readFileSync(jsxPath, 'utf8');
 
-    expect(content).toContain('id="diagnostic-23t"');
-    expect(content).toContain('Diagnostic version: 23T');
-    expect(content).toContain('Save draft RPC called');
-    expect(content).toContain('Save draft RPC error');
-    expect(content).toContain('Normalized draft id');
+    expect(content).toContain('Standalone receiving draft creation was removed');
+    expect(content).toContain('diagnostics: {');
+    expect(content).toContain('rpcCalled');
+    expect(content).toContain('rpcName');
   });
 
   it('receivingService.js createReceivingDocument returns diagnostics', () => {

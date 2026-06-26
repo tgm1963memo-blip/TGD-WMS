@@ -40,6 +40,8 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
   getMovementLedgerRows: (...args) => ledgerMocks.getMovementLedgerRows(...args),
   getMovementLedgerSummary: (...args) => ledgerMocks.getMovementLedgerSummary(...args),
   getMovementTypeBreakdown: (...args) => ledgerMocks.getMovementTypeBreakdown(...args),
+  getConfirmedDepositReceiptRows: vi.fn(async () => ({ data: [], error: null })),
+  getConfirmedWithdrawalRows: vi.fn(async () => ({ data: [], error: null })),
   summarizeMovements: (rows) => ({
     totalMovementRows: rows.length,
     totalInboundQty: 0,
@@ -121,8 +123,12 @@ describe('20B operational report preview UI integration', () => {
     expect(screen.getByTestId('report-print-button')).toBeInTheDocument();
   });
 
-  it('shows preview and print actions on movement ledger report page', async () => {
+  it('shows preview and print actions on movement ledger report page after search', async () => {
     renderWithLanguage(<MovementLedgerReportPage />);
+
+    fireEvent.change(screen.getByLabelText('Date From'), { target: { value: '2026-06-01' } });
+    fireEvent.change(screen.getByLabelText('Date To'), { target: { value: '2026-06-30' } });
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('operational-report-preview-action')).toBeInTheDocument();

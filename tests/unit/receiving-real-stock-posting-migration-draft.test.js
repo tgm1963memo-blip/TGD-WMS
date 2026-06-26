@@ -264,14 +264,13 @@ describe('Sprint 13J-O Receiving Real Stock Posting Migration Draft', () => {
 
   // --- G. Safety: no frontend changes ---
 
-  test('ReceivingCreatePage uses controlled post wrapper and avoids direct writes', () => {
-    // Verify migration does not reference ReceivingCreatePage
-    expect(lower).not.toContain('receivingcreatepage');
-    const pagePath = path.resolve(__dirname, '../../src/features/operations/receiving/ReceivingCreatePage.jsx');
+  test('ReceivingDetailPage uses controlled post wrapper and avoids direct writes', () => {
+    expect(lower).not.toContain('receivingdetailpage');
+    const pagePath = path.resolve(__dirname, '../../src/features/operations/receiving/ReceivingDetailPage.jsx');
     const page = fs.readFileSync(pagePath, 'utf8');
-    expect(page).toContain('Controlled receiving draft mode');
     expect(page).toContain('Confirm/Post Receiving');
     expect(page).toContain('postReceivingDocument');
+    expect(page).toContain('No stock movement until Confirm/Post');
     expect(page).not.toContain('tgd_rpc_post_receiving_document');
     expect(page).not.toMatch(/\.insert\s*\(/);
     expect(page).not.toMatch(/\.update\s*\(/);

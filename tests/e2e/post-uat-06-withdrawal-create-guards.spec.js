@@ -46,7 +46,7 @@ async function screenshot(page, name) {
 const baseUrl = getBaseUrl();
 
 async function gotoCreateWithdrawal(page) {
-  await gotoUrl(page, `${baseUrl}/customer/withdrawal-request/create`);
+  await gotoUrl(page, `${baseUrl}/customer/withdrawal-request/new`);
   await expect(page.locator('[data-testid="customer-withdrawal-request-create-page"]')).toBeVisible({ timeout: 25000 });
 }
 

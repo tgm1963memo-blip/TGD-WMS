@@ -64,7 +64,7 @@ describe('054 frontend wiring', () => {
     const permissions = read(path.join(process.cwd(), 'src/security/routePermissionCatalog.js'));
 
     expect(navigation).not.toContain("key: 'customer_product_catalog'");
-    expect(permissions).toContain("route_path: '/customer/products'");
+    expect(permissions).toContain("route_path: '/admin/customer-products'");
     expect(permissions).toContain("minimum_role: 'admin'");
   });
 });

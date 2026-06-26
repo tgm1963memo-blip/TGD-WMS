@@ -8,7 +8,7 @@ const projectRoot = resolve(testDir, '..', '..');
 const dashboardPath = resolve(projectRoot, 'src/features/dashboard/DashboardPage.jsx');
 const newReceivingPanelPath = resolve(projectRoot, 'src/components/dashboard/ControlledReceivingRpcDryRunPanel.jsx');
 const newReceivingServicePath = resolve(projectRoot, 'src/services/controlledReceivingRpcDryRunService.js');
-const receivingCreatePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
 
 function readProjectFile(path) {
@@ -57,36 +57,30 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     expect(source).not.toMatch(/\.upsert\s*\(/);
   });
 
-  it('ReceivingCreatePage allows controlled draft and post wrapper only', () => {
-    const receivingCreate = readProjectFile(receivingCreatePath);
+  it('ReceivingDetailPage allows controlled post wrapper only', () => {
+    const receivingDetail = readProjectFile(receivingDetailPath);
 
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Save Draft');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
-    expect(receivingCreate).not.toMatch(/>\s*Confirm\s*</i);
-    expect(receivingCreate).not.toMatch(/>\s*Post\s*</i);
-    expect(receivingCreate).not.toContain('supabase.from');
-    expect(receivingCreate).not.toMatch(/\.insert\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.update\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.delete\s*\(/);
-    expect(receivingCreate).not.toMatch(/\.upsert\s*\(/);
-    expect(receivingCreate).not.toContain('tgd_stock_movements');
-    expect(receivingCreate).not.toContain('tgd_stock_balances');
+    expect(receivingDetail).toContain('Confirm/Post Receiving');
+    expect(receivingDetail).toContain('postReceivingDocument');
+    expect(receivingDetail).toContain('No stock movement until Confirm/Post');
+    expect(receivingDetail).not.toContain('tgd_rpc_post_receiving_document');
+    expect(receivingDetail).not.toContain('supabase.from');
+    expect(receivingDetail).not.toMatch(/\.insert\s*\(/);
+    expect(receivingDetail).not.toMatch(/\.update\s*\(/);
+    expect(receivingDetail).not.toMatch(/\.delete\s*\(/);
+    expect(receivingDetail).not.toMatch(/\.upsert\s*\(/);
+    expect(receivingDetail).not.toContain('tgd_stock_movements');
+    expect(receivingDetail).not.toContain('tgd_stock_balances');
   });
 
-  it('receivingService remains RPC-only for receiving draft writes', () => {
+  it('receivingService remains RPC-only for receiving writes', () => {
     const receivingService = readProjectFile(receivingServicePath);
 
-    expect(receivingService).toContain('tgd_rpc_create_receiving_draft');
     expect(receivingService).toContain('tgd_rpc_add_receiving_line');
     expect(receivingService).toContain('postReceivingDocument');
     expect(receivingService).toContain('tgd_rpc_post_receiving_document');
+    expect(receivingService).toContain('Standalone receiving draft creation was removed');
     expect(receivingService).toContain('p_document_id: id');
-    expect(receivingService).not.toContain('tgd_rpc_confirm_receiving_document');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);
     expect(receivingService).not.toMatch(/\.delete\s*\(/);

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(testDir, '..', '..');
 const reportPath = resolve(projectRoot, 'docs/13J-P_RECEIVING_REAL_STOCK_POSTING_STAGING_READINESS.md');
-const receivingCreatePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
 
 function readProjectFile(path) {
@@ -65,18 +65,15 @@ describe('Sprint 13J-P receiving real stock posting staging readiness report', (
 
   it('does not claim migration 020 was applied or enable receiving UI/service', () => {
     const report = readProjectFile(reportPath);
-    const receivingCreate = readProjectFile(receivingCreatePath);
+    const receivingDetail = readProjectFile(receivingDetailPath);
     const receivingService = readProjectFile(receivingServicePath);
 
     expect(report).not.toMatch(/Migration 020 was applied/i);
     expect(report).not.toMatch(/Migration 020 is applied/i);
     expect(report).not.toContain('Receiving UI enabled');
-    expect(receivingCreate).toContain('Controlled receiving draft mode');
-    expect(receivingCreate).toContain('createReceivingDocument');
-    expect(receivingCreate).toContain('addReceivingLine');
-    expect(receivingCreate).toContain('Confirm/Post Receiving');
-    expect(receivingCreate).toContain('postReceivingDocument');
-    expect(receivingCreate).not.toContain('tgd_rpc_post_receiving_document');
+    expect(receivingDetail).toContain('postReceivingDocument');
+    expect(receivingDetail).toContain('No stock movement until Confirm/Post');
+    expect(receivingDetail).not.toContain('tgd_rpc_post_receiving_document');
     expect(receivingService).not.toMatch(/\.insert\s*\(/);
     expect(receivingService).not.toMatch(/\.update\s*\(/);
     expect(receivingService).not.toMatch(/\.delete\s*\(/);

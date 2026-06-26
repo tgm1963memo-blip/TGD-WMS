@@ -30,10 +30,15 @@ const profileMocks = vi.hoisted(() => ({
 vi.mock('../../src/services/stagingAuthService.js', () => ({
   getStagingSession: authMocks.getStagingSession,
   subscribeToStagingAuth: authMocks.subscribeToStagingAuth,
+  subscribeToAuthEvents: authMocks.subscribeToStagingAuth,
   requestPasswordReset: authMocks.requestPasswordReset,
   updateStagingPassword: authMocks.updateStagingPassword,
   signOutFromStaging: authMocks.signOutFromStaging,
   signInToStaging: vi.fn(),
+  verifyRecoveryToken: vi.fn(async () => ({
+    data: { user: { email: 'user@example.com' } },
+    error: null,
+  })),
 }));
 
 vi.mock('../../src/services/userProfileService.js', () => ({
@@ -129,11 +134,11 @@ describe('UX-AUTH-1 auth and user settings', () => {
       error: null,
     });
     authMocks.subscribeToStagingAuth.mockImplementation((onChange) => {
-      onChange({ user: { email: 'user@example.com' } });
+      onChange('PASSWORD_RECOVERY', { user: { email: 'user@example.com' } });
       return { unsubscribe: vi.fn() };
     });
 
-    renderWithProviders(null, { route: '/reset-password' });
+    renderWithProviders(null, { route: '/reset-password?token_hash=abc&type=recovery' });
 
     await waitFor(() => {
       expect(screen.getByTestId('reset-password-new-input')).toBeInTheDocument();

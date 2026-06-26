@@ -40,25 +40,18 @@ export function UserRoleProvider({ children }) {
       return undefined;
     }
 
-    console.log(`[UserRoleProvider] useEffect [authLoading=${authLoading}, sessionUserId=${sessionUserId}]`);
-
     setState((current) => ({
       ...current,
       ready: false,
       resolvedUserId: current.resolvedUserId === sessionUserId ? current.resolvedUserId : null,
     }));
 
-    console.log('[UserRoleProvider] calling getCurrentUserProfile');
-
     getCurrentUserProfile(sessionUserId)
       .then(async (result) => {
-        console.log(`[UserRoleProvider] getCurrentUserProfile resolved, active=${active}`);
         if (!active) return;
         const resolved = resolveUserProfileRole(result.data);
         setAuthenticatedUserRole(resolved.role);
-        console.log('[UserRoleProvider] calling refreshRoleAreaPermissionCache inside then');
         await refreshRoleAreaPermissionCache();
-        console.log(`[UserRoleProvider] refreshRoleAreaPermissionCache done, active=${active}`);
         if (!active) return;
         setState({
           role: getCurrentUserRole(),

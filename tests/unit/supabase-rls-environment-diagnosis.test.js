@@ -21,11 +21,12 @@ describe('23J: Supabase RLS and Environment Diagnosis', () => {
     expect(docContent).toContain('Environment Mismatch');
   });
 
-  it('should verify ReceivingCreatePage.jsx contains the diagnostics panel 23J', () => {
-    const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingCreatePage.jsx');
+  it('should verify ReceivingDetailPage.jsx uses controlled post wrapper', () => {
+    const pagePath = path.join(process.cwd(), 'src', 'features', 'operations', 'receiving', 'ReceivingDetailPage.jsx');
     const pageContent = fs.readFileSync(pagePath, 'utf8');
-    
-    expect(pageContent).toContain('Diagnostic version: 23T');
+
+    expect(pageContent).toContain('postReceivingDocument');
+    expect(pageContent).toContain('No stock movement until Confirm/Post');
   });
   
   it('should verify transaction-uat-round-1.spec.js captures pageDiagnostics 23J', () => {

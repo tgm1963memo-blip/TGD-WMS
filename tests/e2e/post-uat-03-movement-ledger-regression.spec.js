@@ -84,8 +84,8 @@ test.describe('Post-UAT: Movement Ledger Regression', () => {
     await gotoUrl(page, `${baseUrl}/reports/movement-ledger`);
     await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 20000 });
 
-    const title = await page.locator('h1, h2, .page-header__title').first().textContent().catch(() => '');
-    expect(title).toContain('รายงานการเคลื่อนไหว');
+    const title = await page.locator('.page-shell h2, .page-shell .page-header__title').first().textContent().catch(() => '');
+    expect(title).toMatch(/รายงานการเคลื่อนไหว/);
     await screenshot(page, '02-page-title.png');
   });
 

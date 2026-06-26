@@ -3,36 +3,26 @@ import fs from 'fs';
 import path from 'path';
 
 describe('23Q Receiving Draft ID and Lot No Line Add', () => {
-  const pagePath = path.join(process.cwd(), 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+  const detailPath = path.join(process.cwd(), 'src/features/operations/receiving/ReceivingDetailPage.jsx');
   const servicePath = path.join(process.cwd(), 'src/services/receivingService.js');
-  const pageContent = fs.readFileSync(pagePath, 'utf8');
+  const detailContent = fs.readFileSync(detailPath, 'utf8');
   const serviceContent = fs.readFileSync(servicePath, 'utf8');
 
-  it('verifies that draft creation exposes document id or throws DRAFT_ID_MISSING', () => {
-    expect(pageContent).toContain("setError('Save draft succeeded but returned no document id (DRAFT_ID_MISSING).')");
-    expect(pageContent).toContain('Draft id: {draft?.id || \'None\'}');
+  it('verifies receiving detail uses controlled post wrapper and draft movement guard', () => {
+    expect(detailContent).toContain('postReceivingDocument');
+    expect(detailContent).toContain('No stock movement until Confirm/Post');
+    expect(detailContent).toContain('Controlled Confirm/Post');
   });
 
-  it('verifies Add Line requires selectedLotId OR lotNo', () => {
-    expect(pageContent).toContain('const canAddLine = Boolean(');
-    expect(pageContent).toContain('(lineForm.lot_id || lineForm.lot_no)');
-    
-    // Check that Add Line disable reason is properly exposed
-    expect(pageContent).toContain("if (!draft?.id) addLineDisabledReason = 'Missing document id'");
-    expect(pageContent).toContain("else if (!lineForm.lot_id && !lineForm.lot_no) addLineDisabledReason = 'Missing lot id or lot no'");
-    expect(pageContent).toContain('Add Line requires: {addLineDisabledReason || \'All valid\'}');
-  });
-
-  it('verifies no direct stock update or movement ledger bypass', () => {
-    expect(pageContent).toContain('No stock movement or stock balance update is triggered from this page');
-    // Ensure no direct imports of movement ledger or stock balance updates
-    expect(pageContent).not.toContain('updateStockBalance');
-    expect(pageContent).not.toContain('insertMovementLedger');
-  });
-
-  it('verifies lot resolution is called when no lot_id is present', () => {
-    expect(pageContent).toContain('resolveLotForReceiving(lineForm.product_id, lineForm.lot_no)');
+  it('verifies standalone draft creation is locked in receivingService', () => {
+    expect(serviceContent).toContain('Standalone receiving draft creation was removed');
     expect(serviceContent).toContain('export async function resolveLotForReceiving');
+  });
+
+  it('verifies no direct stock update or movement ledger bypass in detail page', () => {
+    expect(detailContent).not.toContain('updateStockBalance');
+    expect(detailContent).not.toContain('insertMovementLedger');
+    expect(detailContent).not.toMatch(/from\(['"`]tgd_stock_balances['"`]\)/i);
   });
 
   it('verifies Production remains HOLD and FINAL GO is NOT AUTHORIZED', () => {

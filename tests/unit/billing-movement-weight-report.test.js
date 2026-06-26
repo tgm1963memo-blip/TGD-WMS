@@ -98,7 +98,7 @@ describe('Gate 3A billing movement weight report', () => {
       'billing-movement-weight-table',
       'billing-movement-weight-empty-state',
       'billing-movement-weight-error-alert',
-      'billing-movement-weight-summary-card',
+      'create-invoice-draft-button',
       'billing-movement-weight-export-button',
       'billing-status-badge',
       'billing-exclusion-reason-badge',

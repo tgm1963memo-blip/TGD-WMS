@@ -29,23 +29,25 @@ test.describe('Post-UAT: Admin Review Columns', () => {
     await login(page);
     await gotoUrl(page, `${baseUrl}/customer/admin/withdrawal-review`);
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('.page-shell').first()).toBeVisible({ timeout: 20000 });
-    await page.waitForTimeout(2000);
+    await expect(page.locator('[data-testid="customer-admin-withdrawal-review-page"]')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('[data-testid="admin-withdrawal-review-table"]')).toBeVisible({ timeout: 20000 });
 
-    const bodyText = await page.locator('body').textContent();
-    
-    // We check if the columns exist in the UI
-    const hasWeight = bodyText.includes('น้ำหนักที่เบิก') || bodyText.includes('น้ำหนักเบิก') || bodyText.includes('requested_weight') || bodyText.includes('Weight');
-    const hasBoxes = bodyText.includes('จำนวนกล่อง') || bodyText.includes('กล่องที่เบิก') || bodyText.includes('requested_boxes') || bodyText.includes('Boxes');
-    const hasQty = bodyText.includes('จำนวนที่เบิก') || bodyText.includes('จำนวนเบิก') || bodyText.includes('requested_quantity') || bodyText.includes('Qty');
+    const reviewBtn = page.locator('[data-testid^="admin-withdrawal-review-select-"]').first();
+    if (!await reviewBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      test.skip(true, 'No withdrawal rows in UAT data');
+      return;
+    }
+    await reviewBtn.click();
+
+    const modal = page.locator('.modal, [role="dialog"]').first();
+    await expect(modal).toBeVisible({ timeout: 10000 });
+
+    const modalText = await modal.textContent();
+    expect(modalText).not.toContain('ระบบเกิดข้อผิดพลาด');
+    expect(modalText).toMatch(/น้ำหนักที่ขอ/);
+    expect(modalText).toMatch(/กล่องที่ขอ/);
+    expect(modalText).toMatch(/จำนวนที่ขอ/);
 
     await screenshot(page, '01-admin-review-columns.png');
-
-    // These columns were added in commit 804dd75
-    // As long as the page loads and doesn't crash, the UI component expects these properties without crashing
-    expect(bodyText).not.toContain('ระบบเกิดข้อผิดพลาด');
-    
-    // Validate we have at least one indication of requested metrics (allow flexible localization)
-    expect(hasWeight || hasBoxes || hasQty).toBe(true);
   });
 });

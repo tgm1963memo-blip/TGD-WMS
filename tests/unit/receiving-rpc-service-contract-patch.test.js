@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const projectRoot = resolve(__dirname, '../..');
 const migrationPath = resolve(projectRoot, 'database/migrations/023_tgd_wms_receiving_add_line_location_rpc_patch.sql');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
-const receivingCreatePath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingCreatePage.jsx');
+const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 
 function readProjectFile(path) {
   return readFileSync(path, 'utf8');
@@ -105,13 +105,12 @@ describe('Sprint 13J-AE receiving RPC service contract patch', () => {
     expect(service).not.toMatch(/\.upsert\s*\(/);
   });
 
-  it('createReceivingDocument maps document_no to p_document_no and does not send p_reference', () => {
+  it('createReceivingDocument is locked and documents standalone draft removal', () => {
     const service = readProjectFile(receivingServicePath);
 
-    expect(service).toContain("p_customer_id: input.customer_id");
-    expect(service).toContain("p_document_no: input.document_no");
-    expect(service).toContain('document_no is required');
-    expect(service).not.toContain('p_reference');
+    expect(service).toContain('Standalone receiving draft creation was removed');
+    expect(service).toContain('tgd_rpc_create_receiving_draft');
+    expect(service).toContain('rpcCalled: false');
   });
 
   it('addReceivingLine maps locationId to p_location_id', () => {
@@ -126,14 +125,12 @@ describe('Sprint 13J-AE receiving RPC service contract patch', () => {
     expect(service).toContain('p_document_id: id');
   });
 
-  it('ReceivingCreatePage allows controlled draft and service-wrapper Confirm/Post only', () => {
-    const page = readProjectFile(receivingCreatePath);
+  it('ReceivingDetailPage allows service-wrapper Confirm/Post only', () => {
+    const page = readProjectFile(receivingDetailPath);
 
-    expect(page).toContain('Controlled receiving draft mode');
-    expect(page).toContain('Save Draft');
-    expect(page).toContain('addReceivingLine');
     expect(page).toContain('Confirm/Post Receiving');
     expect(page).toContain('postReceivingDocument');
+    expect(page).toContain('No stock movement until Confirm/Post');
     expect(page).not.toContain('tgd_rpc_post_receiving_document');
     expect(page).not.toMatch(/\.insert\s*\(/);
     expect(page).not.toMatch(/\.update\s*\(/);

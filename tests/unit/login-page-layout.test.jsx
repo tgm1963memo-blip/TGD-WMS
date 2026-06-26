@@ -1,14 +1,24 @@
 import { expect, test, vi } from 'vitest';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../../src/features/auth/AuthContext.jsx';
+import { UserRoleProvider } from '../../src/features/auth/UserRoleProvider.jsx';
 import { AppRoutes } from '../../src/app/routes.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 vi.mock('../../src/services/stagingAuthService.js', () => ({
   getStagingSession: vi.fn().mockResolvedValue({ data: null, error: null }),
-  subscribeToStagingAuth: vi.fn(() => ({ unsubscribe: vi.fn() })),
+  subscribeToStagingAuth: vi.fn((onChange) => {
+    onChange(null);
+    return { unsubscribe: vi.fn() };
+  }),
+  subscribeToAuthEvents: vi.fn(() => ({ unsubscribe: vi.fn() })),
+  verifyRecoveryToken: vi.fn(async () => ({ data: null, error: null })),
+}));
+
+vi.mock('../../src/services/userProfileService.js', () => ({
+  getCurrentUserProfile: vi.fn().mockResolvedValue({ data: null, error: null }),
 }));
 
 test('LoginPage renders standalone without layout wrappers', async () => {
@@ -16,19 +26,19 @@ test('LoginPage renders standalone without layout wrappers', async () => {
     <MemoryRouter initialEntries={['/login']}>
       <LanguageProvider initialLanguage="th">
         <AuthProvider>
-          <AppRoutes />
+          <UserRoleProvider>
+            <AppRoutes />
+          </UserRoleProvider>
         </AuthProvider>
       </LanguageProvider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 
-  // Expect login container to be present
   await waitFor(() => {
     expect(screen.getByText('TG Cold Storage WMS')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'เข้าสู่ระบบ' })).toBeInTheDocument();
     expect(screen.getByTestId('forgot-password-link')).toBeInTheDocument();
   });
 
-  // Expect sidebar/topbar to NOT be present
   expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
 });

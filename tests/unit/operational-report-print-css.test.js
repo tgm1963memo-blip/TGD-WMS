@@ -14,7 +14,7 @@ describe('20B operational report print CSS', () => {
     expect(css).toContain('.operational-report-signatures');
     expect(css).toContain('.operational-report-print-root');
     expect(css).toContain('@media print');
-    expect(css).toContain('page-break-after: always');
+    expect(css).toContain('page-break-after: auto');
     expect(css).toContain('.no-print');
   });
 });

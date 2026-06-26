@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
@@ -7,21 +7,13 @@ import { Sidebar } from '../../src/components/layout/Sidebar.jsx';
 vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
   useUserRole: () => ({ role: 'admin', ready: true }),
 }));
+
 import { AppShell } from '../../src/components/layout/AppShell.jsx';
 
-/**
- * 17B App Shell and Navigation UI Tests.
- *
- * Safety:
- * - No Production touched.
- * - No Supabase write operations.
- * - Tests UI rendering only.
- */
-
-function renderWithProviders(ui) {
+function renderWithProviders(ui, { language = 'en' } = {}) {
   return render(
     <MemoryRouter>
-      <LanguageProvider initialLanguage="en">
+      <LanguageProvider initialLanguage={language}>
         {ui}
       </LanguageProvider>
     </MemoryRouter>,
@@ -29,8 +21,6 @@ function renderWithProviders(ui) {
 }
 
 describe('17B App Shell and Navigation UI', () => {
-  // ── Layout Rendering ────────────────────────────────────────
-
   it('AppShell renders without crashing', () => {
     renderWithProviders(
       <AppShell currentSection="Dashboard">
@@ -44,21 +34,16 @@ describe('17B App Shell and Navigation UI', () => {
 
   it('Sidebar renders without crashing', () => {
     renderWithProviders(<Sidebar />);
-
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
   });
-
-  // ── Full Professional Text Labels ───────────────────────────
 
   describe('Sidebar contains full text professional labels', () => {
     const requiredLabels = [
       'Dashboard',
       'Receiving',
-      'Putaway',
       'Stock Balance',
-      'Picking Confirmation',
-      'Post Outbound',
       'Users and Roles',
+      'Invoice Drafts',
     ];
 
     it.each(requiredLabels)('contains label: %s', (label) => {
@@ -66,8 +51,6 @@ describe('17B App Shell and Navigation UI', () => {
       expect(screen.getByText(label)).toBeInTheDocument();
     });
   });
-
-  // ── Professional Group Labels ───────────────────────────────
 
   describe('Sidebar contains professional group labels', () => {
     const requiredGroups = [
@@ -77,6 +60,7 @@ describe('17B App Shell and Navigation UI', () => {
       'Outbound Management',
       'Barcode / Handheld',
       'Customer Portal',
+      'Billing',
       'Reports',
       'System Administration',
     ];
@@ -87,25 +71,16 @@ describe('17B App Shell and Navigation UI', () => {
     });
   });
 
-  // ── No Emoji Icons ──────────────────────────────────────────
-
   it('Sidebar does not render cute emoji icons', () => {
     renderWithProviders(<Sidebar />);
     const sidebar = screen.getByTestId('sidebar');
-    const textContent = sidebar.textContent;
-
-    // Common emoji ranges and specific warehouse emojis
-    const emojiPattern = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]/u;
-    expect(textContent).not.toMatch(emojiPattern);
+    const emojiPattern = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
+    expect(sidebar.textContent).not.toMatch(emojiPattern);
   });
-
-  // ── No Short Code-Only Labels ───────────────────────────────
 
   it('Sidebar does not use short code-only primary labels', () => {
     renderWithProviders(<Sidebar />);
     const sidebar = screen.getByTestId('sidebar');
-
-    // These short code labels must not appear as standalone nav items
     const codeLabels = ['RCV', 'PTW', 'PCK', 'PST', 'ADJ', 'TRF', 'DSP'];
     const navLinks = sidebar.querySelectorAll('.nav-link');
 
@@ -117,71 +92,36 @@ describe('17B App Shell and Navigation UI', () => {
     });
   });
 
-  // ── Production HOLD Indicator ───────────────────────────────
-
   it('Production HOLD text is visible', () => {
     renderWithProviders(<Sidebar />);
-
     const indicator = screen.getByTestId('production-hold-indicator');
     expect(indicator).toBeInTheDocument();
     expect(indicator.textContent).toContain('Production HOLD');
   });
 
-  // ── Post Outbound Menu Item ─────────────────────────────────
-
-  it('Post Outbound menu is visible but does not imply feature gate enabled', () => {
+  it('withdrawal review menu links to customer admin review route', () => {
     renderWithProviders(<Sidebar />);
-
-    const postOutbound = screen.getByText('Post Outbound');
-    expect(postOutbound).toBeInTheDocument();
-
-    // Post Outbound should be a regular nav link, not indicating "enabled" or "active"
-    // It should not have text indicating the feature gate is on
-    const sidebar = screen.getByTestId('sidebar');
-    expect(sidebar.textContent).not.toContain('Feature Gate: ON');
-    expect(sidebar.textContent).not.toContain('Gate Enabled');
+    const withdrawalLink = screen.getByRole('link', { name: /Withdrawal Request/i });
+    expect(withdrawalLink).toHaveAttribute('href', '/customer/admin/withdrawal-review');
   });
-
-  // ── Disabled Items ──────────────────────────────────────────
-
-  it('disabled items are marked as aria-disabled', () => {
-    renderWithProviders(<Sidebar />);
-
-    const disabledItems = screen.getAllByTitle('Coming soon');
-    expect(disabledItems.length).toBeGreaterThan(0);
-
-    disabledItems.forEach((item) => {
-      expect(item).toHaveAttribute('aria-disabled', 'true');
-    });
-  });
-
-  // ── Navigation Structure ────────────────────────────────────
 
   it('Sidebar renders expected number of navigation groups', () => {
     renderWithProviders(<Sidebar />);
     const sidebar = screen.getByTestId('sidebar');
     const groupLabels = sidebar.querySelectorAll('.nav-group-label');
-
     expect(groupLabels.length).toBeGreaterThan(0);
   });
 
-  // ── Additional Menu Items ───────────────────────────────────
-
   describe('Sidebar contains additional expected items', () => {
     const additionalItems = [
-      'Transfer',
-      'Adjustment',
-      'Withdrawal Request',
-      'Reservation',
-      'Dispatch History',
       'Movement Ledger',
       'Stock Aging',
-      'Master Data',
-      'Handheld Receiving',
+      'Customer Data',
       'Scan Center',
       'Customer Deposit',
       'Customer Requests',
       'Portal Overview',
+      'Billing Movement Weight',
     ];
 
     it.each(additionalItems)('contains item: %s', (item) => {

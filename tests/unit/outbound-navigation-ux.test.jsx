@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 describe('Sprint 14L outbound navigation and UX hardening', () => {
-  it('sidebar navigation includes outbound list and draft routes', () => {
+  it('sidebar navigation includes withdrawal review route', () => {
     render(
       <MemoryRouter>
         <LanguageProvider initialLanguage="en">
@@ -67,9 +67,10 @@ describe('Sprint 14L outbound navigation and UX hardening', () => {
       </MemoryRouter>,
     );
 
-    // 17B: navigation restructured – 'Post Outbound' links to outbound list
-    expect(screen.getByRole('link', { name: 'Post Outbound' })).toHaveAttribute('href', '/operations/outbound');
-    // Outbound Draft is no longer a sidebar item but the route still exists
+    expect(screen.getByRole('link', { name: /Withdrawal Request/i })).toHaveAttribute(
+      'href',
+      '/customer/admin/withdrawal-review',
+    );
   });
 
   it('list page shows safety note, loading state, empty permission hint, refresh, and draft link', async () => {

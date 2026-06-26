@@ -21,16 +21,15 @@ describe('19B Sidebar Language Switch', () => {
         <LanguageProvider initialLanguage="th">
           <Sidebar />
         </LanguageProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    // 17B: group labels stay professional English; nav items localize to Thai
     expect(screen.getByText('Main Operation')).toBeInTheDocument();
     expect(screen.getByText('Inbound Management')).toBeInTheDocument();
     expect(screen.getByText('แดชบอร์ด')).toBeInTheDocument();
     expect(screen.getByText('รับเข้า')).toBeInTheDocument();
-    expect(screen.getByText('จัดเก็บ')).toBeInTheDocument();
-    expect(screen.getByText('รับเข้าด้วย Handheld')).toBeInTheDocument();
+    expect(screen.getByText('ยอดคงเหลือ')).toBeInTheDocument();
+    expect(screen.getByText('ศูนย์สแกน')).toBeInTheDocument();
   });
 
   it('renders sidebar with English translations when English is selected', () => {
@@ -39,24 +38,22 @@ describe('19B Sidebar Language Switch', () => {
         <LanguageProvider initialLanguage="en">
           <Sidebar />
         </LanguageProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    // Verify main keys in English
     expect(screen.getByText('Main Operation')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Inbound Management')).toBeInTheDocument();
     expect(screen.getByText('Receiving')).toBeInTheDocument();
-    expect(screen.getByText('Putaway')).toBeInTheDocument();
-    expect(screen.getByText('Handheld Receiving')).toBeInTheDocument();
+    expect(screen.getByText('Stock Balance')).toBeInTheDocument();
+    expect(screen.getByText('Scan Center')).toBeInTheDocument();
   });
 
   it('contains proper translation keys for navigation items in translation catalog', () => {
-    // Ensure the new nav.* keys were added to the catalog
     expect(TRANSLATION_CATALOG['nav.dashboard']).toBeDefined();
     expect(TRANSLATION_CATALOG['nav.receiving']).toBeDefined();
     expect(TRANSLATION_CATALOG['nav.stockBalance']).toBeDefined();
-    expect(TRANSLATION_CATALOG['nav.pickingConfirmation']).toBeDefined();
+    expect(TRANSLATION_CATALOG['nav.scanCenter']).toBeDefined();
     expect(TRANSLATION_CATALOG['nav.barcodeHandheld']).toBeDefined();
   });
 });
