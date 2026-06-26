@@ -15,14 +15,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true;
 
-    getStagingSession().then((result) => {
-      if (!isMounted) return;
-      setSession(result.data ?? null);
-      setError(result.error ?? null);
-      setLoading(false);
-    });
+    // Only use subscribeToStagingAuth to avoid deadlocking GoTrueClient.
+    // supabase-js will immediately fire an INITIAL_SESSION event.
 
     const subscription = subscribeToStagingAuth((nextSession) => {
+      console.log('[AuthContext] subscribeToStagingAuth event', !!nextSession);
       if (!isMounted) return;
       setSession(nextSession);
       setError(null);

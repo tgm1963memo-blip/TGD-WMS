@@ -171,9 +171,13 @@ export async function getStockAtLocation(locationId) {
 
   const { data, error } = await supabase
     .from('tgd_stock_balances')
-    .select('id, qty_on_hand, qty_allocated, qty_available, uom, weight, customer_id, product_id, lot_id, pallet_id, tgd_lots(lot_number, expiry_date)')
+    .select('id, qty_on_hand, qty_allocated, uom, weight, customer_id, product_id, lot_id, pallet_id, tgd_lots(lot_number, expiry_date)')
     .eq('location_id', locationId)
     .gt('qty_on_hand', 0);
+
+  if (error) {
+    console.error('Failed to fetch stock at location:', error);
+  }
 
   return { data: data ?? [], error };
 }

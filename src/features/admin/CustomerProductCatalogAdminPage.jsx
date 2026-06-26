@@ -17,6 +17,7 @@ import {
 } from '../../utils/customerProductExcelUtils.js';
 import { canWriteCustomerCatalog } from '../../security/userManagementPermissions.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const EMPTY_FORM = {
   productId: '',
@@ -283,6 +284,7 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
 }
 
 export function CustomerProductCatalogAdminPage() {
+  const { session } = useAuth();
   const t = useTranslation();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -319,7 +321,7 @@ export function CustomerProductCatalogAdminPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getCurrentUserProfile(), getCustomers()]).then(([profileResult, customerResult]) => {
+    Promise.all([getCurrentUserProfile(session?.user?.id), getCustomers()]).then(([profileResult, customerResult]) => {
       if (!active) return;
       setCanWrite(canWriteCustomerCatalog(profileResult.data?.role ?? ''));
       setCustomers(customerResult.data ?? []);

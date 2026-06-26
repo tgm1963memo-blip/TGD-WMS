@@ -8,7 +8,7 @@
  * Flow D — Reports
  */
 import { test, expect } from '@playwright/test';
-import { getBaseUrl, login, loginAsCustomerAdmin, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, login, loginAsCustomerAdmin, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
 
 requireUatCredentials();
 
@@ -24,7 +24,7 @@ async function adminLogin(page) {
 }
 
 async function goto(page, path) {
-  await page.goto(`${BASE}${path}`);
+  await gotoUrl(page, `${BASE}${path}`);
 }
 
 // ─── FLOW A — System Setup ───────────────────────────────────────────────────

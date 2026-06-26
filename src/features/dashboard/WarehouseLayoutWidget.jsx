@@ -253,8 +253,16 @@ export function WarehouseLayoutWidget() {
     setStockModal({ locId, locCode });
     setStockItems([]);
     setStockLoading(true);
-    getStockAtLocation(locId).then(({ data }) => {
-      setStockItems(data ?? []);
+    getStockAtLocation(locId).then(({ data, error }) => {
+      if (error) {
+        setStockItems([]);
+      } else {
+        const itemsWithAvailable = (data ?? []).map(item => ({
+          ...item,
+          qty_available: item.qty_on_hand - (item.qty_allocated || 0)
+        }));
+        setStockItems(itemsWithAvailable);
+      }
       setStockLoading(false);
     });
   }

@@ -16,7 +16,7 @@ export function UserSessionMenu() {
   useEffect(() => {
     let active = true;
 
-    getCurrentUserProfile().then((result) => {
+    getCurrentUserProfile(session?.user?.id).then((result) => {
       if (!active) return;
       setRole(result.data?.role ?? null);
     });

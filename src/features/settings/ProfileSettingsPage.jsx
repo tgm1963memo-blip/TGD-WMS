@@ -20,7 +20,7 @@ export function ProfileSettingsPage() {
     let active = true;
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    getCurrentUserProfile().then((result) => {
+    getCurrentUserProfile(session?.user?.id).then((result) => {
       if (!active) return;
       setState({
         profile: result.data ?? null,

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login } from './helpers/uatAuth.js';
+import { login , gotoUrl } from './helpers/uatAuth.js';
 
 test.describe('Customer to Admin Full Loop UAT', () => {
   test.setTimeout(180_000);
@@ -21,7 +21,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     await page.waitForURL('**/customer', { timeout: 15000 }).catch(() => {});
     
     console.log('--- Step 2: Customer creates Deposit Request ---');
-    await page.goto(`${baseUrl}/customer/deposit-request/new`);
+    await gotoUrl(page, `${baseUrl}/customer/deposit-request/new`);
     await page.waitForLoadState('networkidle');
 
     // Fill deposit request form (Header)
@@ -43,7 +43,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     await page.waitForTimeout(2000);
 
     console.log('--- Step 3: Logout Customer ---');
-    await page.goto(`${baseUrl}`);
+    await gotoUrl(page, `${baseUrl}`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => {
       localStorage.clear();
@@ -58,7 +58,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 4. Admin logs in and receives the items
     // ---------------------------------------------------------
     console.log('--- Step 4: Admin Login ---');
-    await page.goto(`${baseUrl}/login`);
+    await page.goto();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
     await page.fill('input[type="email"]', adminEmail);
@@ -68,7 +68,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     await page.waitForURL('**/dashboard', { timeout: 15000 }).catch(() => {});
 
     console.log('--- Step 5: Admin Process Receiving ---');
-    await page.goto(`${baseUrl}/operations/receiving`);
+    await gotoUrl(page, `${baseUrl}/operations/receiving`);
     await page.waitForLoadState('networkidle');
 
     // Admin opens work order (Create Receiving Draft)
@@ -91,7 +91,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // Handheld Receiving
     // ---------------------------------------------------------
     console.log('--- Step 5.2: Handheld Receiving ---');
-    await page.goto(`${baseUrl}/handheld`);
+    await gotoUrl(page, `${baseUrl}/handheld`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => {
       localStorage.setItem('tgd_handheld_profile', JSON.stringify({id: 'test-admin', role: 'admin', first_name: 'Admin'}));
@@ -118,7 +118,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // Check Stock Balance
     // ---------------------------------------------------------
     console.log('--- Step 5.3: Check Stock Balance ---');
-    await page.goto(`${baseUrl}/inventory`);
+    await gotoUrl(page, `${baseUrl}/inventory`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('text=ยอดคงเหลือ').first() || page.locator('text=Inventory').first()).toBeVisible({ timeout: 10000 });
     // Look for our document number or customer
@@ -129,13 +129,13 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.4 Logout Admin, Login Customer
     // ---------------------------------------------------------
     console.log('--- Step 5.4: Logout Admin, Login Customer ---');
-    await page.goto(`${baseUrl}`);
+    await gotoUrl(page, `${baseUrl}`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.context().clearCookies();
     await page.reload();
 
-    await page.goto(`${baseUrl}/login`);
+    await page.goto();
     await page.fill('input[type="email"]', customerEmail);
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');
@@ -145,7 +145,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.5 Customer Creates Withdrawal Request
     // ---------------------------------------------------------
     console.log('--- Step 5.5: Customer Creates Withdrawal Request ---');
-    await page.goto(`${baseUrl}/customer/withdrawal-request/new`);
+    await gotoUrl(page, `${baseUrl}/customer/withdrawal-request/new`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('[data-testid="customer-withdrawal-dispatch-date"]').fill(new Date().toISOString().split('T')[0]);
@@ -172,13 +172,13 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.6 Logout Customer, Login Admin
     // ---------------------------------------------------------
     console.log('--- Step 5.6: Logout Customer, Login Admin ---');
-    await page.goto(`${baseUrl}`);
+    await gotoUrl(page, `${baseUrl}`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.context().clearCookies();
     await page.reload();
 
-    await page.goto(`${baseUrl}/login`);
+    await page.goto();
     await page.fill('input[type="email"]', adminEmail);
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');
@@ -188,7 +188,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.7 Admin Open Work Order (Withdrawal)
     // ---------------------------------------------------------
     console.log('--- Step 5.7: Admin Open Work Order (Withdrawal) ---');
-    await page.goto(`${baseUrl}/operations/withdrawal-requests`);
+    await gotoUrl(page, `${baseUrl}/operations/withdrawal-requests`);
     await page.waitForLoadState('networkidle');
     
     // Click the first Review button
@@ -210,7 +210,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.8 Handheld Picking
     // ---------------------------------------------------------
     console.log('--- Step 5.8: Handheld Picking ---');
-    await page.goto(`${baseUrl}/handheld`);
+    await gotoUrl(page, `${baseUrl}/handheld`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => {
       localStorage.setItem('tgd_handheld_profile', JSON.stringify({id: 'test-admin', role: 'admin', first_name: 'Admin'}));
@@ -243,7 +243,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.9 Admin Outbound Dispatch
     // ---------------------------------------------------------
     console.log('--- Step 5.9: Admin Outbound Dispatch ---');
-    await page.goto(`${baseUrl}/operations/outbound`);
+    await gotoUrl(page, `${baseUrl}/operations/outbound`);
     await page.waitForLoadState('networkidle');
     
     // Check if there are documents to dispatch
@@ -281,11 +281,11 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 7. Verify Reports (Storage Aging / Movement Ledger)
     // ---------------------------------------------------------
     console.log('--- Step 7: Admin checks Reports ---');
-    await page.goto(`${baseUrl}/reports/storage-aging`);
+    await gotoUrl(page, `${baseUrl}/reports/storage-aging`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('button, input').first()).toBeVisible({ timeout: 10000 });
     
-    await page.goto(`${baseUrl}/reports/movement-ledger`);
+    await gotoUrl(page, `${baseUrl}/reports/movement-ledger`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('button, input').first()).toBeVisible({ timeout: 10000 });
 

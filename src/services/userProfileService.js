@@ -7,28 +7,46 @@ function missingSupabaseClientResult() {
   };
 }
 
-export async function getCurrentUserProfile() {
+let _profilePromise = null;
+
+export async function getCurrentUserProfile(providedAuthUserId = null) {
   if (!supabase) {
     return missingSupabaseClientResult();
   }
 
-  const { data: userResult, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    return { data: null, error: userError };
-  }
-
-  const authUserId = userResult?.user?.id;
+  const authUserId = providedAuthUserId;
+  console.log('[userProfileService] getCurrentUserProfile called with', authUserId);
 
   if (!authUserId) {
-    return { data: null, error: null };
+    console.warn('[userProfileService] getCurrentUserProfile called without authUserId! Returning null to avoid getSession() deadlock.');
+    return { data: null, error: new Error('No active session') };
+  }
+  if (_profilePromise) {
+    console.log('[userProfileService] returning cached _profilePromise');
+    return _profilePromise;
   }
 
-  return supabase
-    .from('tgd_user_profiles')
-    .select('*')
-    .eq('auth_user_id', authUserId)
-    .maybeSingle();
+  _profilePromise = (async () => {
+    console.log('[userProfileService] starting _profilePromise execution for', authUserId);
+    try {
+      console.log('[userProfileService] calling supabase.from(tgd_user_profiles)');
+      const res = await supabase
+        .from('tgd_user_profiles')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+      console.log('[userProfileService] supabase.from resolved', !!res.data);
+      return res;
+    } catch (e) {
+      console.log('[userProfileService] supabase.from caught error', e);
+      throw e;
+    } finally {
+      console.log('[userProfileService] clearing _profilePromise');
+      _profilePromise = null;
+    }
+  })();
+
+  return _profilePromise;
 }
 
 export async function getUserProfiles(filters = {}) {

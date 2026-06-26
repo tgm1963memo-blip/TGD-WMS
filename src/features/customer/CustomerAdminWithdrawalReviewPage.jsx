@@ -7,7 +7,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
-import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
+import { getWithdrawalStatusLabel, getLinePickingStatus } from '../../utils/customerWithdrawalStatusLabels.js';
 import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
@@ -67,7 +67,8 @@ export function CustomerAdminWithdrawalReviewPage() {
       if (!active) return;
       const data = result.data ?? [];
       setRows(data);
-      setSelectedId(data[0]?.id ?? '');
+      const sorted = [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setSelectedId(sorted[0]?.id ?? '');
       setLoading(false);
       setError(result.error?.message ?? '');
     });
@@ -282,7 +283,11 @@ export function CustomerAdminWithdrawalReviewPage() {
             </thead>
             <tbody>
               {sortedData.length ? sortedData.map((row) => (
-                <tr key={row.id}>
+                <tr 
+                  key={row.id}
+                  onClick={() => openDetail(row.id)}
+                  style={{ cursor: 'pointer', background: selectedId === row.id ? '#f0f9ff' : 'inherit' }}
+                >
                   <td>{row.withdrawal_no}</td>
                   <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
@@ -396,7 +401,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                           {line.requested_qty != null ? `${line.requested_qty} ${line.uom ?? ''}`.trim() : '-'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          {line.picked_at != null ? (
+                          {getLinePickingStatus(line, selected?.status) === 'PICKED' ? (
                             <div style={{ lineHeight: 1.6 }}>
                               <div style={{ display: 'inline-block', background: '#ecfdf5', color: '#059669', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800, marginBottom: 4 }}>
                                 ✓ จัดแล้ว

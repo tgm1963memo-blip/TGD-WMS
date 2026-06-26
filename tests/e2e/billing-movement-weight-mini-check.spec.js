@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getBaseUrl, login, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, login, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
 import { isBillingWriteRole, readProfileRole } from './helpers/billingAccess.js';
 
 requireUatCredentials();
@@ -21,13 +21,13 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 3: Report page loads', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     const reportPage = page.locator('[data-testid="billing-movement-weight-report-page"]');
     await expect(reportPage).toBeVisible();
   });
 
   test('Scenario 4: Frontend reads billing view', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     const table = page.locator('[data-testid="billing-movement-weight-table"]');
     const emptyState = page.locator('[data-testid="billing-movement-weight-empty-state"]');
     const errorAlert = page.locator('[data-testid="billing-movement-weight-error-alert"]');
@@ -51,7 +51,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 5: Filter form works', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     const filterForm = page.locator('[data-testid="billing-movement-weight-filter-form"]');
     await expect(filterForm).toBeVisible();
     // If there are any input/select controls, interact safely
@@ -67,7 +67,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
   });
 
   test('Scenario 6: CSV export button present', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     const exportBtn = page.locator('[data-testid="billing-movement-weight-export-button"]');
     await expect(exportBtn).toBeVisible();
     if (await exportBtn.isEnabled()) {
@@ -88,7 +88,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
       testInfo.skip(true, `Requires billing write role accounting/admin (current: ${role || 'unknown'})`);
     }
 
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="create-invoice-draft-button"]')).toBeVisible({ timeout: 20000 });
     const forbiddenSelectors = [
       '[data-testid="approve-invoice-draft-button"]',
@@ -111,7 +111,7 @@ test.describe('Billing Movement Weight Mini Check', () => {
     await expect(page.locator('[data-testid="login-page"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="app-shell"]')).not.toBeVisible();
 
-    await page.goto(`${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="login-page"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="billing-movement-weight-report-page"]')).not.toBeVisible();
   });

@@ -46,7 +46,10 @@ vi.mock('../../src/features/customer/useCustomerPortalProfile.js', () => ({
     role: 'customer_admin',
     customerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
     canWriteCustomerRequests: true,
+    isRequestProxy: false,
   }),
+  getAdminPortalCustomerId: () => null,
+  setAdminPortalCustomerId: vi.fn(),
 }));
 
 vi.mock('../../src/services/customerProductCatalogService.js', () => ({

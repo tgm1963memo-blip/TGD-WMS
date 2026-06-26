@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { AgingBucketSummary } from '../../components/reports/AgingBucketSummary.jsx';
 import { ExpiryAlertTable } from '../../components/reports/ExpiryAlertTable.jsx';
@@ -10,9 +10,9 @@ import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import {
   getExpiryAlertRows,
   getStorageAgingRows,
-  getStorageAgingSummary,
   groupAgingByCustomer,
   groupAgingByWarehouse,
+  summarizeAgingRows,
 } from '../../services/storageAgingReportService.js';
 
 const initialState = {
@@ -56,51 +56,21 @@ export function StorageAgingReportPage() {
 
     Promise.all([
       getStorageAgingRows(filters),
-      getStorageAgingSummary(filters),
       getExpiryAlertRows(filters),
-    ]).then(([rowsResult, summaryResult, expiryResult]) => {
+    ]).then(([rowsResult, expiryResult]) => {
       if (!isMounted) return;
 
-      let rows = rowsResult.data ?? [];
-      let expiryAlerts = expiryResult.data ?? [];
-      const error = rowsResult.error ?? summaryResult.error ?? expiryResult.error ?? null;
-
-      let mappedCustomerSummary = groupAgingByCustomer(rows);
-      let mappedWarehouseSummary = groupAgingByWarehouse(rows);
-
-      if (customerOptions && productOptions) {
-        const cMap = Object.fromEntries(customerOptions.map(c => [c.value, c.label]));
-        const pMap = Object.fromEntries(productOptions.map(p => [p.value, p.label]));
-
-        const mapRow = r => ({
-          ...r,
-          customer_name: r.customer_name ?? cMap[r.customer_id] ?? r.customer_id,
-          product_name: r.product_name ?? pMap[r.product_id] ?? r.product_id,
-        });
-
-        rows = rows.map(mapRow);
-        expiryAlerts = expiryAlerts.map(mapRow);
-
-        mappedCustomerSummary = groupAgingByCustomer(rows).map(s => ({
-          ...s,
-          group_id: cMap[s.group_id] ?? s.group_id
-        }));
-        
-        // Warehouse names are usually in row.warehouse_name, we can just group and pick the name from the first row or rely on row mapping if warehouse_name is present. 
-        // groupAgingByWarehouse groups by warehouse_id. Let's just map group_id to warehouse_name if it exists in any row.
-        const wMap = Object.fromEntries(rows.map(r => [r.warehouse_id, r.warehouse_name ?? r.warehouse_id]));
-        mappedWarehouseSummary = groupAgingByWarehouse(rows).map(s => ({
-          ...s,
-          group_id: s.group_id === 'UNASSIGNED' ? 'ยังไม่ระบุคลัง' : (wMap[s.group_id] ?? s.group_id)
-        }));
-      }
+      const rows = rowsResult.data ?? [];
+      const expiryAlerts = expiryResult.data ?? [];
+      const error = rowsResult.error ?? expiryResult.error ?? null;
+      const summary = summarizeAgingRows(rows);
 
       setState({
         rows,
-        summary: summaryResult.data,
+        summary,
         expiryAlerts,
-        customerSummary: mappedCustomerSummary,
-        warehouseSummary: mappedWarehouseSummary,
+        customerSummary: groupAgingByCustomer(rows),
+        warehouseSummary: groupAgingByWarehouse(rows),
         loading: false,
         error,
       });
@@ -109,7 +79,42 @@ export function StorageAgingReportPage() {
     return () => {
       isMounted = false;
     };
-  }, [filters, customerOptions, productOptions]);
+  }, [filters]);
+
+  const displayState = useMemo(() => {
+    if (!customerOptions || !productOptions) {
+      return state;
+    }
+
+    const cMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
+    const pMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
+
+    const mapRow = (row) => ({
+      ...row,
+      customer_name: row.customer_name ?? cMap[row.customer_id] ?? row.customer_id,
+      product_name: row.product_name ?? pMap[row.product_id] ?? row.product_id,
+    });
+
+    const rows = state.rows.map(mapRow);
+    const expiryAlerts = state.expiryAlerts.map(mapRow);
+    const wMap = Object.fromEntries(rows.map((r) => [r.warehouse_id, r.warehouse_name ?? r.warehouse_id]));
+
+    return {
+      ...state,
+      rows,
+      expiryAlerts,
+      customerSummary: groupAgingByCustomer(rows).map((summaryRow) => ({
+        ...summaryRow,
+        group_id: cMap[summaryRow.group_id] ?? summaryRow.group_id,
+      })),
+      warehouseSummary: groupAgingByWarehouse(rows).map((summaryRow) => ({
+        ...summaryRow,
+        group_id: summaryRow.group_id === 'UNASSIGNED'
+          ? 'ยังไม่ระบุคลัง'
+          : (wMap[summaryRow.group_id] ?? summaryRow.group_id),
+      })),
+    };
+  }, [state, customerOptions, productOptions]);
 
   return (
     <section className="page-shell">
@@ -119,20 +124,50 @@ export function StorageAgingReportPage() {
       />
       <ReportFilterPanel onChange={setFilters} customerOptions={customerOptions} productOptions={productOptions} />
 
+      <DashboardSection title="สรุปภาพรวม (Overall Summary)">
+        <div className="report-summary-grid" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <ReportSummaryCard 
+            label="อายุจัดเก็บเฉลี่ย (วัน)" 
+            value={displayState.summary?.average_storage_age} 
+            testId="summary-avg-age" 
+          />
+          <ReportSummaryCard 
+            label="อายุสินค้าคงเหลือเฉลี่ย (วัน)" 
+            value={displayState.summary?.average_shelf_life} 
+            testId="summary-avg-shelf-life" 
+          />
+          <ReportSummaryCard 
+            label="หมดอายุแล้ว (รายการ)" 
+            value={displayState.summary?.expired_lots} 
+            testId="summary-expired" 
+          />
+          <ReportSummaryCard 
+            label="ใกล้หมดอายุ (รายการ)" 
+            value={displayState.summary?.near_expiry_lots} 
+            testId="summary-near-expiry" 
+          />
+          <ReportSummaryCard 
+            label="ไม่มีวันหมดอายุ (รายการ)" 
+            value={displayState.summary?.no_expiry_lots} 
+            testId="summary-no-expiry" 
+          />
+        </div>
+      </DashboardSection>
+
       <DashboardSection title="รายงานอายุสินค้าจัดเก็บ (Storage Aging Table)">
-        <StorageAgingTable data={state.rows} loading={state.loading} error={state.error} />
+        <StorageAgingTable data={displayState.rows} loading={displayState.loading} error={displayState.error} />
       </DashboardSection>
 
       <DashboardSection title="รายการใกล้หมดอายุ / หมดอายุ (Expiry Alert Section)">
-        <ExpiryAlertTable data={state.expiryAlerts} loading={state.loading} error={state.error} />
+        <ExpiryAlertTable data={displayState.expiryAlerts} loading={displayState.loading} error={displayState.error} />
       </DashboardSection>
 
       <DashboardSection title="สรุปตามลูกค้า">
-        <AgingBucketSummary data={state.customerSummary} loading={state.loading} error={state.error} label="ลูกค้า" />
+        <AgingBucketSummary data={displayState.customerSummary} loading={displayState.loading} error={displayState.error} label="ลูกค้า" />
       </DashboardSection>
 
       <DashboardSection title="สรุปตามคลังสินค้า">
-        <AgingBucketSummary data={state.warehouseSummary} loading={state.loading} error={state.error} label="คลังสินค้า" />
+        <AgingBucketSummary data={displayState.warehouseSummary} loading={displayState.loading} error={displayState.error} label="คลังสินค้า" />
       </DashboardSection>
     </section>
   );

@@ -19,6 +19,10 @@ const columns = [
       const d = new Date(dateString);
       return Number.isNaN(d.getTime()) ? dateString : d.toLocaleDateString('th-TH');
   }},
+  { key: 'remaining_shelf_life_days', header: 'อายุสินค้าคงเหลือ (วัน)', render: (row) => {
+      if (row.remaining_shelf_life_days === null || row.remaining_shelf_life_days === undefined) return '-';
+      return row.remaining_shelf_life_days;
+  }},
   { key: 'expiry_status', header: 'สถานะหมดอายุ' },
   { key: 'chargeable_days', header: 'จำนวนวันคิดค่าฝาก' },
 ];

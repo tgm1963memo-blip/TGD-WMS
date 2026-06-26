@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { getBaseUrl, login, logout } from './helpers/uatAuth.js';
+import { getBaseUrl, login, logout , gotoUrl } from './helpers/uatAuth.js';
 
 const PASSWORD = process.env.UAT_PASSWORD || process.env.UAT_DEMO_PASSWORD;
 
@@ -95,7 +95,7 @@ test.describe('All-role production smoke', () => {
       const results = [];
 
       for (const check of entry.checks) {
-        await page.goto(`${baseUrl}${check.path}`);
+        await gotoUrl(page, `${baseUrl}${check.path}`);
         await page.waitForLoadState('domcontentloaded');
         try {
           const shellLocator = check.path === '/handheld' 

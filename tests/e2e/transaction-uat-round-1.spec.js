@@ -170,7 +170,7 @@ test.describe('Transaction UAT Round 1', () => {
   };
 
   const safeGoto = async (page, urlPath, evidenceName) => {
-    await page.goto(`${process.env.UAT_BASE_URL}${urlPath}`);
+    await gotoUrl(page, `${process.env.UAT_BASE_URL}${urlPath}`);
     await page.waitForLoadState('networkidle');
     if (evidenceName) {
       await captureScenarioEvidence(page, evidenceName);
@@ -239,7 +239,7 @@ test.describe('Transaction UAT Round 1', () => {
       let baseUrl = process.env.UAT_BASE_URL || '';
       if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-      await page.goto(baseUrl);
+      await gotoUrl(page, baseUrl);
       await captureScenarioEvidence(page, '00-before-login.png');
 
       let bodyText = await page.evaluate(() => document.body.innerText);
@@ -251,7 +251,7 @@ test.describe('Transaction UAT Round 1', () => {
       try {
          await emailInput.waitFor({ state: 'visible', timeout: 3000 });
       } catch (e) {
-         await page.goto(`${baseUrl}/login`);
+         await page.goto();
          bodyText = await page.evaluate(() => document.body.innerText);
          if (bodyText.includes('404') && bodyText.includes('NOT_FOUND')) {
            throw new Error('Vercel route fallback failed. Check vercel.json rewrite.');

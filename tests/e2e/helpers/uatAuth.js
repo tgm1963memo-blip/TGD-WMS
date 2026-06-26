@@ -60,6 +60,20 @@ export async function login(page, credentials = {}) {
 
   const handheldPage = page.locator('[data-testid="handheld-page"]');
   await expect(appShell.or(handheldPage).first()).toBeVisible({ timeout: 20000 });
+  
+  // Explicitly wait for the critical permission queries to finish before allowing navigation
+  // This prevents Playwright's page.goto from aborting these requests and corrupting the HTTP/2 stream
+  await page.waitForResponse(res => res.url().includes('tgd_user_profiles'), { timeout: 5000 }).catch(() => {});
+  await page.waitForResponse(res => res.url().includes('tgd_role_definitions'), { timeout: 5000 }).catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
+}
+
+export async function gotoUrl(page, url) {
+  // Wait for any pending requests from previous tests to finish before hard-navigating.
+  // This prevents Playwright's page.goto from aborting in-flight Supabase requests 
+  // and corrupting the Chromium HTTP/2 multiplexed connection pool.
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.goto(url);
 }
 
 export async function switchUser(page, credentials = {}) {

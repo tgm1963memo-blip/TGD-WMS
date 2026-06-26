@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
 
 requireUatCredentials();
 
 const TARGET_DRAFT_NO = 'BID-20260611-0002';
 
 async function loginFromRoot(page) {
-  await page.goto(`${getBaseUrl()}/login`);
+  await gotoUrl(page, `${getBaseUrl()}/login`);
   await page.locator('[data-testid="login-email-input"], input[name="email"], input[type="email"]').fill(process.env.UAT_EMAIL);
   await page.locator('[data-testid="login-password-input"], input[name="password"], input[type="password"]').fill(process.env.UAT_PASSWORD);
   await page.locator('[data-testid="login-submit-button"], button[type="submit"], button:has-text("Login"), button:has-text("เข้าสู่ระบบ")').click();
@@ -23,13 +23,13 @@ test.describe('Gate 3B-4 Bplus Export Readiness Preview (read-only UAT)', () => 
   });
 
   test('Scenario 2: Navigate to Invoice Draft List', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/billing/invoice-drafts`);
+    await gotoUrl(page, `${getBaseUrl()}/billing/invoice-drafts`);
     await expect(page.locator('[data-testid="billing-invoice-drafts-page"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="invoice-draft-filter-form"]')).toBeVisible();
   });
 
   test('Scenario 3-13: Approved draft readiness preview is read-only', async ({ page }) => {
-    await page.goto(`${getBaseUrl()}/billing/invoice-drafts`);
+    await gotoUrl(page, `${getBaseUrl()}/billing/invoice-drafts`);
     await expect(page.locator('[data-testid="billing-invoice-drafts-page"]')).toBeVisible({ timeout: 15000 });
 
     const draftNoInput = page.locator('[data-testid="invoice-draft-filter-form"] input[type="search"]');

@@ -16,3 +16,9 @@ export function getWithdrawalStatusLabel(status, t) {
   const key = CUSTOMER_WITHDRAWAL_STATUS_I18N_KEYS[status];
   return key ? t(key) : status;
 }
+
+export function getLinePickingStatus(line, documentStatus) {
+  if (line?.picked_at != null) return 'PICKED';
+  if (['COMPLETED', 'DISPATCHED'].includes(documentStatus)) return 'PICKED';
+  return 'PENDING';
+}

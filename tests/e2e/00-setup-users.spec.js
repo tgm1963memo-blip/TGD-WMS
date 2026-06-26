@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getBaseUrl, login, logout } from './helpers/uatAuth.js';
+import { getBaseUrl, login, logout , gotoUrl } from './helpers/uatAuth.js';
 
 const DEFAULT_PASSWORD = process.env.UAT_PASSWORD || process.env.UAT_DEMO_PASSWORD || 'password123';
 const WAREHOUSE_PASSWORD = process.env.UAT_WAREHOUSE_PASSWORD || DEFAULT_PASSWORD;
@@ -33,7 +33,7 @@ test.describe('Setup Users via Admin UI', () => {
     }
 
     // Go to User Management page
-    await page.goto(`${baseUrl}/admin/users`);
+    await gotoUrl(page, `${baseUrl}/admin/users`);
     await page.waitForLoadState('domcontentloaded');
 
     await expect(page.locator('[data-testid="user-management-page"]')).toBeVisible({ timeout: 15000 });

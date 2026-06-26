@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import { detectUatErrors } from '../utils/uatErrorDetection.js';
-import { getBaseUrl, login, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, login, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
 import { systemRouteExpectations } from './fixtures/systemRoutes.js';
 
 requireUatCredentials();
@@ -25,7 +25,7 @@ test.describe('System pre-user UAT smoke', () => {
 
     for (const route of systemRouteExpectations) {
       const url = `${baseUrl}${route.path}`;
-      await page.goto(url);
+      await gotoUrl(page, url);
       await page.waitForLoadState('domcontentloaded');
 
       const bodyText = await page.locator('body').innerText();
@@ -64,17 +64,17 @@ test.describe('System pre-user UAT smoke', () => {
       });
     }
 
-    await page.goto(`${baseUrl}/customer`);
+    await gotoUrl(page, `${baseUrl}/customer`);
     await expect(page.locator('[data-testid="customer-portal-page"]')).toBeVisible();
 
-    await page.goto(`${baseUrl}/operations/receiving`);
+    await gotoUrl(page, `${baseUrl}/operations/receiving`);
     await expect(page.locator('[data-testid="receiving-customer-deposit-section"]')).toBeVisible();
     await expect(page.locator('[data-testid="receiving-post-button"]')).toHaveCount(0);
 
-    await page.goto(`${baseUrl}/operations/dispatch`);
+    await gotoUrl(page, `${baseUrl}/operations/dispatch`);
     await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
 
-    await page.goto(`${baseUrl}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${baseUrl}/reports/billing-movement-weight`);
     await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
 

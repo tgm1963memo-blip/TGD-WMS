@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import { detectUatErrors } from '../utils/uatErrorDetection.js';
-import { getBaseUrl, requireUatCredentials } from './helpers/uatAuth.js';
+import { getBaseUrl, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
 
 requireUatCredentials();
 
@@ -37,7 +37,7 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
   };
 
   // 1. Navigate and Check State
-  await page.goto(`${BASE_URL}/`);
+  await gotoUrl(page, `${BASE_URL}/`);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1500);
 
@@ -125,43 +125,43 @@ test('UAT Round 1 Browser Execution', async ({ page }) => {
   await checkErrors();
 
   // 3. Receiving
-  await page.goto(`${BASE_URL}/receiving`);
+  await gotoUrl(page, `${BASE_URL}/receiving`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/03-receiving.png' });
   await checkErrors();
 
   // 4. Putaway
-  await page.goto(`${BASE_URL}/putaway`);
+  await gotoUrl(page, `${BASE_URL}/putaway`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/04-putaway.png' });
   await checkErrors();
 
   // 5. Stock Balance
-  await page.goto(`${BASE_URL}/inventory/stock-balance`);
+  await gotoUrl(page, `${BASE_URL}/inventory/stock-balance`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/05-stock-balance.png' });
   await checkErrors();
 
   // 6. Transfer
-  await page.goto(`${BASE_URL}/inventory/transfer`);
+  await gotoUrl(page, `${BASE_URL}/inventory/transfer`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/06-transfer.png' });
   await checkErrors();
 
   // 7. Adjustment
-  await page.goto(`${BASE_URL}/inventory/adjustment`);
+  await gotoUrl(page, `${BASE_URL}/inventory/adjustment`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/07-adjustment.png' });
   await checkErrors();
 
   // 8. Movement Ledger
-  await page.goto(`${BASE_URL}/inventory/movement-ledger`);
+  await gotoUrl(page, `${BASE_URL}/inventory/movement-ledger`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/08-movement-ledger.png' });
   await checkErrors();
 
   // 9. Stock Aging
-  await page.goto(`${BASE_URL}/reports/stock-aging`);
+  await gotoUrl(page, `${BASE_URL}/reports/stock-aging`);
   await page.waitForTimeout(2000);
   await page.screenshot({ path: 'uat-evidence/round-1/09-stock-aging.png' });
   await checkErrors();

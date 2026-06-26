@@ -14,6 +14,7 @@ import {
 } from '../../services/userManagementService.js';
 import { canManageUsers } from '../../security/userManagementPermissions.js';
 import { useTranslation, useLanguage } from '../../i18n/languageProvider.jsx';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const EMPTY_FORM = {
   profileId: '',
@@ -28,6 +29,7 @@ const EMPTY_FORM = {
 };
 
 export function UserManagementPage() {
+  const { session } = useAuth();
   const t = useTranslation();
   const { language } = useLanguage();
   const [profiles, setProfiles] = useState([]);
@@ -86,7 +88,7 @@ export function UserManagementPage() {
     setError('');
 
     const [profileResult, userResult, customerResult] = await Promise.all([
-      getCurrentUserProfile(),
+      getCurrentUserProfile(session?.user?.id),
       getUserProfiles(),
       getCustomers(),
     ]);
