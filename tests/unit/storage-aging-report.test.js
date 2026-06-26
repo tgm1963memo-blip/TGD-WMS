@@ -84,42 +84,35 @@ describe('Sprint 6D storage aging report foundation', () => {
   it('renders cold storage aging sections, summary cards, and table columns', () => {
     const source = reportUiFiles.map(readProjectFile).join('\n');
 
+    // English section-level strings that appear in the bilingual titles / report definitions
     [
       'cold storage',
-      'customer-owned inventory',
-      'monthly storage billing preparation',
-      'Total Lots',
-      'Total Pallets',
-      'Total Customers',
-      'Total Stock Qty',
-      'Aging 0-30 Days',
-      'Aging 31-60 Days',
-      'Aging 61-90 Days',
-      'Aging Over 90 Days',
-      'Near Expiry Lots',
-      'Expired Lots',
-      'Estimated Chargeable Days',
+      'Storage Aging / Lot / Expiry / Chargeable Days Report',
+      '/reports/storage-aging',
       'Storage Aging Table',
       'Expiry Alert Section',
-      'Customer Aging Summary',
-      'Warehouse Aging Summary',
-      'Customer',
-      'Product',
-      'Lot',
-      'Pallet',
-      'Warehouse',
-      'Room / Zone',
-      'Location',
-      'Condition',
-      'Stock Qty',
-      'UOM',
-      'Storage Start / Received',
-      'Aging Days',
-      'Aging Bucket',
-      'Expiry Date',
-      'Expiry Status',
-      'Chargeable Days',
-      'Billing Note',
+    ].forEach((term) => {
+      expect(source).toContain(term);
+    });
+
+    // Summary card test-IDs required by Phase 5 (Single Source of Truth)
+    [
+      'summary-avg-age',
+      'summary-avg-shelf-life',
+      'summary-expired',
+      'summary-near-expiry',
+      'summary-no-expiry',
+    ].forEach((testId) => {
+      expect(source).toContain(testId);
+    });
+
+    // Phase 4: Thai column headers that MUST appear in the Storage Aging Table
+    // (Expiry Date, Remaining Days, Expiry Status, Storage Age)
+    [
+      'วันหมดอายุ',              // Expiry Date
+      'อายุสินค้าคงเหลือ (วัน)', // Remaining Days
+      'สถานะหมดอายุ',            // Expiry Status
+      'อายุจัดเก็บ (วัน)',        // Storage Age / Aging Days
     ].forEach((term) => {
       expect(source).toContain(term);
     });

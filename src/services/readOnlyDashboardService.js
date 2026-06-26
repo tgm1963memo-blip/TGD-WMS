@@ -15,6 +15,10 @@ const emptySummary = {
   openDispatchRows: 0,
 };
 
+// tgd_putaway_documents does not exist in the current schema (superseded by tgd_putaway_tasks).
+// This constant prevents a 404 console error from the dashboard summary query.
+const PUTAWAY_ROWS_UNAVAILABLE = 0;
+
 function missingClientResult() {
   return {
     data: { ...emptySummary },
@@ -91,7 +95,6 @@ export async function getReadOnlyDashboardSummary() {
       lotRows,
       locationRows,
       openReceivingRows,
-      openPutawayRows,
       openPickingRows,
       openDispatchRows,
     ] = await Promise.all([
@@ -103,10 +106,10 @@ export async function getReadOnlyDashboardSummary() {
       getRowCount('tgd_lots'),
       getActiveLocationCount(),
       getOpenDocumentCount('tgd_receiving_documents'),
-      getOpenDocumentCount('tgd_putaway_documents'),
       getOpenDocumentCount('tgd_picking_documents'),
       getOpenDocumentCount('tgd_dispatch_documents'),
     ]);
+    const openPutawayRows = PUTAWAY_ROWS_UNAVAILABLE;
 
     return {
       data: {

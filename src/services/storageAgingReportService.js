@@ -32,7 +32,14 @@ function daysBetween(startDate, endDate) {
   return Math.max(0, Math.floor((endDate.getTime() - startDate.getTime()) / millisecondsPerDay));
 }
 
-function enrichAgingRows(rows = [], filters = {}) {
+/** Like daysBetween but allows negative values (for expired items) */
+function signedDaysBetween(startDate, endDate) {
+  if (!startDate || !endDate) return null;
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor((endDate.getTime() - startDate.getTime()) / millisecondsPerDay);
+}
+
+export function enrichAgingRows(rows = [], filters = {}) {
   const today = parseDate(filters.dateAsOf) ?? new Date();
 
   return rows.map((row) => {
@@ -44,6 +51,9 @@ function enrichAgingRows(rows = [], filters = {}) {
       ? Math.max(0, agingDays - Number(filters.freeDays ?? 0))
       : agingDays;
 
+    const expiryDateObj = parseDate(row.expiry_date ?? row.exp_date);
+    const remainingShelfLifeDays = expiryDateObj ? signedDaysBetween(today, expiryDateObj) : null;
+
     return {
       ...row,
       storage_start_date: storageStartDate,
@@ -51,6 +61,7 @@ function enrichAgingRows(rows = [], filters = {}) {
       aging_bucket: agingBucket,
       expiry_status: expiryStatus,
       chargeable_days: chargeableDays,
+      remaining_shelf_life_days: remainingShelfLifeDays,
     };
   }).filter((row) => {
     if (filters.agingBucket && row.aging_bucket !== filters.agingBucket) return false;
@@ -75,30 +86,37 @@ function enrichAgingRows(rows = [], filters = {}) {
   });
 }
 
-function summarizeAgingRows(rows = []) {
+export function summarizeAgingRows(rows = []) {
   const customerIds = new Set();
   const lotIds = new Set();
   const palletIds = new Set();
 
-  return rows.reduce((summary, row) => {
+  const summary = rows.reduce((acc, row) => {
     if (row.customer_id) customerIds.add(row.customer_id);
     if (row.lot_id) lotIds.add(row.lot_id);
     if (row.pallet_id) palletIds.add(row.pallet_id);
 
-    summary.total_customers = customerIds.size;
-    summary.total_lots = lotIds.size;
-    summary.total_pallets = palletIds.size;
-    summary.total_stock_qty += Number(row.qty_on_hand ?? 0);
-    summary.estimated_chargeable_days += Number(row.chargeable_days ?? 0);
+    acc.total_customers = customerIds.size;
+    acc.total_lots = lotIds.size;
+    acc.total_pallets = palletIds.size;
+    acc.total_stock_qty += Number(row.qty_on_hand ?? 0);
+    acc.estimated_chargeable_days += Number(row.chargeable_days ?? 0);
 
-    if (row.aging_bucket === '0_30') summary.aging_0_30 += 1;
-    if (row.aging_bucket === '31_60') summary.aging_31_60 += 1;
-    if (row.aging_bucket === '61_90') summary.aging_61_90 += 1;
-    if (row.aging_bucket === 'OVER_90') summary.aging_over_90 += 1;
-    if (row.expiry_status === 'NEAR_EXPIRY') summary.near_expiry_lots += 1;
-    if (row.expiry_status === 'EXPIRED') summary.expired_lots += 1;
+    if (row.aging_bucket === '0_30') acc.aging_0_30 += 1;
+    if (row.aging_bucket === '31_60') acc.aging_31_60 += 1;
+    if (row.aging_bucket === '61_90') acc.aging_61_90 += 1;
+    if (row.aging_bucket === 'OVER_90') acc.aging_over_90 += 1;
+    if (row.expiry_status === 'NEAR_EXPIRY') acc.near_expiry_lots += 1;
+    if (row.expiry_status === 'EXPIRED') acc.expired_lots += 1;
+    if (row.expiry_status === 'NO_EXPIRY_DATE') acc.no_expiry_lots += 1;
 
-    return summary;
+    acc.total_aging_days += Number(row.aging_days ?? 0);
+    if (row.remaining_shelf_life_days !== null && row.remaining_shelf_life_days !== undefined) {
+      acc.total_remaining_shelf_life_days += Number(row.remaining_shelf_life_days);
+      acc.lots_with_expiry += 1;
+    }
+
+    return acc;
   }, {
     total_customers: 0,
     total_lots: 0,
@@ -111,7 +129,16 @@ function summarizeAgingRows(rows = []) {
     near_expiry_lots: 0,
     expired_lots: 0,
     estimated_chargeable_days: 0,
+    no_expiry_lots: 0,
+    total_aging_days: 0,
+    total_remaining_shelf_life_days: 0,
+    lots_with_expiry: 0,
   });
+
+  summary.average_storage_age = rows.length ? Math.round(summary.total_aging_days / rows.length) : 0;
+  summary.average_shelf_life = summary.lots_with_expiry ? Math.round(summary.total_remaining_shelf_life_days / summary.lots_with_expiry) : 0;
+
+  return summary;
 }
 
 function groupAgingRows(rows = [], key) {
@@ -151,7 +178,7 @@ export async function getStorageAgingRows(filters = {}) {
   const query = applyStorageAgingFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at, tgd_lots(lot_number, expiry_date)')
       .order('created_at', { ascending: true }),
     filters,
   );
@@ -180,6 +207,9 @@ export async function getStorageAgingRows(filters = {}) {
     ...row,
     location_code: locationMap[row.location_id]?.location_code ?? null,
     location_name: locationMap[row.location_id]?.location_name ?? null,
+    expiry_date: row.tgd_lots?.expiry_date ?? null,
+    lot_number: row.tgd_lots?.lot_number ?? null,
+    lot_no: row.tgd_lots?.lot_number ?? null,
   }));
 
   return { data: enrichAgingRows(flat, filters), error: null };
@@ -245,5 +275,5 @@ export function classifyExpiryStatus(expiryDate, today = new Date()) {
   const daysToExpiry = daysBetween(asOfDate, expiry);
   if (daysToExpiry <= 30) return 'NEAR_EXPIRY';
 
-  return 'OK';
+  return 'GOOD';
 }
