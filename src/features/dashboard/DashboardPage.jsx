@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
 import { WarehouseLayoutWidget } from './WarehouseLayoutWidget.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -8,6 +9,7 @@ import { useLanguage, useTranslation } from '../../i18n/languageProvider.jsx';
 import {
   getReadOnlyDashboardEmptySummary,
   getReadOnlyDashboardSummary,
+  getPendingAdminDocuments,
 } from '../../services/readOnlyDashboardService.js';
 import { summarizeSupabaseReadiness } from '../../services/supabaseConnectionReadinessService.js';
 import { supabase } from '../../services/supabaseClient.js';
@@ -19,9 +21,15 @@ const initialState = {
   error: null,
 };
 
+function fmtDate(val) {
+  if (!val) return '-';
+  try { return new Date(val).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return val; }
+}
+
 export function DashboardPage() {
   const [state, setState] = useState(initialState);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingDocs, setPendingDocs] = useState({ data: null, loading: true });
   const { session } = useAuth();
   const { language } = useLanguage();
   const t = useTranslation();
@@ -49,6 +57,12 @@ export function DashboardPage() {
         loading: false,
         error: result.error ?? null,
       });
+    });
+
+    setPendingDocs({ data: null, loading: true });
+    getPendingAdminDocuments().then((result) => {
+      if (!isMounted) return;
+      setPendingDocs({ data: result.data ?? [], loading: false });
     });
 
     return () => { isMounted = false; };
@@ -248,6 +262,57 @@ export function DashboardPage() {
           </div>
         </DashboardSection>
       ) : null}
+
+      {/* Pending Customer Documents */}
+      <DashboardSection title={language === 'th' ? 'เอกสารจากลูกค้า — รอธุรการดำเนินการ' : 'Customer Documents — Awaiting Admin Action'}>
+        {pendingDocs.loading ? (
+          <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลด...' : 'Loading...'}</div>
+        ) : !pendingDocs.data || pendingDocs.data.length === 0 ? (
+          <div style={{ color: 'var(--tgd-text-light)', padding: '8px 0' }}>
+            {language === 'th' ? 'ไม่มีเอกสารค้างดำเนินการ ✓' : 'No documents awaiting action ✓'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--tgd-border)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>ประเภท</th>
+                  <th style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>เลขที่เอกสาร</th>
+                  <th style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>ลูกค้า</th>
+                  <th style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>วันที่แจ้ง</th>
+                  <th style={{ padding: '6px 10px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingDocs.data.map((doc) => (
+                  <tr key={`${doc.docType}-${doc.id}`} style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                    <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        background: doc.docType === 'deposit' ? '#dbeafe' : '#fef3c7',
+                        color: doc.docType === 'deposit' ? '#1d4ed8' : '#92400e',
+                      }}>
+                        {doc.docType === 'deposit' ? 'ฝากสินค้า' : 'เบิกสินค้า'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '6px 10px', fontWeight: 600 }}>{doc.request_no ?? doc.id.slice(0, 8)}</td>
+                    <td style={{ padding: '6px 10px' }}>{doc.customer?.customer_name ?? doc.customer?.customer_code ?? '-'}</td>
+                    <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: 'var(--tgd-text-light)' }}>{fmtDate(doc.submitted_at ?? doc.created_at)}</td>
+                    <td style={{ padding: '6px 10px' }}>
+                      <Link
+                        to={doc.docType === 'deposit' ? `/customer/admin/deposit-review/${doc.id}` : `/customer/admin/withdrawal-review`}
+                        style={{ color: 'var(--tgd-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 12 }}
+                      >
+                        ดูเอกสาร →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </DashboardSection>
 
       {/* Warehouse Layout Map */}
       <DashboardSection title={language === 'th' ? 'แผนผังคลังสินค้า' : 'Warehouse Layout Map'}>

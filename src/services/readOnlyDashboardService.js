@@ -142,3 +142,34 @@ export async function getReadOnlyDashboardSummary() {
 export function getReadOnlyDashboardEmptySummary() {
   return { ...emptySummary };
 }
+
+export async function getPendingAdminDocuments() {
+  if (!supabase) return { data: null, error: new Error('Supabase not configured') };
+
+  const [depositResult, withdrawalResult] = await Promise.all([
+    supabase
+      .from('tgd_customer_deposit_requests')
+      .select('id, request_no, status, submitted_at, created_at, customer:tgd_customers(customer_name, customer_code)')
+      .eq('status', 'SUBMITTED_BY_CUSTOMER')
+      .order('submitted_at', { ascending: true }),
+    supabase
+      .from('tgd_customer_withdrawal_requests')
+      .select('id, request_no, status, submitted_at, created_at, customer:tgd_customers(customer_name, customer_code)')
+      .eq('status', 'SUBMITTED_BY_CUSTOMER')
+      .order('submitted_at', { ascending: true }),
+  ]);
+
+  if (depositResult.error || withdrawalResult.error) {
+    return { data: null, error: depositResult.error ?? withdrawalResult.error };
+  }
+
+  const deposits = (depositResult.data ?? []).map((r) => ({ ...r, docType: 'deposit' }));
+  const withdrawals = (withdrawalResult.data ?? []).map((r) => ({ ...r, docType: 'withdrawal' }));
+  const all = [...deposits, ...withdrawals].sort((a, b) => {
+    const da = a.submitted_at ?? a.created_at ?? '';
+    const db = b.submitted_at ?? b.created_at ?? '';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+
+  return { data: all, error: null };
+}

@@ -42,7 +42,7 @@ function summarizeStockRows(rows = []) {
     return {
       totalStockQty: summary.totalStockQty + Number(row.qty_on_hand ?? 0),
       totalAllocatedQty: summary.totalAllocatedQty + Number(row.qty_allocated ?? 0),
-      availableQty: summary.availableQty + Number(row.qty_available ?? 0),
+      availableQty: summary.availableQty + Math.max(0, Number(row.qty_on_hand ?? 0) - Number(row.qty_allocated ?? 0)),
     };
   }, {
     totalStockQty: 0,
@@ -75,7 +75,7 @@ function groupStockRows(rows = [], key) {
 
     current.qty_on_hand += Number(row.qty_on_hand ?? 0);
     current.qty_allocated += Number(row.qty_allocated ?? 0);
-    current.qty_available += Number(row.qty_available ?? 0);
+    current.qty_available += Math.max(0, Number(row.qty_on_hand ?? 0) - Number(row.qty_allocated ?? 0));
     if (row.product_id) current.productIds.add(row.product_id);
     current.sku_count = current.productIds.size;
     groups.set(groupKey, current);
@@ -100,8 +100,8 @@ export async function getStockBalanceRows(filters = {}) {
   const query = applyStockFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, qty_available')
-      .order('qty_available', { ascending: true }),
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated')
+      .order('qty_on_hand', { ascending: true }),
     filters,
   );
 
@@ -124,16 +124,22 @@ export async function getLowStockItems(filters = {}) {
   }
 
   const threshold = Number(filters.threshold ?? 0);
-  const query = applyStockFilters(
+  const { data, error } = await applyStockFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, qty_available')
-      .lte('qty_available', threshold)
-      .order('qty_available', { ascending: true }),
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated')
+      .order('qty_on_hand', { ascending: true }),
     filters,
   );
 
-  return query;
+  if (error) return { data: null, error };
+
+  const filtered = (data ?? []).filter((row) => {
+    const available = Number(row.qty_on_hand ?? 0) - Number(row.qty_allocated ?? 0);
+    return available <= threshold;
+  });
+
+  return { data: filtered, error: null };
 }
 
 export async function getExpiringLots(filters = {}) {

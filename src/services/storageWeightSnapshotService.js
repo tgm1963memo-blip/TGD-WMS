@@ -34,7 +34,7 @@ function groupByKey(rows = [], key) {
       row_count: 0,
     };
 
-    current.qty_on_hand += Number(row.qty_on_hand ?? row.qty_available ?? 0);
+    current.qty_on_hand += Number(row.qty_on_hand ?? 0);
     current.weight += Number(row.weight ?? row.gross_weight ?? row.net_weight ?? 0);
     current.chargeable_weight += Number(row.chargeable_weight ?? 0);
     current.row_count += 1;
@@ -50,7 +50,7 @@ export async function getDailyStorageWeightPreview(filters = {}) {
   return applyStorageFilters(
     supabase
       .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_available, uom, created_at')
+      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
       .order('created_at', { ascending: false }),
     filters,
   );
@@ -76,7 +76,7 @@ export function calculateChargeableWeight(rows = [], options = {}) {
 
   return rows.map((row) => {
     const baseWeight = Number(row.weight ?? row.gross_weight ?? row.net_weight ?? 0);
-    const qtyWeight = Number(row.qty_on_hand ?? row.qty_available ?? 0) * weightPerQty;
+    const qtyWeight = Number(row.qty_on_hand ?? 0) * weightPerQty;
     const calculatedWeight = baseWeight > 0 ? baseWeight : qtyWeight;
     const chargeableWeight = Math.max(calculatedWeight, minimumWeight);
 
