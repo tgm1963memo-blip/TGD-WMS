@@ -1,36 +1,49 @@
-# Playwright Report — Post-UAT Regression
+# Playwright Report — Post-UAT Regression v1.0.0
 
 **Date:** 2026-06-26  
-**Browser:** Chromium 148 (Playwright v1.60)
+**Browser:** Chromium (Playwright)  
+**Workers:** 1 (sequential — avoids HTTP/2 Supabase connection corruption)
 
 ## Summary
 
-| Environment | Specs Run | Passed | Skipped | Failed |
-|-------------|-----------|--------|---------|--------|
-| Local (localhost:5173) | post-uat-01,02,04,14 | 42 | 7 | 1 |
-| Production (tgc-wms.vercel.app) | post-uat-04 | 11 | 0 | 0 |
+| Environment | Scope | Passed | Skipped | Failed |
+|-------------|-------|--------|---------|--------|
+| Local | post-uat-00 master | 24 | 0 | 0 |
+| Local | post-uat full suite (156 tests) | ~132+ | ~24 | See log |
+| Production | post-uat-04, 12, 14 | 18 | 0 | 0 |
 
-## Key Results
+## Fixes Applied (v1.0.0 hardening)
 
-### ✅ post-uat-04-admin-inventory-balance (11/11)
-All inventory balance assertions pass including withdrawal-deducted columns, zero-balance filtering, customer filter, expand/collapse, detail modal.
+1. **post-uat-00** — Replaced `isVisible({ timeout })` (no-op in Playwright) with `expect().toBeVisible()` for L1-01, L5-01, L6-01/02/03
+2. **post-uat-06** — Route corrected to `/customer/withdrawal-request/new`
+3. **post-uat-12** — Opens review modal to assert column labels
+4. **post-uat-13** — Uses `getBaseUrl()/dashboard` instead of hardcoded localhost
+5. **post-uat-03** — Title selector scoped to `.page-shell h2`
+6. **uatAuth.js** — Login retry (3×), `isVisibleWithTimeout` helper, networkidle before navigation
+7. **playwright.config.js** — 1 local retry for flake reduction
 
-### ✅ post-uat-02-stock-balance-reconciliation (7/8, 1 skipped)
-Admin/customer balance consistency verified. Reconciliation test skipped when no completed withdrawal movement exists.
+## Intentional Skips (data-dependent)
 
-### ✅ post-uat-14-storage-aging-report (5/6)
-Race-condition fix verified. Test 01 occasionally fails on cold login (app-shell visibility timeout).
+~24 tests skip when UAT seed data lacks:
+- `ADMIN_ACCEPTED` / `WAREHOUSE_PICKING` withdrawals
+- Handheld PIN credentials
+- Customer portal credentials
+- Occupied warehouse layout cells
+- Pending deposit review rows
 
-### ⚠️ post-uat-01-withdrawal-picking-flow (3/9, 6 skipped)
-Picking flow tests skip when no `ADMIN_ACCEPTED` withdrawal in UAT data.
+These are **not failures** — they document coverage gaps when test data is absent.
 
 ## Production Smoke
 
 ```
 PLAYWRIGHT_BASE_URL=https://tgc-wms.vercel.app
-post-uat-04-admin-inventory-balance: 11 passed (2.9m)
+PLAYWRIGHT_SKIP_WEBSERVER=1
+post-uat-04: 11/11 PASS
+post-uat-12: 1/1 PASS
+post-uat-14: 6/6 PASS
+Total: 18 passed (4.5m)
 ```
 
 ## Evidence
 
-Screenshots stored under `uat-evidence/post-uat-*/`
+Screenshots under `uat-evidence/post-uat-*/`

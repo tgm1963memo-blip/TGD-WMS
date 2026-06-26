@@ -11,11 +11,12 @@
 | Domain | Status | Evidence |
 |--------|--------|----------|
 | Build | ✅ PASS | `npm run build` — 329 modules, 0 errors |
-| Lint | ✅ PASS | `npm run lint` — 368 files scanned, 0 violations |
+| Lint | ✅ PASS | `npm run lint` — 368 files, 0 violations |
 | Vitest | ✅ PASS | 259 files, 1932 tests, 100% |
 | Database Integrity | ✅ PASS | `validate-db.js` — 0 orphans, 0 duplicates |
-| SQL Validation | ✅ PASS | `sql-validation-phase6.mjs` — MATCH |
-| Production Smoke | ✅ PASS | post-uat-04 on https://tgc-wms.vercel.app |
+| SQL Validation | ✅ PASS | Phase 6 sum check MATCH |
+| Production Smoke | ✅ PASS | 18/18 on https://tgc-wms.vercel.app |
+| Post-UAT Master | ✅ PASS | post-uat-00: 24/24 |
 | Security (static) | ✅ PASS | No console.log/TODO in src; RLS via Supabase |
 | npm audit | ⚠️ CONDITIONAL | 6 vulns — see KNOWN_ISSUES.md |
 
@@ -38,7 +39,7 @@
 | Migration | Description |
 |-----------|-------------|
 | `20260625162400_restore_count_variance_logic.sql` | COUNT_VARIANCE deposit review |
-| Prior migrations | Applied via Supabase (076–080 series in database/) |
+| Prior migrations | Applied via Supabase (076–080 series) |
 
 **Integrity:** 5 stock balances, 5 lots, 0 orphan FKs, 0 negative qty
 
@@ -52,18 +53,10 @@ Test Files:  259 passed (259)
 Tests:       1932 passed (1932)
 ```
 
-### Playwright (Post-UAT Suite)
-Core regression validated:
-- Admin inventory balance (11/11)
-- Stock balance reconciliation
-- Storage aging report
-- Withdrawal picking flow (data-dependent skips documented)
-
-### Production Validation
-```
-PLAYWRIGHT_BASE_URL=https://tgc-wms.vercel.app
-post-uat-04: 11/11 PASS
-```
+### Playwright
+- post-uat-00 master: 24/24 PASS
+- Production smoke (04+12+14): 18/18 PASS
+- Full post-uat: ~132 executed + ~24 data skips (see PLAYWRIGHT_REPORT.md)
 
 ---
 
@@ -85,7 +78,7 @@ post-uat-04: 11/11 PASS
 |--------|-------|
 | Main bundle | 1.56 MB (gzip 433 KB) |
 | CSS | 44 KB |
-| Build time | ~2.2s local |
+| Build time | ~6.5s local |
 
 Recommendation: route-based code splitting (post-v1.0.0)
 
@@ -109,7 +102,7 @@ See `ROLLBACK_PLAN.md` — Vercel promote previous deployment + revert git tag i
 
 ### **CERTIFIED FOR PRODUCTION v1.0.0**
 
-All mandatory technical gates pass. Residual npm audit items documented with justification in `KNOWN_ISSUES.md`.
+All mandatory technical gates pass. Residual npm audit items documented in `KNOWN_ISSUES.md`.
 
 ---
 

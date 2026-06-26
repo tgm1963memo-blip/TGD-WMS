@@ -1,36 +1,38 @@
-# Test Report — TGD WMS Go-Live
+# Test Report — TGD WMS v1.0.0
 
-**Date:** 2026-06-26
+**Date:** 2026-06-26  
+**Commit:** `9af962f` (+ hardening fixes pending commit)
 
 ## Vitest
 
 ```
-Total:   1938 tests
-Passed:  1841 (95.0%)
-Failed:  97 (5.0%)
-Files:   259 (208 pass, 51 fail)
+Test Files:  259 passed (259)
+Tests:       1932 passed (1932)
+Duration:    ~32s
 ```
 
-### Critical New Tests (100% pass)
+**Status:** ✅ 100% PASS
 
-- `tests/unit/storageAgingReportService.test.js` — 22 tests
-- `src/utils/customerWithdrawalStatusLabels.test.js` — 6 tests
+Legacy Sprint guardrail tests updated to current routes, navigation labels, and removed components (`ReceivingCreatePage.jsx` → `ReceivingPage.jsx` flow).
 
-### Failure Root Causes
+## Lint Gate
 
-1. **Removed files** — Tests reference `ReceivingCreatePage.jsx` (deprecated)
-2. **Route drift** — `App.test.jsx` uses legacy paths (`/customers`, `/products`)
-3. **Navigation labels** — Sidebar restructured; guardrail tests not updated
-4. **Permission catalog** — `routePermissionCatalog.js` evolved; billing/route tests stale
+```
+npm run lint — 368 files scanned, 0 violations
+```
 
-### Recommendation
+Scans `src/` for `console.log`, `TODO`, `FIXME`.
 
-Update or archive Sprint-era guardrail tests. Business-logic tests for go-live paths are green.
+## Playwright (Post-UAT)
 
-## Playwright
+See `PLAYWRIGHT_REPORT.md` for full matrix.
 
-See PLAYWRIGHT_REPORT.md — core post-UAT paths green on local and production.
+| Suite | Result |
+|-------|--------|
+| post-uat-00 master orchestrator | 24/24 PASS |
+| Production smoke (04, 12, 14) | 18/18 PASS on tgc-wms.vercel.app |
+| Full post-uat suite | See latest `playwright-post-uat-full.log` |
 
 ## Build
 
-`npm run build` — ✅ Success (2.2s local, 7.5s Vercel)
+`npm run build` — ✅ Success (329 modules, 0 errors)

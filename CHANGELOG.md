@@ -7,6 +7,16 @@
 - **Warehouse map auto-update**: added Supabase realtime subscription on `tgd_stock_balances` so the map refreshes automatically on any stock change
 - **Dashboard KPI auto-update**: added Supabase realtime subscription so all KPI counters refresh automatically when stock changes
 
+## [1.0.0] — 2026-06-26 (final hardening)
+
+### Fixed
+- Playwright post-uat-00: `expect().toBeVisible()` instead of non-waiting `isVisible({ timeout })`
+- Playwright post-uat-05: handheld staff list waits for RPC + clears localStorage session
+- `uatAuth.js`: `isVisibleWithTimeout` helper; playwright.config local retry
+
+### Documentation
+- Updated TEST_REPORT, PLAYWRIGHT_REPORT, PRODUCTION_CERTIFICATION, RELEASE_NOTES, GO_LIVE_REPORT, SECURITY_REPORT
+
 ## [1.0.0] — 2026-06-26
 
 ### Added

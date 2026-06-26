@@ -17,7 +17,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { login, getBaseUrl, requireUatCredentials , gotoUrl } from './helpers/uatAuth.js';
+import { login, getBaseUrl, requireUatCredentials, gotoUrl, isVisibleWithTimeout } from './helpers/uatAuth.js';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -132,19 +132,35 @@ test.describe('Post-UAT: Handheld Picking Workflow', () => {
     await gotoUrl(page, `${baseUrl}/handheld`);
     await expect(page.locator('[data-testid="handheld-page"]')).toBeVisible({ timeout: 20000 });
 
+    // Ensure handheld PIN session is cleared so the staff picker is shown
+    await page.evaluate(() => localStorage.removeItem('tgd_handheld_profile'));
+    await page.reload();
+    await expect(page.locator('[data-testid="handheld-page"]')).toBeVisible({ timeout: 20000 });
+
     const loginPage = page.locator('[data-testid="handheld-login-page"]');
-    if (!await loginPage.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (!await isVisibleWithTimeout(loginPage, 5000)) {
       test.skip(true, 'Handheld already authenticated — skip login page test');
       return;
     }
 
-    await expect(loginPage).toBeVisible({ timeout: 10000 });
+    await page.waitForResponse(
+      (res) => res.url().includes('tgd_handheld_list_staff') && res.status() === 200,
+      { timeout: 20000 },
+    ).catch(() => {});
+
+    await expect(loginPage.getByText('กำลังโหลดรายชื่อพนักงาน')).toBeHidden({ timeout: 20000 });
+
+    const loginText = await loginPage.textContent();
+    if (loginText?.includes('ไม่พบพนักงานที่มี PIN')) {
+      test.skip(true, 'No handheld staff with PIN configured — skip');
+      return;
+    }
+
     await screenshot(page, '02-handheld-login.png');
 
-    // Staff list should contain buttons
-    const staffButtons = loginPage.locator('button');
-    const btnCount = await staffButtons.count();
-    expect(btnCount).toBeGreaterThan(0);
+    const staffButtons = loginPage.locator('button').filter({ hasText: /›/ });
+    await expect(staffButtons.first()).toBeVisible({ timeout: 10000 });
+    expect(await staffButtons.count()).toBeGreaterThan(0);
   });
 
   test('03 — PIN keypad has digit buttons 0–9', async ({ page }) => {
