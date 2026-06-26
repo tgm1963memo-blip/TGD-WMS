@@ -331,13 +331,19 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
 function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, customerName, lotText, expText }) {
   const hasBadges = Boolean(lotText || expText);
   return (
-    <button type="button" onClick={onClick}
+    // Use div+role instead of <button> — mobile browsers clip button height when content grows dynamically
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}
       style={{
-        display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
+        width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
         borderRadius: 20,
-        padding: hasBadges ? '20px 24px 22px' : '20px 24px',
+        padding: '20px 24px',
+        paddingBottom: hasBadges ? 22 : 20,
         marginBottom: 16,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
@@ -364,7 +370,7 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, c
           {expText && <span style={{ display: 'inline-block', fontSize: 12, color: C.amber, fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>หมดอายุ: {expText}</span>}
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
