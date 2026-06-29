@@ -39,93 +39,104 @@ export function CustomerWithdrawalRequestPrintDocument({
     ? header.requested_dispatch_date
     : header.created_at ? header.created_at.split('T')[0] : '-';
 
+  const sigs = [
+    { label: 'ISSUED BY', name: header.created_by_email ?? '(CUSTOMER SERVICE)', dt: fmtDT(header.submitted_at ?? header.created_at) },
+    { label: 'CHECKER', name: header.last_action_by_email ?? null, dt: fmtDT(header.last_action_at) },
+    { label: 'APPROVED BY', name: header.web_approved_by_email ?? null, dt: null },
+    { label: 'RECEIVED BY', name: null, dt: null },
+  ];
+
   return (
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-withdrawal-print-document"
-      style={{ padding: 0 }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
     >
+      {/* ── Page header: company info + delivery meta ── */}
+      <div style={{ padding: '4mm 0 3mm', borderBottom: '2px solid #ccc', marginBottom: 6 }}>
+        <DocumentHeader
+          branding={branding}
+          documentDate={docDate}
+          documentNo={header.withdrawal_no ?? header.request_no}
+          documentTitle={t('customer_withdrawal_print_title')}
+          language={language}
+        />
+
+        {/* Delivery meta */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 8, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '34%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '36%' }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              {!hideCustomerName ? (
+                <>
+                  <td style={META_KEY}>CUSTOMER NAME</td>
+                  <td style={META_VAL}>{fmt(header.customer_name)}</td>
+                </>
+              ) : (
+                <td colSpan={2} style={{ border: 'none' }}></td>
+              )}
+              <td style={META_KEY}>DATE</td>
+              <td style={META_VAL}>{fmt(docDate)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>ADDRESS</td>
+              <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>TEL</td>
+              <td style={META_VAL}>{fmt(header.contact_phone)}</td>
+              <td style={META_KEY}>FAX</td>
+              <td style={META_VAL}>{fmt(header.contact_fax)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>DELIVERY TO</td>
+              <td style={META_VAL}>{fmt(header.delivery_to ?? header.delivery_type)}</td>
+              <td style={META_KEY}>NO</td>
+              <td style={META_VAL}>{fmt(header.withdrawal_no ?? header.request_no)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>VEHICLE REG.</td>
+              <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
+              <td style={META_KEY}>PICKUP CONTACT</td>
+              <td style={META_VAL}>{fmt(header.pickup_contact)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>TRUCK TEMP</td>
+              <td style={META_VAL}>{fmt(header.truck_temp)}</td>
+              <td style={META_KEY}>ROOM TEMP</td>
+              <td style={META_VAL}>{fmt(header.room_temp)}</td>
+            </tr>
+            {header.note ? (
+              <tr>
+                <td style={META_KEY}>REMARK</td>
+                <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{header.note}</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Lines table ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
-          <col style={{ width: '4%' }} />   {/* # */}
-          <col style={{ width: '12%' }} />  {/* LOT/LOCATION */}
-          <col style={{ width: '24%' }} />  {/* CUSTOMER PRODUCT */}
-          <col style={{ width: '12%' }} />  {/* ITEM CODE */}
-          <col style={{ width: '9%' }} />   {/* T.WEIGHT */}
-          <col style={{ width: '7%' }} />   {/* Palet */}
-          <col style={{ width: '7%' }} />   {/* Box */}
-          <col style={{ width: '7%' }} />   {/* Pack */}
-          <col style={{ width: '7%' }} />   {/* Pcs */}
-          <col style={{ width: '11%' }} />  {/* REMARK */}
+          <col style={{ width: '4%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '24%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '11%' }} />
         </colgroup>
 
         <thead>
-          {/* Row 1: Document header + delivery meta — repeats on every page */}
-          <tr>
-            <td colSpan={NCOLS} style={{ padding: '6mm 8mm', borderBottom: '2px solid #ccc' }}>
-              <DocumentHeader
-                branding={branding}
-                documentDate={docDate}
-                documentNo={header.withdrawal_no ?? header.request_no}
-                documentTitle={t('customer_withdrawal_print_title')}
-                language={language}
-              />
-
-              {/* Delivery meta grid */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 8 }}>
-                <tbody>
-                  <tr>
-                    {!hideCustomerName ? (
-                      <>
-                        <td style={{ ...META_KEY, width: '16%' }}>CUSTOMER NAME</td>
-                        <td style={META_VAL}>{fmt(header.customer_name)}</td>
-                      </>
-                    ) : (
-                      <td colSpan={2} style={{ border: 'none' }}></td>
-                    )}
-                    <td style={{ ...META_KEY, width: '14%' }}>DATE</td>
-                    <td style={{ ...META_VAL, width: '22%' }}>{fmt(docDate)}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_KEY}>ADDRESS</td>
-                    <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_KEY}>TEL</td>
-                    <td style={META_VAL}>{fmt(header.contact_phone)}</td>
-                    <td style={META_KEY}>FAX</td>
-                    <td style={META_VAL}>{fmt(header.contact_fax)}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_KEY}>DELIVERY TO</td>
-                    <td style={META_VAL}>{fmt(header.delivery_to ?? header.delivery_type)}</td>
-                    <td style={META_KEY}>NO</td>
-                    <td style={META_VAL}>{fmt(header.withdrawal_no ?? header.request_no)}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_KEY}>VEHICLE REG.</td>
-                    <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
-                    <td style={META_KEY}>PICKUP CONTACT</td>
-                    <td style={META_VAL}>{fmt(header.pickup_contact)}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_KEY}>TRUCK TEMP</td>
-                    <td style={META_VAL}>{fmt(header.truck_temp)}</td>
-                    <td style={META_KEY}>ROOM TEMP</td>
-                    <td style={META_VAL}>{fmt(header.room_temp)}</td>
-                  </tr>
-                  {header.note ? (
-                    <tr>
-                      <td style={META_KEY}>REMARK</td>
-                      <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{header.note}</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </td>
-          </tr>
-
-          {/* Row 2+3: Column headers */}
           <tr>
             <th rowSpan={2} style={TH}>#</th>
             <th rowSpan={2} style={TH}>LOT NO<br />LOCATION</th>
@@ -189,51 +200,47 @@ export function CustomerWithdrawalRequestPrintDocument({
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={TD} />
           </tr>
-
-          {/* Signatures row */}
-          <tr>
-            <td colSpan={NCOLS} style={{ border: 'none', padding: '12px 8px 8px' }}>
-              {(() => {
-                const sigs = [
-                  { label: 'ISSUED BY', name: header.created_by_email ?? '(CUSTOMER SERVICE)', dt: fmtDT(header.submitted_at ?? header.created_at) },
-                  { label: 'CHECKER', name: header.last_action_by_email ?? null, dt: fmtDT(header.last_action_at) },
-                  { label: 'APPROVED BY', name: header.web_approved_by_email ?? null, dt: null },
-                  { label: 'RECEIVED BY', name: null, dt: null },
-                ];
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
-                    {sigs.map(({ label, name, dt }) => (
-                      <div key={label} style={{ textAlign: 'center' }}>
-                        <div style={{ borderTop: '1px solid #000', paddingTop: 4, fontWeight: 700 }}>{label}</div>
-                        <div style={{ color: '#444', fontSize: 9, marginTop: 2 }}>{name ?? '____________________'}</div>
-                        {dt && <div style={{ color: '#888', fontSize: 8 }}>{dt}</div>}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-              <div style={{ display: 'flex', gap: 16, alignItems: 'center', borderTop: '1px solid #ccc', paddingTop: 6, fontSize: 10, flexWrap: 'wrap' }}>
-                {[
-                  ['TRUCK NO', 100],
-                  ['SEAL NO', 80],
-                  ['START', 60],
-                  ['FINISH', 60],
-                  ['FORKMAN BY', 80],
-                ].map(([label, w]) => (
-                  <div key={label} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <strong>{label}</strong>
-                    <span style={{ borderBottom: '1px solid #000', minWidth: w, display: 'inline-block' }}>&nbsp;</span>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <span>☐ CLEAN</span>
-                  <span>☐ UNCLEAN</span>
-                </div>
-              </div>
-            </td>
-          </tr>
         </tfoot>
       </table>
+
+      {/* ── Spacer: pushes signatures to bottom of page ── */}
+      <div style={{ flex: '1 1 auto' }} />
+
+      {/* ── Page footer: signatures + truck info ── */}
+      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
+          {sigs.map(({ label, name, dt }) => (
+            <div key={label} style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: 4, fontWeight: 700 }}>{label}</div>
+              <div style={{ color: '#444', fontSize: 9, marginTop: 2 }}>{name ?? '____________________'}</div>
+              {dt && <div style={{ color: '#888', fontSize: 8 }}>{dt}</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center', borderTop: '1px solid #ccc', paddingTop: 6, fontSize: 10, flexWrap: 'nowrap' }}>
+          {[
+            ['TRUCK NO', 100],
+            ['SEAL NO', 80],
+            ['START', 60],
+            ['FINISH', 60],
+          ].map(([label, w]) => (
+            <div key={label} style={{ display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <strong>{label}</strong>
+              <span style={{ borderBottom: '1px solid #000', minWidth: w, display: 'inline-block' }}>&nbsp;</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center', paddingTop: 6, fontSize: 10 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>
+            <strong>FORKMAN BY</strong>
+            <span style={{ borderBottom: '1px solid #000', minWidth: 80, display: 'inline-block' }}>&nbsp;</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span>☐ CLEAN</span>
+            <span>☐ UNCLEAN</span>
+          </div>
+        </div>
+      </div>
     </article>
   );
 }
