@@ -33,7 +33,8 @@ const MIGRATIONS = [
   '077_add_count_variance_decision_to_deposit_review.sql',
   '078_fix_stock_balance_occupancy_backfill.sql',
   '079_fix_withdrawal_draft_submission.sql',
-  '080_patch_withdrawal_drafts.sql'
+  '080_patch_withdrawal_drafts.sql',
+  '081_sync_stock_balances_on_withdrawal_confirm.sql',
 ];
 
 function runSql(sql, label) {

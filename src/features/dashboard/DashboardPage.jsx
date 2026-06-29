@@ -170,47 +170,19 @@ export function DashboardPage() {
         </div>
       </DashboardSection>
 
-      <DashboardSection title={t('system_status')}>
-        <div className="workflow-panel">
-          <div className="workflow-step">
-            <div className="workflow-step-name">{t('receiving')}</div>
-            <div className="workflow-step-value">{state.loading ? loadingLabel : (goLive ? d.openReceivingRows : d.stockMovementRows)}</div>
-            <div className="workflow-step-status info">{goLive ? t('status_open') : t('status_open')}</div>
-          </div>
-          <div className="workflow-connector">→</div>
-          <div className="workflow-step">
-            <div className="workflow-step-name">{t('putaway')}</div>
-            <div className="workflow-step-value">{state.loading ? loadingLabel : (goLive ? d.openPutawayRows : '—')}</div>
-            <div className="workflow-step-status warning">{goLive ? t('status_open') : t('demo_uat_placeholder')}</div>
-          </div>
-          <div className="workflow-connector">→</div>
-          <div className="workflow-step">
-            <div className="workflow-step-name">{t('stock_balance')}</div>
-            <div className="workflow-step-value">{state.loading ? loadingLabel : d.totalStockQuantity}</div>
-            <div className="workflow-step-status success">{t('status_pass')}</div>
-          </div>
-          <div className="workflow-connector">→</div>
-          <div className="workflow-step">
-            <div className="workflow-step-name">{t('picking')}</div>
-            <div className="workflow-step-value">{state.loading ? loadingLabel : (goLive ? d.openPickingRows : '—')}</div>
-            <div className="workflow-step-status info">{goLive ? t('status_open') : t('status_draft')}</div>
-          </div>
-          <div className="workflow-connector">→</div>
-          <div className="workflow-step">
-            <div className="workflow-step-name">{t('dispatch')}</div>
-            <div className="workflow-step-value">{state.loading ? loadingLabel : (goLive ? d.openDispatchRows : '—')}</div>
-            <div className="workflow-step-status danger">{goLive ? t('status_open') : t('status_hold')}</div>
-          </div>
-        </div>
-      </DashboardSection>
-
       <div className="dashboard-grid-2col">
         <DashboardSection title={language === 'th' ? 'งานวันนี้' : 'Today task list'}>
           {state.loading ? (
             <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading...'}</div>
           ) : (
             <ul className="task-list">
-              {d.openReceivingRows > 0 && <li className="task-item">{language === 'th' ? `เอกสารรับเข้าที่รอตรวจสอบ (${d.openReceivingRows} รายการ)` : `Pending receiving documents (${d.openReceivingRows})`}</li>}
+              {d.openReceivingRows > 0 && (
+                <li className="task-item">
+                  <Link to="/operations/receiving" style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: 'var(--tgd-primary)', cursor: 'pointer' }}>
+                    {language === 'th' ? `เอกสารรับเข้าที่รอตรวจสอบ (${d.openReceivingRows} รายการ)` : `Pending receiving documents (${d.openReceivingRows})`}
+                  </Link>
+                </li>
+              )}
               {d.openPutawayRows > 0 && <li className="task-item">{language === 'th' ? `งานจัดเก็บ Putaway ที่รอทำ (${d.openPutawayRows} รายการ)` : `Pending putaway sessions (${d.openPutawayRows})`}</li>}
               {d.openPickingRows > 0 && <li className="task-item">{language === 'th' ? `คิวหยิบสินค้าที่ค้างอยู่ (${d.openPickingRows} รายการ)` : `Pending picking queue (${d.openPickingRows})`}</li>}
               {d.openDispatchRows > 0 && <li className="task-item">{language === 'th' ? `เอกสารตัดจ่ายออกที่รอตรวจสอบ (${d.openDispatchRows} รายการ)` : `Pending dispatch queue (${d.openDispatchRows})`}</li>}
