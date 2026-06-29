@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -8,6 +9,78 @@ import {
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
+
+const TEMPLATE_COLUMNS = [
+  'รหัสสินค้า (ของท่าน)*',
+  'ชื่อสินค้า*',
+  'หน่วย (UOM)',
+  'อุณหภูมิจัดเก็บ (FROZEN/CHILLED/AMBIENT)',
+  'น้ำหนักต่อหน่วย (กก.)',
+  'สารก่อภูมิแพ้ (มี/ไม่มี)',
+  'รายละเอียดสารก่อภูมิแพ้',
+  'หมายเหตุ',
+];
+
+function downloadTemplate() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    TEMPLATE_COLUMNS,
+    ['10001', 'ตัวอย่างสินค้า A', 'กก.', 'FROZEN', '1.500', 'ไม่มี', '', ''],
+    ['10002', 'ตัวอย่างสินค้า B', 'กล่อง', 'CHILLED', '0.500', 'มี', 'Gluten, Dairy', 'หมายเหตุ'],
+  ]);
+  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 20].map((w) => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template');
+  XLSX.writeFile(wb, 'product_catalog_template.xlsx');
+}
+
+function exportProducts(products) {
+  const rows = products.map((p) => ([
+    p.customer_product_code ?? '',
+    p.product_name ?? '',
+    p.uom ?? '',
+    p.temperature_type ?? '',
+    p.pack_weight_kg ?? '',
+    p.allergen ? 'มี' : 'ไม่มี',
+    p.allergen ?? '',
+    p.note ?? '',
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLUMNS, ...rows]);
+  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 20].map((w) => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'สินค้า');
+  XLSX.writeFile(wb, 'product_catalog_export.xlsx');
+}
+
+function parseImportFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rows.length < 2) { resolve([]); return; }
+        const dataRows = rows.slice(1).filter((r) => r[0] || r[1]);
+        const parsed = dataRows.map((r) => ({
+          customerProductCode: String(r[0] ?? '').trim(),
+          productName: String(r[1] ?? '').trim(),
+          uom: String(r[2] ?? '').trim(),
+          temperatureType: (['FROZEN', 'CHILLED', 'AMBIENT'].includes(String(r[3]).trim().toUpperCase())
+            ? String(r[3]).trim().toUpperCase() : 'FROZEN'),
+          packWeightKg: r[4] !== '' && !isNaN(Number(r[4])) ? Number(r[4]) : null,
+          allergenHas: String(r[5] ?? '').trim() === 'มี',
+          allergen: String(r[6] ?? '').trim(),
+          note: String(r[7] ?? '').trim(),
+        })).filter((r) => r.customerProductCode && r.productName);
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
 
 const EMPTY_FORM = {
   productId: '',
@@ -232,6 +305,9 @@ export function CustomerProductCatalogPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formError, setFormError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const importFileRef = useRef(null);
 
   async function loadProducts() {
     if (!customerId) return;
@@ -331,6 +407,48 @@ export function CustomerProductCatalogPage() {
     await loadProducts();
   }
 
+  async function handleImportFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setError('');
+    setSuccess('');
+    try {
+      const parsed = await parseImportFile(file);
+      if (parsed.length === 0) { setError('ไม่พบข้อมูลในไฟล์ หรือข้อมูลไม่ครบถ้วน'); return; }
+      setImportPreview(parsed);
+    } catch {
+      setError('อ่านไฟล์ไม่สำเร็จ กรุณาใช้ไฟล์ .xlsx ตาม template');
+    }
+  }
+
+  async function handleImportConfirm() {
+    if (!importPreview || !customerId) return;
+    setImporting(true); setError(''); setSuccess('');
+    let ok = 0; let fail = 0;
+    for (const row of importPreview) {
+      const result = await upsertCustomerProduct({
+        productId: null,
+        customerId,
+        customerProductCode: row.customerProductCode,
+        productName: row.productName,
+        internalProductCode: '',
+        uom: row.uom,
+        packWeightKg: row.packWeightKg,
+        temperatureType: row.temperatureType,
+        allergen: row.allergenHas ? row.allergen : '',
+        note: row.note,
+        isActive: true,
+      });
+      if (result.error) fail += 1; else ok += 1;
+    }
+    setImporting(false);
+    setImportPreview(null);
+    if (fail > 0) setError(`นำเข้าสำเร็จ ${ok} รายการ, ล้มเหลว ${fail} รายการ (รหัสสินค้าซ้ำจะอัปเดตอัตโนมัติ)`);
+    else setSuccess(`นำเข้าสำเร็จ ${ok} รายการ`);
+    await loadProducts();
+  }
+
   const activeCount = products.filter((p) => p.is_active).length;
 
   const filtered = products.filter((p) => {
@@ -368,16 +486,54 @@ export function CustomerProductCatalogPage() {
       <PageHeader
         title="แคตตาล็อกสินค้า"
         description="รายการสินค้าที่ใช้สำหรับแจ้งฝาก-เบิกสินค้าในระบบ TGC"
-        actions={canWrite ? (
-          <button
-            className="btn btn-primary"
-            data-testid="catalog-create-button"
-            onClick={openCreate}
-            type="button"
-          >
-            + เพิ่มสินค้า
-          </button>
-        ) : null}
+        actions={(
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              type="button"
+              title="ดาวน์โหลด Template Excel สำหรับนำเข้าสินค้า"
+              onClick={downloadTemplate}
+            >
+              ⬇️ Template
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              type="button"
+              title="ส่งออกรายการสินค้าปัจจุบันเป็น Excel"
+              onClick={() => exportProducts(products)}
+              disabled={products.length === 0}
+            >
+              📤 Export
+            </button>
+            {canWrite && (
+              <>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  type="button"
+                  title="นำเข้าสินค้าจากไฟล์ Excel"
+                  onClick={() => importFileRef.current?.click()}
+                >
+                  📥 Import
+                </button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style={{ display: 'none' }}
+                  onChange={handleImportFileChange}
+                />
+                <button
+                  className="btn btn-primary"
+                  data-testid="catalog-create-button"
+                  onClick={openCreate}
+                  type="button"
+                >
+                  + เพิ่มสินค้า
+                </button>
+              </>
+            )}
+          </div>
+        )}
       />
 
       {/* KPI row */}
@@ -555,6 +711,79 @@ export function CustomerProductCatalogPage() {
           onSave={handleSubmit}
           onFieldChange={updateField}
         />
+      )}
+
+      {importPreview && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }}>
+          <div style={{
+            background: 'var(--tgd-card-bg, #fff)',
+            borderRadius: 16, width: '100%', maxWidth: 780,
+            maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '18px 22px 14px', borderBottom: '1px solid var(--tgd-border)', flexShrink: 0,
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>ตรวจสอบข้อมูลก่อนนำเข้า</h2>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
+                  พบ {importPreview.length} รายการ — กด "นำเข้า" เพื่อบันทึกเข้าระบบ (รหัสสินค้าซ้ำจะอัปเดตอัตโนมัติ)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImportPreview(null)}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--tgd-muted-text)' }}
+              >✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '14px 22px' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ fontSize: 12, width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>รหัสสินค้า</th>
+                      <th>ชื่อสินค้า</th>
+                      <th>หน่วย</th>
+                      <th>อุณหภูมิ</th>
+                      <th>น้ำหนัก (กก.)</th>
+                      <th>Allergen</th>
+                      <th>หมายเหตุ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.map((row, i) => (
+                      <tr key={i}>
+                        <td style={{ color: 'var(--tgd-muted-text)' }}>{i + 1}</td>
+                        <td style={{ fontWeight: 700, fontFamily: 'monospace' }}>{row.customerProductCode}</td>
+                        <td>{row.productName}</td>
+                        <td>{row.uom || '-'}</td>
+                        <td><TempBadge type={row.temperatureType} /></td>
+                        <td>{row.packWeightKg ?? '-'}</td>
+                        <td>{row.allergenHas ? <span style={{ color: '#ef4444' }}>มี</span> : '-'}</td>
+                        <td style={{ color: 'var(--tgd-muted-text)' }}>{row.note || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--tgd-border)', display: 'flex', gap: 10, justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setImportPreview(null)} disabled={importing}>
+                ยกเลิก
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleImportConfirm} disabled={importing}>
+                {importing ? `กำลังนำเข้า...` : `นำเข้า ${importPreview.length} รายการ`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );
