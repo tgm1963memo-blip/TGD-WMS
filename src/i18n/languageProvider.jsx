@@ -1,5 +1,5 @@
 // src/i18n/languageProvider.jsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, getTranslation } from './translationCatalog.js';
 
 /**
@@ -64,7 +64,7 @@ export const useLanguage = () => {
 
 export const useTranslation = () => {
   const { language } = useLanguage();
-  return (key) => getTranslation(key, language);
+  return useCallback((key) => getTranslation(key, language), [language]);
 };
 
 export default LanguageProvider;
