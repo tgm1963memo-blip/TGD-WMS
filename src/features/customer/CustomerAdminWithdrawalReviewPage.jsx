@@ -14,6 +14,7 @@ import {
   reviewCustomerWithdrawalRequest,
   cancelCustomerWithdrawalRequest,
   enqueueCustomerWithdrawalNotification,
+  recordWithdrawalLinePick,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -36,6 +37,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [recountLine, setRecountLine] = useState(null);
   const [recountQty, setRecountQty] = useState('');
   const [recountBoxes, setRecountBoxes] = useState('');
+  const [recountWeight, setRecountWeight] = useState('');
+  const [recounting, setRecounting] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -232,6 +235,27 @@ export function CustomerAdminWithdrawalReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
     setCancelOpen(false);
     setCancelComment('');
+  }
+
+  async function handleSaveRecount() {
+    if (!recountLine) return;
+    setRecounting(true);
+    setError('');
+    const boxes = recountBoxes !== '' ? Number(recountBoxes) : null;
+    const weight = recountWeight !== '' ? Number(recountWeight) : null;
+    const result = await recordWithdrawalLinePick(recountLine.id, boxes, weight);
+    setRecounting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+      return;
+    }
+    setLines((prev) => prev.map((l) =>
+      l.id === recountLine.id
+        ? { ...l, picked_boxes: boxes, picked_weight: weight }
+        : l
+    ));
+    setActionMsg('บันทึกการตรวจนับเรียบร้อย');
+    setRecountLine(null);
   }
 
   async function handleNotifyCustomer() {
@@ -501,8 +525,10 @@ export function CustomerAdminWithdrawalReviewPage() {
                             type="button"
                             onClick={() => {
                               setRecountLine(line);
-                              setRecountQty(line.requested_qty?.toString() ?? '');
-                              setRecountBoxes(line.requested_boxes?.toString() ?? '');
+                              setRecountBoxes((line.picked_boxes ?? line.requested_boxes ?? '').toString());
+                              setRecountWeight((line.picked_weight ?? line.requested_weight ?? '').toString());
+                              setRecountQty((line.picked_qty ?? line.requested_qty ?? '').toString());
+                              setError('');
                             }}
                           >
                             {t('admin_recount_button')}
@@ -684,12 +710,10 @@ export function CustomerAdminWithdrawalReviewPage() {
             <button
               className="btn btn-primary"
               type="button"
-              onClick={() => {
-                setActionMsg(t('admin_recount_saved'));
-                setRecountLine(null);
-              }}
+              disabled={recounting}
+              onClick={handleSaveRecount}
             >
-              {t('save')}
+              {recounting ? '...' : t('save')}
             </button>
             <button className="btn btn-secondary" onClick={() => setRecountLine(null)} type="button">
               {t('cancel')}
@@ -702,25 +726,28 @@ export function CustomerAdminWithdrawalReviewPage() {
             <p style={{ marginTop: 0 }}>
               <strong>{recountLine.product_name ?? recountLine.customer_product_code}</strong>
             </p>
+            {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 8 }}>{error}</div> : null}
             <div className="form-grid">
               <label className="form-field">
-                <span>{t('admin_received_boxes')}</span>
+                <span>กล่องที่หยิบจริง</span>
                 <input
                   className="form-control"
                   type="number"
                   min={0}
+                  step={1}
                   value={recountBoxes}
                   onChange={(e) => setRecountBoxes(e.target.value)}
                 />
               </label>
               <label className="form-field">
-                <span>{t('admin_picked_qty')}</span>
+                <span>น้ำหนักที่หยิบจริง (กก.)</span>
                 <input
                   className="form-control"
                   type="number"
                   min={0}
-                  value={recountQty}
-                  onChange={(e) => setRecountQty(e.target.value)}
+                  step={0.001}
+                  value={recountWeight}
+                  onChange={(e) => setRecountWeight(e.target.value)}
                 />
               </label>
             </div>

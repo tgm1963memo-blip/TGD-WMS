@@ -172,6 +172,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       id, withdrawal_no, customer_id, status, last_action_at,
       tgd_customer_withdrawal_request_lines(
         id, line_no, customer_product_code, product_name, lot_no,
+        requested_boxes, requested_weight,
         picked_boxes, picked_weight, picked_at, picked_by_email
       )
     `)
@@ -187,9 +188,14 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   const rows = [];
   for (const req of (data ?? [])) {
     const lines = (req.tgd_customer_withdrawal_request_lines ?? [])
-      .filter((l) => l.picked_boxes != null && Number(l.picked_boxes) > 0);
+      .filter((l) => (l.picked_boxes ?? l.requested_boxes) != null &&
+                     Number(l.picked_boxes ?? l.requested_boxes) > 0);
 
     for (const line of lines) {
+      const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
+      // Use picked_weight if recorded; fall back to requested_weight so reports are never 0
+      const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
+
       rows.push({
         id: `withdrawal-${line.id}`,
         ledger_source: 'stock_ledger',
@@ -201,9 +207,9 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         product_id: null,
         lot_id: null,
         lot_no: line.lot_no ?? null,
-        qty: Number(line.picked_boxes),
-        quantity: Number(line.picked_boxes),
-        weight: Number(line.picked_weight ?? 0),
+        qty: boxes,
+        quantity: boxes,
+        weight,
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
