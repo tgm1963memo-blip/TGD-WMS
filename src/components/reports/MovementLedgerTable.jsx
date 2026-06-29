@@ -11,6 +11,23 @@ function DetailField({ label, value }) {
   );
 }
 
+function fmtWt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0
+    ? n.toLocaleString('en', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+    : '-';
+}
+
+const INBOUND_TYPES = new Set([
+  'RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN',
+  'RECEIVE_PENDING', 'CUSTOMER_NOTIFIED',
+]);
+
+function isInbound(row) {
+  const raw = String(row.movement_type_raw || row.movement_type || '').toUpperCase();
+  return INBOUND_TYPES.has(raw) || raw.includes('RECEIVE') || raw.includes('INBOUND');
+}
+
 const summaryColumns = [
   {
     key: 'created_at',
@@ -25,6 +42,11 @@ const summaryColumns = [
     key: 'movement_type',
     header: 'ประเภท',
     render: (row) => <StatusBadge value={row.movement_type} />,
+  },
+  {
+    key: 'lot_no',
+    header: 'ล็อต',
+    render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
   },
   {
     key: 'product_id',
@@ -52,11 +74,37 @@ const summaryColumns = [
     title: (row) => row.customer_name ?? row.customer_id,
   },
   {
-    key: 'qty',
-    header: 'จำนวน',
+    key: 'inbound_qty',
+    header: 'รับเข้า (กล่อง)',
     render: (row) => {
-      const qty = Number(row.qty ?? 0);
-      return <span className="compact-cell-qty">{qty > 0 ? `+${qty}` : qty}</span>;
+      if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
+      const qty = Number(row.qty ?? row.quantity ?? 0);
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>+{qty}</span>;
+    },
+  },
+  {
+    key: 'inbound_weight',
+    header: 'รับเข้า (KG)',
+    render: (row) => {
+      if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>{fmtWt(row.weight)}</span>;
+    },
+  },
+  {
+    key: 'outbound_qty',
+    header: 'จ่ายออก (กล่อง)',
+    render: (row) => {
+      if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
+      const qty = Number(row.qty ?? row.quantity ?? 0);
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>-{qty}</span>;
+    },
+  },
+  {
+    key: 'outbound_weight',
+    header: 'จ่ายออก (KG)',
+    render: (row) => {
+      if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{fmtWt(row.weight)}</span>;
     },
   },
   {
@@ -72,20 +120,31 @@ const summaryColumns = [
 ];
 
 function renderMovementDetail(row) {
+  const inbound = isInbound(row);
   return (
     <>
       <DetailField label="วันที่เคลื่อนไหว" value={formatDocumentDate(row.movement_date ?? row.created_at)} />
       <DetailField label="ประเภท" value={row.movement_type} />
       <DetailField label="สินค้า" value={row.product_name ?? row.product_id} />
       <DetailField label="ลูกค้า" value={row.customer_name ?? row.customer_id} />
-      <DetailField label="ล็อต" value={row.lot_id} />
+      <DetailField label="ล็อต" value={row.lot_no} />
       <DetailField label="ตำแหน่งต้นทาง" value={row.from_location_id} />
       <DetailField label="ตำแหน่งปลายทาง" value={row.to_location_id} />
-      <DetailField label="จำนวน" value={row.qty} />
+      {inbound ? (
+        <>
+          <DetailField label="รับเข้า (กล่อง)" value={row.qty ?? row.quantity} />
+          <DetailField label="รับเข้า (KG)" value={fmtWt(row.weight)} />
+        </>
+      ) : (
+        <>
+          <DetailField label="จ่ายออก (กล่อง)" value={row.qty ?? row.quantity} />
+          <DetailField label="จ่ายออก (KG)" value={fmtWt(row.weight)} />
+        </>
+      )}
       <DetailField label="หน่วย" value={row.uom} />
       <DetailField label="ประเภทอ้างอิง" value={row.reference_type} />
       <DetailField label="เลขที่อ้างอิง" value={row.reference_no} />
-      <DetailField label="เอกสารอ้างอิง" value={row.reference_id} />
+      <DetailField label="เอกสารอ้างอิง" value={row.source_document_no ?? row.reference_id} />
       <DetailField label="วันที่สร้าง" value={formatDocumentDate(row.created_at)} />
     </>
   );
