@@ -8,6 +8,7 @@ export const CUSTOMER_DEPOSIT_STATUS_I18N_KEYS = {
   WAREHOUSE_RECEIVING: 'customer_deposit_status_warehouse_receiving',
   PALLETIZING: 'customer_deposit_status_palletizing',
   COUNT_VARIANCE_REVIEW: 'customer_deposit_status_count_variance',
+  RECEIVING_VARIANCE: 'customer_deposit_status_receiving_variance',
   ADMIN_RECOUNT_REQUESTED: 'customer_deposit_status_recount_requested',
   RECEIVED_CONFIRMED: 'customer_deposit_status_received_confirmed',
   CUSTOMER_NOTIFIED: 'customer_deposit_status_customer_notified',

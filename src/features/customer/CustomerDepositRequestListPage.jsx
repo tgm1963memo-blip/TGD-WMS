@@ -189,6 +189,12 @@ export function CustomerDepositRequestListPage() {
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getDepositStatusLabel(row.status, t)}
                     </span>
+                    {row.status === 'RECEIVED_CONFIRMED' || row.status === 'CUSTOMER_NOTIFIED' || row.status === 'CLOSED' ? (
+                      <div style={{ fontSize: 11, color: 'var(--tgd-success, #16a34a)', marginTop: 3 }}>&#10003; ได้รับสินค้าครบทุกจำนวน</div>
+                    ) : null}
+                    {row.status === 'RECEIVING_VARIANCE' || row.status === 'COUNT_VARIANCE_REVIEW' ? (
+                      <div style={{ fontSize: 11, color: 'var(--tgd-warning, #d97706)', marginTop: 3 }}>&#9888; ได้รับสินค้าไม่ครบทุกรายการ</div>
+                    ) : null}
                   </td>
                   <td>{row.expected_arrival_date ?? '-'}</td>
                   <td>{row.contact_name ?? '-'}</td>

@@ -769,6 +769,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_deposit_status_warehouse_receiving: { th: 'คลังรับสินค้า', en: 'Warehouse receiving' },
   customer_deposit_status_palletizing: { th: 'จัดพาเลท', en: 'Palletizing' },
   customer_deposit_status_count_variance: { th: 'ตรวจนับ/ส่วนต่าง', en: 'Count variance review' },
+  customer_deposit_status_receiving_variance: { th: 'รับสินค้าไม่ครบ', en: 'Received with variance' },
   customer_deposit_status_recount_requested: { th: 'ขอนับใหม่', en: 'Recount requested' },
   customer_deposit_status_received_confirmed: { th: 'ยืนยันรับแล้ว', en: 'Received confirmed' },
   customer_deposit_status_customer_notified: { th: 'แจ้งลูกค้าแล้ว', en: 'Customer notified' },

@@ -923,6 +923,8 @@ table .status-badge,
 .status-badge--pass { background: #d1e7dd; color: #198754; }
 .status-badge--fail { background: #f8d7da; color: #dc3545; }
 .status-badge--uat { background: var(--tgd-navy-soft); color: var(--tgd-navy); }
+.status-badge--success { background: #d1e7dd; color: #0f5132; }
+.status-badge--warning { background: #fff3cd; color: #664d03; }
 
 .warning-panel {
   background: #fffbeb;
