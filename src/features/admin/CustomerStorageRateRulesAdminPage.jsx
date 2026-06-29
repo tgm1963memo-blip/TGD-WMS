@@ -72,7 +72,7 @@ export function CustomerStorageRateRulesAdminPage() {
       key: 'temperature_type',
       header: 'การจัดเก็บ',
       render: (row) => {
-        const labels = { CHILLED: 'Chilled — แช่เย็น', FROZEN: 'Frozen — แช่แข็ง', FREEZE: 'Freeze — ฝากฟรีส' };
+        const labels = { CHILLED: 'Chilled — แช่เย็น', FROZEN: 'Frozen — แช่แข็ง', FREEZE: 'Freeze — ฝากฟรีส', FREEZE_FROZEN: 'Freeze&Frozen — ฟรีสและฝากแช่' };
         return labels[row.temperature_type] ?? row.temperature_type ?? '-';
       },
     },
@@ -135,6 +135,7 @@ export function CustomerStorageRateRulesAdminPage() {
                 <option value="CHILLED">Chilled — แช่เย็น</option>
                 <option value="FROZEN">Frozen — แช่แข็ง</option>
                 <option value="FREEZE">Freeze — ฝากฟรีส</option>
+                <option value="FREEZE_FROZEN">Freeze&Frozen — ฟรีสและฝากแช่</option>
               </select>
             </label>
             <label className="form-field">

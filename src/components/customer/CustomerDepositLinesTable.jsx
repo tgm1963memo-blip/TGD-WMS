@@ -139,6 +139,7 @@ export function CustomerDepositLinesTable({
                     <option value="CHILLED">Chilled — แช่เย็น</option>
                     <option value="FROZEN">Frozen — แช่แข็ง</option>
                     <option value="FREEZE">Freeze — ฝากฟรีส</option>
+                    <option value="FREEZE_FROZEN">Freeze&Frozen — ฟรีสและฝากแช่</option>
                   </select>
                 </td>
                 <td>
