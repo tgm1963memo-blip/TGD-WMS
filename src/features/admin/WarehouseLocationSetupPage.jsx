@@ -6,6 +6,7 @@ import {
   getSectionsWithOccupancy,
   createSection,
   deleteSection,
+  updateSectionSize,
 } from '../../services/warehouseLayoutService.js';
 
 const EMPTY_FORM = {
@@ -60,12 +61,46 @@ function describeGrid(gridInfo) {
   return '';
 }
 
-function SectionCard({ section, onDelete }) {
+function initEditForm(section) {
+  const sc = section.gridInfo?.sidesConfig ?? {};
+  return {
+    leftActive: (sc.L?.rows ?? 0) > 0,
+    leftRows: sc.L?.rows || 5,
+    leftLevels: sc.L?.levels || 5,
+    rightActive: (sc.R?.rows ?? 0) > 0,
+    rightRows: sc.R?.rows || 5,
+    rightLevels: sc.R?.levels || 5,
+  };
+}
+
+function SectionCard({ section, onDelete, onEdit }) {
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState(() => initEditForm(section));
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+
   const color = pctColor(section.usedPct);
   const gridDesc = describeGrid(section.gridInfo);
   const tempBadge = TEMP_BADGE[section.temperatureType] ?? null;
+  const canEdit = section.gridInfo?.type === 'new';
+
+  function setEf(k, v) { setEditForm((f) => ({ ...f, [k]: v })); }
+
+  function openEdit() {
+    setEditForm(initEditForm(section));
+    setEditError('');
+    setEditSuccess('');
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setEditError('');
+    setEditSuccess('');
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -74,81 +109,229 @@ function SectionCard({ section, onDelete }) {
     setConfirm(false);
   }
 
+  async function handleEditSave() {
+    if (!editForm.leftActive && !editForm.rightActive) {
+      setEditError('กรุณาเลือกฝั่งอย่างน้อย 1 ฝั่ง');
+      return;
+    }
+    setEditSaving(true);
+    setEditError('');
+    setEditSuccess('');
+    const lRows = Math.max(1, Math.min(50, +editForm.leftRows || 1));
+    const lLevels = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
+    const rRows = Math.max(1, Math.min(50, +editForm.rightRows || 1));
+    const rLevels = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
+    const result = await onEdit(section.id, {
+      zoneCode: section.code,
+      zoneName: section.name,
+      leftConfig: { active: editForm.leftActive, rows: lRows, levels: lLevels },
+      rightConfig: { active: editForm.rightActive, rows: rRows, levels: rLevels },
+    });
+    setEditSaving(false);
+    if (result?.error) {
+      setEditError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+    } else {
+      const { added, removed } = result?.data ?? {};
+      setEditSuccess(`บันทึกสำเร็จ${added ? ` เพิ่ม ${added}` : ''}${removed ? ` ลบ ${removed}` : ''} Location`);
+      setEditing(false);
+    }
+  }
+
+  const efLR = Math.max(1, Math.min(50, +editForm.leftRows || 1));
+  const efLL = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
+  const efRR = Math.max(1, Math.min(50, +editForm.rightRows || 1));
+  const efRL = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
+  const editTotal = (editForm.leftActive ? efLR * efLL : 0) + (editForm.rightActive ? efRR * efRL : 0);
+
   return (
-    <div style={{
-      background: '#fff',
-      border: '1px solid #e5e7eb',
-      borderRadius: 12,
-      padding: '16px 18px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-      marginBottom: 10,
-    }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: 10,
-        background: '#f0fdf4',
-        border: '1.5px solid #bbf7d0',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 800, fontSize: 12, color: '#2d9348', flexShrink: 0,
-        textAlign: 'center', lineHeight: 1.2,
-      }}>
-        {section.code}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
+      {/* Main row */}
+      <div style={{ background: '#fff', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 10,
+          background: '#f0fdf4', border: '1.5px solid #bbf7d0',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: 12, color: '#2d9348', flexShrink: 0,
+          textAlign: 'center', lineHeight: 1.2,
+        }}>
+          {section.code}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{section.name}</span>
+            {tempBadge && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+                background: tempBadge.bg, color: tempBadge.color, border: `1px solid ${tempBadge.color}33`,
+              }}>
+                {tempBadge.label}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+            {section.total} location
+            {gridDesc ? ` · ${gridDesc}` : ''}
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{section.name}</span>
-          {tempBadge && (
-            <span style={{
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
-              background: tempBadge.bg, color: tempBadge.color, border: `1px solid ${tempBadge.color}33`,
-            }}>
-              {tempBadge.label}
-            </span>
+          <div style={{ width: 80, height: 6, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${section.usedPct}%`, background: color, borderRadius: 4 }} />
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, color, width: 36, textAlign: 'right' }}>
+            {section.usedPct}%
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!confirm && canEdit && (
+            <button
+              type="button"
+              onClick={editing ? cancelEdit : openEdit}
+              style={{ padding: '6px 10px', border: '1px solid #3b82f6', borderRadius: 8, background: editing ? '#eff6ff' : '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              {editing ? 'ยกเลิก' : 'แก้ไข'}
+            </button>
+          )}
+          {confirm ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setConfirm(false)}
+                style={{ padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12 }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ padding: '6px 12px', border: 'none', borderRadius: 8, background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+              >
+                {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirm(true)}
+              style={{ padding: '6px 10px', border: 'none', borderRadius: 8, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              ลบ
+            </button>
           )}
         </div>
-        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-          {section.total} location
-          {gridDesc ? ` · ${gridDesc}` : ''}
-        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 80, height: 6, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${section.usedPct}%`, background: color, borderRadius: 4 }} />
-        </div>
-        <span style={{ fontSize: 12, fontWeight: 700, color, width: 36, textAlign: 'right' }}>
-          {section.usedPct}%
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {confirm ? (
-          <>
+
+      {/* Edit panel */}
+      {editing && (
+        <div style={{ background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '16px 18px' }}>
+          {editError && (
+            <div style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
+              {editError}
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+            {/* Left side */}
+            <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={editForm.leftActive}
+                  onChange={(e) => setEf('leftActive', e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+                />
+                ฝั่งซ้าย (L)
+              </label>
+              {editForm.leftActive && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนแถว
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={50}
+                      value={editForm.leftRows}
+                      onChange={(e) => setEf('leftRows', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนชั้น
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={20}
+                      value={editForm.leftLevels}
+                      onChange={(e) => setEf('leftLevels', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+            {/* Right side */}
+            <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={editForm.rightActive}
+                  onChange={(e) => setEf('rightActive', e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#2d9348' }}
+                />
+                ฝั่งขวา (R)
+              </label>
+              {editForm.rightActive && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนแถว
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={50}
+                      value={editForm.rightRows}
+                      onChange={(e) => setEf('rightRows', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนชั้น
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={20}
+                      value={editForm.rightLevels}
+                      onChange={(e) => setEf('rightLevels', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 13, color: '#64748b' }}>
+              รวม <strong style={{ color: '#1e293b' }}>{editTotal}</strong> location
+              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}×{efLL}</span>}
+              {editForm.leftActive && editForm.rightActive && <span style={{ color: '#94a3b8' }}> / </span>}
+              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}×{efRL}</span>}
+            </div>
             <button
               type="button"
-              onClick={() => setConfirm(false)}
-              style={{ padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12 }}
+              onClick={handleEditSave}
+              disabled={editSaving}
+              style={{ marginLeft: 'auto', padding: '8px 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
             >
-              ยกเลิก
+              {editSaving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: 8, background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
-            >
-              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirm(true)}
-            style={{ padding: '6px 10px', border: 'none', borderRadius: 8, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-          >
-            ลบ
-          </button>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success message below card */}
+      {editSuccess && (
+        <div style={{ background: '#f0fdf4', borderTop: '1px solid #bbf7d0', padding: '8px 18px', fontSize: 13, color: '#2d9348', fontWeight: 600 }}>
+          {editSuccess}
+        </div>
+      )}
     </div>
   );
 }
@@ -426,6 +609,12 @@ export function WarehouseLocationSetupPage() {
     await load();
   }
 
+  async function handleEdit(zoneId, params) {
+    const result = await updateSectionSize(zoneId, params);
+    if (!result.error) await load();
+    return result;
+  }
+
   const totalLocations = sections.reduce((s, z) => s + z.total, 0);
 
   return (
@@ -469,7 +658,7 @@ export function WarehouseLocationSetupPage() {
             ห้องที่มีอยู่ ({sections.length})
           </div>
           {sections.map((sec) => (
-            <SectionCard key={sec.id} section={sec} onDelete={handleDelete} />
+            <SectionCard key={sec.id} section={sec} onDelete={handleDelete} onEdit={handleEdit} />
           ))}
         </div>
       )}

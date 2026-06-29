@@ -284,6 +284,83 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   return { data: zone, error: null };
 }
 
+export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig, rightConfig }) {
+  if (!supabase) return missing();
+
+  const { data: rooms, error: roomErr } = await supabase
+    .from('tgd_rooms').select('id').eq('zone_id', zoneId);
+  if (roomErr) return { error: roomErr };
+  const roomId = rooms?.[0]?.id;
+  if (!roomId) return { error: new Error('ไม่พบห้องสำหรับ zone นี้') };
+
+  const { data: existingLocs, error: locErr } = await supabase
+    .from('tgd_locations').select('id, location_code').eq('zone_id', zoneId);
+  if (locErr) return { error: locErr };
+
+  const existingMap = new Map((existingLocs ?? []).map((l) => [l.location_code, l]));
+  const existingCodes = new Set(existingMap.keys());
+
+  let occupiedIds = new Set();
+  const locIds = (existingLocs ?? []).map((l) => l.id);
+  if (locIds.length > 0) {
+    const { data: stockRows } = await supabase
+      .from('tgd_stock_balances').select('location_id').in('location_id', locIds).gt('qty_on_hand', 0);
+    occupiedIds = new Set((stockRows ?? []).map((s) => s.location_id));
+  }
+
+  const sideNames = { L: 'ซ้าย', R: 'ขวา' };
+  const desiredCodes = new Set();
+  const toInsertRows = [];
+
+  const addSide = (side, config) => {
+    if (!config?.active) return;
+    for (let r = 1; r <= config.rows; r++) {
+      for (let lv = 1; lv <= config.levels; lv++) {
+        const code = `${zoneCode}-${side}-${String(r).padStart(2, '0')}-${String(lv).padStart(2, '0')}`;
+        desiredCodes.add(code);
+        if (!existingCodes.has(code)) {
+          toInsertRows.push({
+            room_id: roomId,
+            zone_id: zoneId,
+            name: code,
+            location_code: code,
+            location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv}`,
+            location_type: 'SHELF',
+          });
+        }
+      }
+    }
+  };
+
+  addSide('L', leftConfig);
+  addSide('R', rightConfig);
+
+  const toDeleteCodes = [...existingCodes].filter((code) => !desiredCodes.has(code));
+  const occupiedToDelete = toDeleteCodes.filter((code) => {
+    const loc = existingMap.get(code);
+    return loc && occupiedIds.has(loc.id);
+  });
+
+  if (occupiedToDelete.length > 0) {
+    return { error: new Error(`ไม่สามารถลด Location ได้ มี ${occupiedToDelete.length} Location ที่มีสินค้าอยู่`) };
+  }
+
+  if (toDeleteCodes.length > 0) {
+    const idsToDelete = toDeleteCodes.map((code) => existingMap.get(code)?.id).filter(Boolean);
+    if (idsToDelete.length > 0) {
+      const { error: delErr } = await supabase.from('tgd_locations').delete().in('id', idsToDelete);
+      if (delErr) return { error: delErr };
+    }
+  }
+
+  if (toInsertRows.length > 0) {
+    const { error: insErr } = await insertLocationsWithSchemaFallback(toInsertRows);
+    if (insErr) return { error: insErr };
+  }
+
+  return { data: { added: toInsertRows.length, removed: toDeleteCodes.length }, error: null };
+}
+
 export async function deleteSection(zoneId) {
   if (!supabase) return missing();
   const { data: rooms } = await supabase.from('tgd_rooms').select('id').eq('zone_id', zoneId);
