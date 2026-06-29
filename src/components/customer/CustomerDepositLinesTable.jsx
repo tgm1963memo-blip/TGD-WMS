@@ -65,12 +65,12 @@ export function CustomerDepositLinesTable({
             <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
             <th>{t('catalog_col_product_name')}</th>
             <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
+            <th>{t('customer_col_pack_entry_mode')}</th>
             <th>{t('customer_col_total_deposit_weight')} <span className="field-required">*</span></th>
             <th>{t('customer_col_box_count')} <span className="field-required">*</span></th>
             <th>เลข LOT</th>
             <th>วันผลิต / วันหมดอายุ</th>
             <th>{t('customer_col_line_note')}</th>
-            <th>{t('customer_col_pack_entry_mode')}</th>
             <th>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
@@ -119,6 +119,17 @@ export function CustomerDepositLinesTable({
                     type="number"
                     value={line.weight_per_box}
                   />
+                </td>
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-pack-entry-mode' : `${rowTestId}-pack-entry-mode`}
+                    onChange={(event) => updateLine(line.key, { pack_entry_mode: event.target.value })}
+                    value={packMode}
+                  >
+                    <option value={PACK_ENTRY_MODES.BOXES}>{t('customer_pack_mode_boxes')}</option>
+                    <option value={PACK_ENTRY_MODES.WEIGHT}>{t('customer_pack_mode_weight')}</option>
+                  </select>
                 </td>
                 <td>
                   <input
@@ -178,17 +189,6 @@ export function CustomerDepositLinesTable({
                     onChange={(event) => updateLine(line.key, { line_note: event.target.value })}
                     value={line.line_note}
                   />
-                </td>
-                <td>
-                  <select
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-pack-entry-mode' : `${rowTestId}-pack-entry-mode`}
-                    onChange={(event) => updateLine(line.key, { pack_entry_mode: event.target.value })}
-                    value={packMode}
-                  >
-                    <option value={PACK_ENTRY_MODES.BOXES}>{t('customer_pack_mode_boxes')}</option>
-                    <option value={PACK_ENTRY_MODES.WEIGHT}>{t('customer_pack_mode_weight')}</option>
-                  </select>
                 </td>
                 <td>
                   {lines.length > 1 ? (

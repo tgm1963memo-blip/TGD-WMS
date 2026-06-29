@@ -1,6 +1,6 @@
 import { PACK_ENTRY_MODES } from './customerDepositPackCalcUtils.js';
 
-export const DEPOSIT_LINE_DEFAULT_COUNT = 10;
+export const DEPOSIT_LINE_DEFAULT_COUNT = 5;
 
 export function createEmptyDepositLine(lineKey = 1) {
   return {
