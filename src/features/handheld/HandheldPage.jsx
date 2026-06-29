@@ -502,7 +502,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
 
   useEffect(() => {
-    listCustomerDepositRequests({ statusIn: ['WAREHOUSE_RECEIVING', 'ADMIN_ACCEPTED'] }).then((r) => {
+    listCustomerDepositRequests({ statusIn: ['WAREHOUSE_RECEIVING', 'ADMIN_ACCEPTED', 'ADMIN_RECOUNT_REQUESTED'] }).then((r) => {
       const loaded = r.data ?? [];
       setDocs(loaded);
       setDocsLoading(false);
@@ -724,7 +724,7 @@ function ReceivingWorkflow({ onBack, t }) {
                     onClick={() => pickDoc(doc)}
                     docNo={doc.request_no}
                     statusLabel={getDepositStatusLabel(doc.status, t)}
-                    statusColor={doc.status === 'ADMIN_ACCEPTED' ? C.receiveAccent : C.green}
+                    statusColor={doc.status === 'ADMIN_ACCEPTED' ? C.receiveAccent : doc.status === 'ADMIN_RECOUNT_REQUESTED' ? C.warning ?? '#d97706' : C.green}
                     dateStr={doc.expected_arrival_date ?? '-'}
                     subText={doc.contact_name}
                     customerName={doc.customer?.customer_name || doc.customer?.name || null}

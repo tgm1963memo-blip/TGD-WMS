@@ -117,6 +117,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     ? 'กรุณาบันทึกจำนวนรับจริงทุกรายการก่อนยืนยัน'
     : '';
   const canReject = header && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(header.status);
+  const canRequestRecount = header && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(header.status);
+
+  async function handleRequestRecount() {
+    if (!requestId) return;
+    if (!window.confirm('ต้องการขอให้ handheld ตรวจนับสินค้าใหม่ใช่หรือไม่?\nสถานะเอกสารจะเปลี่ยนเป็น "ขอตรวจนับใหม่" และ handheld จะสามารถอัปเดตจำนวนสินค้าได้')) return;
+    setSubmitting(true); setError(''); setActionMsg('');
+    const r = await reviewCustomerDepositRequest(requestId, 'REQUEST_RECOUNT', comment);
+    setSubmitting(false);
+    if (r.error) { setError(r.error.message ?? 'ขอตรวจนับใหม่ล้มเหลว'); return; }
+    const newStatus = r.data?.status ?? 'ADMIN_RECOUNT_REQUESTED';
+    setActionMsg('ขอตรวจนับใหม่เรียบร้อยแล้ว — handheld สามารถนับสินค้าใหม่ได้');
+    updateHeaderStatus(newStatus);
+  }
 
   function updateHeaderStatus(newStatus) {
     setHeader((prev) => prev ? { ...prev, status: newStatus } : prev);
@@ -333,39 +346,36 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               ? (allLocations.find((loc) => loc.id === line.location_id)?.code ?? line.location_id)
                               : <small>ยังไม่ระบุ</small>}
                           </td>
-                          <td>
-                            {isConfirmed ? (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                type="button"
-                                title="อัปเดตตำแหน่งจัดเก็บ (แก้ไขยอดรับไม่ได้)"
-                                aria-label="Update Location"
-                                onClick={() => {
-                                  setLocationLine(line);
-                                  const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
-                                  const p = existingLoc ? parseLocCode(existingLoc.code) : null;
-                                  setLocZone(p?.zone ?? '');
-                                  setLocSide(p?.side ?? '');
-                                  setLocRow(p?.row ? String(p.row) : '');
-                                  setLocLevel(p?.level ? String(p.level) : '');
-                                }}
-                              >
-                                📍 Location
-                              </button>
-                            ) : (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                type="button"
-                                aria-label="Edit Item Quantities"
-                                onClick={() => {
-                                  setRecountLine(line);
-                                  setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
-                                  setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
-                                }}
-                              >
-                                ตรวจนับใหม่ หากไม่ตรง
-                              </button>
-                            )}
+                          <td style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              title="อัปเดตตำแหน่งจัดเก็บ"
+                              aria-label="Update Location"
+                              onClick={() => {
+                                setLocationLine(line);
+                                const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
+                                const p = existingLoc ? parseLocCode(existingLoc.code) : null;
+                                setLocZone(p?.zone ?? '');
+                                setLocSide(p?.side ?? '');
+                                setLocRow(p?.row ? String(p.row) : '');
+                                setLocLevel(p?.level ? String(p.level) : '');
+                              }}
+                            >
+                              📍 Location
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              aria-label="Edit Item Quantities"
+                              onClick={() => {
+                                setRecountLine(line);
+                                setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
+                                setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
+                              }}
+                            >
+                              🔄 ตรวจนับใหม่
+                            </button>
                           </td>
                         </tr>
                       );
@@ -406,6 +416,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   type="button"
                 >
                   {t('admin_confirm_receiving')}
+                </button>
+              ) : null}
+              {canRequestRecount ? (
+                <button
+                  className="btn btn-warning"
+                  disabled={submitting}
+                  onClick={handleRequestRecount}
+                  title="เปลี่ยนสถานะให้ handheld สามารถนับสินค้าใหม่ได้"
+                  type="button"
+                >
+                  🔄 ขอตรวจนับใหม่
                 </button>
               ) : null}
               {canReject ? (
