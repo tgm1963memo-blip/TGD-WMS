@@ -383,7 +383,7 @@ export function CustomerDepositRequestCreatePage() {
         lineNo: index + 1,
         customerProductCode: line.customer_product_code,
         internalProductCode: line.product_code,
-        productId: line.catalog_product_id || null,
+        productId: null,
         productName: line.product_name,
         expectedQty: line.expected_boxes,
         expectedBoxes: line.expected_boxes,
@@ -427,7 +427,7 @@ export function CustomerDepositRequestCreatePage() {
     }
 
     setSubmitted(true);
-    setTimeout(() => navigate('/customer/deposit-request'), 2500);
+    navigate('/customer/deposit-request');
   }
 
   async function handleSaveDraft(event) {
