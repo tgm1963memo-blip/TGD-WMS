@@ -36,32 +36,7 @@ begin
     raise notice 'skip (not found): tgd_customer_withdrawal_execution_links';
   end;
 
-  -- 5. Deposit request lines → requests
-  delete from public.tgd_customer_deposit_request_lines;
-  delete from public.tgd_customer_deposit_requests;
-  raise notice 'cleared: deposit requests + lines';
-
-  -- 6. Withdrawal allocation lines → allocations
-  begin
-    delete from public.tgd_withdrawal_allocation_lines;
-    raise notice 'cleared: tgd_withdrawal_allocation_lines';
-  exception when undefined_table then
-    raise notice 'skip (not found): tgd_withdrawal_allocation_lines';
-  end;
-
-  begin
-    delete from public.tgd_withdrawal_allocations;
-    raise notice 'cleared: tgd_withdrawal_allocations';
-  exception when undefined_table then
-    raise notice 'skip (not found): tgd_withdrawal_allocations';
-  end;
-
-  -- 7. Withdrawal request lines → requests
-  delete from public.tgd_customer_withdrawal_request_lines;
-  delete from public.tgd_customer_withdrawal_requests;
-  raise notice 'cleared: withdrawal requests + lines';
-
-  -- 8. Handheld picking scans → sessions
+  -- 5. Handheld picking scans → sessions (reference lots, must go before lots)
   begin
     delete from public.tgd_handheld_picking_scans;
     delete from public.tgd_handheld_picking_sessions;
@@ -70,7 +45,7 @@ begin
     raise notice 'skip (not found): handheld picking tables';
   end;
 
-  -- 9. Handheld putaway scans → sessions
+  -- 6. Handheld putaway scans → sessions
   begin
     delete from public.tgd_handheld_putaway_scans;
     delete from public.tgd_handheld_putaway_sessions;
@@ -79,7 +54,7 @@ begin
     raise notice 'skip (not found): handheld putaway tables';
   end;
 
-  -- 10. Handheld receiving scans → sessions
+  -- 7. Handheld receiving scans → sessions
   begin
     delete from public.tgd_handheld_receiving_scans;
     delete from public.tgd_handheld_receiving_sessions;
@@ -88,7 +63,7 @@ begin
     raise notice 'skip (not found): handheld receiving tables';
   end;
 
-  -- 11. Stock count lines → documents/sessions
+  -- 8. Stock count lines → documents/sessions
   begin
     delete from public.tgd_stock_count_lines;
     raise notice 'cleared: tgd_stock_count_lines';
@@ -110,7 +85,9 @@ begin
     raise notice 'skip (not found): tgd_stock_count_sessions';
   end;
 
-  -- 12. Receiving lines → documents
+  -- 9. Receiving lines → documents
+  --    (tgd_receiving_documents.source_deposit_request_id → tgd_customer_deposit_requests)
+  --    MUST delete before deposit requests
   begin
     delete from public.tgd_receiving_lines;
     delete from public.tgd_receiving_documents;
@@ -118,6 +95,31 @@ begin
   exception when undefined_table then
     raise notice 'skip (not found): receiving tables';
   end;
+
+  -- 10. Withdrawal allocation lines → allocations
+  begin
+    delete from public.tgd_withdrawal_allocation_lines;
+    raise notice 'cleared: tgd_withdrawal_allocation_lines';
+  exception when undefined_table then
+    raise notice 'skip (not found): tgd_withdrawal_allocation_lines';
+  end;
+
+  begin
+    delete from public.tgd_withdrawal_allocations;
+    raise notice 'cleared: tgd_withdrawal_allocations';
+  exception when undefined_table then
+    raise notice 'skip (not found): tgd_withdrawal_allocations';
+  end;
+
+  -- 11. Withdrawal request lines → requests
+  delete from public.tgd_customer_withdrawal_request_lines;
+  delete from public.tgd_customer_withdrawal_requests;
+  raise notice 'cleared: withdrawal requests + lines';
+
+  -- 12. Deposit request lines → requests (safe now — receiving docs already deleted)
+  delete from public.tgd_customer_deposit_request_lines;
+  delete from public.tgd_customer_deposit_requests;
+  raise notice 'cleared: deposit requests + lines';
 
   -- 13. Stock balances + movements
   delete from public.tgd_stock_balances;
