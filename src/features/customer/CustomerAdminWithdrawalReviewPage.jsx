@@ -411,6 +411,10 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <div className="form-label">{t('customer_field_pickup_contact')}</div>
                 <div>{selected.pickup_contact ?? '-'}</div>
               </div>
+              <div>
+                <div className="form-label">{t('customer_field_vehicle_registration')}</div>
+                <div>{selected.vehicle_registration || '-'}</div>
+              </div>
             </div>
 
             {/* Print action */}

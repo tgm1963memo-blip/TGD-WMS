@@ -93,6 +93,7 @@ export function mapWithdrawalHeaderForCopy(source) {
     delivery_type: source?.delivery_type ?? 'PICKUP',
     pickup_contact: source?.pickup_contact ?? '',
     destination: source?.destination ?? '',
+    vehicle_registration: source?.vehicle_registration ?? '',
     note: source?.note ?? '',
   };
 }

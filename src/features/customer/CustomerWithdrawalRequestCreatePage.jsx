@@ -38,6 +38,7 @@ const INITIAL_HEADER = {
   delivery_type: 'PICKUP',
   pickup_contact: '',
   destination: '',
+  vehicle_registration: '',
   note: '',
 };
 
@@ -325,6 +326,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           pickupContact: header.pickup_contact,
           destination: header.destination,
           note: header.note,
+          vehicleRegistration: header.vehicle_registration,
         });
 
         if (updateResult.error) {
@@ -340,6 +342,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           pickupContact: header.pickup_contact,
           destination: header.destination,
           note: header.note,
+          vehicleRegistration: header.vehicle_registration,
           customerId: isRequestProxy ? proxyCustomerId : null,
         });
 
@@ -500,6 +503,10 @@ export function CustomerWithdrawalRequestCreatePage() {
           <label className="form-field">
             <span>{t('customer_field_destination')}</span>
             <input className="form-control" onChange={(e) => updateHeaderField('destination', e.target.value)} value={header.destination} />
+          </label>
+          <label className="form-field">
+            <span>{t('customer_field_vehicle_registration')}</span>
+            <input className="form-control" data-testid="customer-withdrawal-vehicle-registration" onChange={(e) => updateHeaderField('vehicle_registration', e.target.value)} value={header.vehicle_registration} />
           </label>
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>

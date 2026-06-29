@@ -103,6 +103,12 @@ export function CustomerWithdrawalRequestPrintDocument({
                     <td style={META_VAL}>{fmt(header.withdrawal_no ?? header.request_no)}</td>
                   </tr>
                   <tr>
+                    <td style={META_KEY}>VEHICLE REG.</td>
+                    <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
+                    <td style={META_KEY}>PICKUP CONTACT</td>
+                    <td style={META_VAL}>{fmt(header.pickup_contact)}</td>
+                  </tr>
+                  <tr>
                     <td style={META_KEY}>TRUCK TEMP</td>
                     <td style={META_VAL}>{fmt(header.truck_temp)}</td>
                     <td style={META_KEY}>ROOM TEMP</td>

@@ -16,6 +16,7 @@ const WITHDRAWAL_HEADER_SELECT = [
   'delivery_type',
   'pickup_contact',
   'destination',
+  'vehicle_registration',
   'note',
   'created_by_email',
   'created_by_role',
@@ -105,6 +106,7 @@ export async function createCustomerWithdrawalRequest({
   pickupContact,
   destination,
   note,
+  vehicleRegistration,
   customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
@@ -116,6 +118,7 @@ export async function createCustomerWithdrawalRequest({
     p_destination: toNullableText(destination),
     p_note: toNullableText(note),
     p_customer_id: customerId,
+    p_vehicle_registration: toNullableText(vehicleRegistration),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
@@ -127,6 +130,7 @@ export async function updateCustomerWithdrawalRequestDraft(requestId, {
   pickupContact,
   destination,
   note,
+  vehicleRegistration,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -137,6 +141,7 @@ export async function updateCustomerWithdrawalRequestDraft(requestId, {
     p_pickup_contact: pickupContact,
     p_destination: toNullableText(destination),
     p_note: toNullableText(note),
+    p_vehicle_registration: toNullableText(vehicleRegistration),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
