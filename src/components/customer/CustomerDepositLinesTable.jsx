@@ -1,6 +1,7 @@
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import {
   applyPackFieldChange,
+  calcTotalWeightFromBoxes,
   PACK_ENTRY_MODES,
 } from '../../utils/customerDepositPackCalcUtils.js';
 
@@ -29,10 +30,10 @@ export function CustomerDepositLinesTable({
     updateLine(line.key, patch);
   }
 
-  function selectCatalogProduct(lineKey, productId) {
+  function selectCatalogProduct(line, productId) {
     const product = catalogProducts.find((row) => row.id === productId);
     if (!product) {
-      updateLine(lineKey, {
+      updateLine(line.key, {
         catalog_product_id: '',
         customer_product_code: '',
         product_code: '',
@@ -40,19 +41,26 @@ export function CustomerDepositLinesTable({
         temperature_type: 'FROZEN',
         weight_per_box: '',
         weight_from_master: false,
+        expected_weight: '',
       });
       return;
     }
 
     const hasPackWeight = product.pack_weight_kg != null && product.pack_weight_kg !== '';
-    updateLine(lineKey, {
+    const weightPerBox = hasPackWeight ? String(product.pack_weight_kg) : '';
+    const expectedWeight = hasPackWeight && line.expected_boxes
+      ? calcTotalWeightFromBoxes(line.expected_boxes, weightPerBox)
+      : line.expected_weight;
+
+    updateLine(line.key, {
       catalog_product_id: product.id,
       customer_product_code: product.customer_product_code ?? '',
       product_code: product.internal_product_code ?? product.customer_product_code ?? '',
       product_name: product.product_name ?? '',
       temperature_type: product.temperature_type ?? 'FROZEN',
-      weight_per_box: hasPackWeight ? String(product.pack_weight_kg) : '',
+      weight_per_box: weightPerBox,
       weight_from_master: hasPackWeight,
+      expected_weight: expectedWeight,
     });
   }
 
@@ -86,7 +94,7 @@ export function CustomerDepositLinesTable({
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-product-picker-select' : `${rowTestId}-product-select`}
-                    onChange={(event) => selectCatalogProduct(line.key, event.target.value)}
+                    onChange={(event) => selectCatalogProduct(line, event.target.value)}
                     value={line.catalog_product_id || ''}
                   >
                     <option value="">{t('customer_deposit_select_product')}</option>
