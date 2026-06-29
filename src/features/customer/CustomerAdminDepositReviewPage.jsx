@@ -52,6 +52,7 @@ export function CustomerAdminDepositReviewPage() {
   const [recountLine, setRecountLine] = useState(null);
   const [recountQty, setRecountQty] = useState('');
   const [recountBoxes, setRecountBoxes] = useState('');
+  const [recountNote, setRecountNote] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -401,6 +402,7 @@ export function CustomerAdminDepositReviewPage() {
                       <th>{t('customer_col_weight_per_box')}</th>
                       <th>กล่อง (รับจริง / แจ้งฝาก)</th>
                       <th>น้ำหนัก กก. (รับจริง / แจ้งฝาก)</th>
+                      <th>หมายเหตุ (Admin)</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
@@ -432,6 +434,13 @@ export function CustomerAdminDepositReviewPage() {
                           <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}> / {line.expected_weight ?? '-'}</span>
                         </td>
                         <td>
+                          {line.actual_note ? (
+                            <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{line.actual_note}</span>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
+                          )}
+                        </td>
+                        <td>
                           <button
                             className="btn btn-secondary btn-sm"
                             type="button"
@@ -439,6 +448,7 @@ export function CustomerAdminDepositReviewPage() {
                               setRecountLine(line);
                               setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
                               setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
+                              setRecountNote(line.actual_note ?? '');
                             }}
                           >
                             {t('admin_recount_button')}
@@ -446,7 +456,7 @@ export function CustomerAdminDepositReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -656,7 +666,7 @@ export function CustomerAdminDepositReviewPage() {
                 const result = await recordDepositLineActualReceipt(recountLine.id, {
                   actualBoxes: recountBoxes,
                   actualWeight: recountQty,
-                  note: null,
+                  note: recountNote || null,
                 });
                 setSubmitting(false);
                 if (result.error) {
@@ -664,7 +674,7 @@ export function CustomerAdminDepositReviewPage() {
                   return;
                 }
                 setLines((prev) => prev.map((l) => l.id === recountLine.id
-                  ? { ...l, actual_boxes: Number(recountBoxes) || null, actual_weight: Number(recountQty) || null }
+                  ? { ...l, actual_boxes: Number(recountBoxes) || null, actual_weight: Number(recountQty) || null, actual_note: recountNote || null }
                   : l));
                 setActionMsg(t('admin_recount_saved'));
                 setRecountLine(null);
@@ -705,6 +715,15 @@ export function CustomerAdminDepositReviewPage() {
                 />
               </label>
             </div>
+            <label className="form-field" style={{ marginTop: 8 }}>
+              <span>หมายเหตุรายบรรทัด (Admin)</span>
+              <input
+                className="form-control"
+                placeholder="บันทึกหมายเหตุสำหรับรายการนี้..."
+                value={recountNote}
+                onChange={(e) => setRecountNote(e.target.value)}
+              />
+            </label>
           </>
         ) : null}
       </Modal>

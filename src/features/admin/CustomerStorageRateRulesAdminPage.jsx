@@ -11,6 +11,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 const EMPTY_FORM = {
   ruleId: '',
   chargeBasis: 'WEIGHT',
+  temperatureType: 'FROZEN',
   rate: '',
   note: '',
 };
@@ -50,6 +51,7 @@ export function CustomerStorageRateRulesAdminPage() {
       ruleId: form.ruleId || null,
       customerId,
       chargeBasis: form.chargeBasis,
+      temperatureType: form.temperatureType,
       rate: form.rate,
       note: form.note,
     });
@@ -66,6 +68,14 @@ export function CustomerStorageRateRulesAdminPage() {
 
   const columns = [
     { key: 'charge_basis', header: t('catalog_col_charge_basis') },
+    {
+      key: 'temperature_type',
+      header: 'การจัดเก็บ',
+      render: (row) => {
+        const labels = { CHILLED: 'Chilled — แช่เย็น', FROZEN: 'Frozen — แช่แข็ง', FREEZE: 'Freeze — ฝากฟรีส' };
+        return labels[row.temperature_type] ?? row.temperature_type ?? '-';
+      },
+    },
     { key: 'rate', header: t('storage_rate_col_rate') },
     { key: 'currency', header: t('storage_rate_col_currency') },
     { key: 'is_active', header: t('catalog_col_status') },
@@ -78,6 +88,7 @@ export function CustomerStorageRateRulesAdminPage() {
           onClick={() => setForm({
             ruleId: row.id,
             chargeBasis: row.charge_basis,
+            temperatureType: row.temperature_type ?? 'FROZEN',
             rate: String(row.rate ?? ''),
             note: row.note ?? '',
           })}
@@ -116,6 +127,14 @@ export function CustomerStorageRateRulesAdminPage() {
               <select className="form-control" onChange={(e) => setForm((c) => ({ ...c, chargeBasis: e.target.value }))} value={form.chargeBasis}>
                 <option value="WEIGHT">WEIGHT</option>
                 <option value="PALLET">PALLET</option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span>การจัดเก็บ (Temperature Type)</span>
+              <select className="form-control" onChange={(e) => setForm((c) => ({ ...c, temperatureType: e.target.value }))} value={form.temperatureType}>
+                <option value="CHILLED">Chilled — แช่เย็น</option>
+                <option value="FROZEN">Frozen — แช่แข็ง</option>
+                <option value="FREEZE">Freeze — ฝากฟรีส</option>
               </select>
             </label>
             <label className="form-field">

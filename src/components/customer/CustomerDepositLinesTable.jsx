@@ -73,6 +73,7 @@ export function CustomerDepositLinesTable({
             <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
             <th>{t('catalog_col_product_name')}</th>
             <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
+            <th>การจัดเก็บ <span className="field-required">*</span></th>
             <th>{t('customer_col_pack_entry_mode')}</th>
             <th>{t('customer_col_total_deposit_weight')} <span className="field-required">*</span></th>
             <th>{t('customer_col_box_count')} <span className="field-required">*</span></th>
@@ -127,6 +128,18 @@ export function CustomerDepositLinesTable({
                     type="number"
                     value={line.weight_per_box}
                   />
+                </td>
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={index === 0 ? 'customer-deposit-temperature-type' : `${rowTestId}-temperature-type`}
+                    onChange={(event) => updateLine(line.key, { temperature_type: event.target.value })}
+                    value={line.temperature_type ?? 'FROZEN'}
+                  >
+                    <option value="CHILLED">Chilled — แช่เย็น</option>
+                    <option value="FROZEN">Frozen — แช่แข็ง</option>
+                    <option value="FREEZE">Freeze — ฝากฟรีส</option>
+                  </select>
                 </td>
                 <td>
                   <select

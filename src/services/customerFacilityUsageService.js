@@ -66,7 +66,7 @@ export async function listCustomerStorageRateRules(customerId) {
 
   return supabase
     .from('tgd_customer_storage_rate_rules')
-    .select('id, customer_id, charge_basis, rate, currency, is_active, note, created_at, updated_at')
+    .select('id, customer_id, charge_basis, temperature_type, rate, currency, is_active, note, created_at, updated_at')
     .eq('customer_id', customerId)
     .order('charge_basis', { ascending: true });
 }
@@ -82,6 +82,7 @@ export async function upsertCustomerStorageRateRule(payload = {}) {
     p_currency: toNullableText(payload.currency) ?? 'THB',
     p_note: toNullableText(payload.note),
     p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
+    p_temperature_type: toNullableText(payload.temperatureType) ?? 'FROZEN',
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
