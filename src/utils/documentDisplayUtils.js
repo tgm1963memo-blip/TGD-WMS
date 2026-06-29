@@ -7,15 +7,16 @@ export function formatDocumentDate(value, { dateOnly = false } = {}) {
       return String(value);
     }
 
+    // Use en-GB locale: produces DD/MM/YYYY (Western CE year, day-first order).
     if (dateOnly) {
-      return date.toLocaleDateString('th-TH', {
+      return date.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
       });
     }
 
-    return date.toLocaleString('th-TH', {
+    return date.toLocaleString('en-GB', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

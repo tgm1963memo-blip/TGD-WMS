@@ -1445,6 +1445,17 @@ table .status-badge,
   padding: 6px 8px;
 }
 
+.customer-deposit-lines-table .form-control-table--product {
+  min-width: 280px;
+  max-width: 380px;
+  width: 320px;
+}
+
+.customer-deposit-lines-table .form-control-table--weight {
+  min-width: 0;
+  width: 88px;
+}
+
 .customer-history-filter-panel {
   padding: 12px 16px 0;
   border-bottom: 1px solid var(--tgd-border);

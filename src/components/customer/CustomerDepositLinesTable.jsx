@@ -92,7 +92,7 @@ export function CustomerDepositLinesTable({
                 <td>{index + 1}</td>
                 <td>
                   <select
-                    className="form-control form-control-table"
+                    className="form-control form-control-table form-control-table--product"
                     data-testid={index === 0 ? 'customer-deposit-product-picker-select' : `${rowTestId}-product-select`}
                     onChange={(event) => selectCatalogProduct(line, event.target.value)}
                     value={line.catalog_product_id || ''}
@@ -107,7 +107,7 @@ export function CustomerDepositLinesTable({
                 </td>
                 <td>
                   <input
-                    className="form-control form-control-table"
+                    className="form-control form-control-table form-control-table--weight"
                     data-testid={index === 0 ? 'customer-deposit-weight-per-box' : `${rowTestId}-weight-per-box`}
                     disabled={weightReadonly}
                     min="0"
