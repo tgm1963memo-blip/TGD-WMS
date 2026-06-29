@@ -284,10 +284,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th style={{ textAlign: 'center' }}>LOT</th>
-                      <th style={{ textAlign: 'right' }}>แจ้งฝาก (กล่อง)</th>
-                      <th style={{ textAlign: 'right' }}>แจ้งฝาก (กก.)</th>
-                      <th style={{ textAlign: 'right' }}>รับจริง (กล่อง)</th>
-                      <th style={{ textAlign: 'right' }}>รับจริง (กก.)</th>
+                      <th style={{ textAlign: 'right' }}>น้ำหนักต่อหน่วย (กก.)</th>
+                      <th style={{ textAlign: 'right' }}>กล่อง (รับจริง / แจ้งฝาก)</th>
+                      <th style={{ textAlign: 'right' }}>น้ำหนัก กก. (รับจริง / แจ้งฝาก)</th>
+                      <th>หมายเหตุ (Admin)</th>
                       <th>Location</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
@@ -297,20 +297,37 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       const isConfirmed = header.status === 'RECEIVED_CONFIRMED';
                       const hasVariance = line.actual_boxes != null &&
                         (line.actual_boxes !== line.expected_boxes || String(line.actual_weight) !== String(line.expected_weight));
+                      const actualBoxColor = line.actual_boxes == null
+                        ? 'var(--tgd-muted-text)'
+                        : hasVariance ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                      const actualWtColor = line.actual_weight == null
+                        ? 'var(--tgd-muted-text)'
+                        : (line.actual_weight !== line.expected_weight) ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                      const weightPerBox = line.weight_per_box ?? (
+                        line.expected_boxes && line.expected_weight
+                          ? (Number(line.expected_weight) / Number(line.expected_boxes)).toFixed(2)
+                          : null
+                      );
                       return (
                         <tr key={line.id} style={hasVariance ? { background: '#fff9e6' } : {}}>
                           <td>{line.line_no}</td>
                           <td>{line.customer_product_code ?? '-'}</td>
                           <td>{line.product_name ?? '-'}</td>
                           <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>
-                          <td style={{ textAlign: 'right' }}>{line.expected_boxes ?? '-'}</td>
-                          <td style={{ textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
-                          <td style={{ textAlign: 'right', fontWeight: line.actual_boxes != null ? 600 : 400, color: hasVariance ? 'var(--tgd-warning)' : (line.actual_boxes != null ? 'var(--tgd-success)' : 'var(--tgd-danger)') }}>
-                            {line.actual_boxes != null ? line.actual_boxes : <small>ยังไม่บันทึก</small>}
+                          <td style={{ textAlign: 'right', color: 'var(--tgd-muted-text)' }}>{weightPerBox ?? '-'}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <span style={{ fontWeight: 700, color: actualBoxColor }}>
+                              {line.actual_boxes != null ? line.actual_boxes : <small>ยังไม่บันทึก</small>}
+                            </span>
+                            {' '}<span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>/ {line.expected_boxes ?? '-'}</span>
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: line.actual_weight != null ? 600 : 400 }}>
-                            {line.actual_weight != null ? line.actual_weight : '-'}
+                          <td style={{ textAlign: 'right' }}>
+                            <span style={{ fontWeight: 700, color: actualWtColor }}>
+                              {line.actual_weight != null ? line.actual_weight : '-'}
+                            </span>
+                            {' '}<span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>/ {line.expected_weight ?? '-'}</span>
                           </td>
+                          <td style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{line.actual_note || '—'}</td>
                           <td style={{ fontSize: 12, color: line.location_id ? 'var(--tgd-success)' : 'var(--tgd-muted-text)' }}>
                             {line.location_id
                               ? (allLocations.find((loc) => loc.id === line.location_id)?.code ?? line.location_id)
@@ -346,7 +363,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
                                 }}
                               >
-                                {t('admin_recount_button')}
+                                ตรวจนับใหม่ หากไม่ตรง
                               </button>
                             )}
                           </td>

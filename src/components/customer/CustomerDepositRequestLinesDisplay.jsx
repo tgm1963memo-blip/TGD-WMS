@@ -34,8 +34,8 @@ export function CustomerDepositRequestLinesDisplay({
             {hasLot && <th onClick={() => requestSort('lot_no')} style={{ cursor: 'pointer' }}>เลข LOT {getSortIndicator('lot_no')}</th>}
             {hasLot && <th onClick={() => requestSort('mfg_date')} style={{ cursor: 'pointer' }}>วันผลิต {getSortIndicator('mfg_date')}</th>}
             {hasLot && <th onClick={() => requestSort('exp_date')} style={{ cursor: 'pointer' }}>วันหมดอายุ {getSortIndicator('exp_date')}</th>}
-            {hasActual && <th onClick={() => requestSort('actual_boxes')} style={{ cursor: 'pointer' }}>รับจริง (กล่อง) {getSortIndicator('actual_boxes')}</th>}
-            {hasActual && <th onClick={() => requestSort('actual_weight')} style={{ cursor: 'pointer' }}>รับจริง (กก.) {getSortIndicator('actual_weight')}</th>}
+            {hasActual && <th onClick={() => requestSort('actual_boxes')} style={{ cursor: 'pointer', textAlign: 'right' }}>กล่อง (รับจริง / แจ้งฝาก) {getSortIndicator('actual_boxes')}</th>}
+            {hasActual && <th onClick={() => requestSort('actual_weight')} style={{ cursor: 'pointer', textAlign: 'right' }}>น้ำหนัก กก. (รับจริง / แจ้งฝาก) {getSortIndicator('actual_weight')}</th>}
             <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>{t('customer_col_line_note')} {getSortIndicator('note')}</th>
           </tr>
         </thead>
@@ -51,16 +51,24 @@ export function CustomerDepositRequestLinesDisplay({
               {hasLot && <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.lot_no || '-'}</td>}
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.exp_date)}</td>}
-              {hasActual && (
-                <td style={{ fontWeight: 700, color: line.actual_boxes != null ? 'var(--tgd-success, #22c55e)' : undefined }}>
-                  {line.actual_boxes != null ? line.actual_boxes : '-'}
-                </td>
-              )}
-              {hasActual && (
-                <td style={{ fontWeight: 700, color: line.actual_weight != null ? 'var(--tgd-success, #22c55e)' : undefined }}>
-                  {line.actual_weight != null ? line.actual_weight : '-'}
-                </td>
-              )}
+              {hasActual && (() => {
+                const hasVar = line.actual_boxes != null &&
+                  (line.actual_boxes !== line.expected_boxes || String(line.actual_weight) !== String(line.expected_weight));
+                const boxColor = line.actual_boxes == null ? undefined : hasVar ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                const wtColor = line.actual_weight == null ? undefined : (String(line.actual_weight) !== String(line.expected_weight)) ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                return (
+                  <>
+                    <td style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 700, color: boxColor }}>{line.actual_boxes != null ? line.actual_boxes : '-'}</span>
+                      {' '}<span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>/ {line.expected_boxes ?? '-'}</span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 700, color: wtColor }}>{line.actual_weight != null ? line.actual_weight : '-'}</span>
+                      {' '}<span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>/ {line.expected_weight ?? '-'}</span>
+                    </td>
+                  </>
+                );
+              })()}
               <td>{line.note ?? line.actual_note ?? '-'}</td>
             </tr>
           )) : (
