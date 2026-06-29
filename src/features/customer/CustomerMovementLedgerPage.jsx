@@ -90,7 +90,7 @@ export function CustomerMovementLedgerPage() {
         <div className="banner banner-warning" role="status">ไม่พบขอบเขตลูกค้า กรุณาติดต่อผู้ดูแลระบบ</div>
       ) : null}
 
-      <form className="table-card" style={{ padding: '20px 24px' }} onSubmit={handleSearch}>
+      <form className="table-card no-print" style={{ padding: '20px 24px' }} onSubmit={handleSearch}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>วันที่เริ่มต้น</label>
@@ -119,7 +119,12 @@ export function CustomerMovementLedgerPage() {
               type="button"
               onClick={() => {
                 const style = document.createElement('style');
-                style.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+                style.textContent = [
+                  '@page { size: A4 landscape; margin: 8mm; }',
+                  '[data-testid="customer-movement-ledger-page"],',
+                  '[data-testid="customer-movement-ledger-page"] * { visibility: visible !important; }',
+                  '[data-testid="customer-movement-ledger-page"] { position: absolute; inset: 0; background: #fff; }',
+                ].join(' ');
                 document.head.appendChild(style);
                 window.print();
                 document.head.removeChild(style);
