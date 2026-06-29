@@ -63,7 +63,7 @@ export function CustomerDepositRequestCreatePage() {
   const copyFromId = searchParams.get('copyFrom');
   const editId = searchParams.get('editId');
   const isEditMode = Boolean(editId);
-  const { customerId, canWriteCustomerRequests, isRequestProxy } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy, profile } = useCustomerPortalProfile();
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [header, setHeader] = useState(INITIAL_HEADER);
@@ -225,6 +225,16 @@ export function CustomerDepositRequestCreatePage() {
 
     return () => { active = false; };
   }, [editId, isRequestProxy]);
+
+  // Auto-fill contact_name with logged-in user's name on new forms
+  useEffect(() => {
+    if (!profile || isEditMode || copyFromId) return;
+    const name = profile.display_name
+      || [profile.first_name, profile.last_name].filter(Boolean).join(' ')
+      || profile.email
+      || '';
+    if (name) setHeader((h) => (h.contact_name ? h : { ...h, contact_name: name }));
+  }, [profile, isEditMode, copyFromId]);
 
   useEffect(() => {
     let active = true;
