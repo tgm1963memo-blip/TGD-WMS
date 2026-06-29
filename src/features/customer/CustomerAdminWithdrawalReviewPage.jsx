@@ -471,7 +471,8 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>น้ำหนักที่ขอ (กก.)</th>
                       <th>กล่องที่ขอ</th>
                       <th>จำนวนที่ขอ</th>
-                      <th>{t('admin_picked_qty')}</th>
+                      <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
+                      <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
@@ -492,30 +493,30 @@ export function CustomerAdminWithdrawalReviewPage() {
                           {line.requested_qty != null ? `${line.requested_qty} ${line.uom ?? ''}`.trim() : '-'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          {getLinePickingStatus(line, selected?.status) === 'PICKED' ? (
-                            <div style={{ lineHeight: 1.6 }}>
-                              <div style={{ display: 'inline-block', background: '#ecfdf5', color: '#059669', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800, marginBottom: 4 }}>
-                                ✓ จัดแล้ว
-                              </div>
-                              {line.picked_boxes != null && (
-                                <div style={{ fontWeight: 700, color: '#059669' }}>
-                                  {line.picked_boxes} กล่อง
-                                </div>
-                              )}
-                              {line.picked_weight != null && (
-                                <div style={{ fontWeight: 700, color: '#059669' }}>
-                                  {Number(line.picked_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
-                                </div>
-                              )}
-                              {line.picked_by_email && (
-                                <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>
-                                  {line.picked_by_email}
-                                </div>
-                              )}
-                            </div>
+                          {line.picked_boxes != null ? (
+                            <>
+                              <span style={{ fontWeight: 700, color: Number(line.picked_boxes) !== Number(line.requested_boxes) ? 'var(--tgd-warning)' : 'var(--tgd-success)' }}>
+                                {line.picked_boxes}
+                              </span>
+                              <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}> / {line.requested_boxes ?? '-'}</span>
+                            </>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>- / {line.requested_boxes ?? '-'}</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {line.picked_weight != null ? (
+                            <>
+                              <span style={{ fontWeight: 700, color: Number(line.picked_weight).toFixed(2) !== Number(line.requested_weight).toFixed(2) ? 'var(--tgd-warning)' : 'var(--tgd-success)' }}>
+                                {Number(line.picked_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
+                                {' / '}{line.requested_weight != null ? Number(line.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                              </span>
+                            </>
                           ) : (
                             <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>
-                              รอดำเนินการ
+                              {'- / '}{line.requested_weight != null ? Number(line.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                             </span>
                           )}
                         </td>
@@ -536,7 +537,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
