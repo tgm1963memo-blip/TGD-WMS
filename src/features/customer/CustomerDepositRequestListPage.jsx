@@ -11,6 +11,7 @@ import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function CustomerDepositRequestListPage() {
   const t = useTranslation();
@@ -201,7 +202,7 @@ export function CustomerDepositRequestListPage() {
                   <td>{row.contact_phone ?? '-'}</td>
                   <td>{row.note || '-'}</td>
                   <td>
-                    <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
+                    <small>{formatDocumentDate(row.last_action_at)}</small>
                   </td>
                   <td>
                     <div className="action-row action-row--table" style={{ flexWrap: 'nowrap' }}>

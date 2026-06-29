@@ -18,6 +18,7 @@ import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function InvoiceDraftListPage() {
   const { language } = useLanguage();
@@ -158,7 +159,7 @@ export function InvoiceDraftListPage() {
             <div><strong>Draft No:</strong> {viewDraft.draft_no ?? '-'}</div>
             <div><strong>ลูกค้า:</strong> {viewDraft.customer_name ?? '-'}</div>
             <div><strong>สถานะ:</strong> <InvoiceDraftStatusBadge status={viewDraft.status} /></div>
-            <div><strong>วันที่สร้าง:</strong> {viewDraft.created_at ? new Date(viewDraft.created_at).toLocaleString() : '-'}</div>
+            <div><strong>วันที่สร้าง:</strong> {formatDocumentDate(viewDraft.created_at)}</div>
             <div><strong>ช่วงเวลา (เริ่ม):</strong> {viewDraft.billing_period_start ?? '-'}</div>
             <div><strong>ช่วงเวลา (สิ้นสุด):</strong> {viewDraft.billing_period_end ?? '-'}</div>
             <div><strong>จำนวนรวม:</strong> {viewDraft.total_qty ?? '-'}</div>
@@ -185,7 +186,7 @@ export function InvoiceDraftListPage() {
                       <td>{line.source_document_no ?? '-'}</td>
                       <td>{line.product_name ?? line.product_code ?? '-'}</td>
                       <td>{line.movement_type ?? '-'}</td>
-                      <td>{line.movement_date ? new Date(line.movement_date).toLocaleDateString('th-TH') : '-'}</td>
+                      <td>{formatDocumentDate(line.movement_date, { dateOnly: true })}</td>
                       <td style={{ textAlign: 'right' }}>{line.qty ?? '-'}</td>
                       <td style={{ textAlign: 'right' }}>{line.chargeable_weight ?? '-'}</td>
                     </tr>

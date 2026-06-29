@@ -1,12 +1,11 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatRequestWeight } from '../../utils/customerRequestCancelUtils.js';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 function formatDate(iso) {
   if (!iso) return '-';
-  try {
-    return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
-  } catch { return iso; }
+  return formatDocumentDate(iso, { dateOnly: true });
 }
 
 export function CustomerDepositRequestLinesDisplay({

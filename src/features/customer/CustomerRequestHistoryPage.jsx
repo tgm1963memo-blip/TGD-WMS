@@ -8,6 +8,7 @@ import { listCustomerPortalRequestHistory } from '../../services/customerPortalR
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 const REQUEST_TYPE_OPTIONS = ['ALL', 'DEPOSIT', 'WITHDRAWAL'];
 const STATUS_OPTIONS = [
@@ -315,7 +316,7 @@ export function CustomerRequestHistoryPage() {
                   <td>
                     {row.latest_action_note}
                     <br />
-                    <small>{row.last_updated_at ? new Date(row.last_updated_at).toLocaleString() : '-'}</small>
+                    <small>{formatDocumentDate(row.last_updated_at)}</small>
                   </td>
                   <td>
                     <RequestTimelineCell documentId={row.id} documentType={row.document_type} />

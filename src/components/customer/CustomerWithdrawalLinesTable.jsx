@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
+import { WITHDRAWAL_QTY_MODES } from '../../utils/customerWithdrawalLineDefaults.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const NULL_LOT_SENTINEL = '__null_lot__';
@@ -130,7 +131,8 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 180 }}>LOT (จากยอดคงเหลือ)</th>
             <th style={{ minWidth: 110 }}>วันผลิต</th>
             <th style={{ minWidth: 110 }}>วันหมดอายุ</th>
-            <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
+            <th style={{ minWidth: 100 }}>โหมด</th>
+            <th style={{ minWidth: 120 }}>จำนวน <span className="field-required">*</span></th>
             <th style={{ minWidth: 160 }}>แหล่งที่มา (ใบฝาก)</th>
             <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
           </tr>
@@ -228,20 +230,77 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
-                {/* Weight with balance validation */}
+                {/* Qty mode selector */}
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    value={line.withdrawal_qty_mode ?? WITHDRAWAL_QTY_MODES.WEIGHT}
+                    onChange={(e) => updateLine(line.key, {
+                      withdrawal_qty_mode: e.target.value,
+                      requested_boxes: '',
+                      requested_weight: '',
+                    })}
+                  >
+                    <option value={WITHDRAWAL_QTY_MODES.WEIGHT}>น้ำหนัก (กก.)</option>
+                    <option value={WITHDRAWAL_QTY_MODES.BOXES}>จำนวนกล่อง</option>
+                  </select>
+                </td>
+
+                {/* Qty input with balance validation */}
                 <td>
                   {(() => {
-                    const lotsBalance = {};
-                    productMatchedLines.forEach((dl) => {
-                      const l = dl.lot_no || 'ไม่ระบุ';
-                      if (!lotsBalance[l]) lotsBalance[l] = 0;
-                      lotsBalance[l] += (Number(dl.actual_weight) || Number(dl.expected_weight) || 0);
-                    });
+                    const mode = line.withdrawal_qty_mode ?? WITHDRAWAL_QTY_MODES.WEIGHT;
+                    const isBoxMode = mode === WITHDRAWAL_QTY_MODES.BOXES;
 
                     const balanceLines = productMatchedLines.filter((dl) => {
                       if (isNullLotSelected) return !dl.lot_no;
                       if (!effectiveLotNo) return true;
                       return dl.lot_no === effectiveLotNo;
+                    });
+
+                    if (isBoxMode) {
+                      const lotsBalance = {};
+                      productMatchedLines.forEach((dl) => {
+                        const l = dl.lot_no || 'ไม่ระบุ';
+                        if (!lotsBalance[l]) lotsBalance[l] = 0;
+                        lotsBalance[l] += (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0);
+                      });
+                      const maxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
+                      const exceedsBalance = maxBalance > 0 && Number(line.requested_boxes) > maxBalance;
+                      return (
+                        <>
+                          <input
+                            className="form-control form-control-table"
+                            min="0"
+                            type="number"
+                            placeholder="กล่อง"
+                            style={exceedsBalance ? { borderColor: '#dc2626', backgroundColor: '#fef2f2' } : {}}
+                            onChange={(e) => updateLine(line.key, { requested_boxes: e.target.value, requested_weight: '' })}
+                            value={line.requested_boxes}
+                          />
+                          {exceedsBalance && (
+                            <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>
+                              <div>เกินยอดคงเหลือ (มี {maxBalance} กล่อง)</div>
+                              {Object.keys(lotsBalance).length > 0 && (
+                                <div style={{ marginTop: 4, padding: '4px', background: '#fee2e2', borderRadius: '4px' }}>
+                                  <div style={{ fontWeight: 700, marginBottom: 2 }}>คงเหลือแต่ละ LOT:</div>
+                                  {Object.entries(lotsBalance).map(([l, b]) => (
+                                    <div key={l}>- {l}: {b} กล่อง</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+
+                    // Weight mode
+                    const lotsBalance = {};
+                    productMatchedLines.forEach((dl) => {
+                      const l = dl.lot_no || 'ไม่ระบุ';
+                      if (!lotsBalance[l]) lotsBalance[l] = 0;
+                      lotsBalance[l] += (Number(dl.actual_weight) || Number(dl.expected_weight) || 0);
                     });
                     const maxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
                     const exceedsBalance = maxBalance > 0 && Number(line.requested_weight) > maxBalance;
@@ -254,7 +313,7 @@ export function CustomerWithdrawalLinesTable({
                           type="number"
                           placeholder="กก."
                           style={exceedsBalance ? { borderColor: '#dc2626', backgroundColor: '#fef2f2' } : {}}
-                          onChange={(e) => updateLine(line.key, { requested_weight: e.target.value })}
+                          onChange={(e) => updateLine(line.key, { requested_weight: e.target.value, requested_boxes: '' })}
                           value={line.requested_weight}
                         />
                         {exceedsBalance && (

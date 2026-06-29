@@ -1,9 +1,9 @@
 import { DataTable } from '../ui/DataTable.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 function fmtDate(dateString) {
   if (!dateString || dateString === 'NO_EXPIRY_DATE') return dateString ?? '-';
-  const d = new Date(dateString);
-  return Number.isNaN(d.getTime()) ? dateString : d.toLocaleDateString('th-TH');
+  return formatDocumentDate(dateString, { dateOnly: true });
 }
 
 const columns = [

@@ -1,4 +1,5 @@
 export const WITHDRAWAL_LINE_DEFAULT_COUNT = 5;
+export const WITHDRAWAL_QTY_MODES = { WEIGHT: 'WEIGHT', BOXES: 'BOXES' };
 
 export function createEmptyWithdrawalLine(lineKey = 1) {
   return {
@@ -12,6 +13,7 @@ export function createEmptyWithdrawalLine(lineKey = 1) {
     mfg_date: '',
     exp_date: '',
     source_deposit_request_id: '',
+    withdrawal_qty_mode: WITHDRAWAL_QTY_MODES.WEIGHT,
     requested_qty: '',
     requested_boxes: '',
     requested_weight: '',
@@ -31,8 +33,13 @@ export function isCatalogWithdrawalLineSelected(line) {
 
 export function getFilledWithdrawalLines(lines) {
   return (lines ?? []).filter(
-    (line) =>
-      (isCatalogWithdrawalLineSelected(line) || Boolean(String(line?.product_name ?? '').trim())) &&
-      String(line.requested_weight ?? '').trim() !== '',
+    (line) => {
+      const hasProduct = isCatalogWithdrawalLineSelected(line) || Boolean(String(line?.product_name ?? '').trim());
+      const mode = line.withdrawal_qty_mode ?? WITHDRAWAL_QTY_MODES.WEIGHT;
+      const hasQty = mode === WITHDRAWAL_QTY_MODES.BOXES
+        ? String(line.requested_boxes ?? '').trim() !== ''
+        : String(line.requested_weight ?? '').trim() !== '';
+      return hasProduct && hasQty;
+    },
   );
 }

@@ -6,6 +6,7 @@ import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 const ALL_WITHDRAWAL_STATUSES = [
   'WITHDRAWAL_DRAFT',
@@ -151,7 +152,7 @@ export function CustomerWithdrawalNotificationsSection({
                 <td>{row.pickup_contact ?? '-'}</td>
                 <td>{row.note || '-'}</td>
                 <td>
-                  <small>{row.last_action_at ? new Date(row.last_action_at).toLocaleString() : '-'}</small>
+                  <small>{formatDocumentDate(row.last_action_at)}</small>
                 </td>
                 <td>
                   <div className="action-row">
