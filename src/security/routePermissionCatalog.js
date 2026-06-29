@@ -47,6 +47,8 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/customer/withdrawal-request/:requestId', route_name: 'CustomerWithdrawalRequestDetailPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: '' },
   { route_path: '/customer/requests', route_name: 'CustomerRequestHistoryPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: '' },
   { route_path: '/customer/facility-usage', route_name: 'CustomerFacilityUsageRequestPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'write', notes: '' },
+  { route_path: '/customer/product-catalog', route_name: 'CustomerProductCatalogPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'write', notes: '' },
+  { route_path: '/customer/movement-ledger', route_name: 'CustomerMovementLedgerPage', permission_area: 'customer_portal', minimum_role: 'customer_user', access_level: 'read', notes: '' },
   { route_path: '/customer/admin/deposit-review', route_name: 'CustomerAdminDepositReviewPage', permission_area: 'customer_portal', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'Linked from receiving workflow' },
   { route_path: '/customer/admin/deposit-review/:requestId', route_name: 'CustomerAdminDepositReviewPage', permission_area: 'customer_portal', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
   { route_path: '/customer/admin/withdrawal-review', route_name: 'CustomerAdminWithdrawalReviewPage', permission_area: 'customer_portal', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'Linked from withdrawal notifications' },

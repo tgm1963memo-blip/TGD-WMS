@@ -615,6 +615,8 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_portal_request_history_hint: { th: 'ดูประวัติคำขอฝาก/เบิก', en: 'View deposit and withdrawal history' },
   customer_portal_product_catalog: { th: 'รายการสินค้าของลูกค้า', en: 'My Product Catalog' },
   customer_portal_product_catalog_hint: { th: 'จัดการรหัสสินค้าที่ใช้ในฟอร์มฝาก/เบิก', en: 'Manage product codes used in deposit and withdrawal forms' },
+  customer_portal_movement_ledger: { th: 'รายงานการเคลื่อนไหวสินค้า', en: 'Movement Ledger' },
+  customer_portal_movement_ledger_hint: { th: 'ดูรายงานรับเข้า-เบิกออกสินค้าตามช่วงเวลา', en: 'View inbound and outbound movement report by date range' },
   catalog_manual_entry: { th: 'กรอกสินค้าเอง (ไม่ใช้แคตตาล็อก)', en: 'Enter product manually (not from catalog)' },
   catalog_add_products_first_hint: { th: 'กรุณาเพิ่มชื่อสินค้าในรายการสินค้าของลูกค้าก่อน จึงจะเลือกใช้ในฟอร์มแจ้งฝากได้', en: 'Add product names in Customer Products before selecting them in deposit requests.' },
   catalog_customer_title: { th: 'รายการสินค้าของลูกค้า', en: 'Customer Product Catalog' },
