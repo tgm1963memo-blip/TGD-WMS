@@ -6,14 +6,14 @@ function fmt(value) {
 function fmtDate(value) {
   if (!value) return '-';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
   if (!draft) return null;
 
   return (
-    <div style={{ fontFamily: 'Sarabun, sans-serif', fontSize: 14, color: '#1e293b', padding: '20px 24px', maxWidth: 800, margin: '0 auto' }}>
+    <div className="operational-report operational-report-a4" style={{ fontFamily: 'Sarabun, sans-serif', fontSize: 14, color: '#1e293b' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #2d9348' }}>

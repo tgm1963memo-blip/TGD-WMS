@@ -6,6 +6,7 @@ export function ReportPreviewModal({
   open = false,
   title,
   language = 'th',
+  orientation = 'portrait',
   onClose,
   children,
 }) {
@@ -33,7 +34,15 @@ export function ReportPreviewModal({
   const closeLabel = getTranslation('close', language) || 'Close';
 
   const handlePrint = () => {
+    let injected = null;
+    if (orientation === 'landscape') {
+      injected = document.createElement('style');
+      injected.id = '__print-page-orientation__';
+      injected.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+      document.head.appendChild(injected);
+    }
     window.print();
+    if (injected) document.head.removeChild(injected);
   };
 
   return createPortal(

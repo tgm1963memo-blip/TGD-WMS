@@ -113,6 +113,21 @@ export function CustomerMovementLedgerPage() {
           <button className="btn btn-primary" type="submit" disabled={!customerId || profileLoading}>
             ดูรายงาน
           </button>
+          {searched && state.rows.length > 0 && (
+            <button
+              className="btn btn-secondary no-print"
+              type="button"
+              onClick={() => {
+                const style = document.createElement('style');
+                style.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+                document.head.appendChild(style);
+                window.print();
+                document.head.removeChild(style);
+              }}
+            >
+              พิมพ์ (แนวนอน)
+            </button>
+          )}
           {(dateFrom || dateTo) && (
             <button
               className="btn btn-secondary"

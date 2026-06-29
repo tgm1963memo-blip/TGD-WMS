@@ -178,6 +178,7 @@ export function MovementLedgerReportPage() {
           <ReportPrintActions
             title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
             disabled={false}
+            orientation="landscape"
             renderReport={(reportLanguage) => {
               const selectedCustomer = customerOptions.find((c) => c.value === committedFilters.customerId);
               const customerLabel = selectedCustomer?.label ?? committedFilters.customerId ?? 'ทั้งหมด';

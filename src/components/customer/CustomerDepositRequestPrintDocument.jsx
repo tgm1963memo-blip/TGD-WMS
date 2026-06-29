@@ -3,7 +3,7 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 
 function fmtDate(iso) {
   if (!iso) return '-';
-  try { return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }); }
+  try { return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }); }
   catch { return iso; }
 }
 
@@ -40,7 +40,7 @@ export function CustomerDepositRequestPrintDocument({
             <td colSpan={colCount} style={{ padding: '8mm', borderBottom: '2px solid #ccc' }}>
               <DocumentHeader
                 branding={branding}
-                documentDate={header.created_at ? new Date(header.created_at).toLocaleDateString(language === 'en' ? 'en-GB' : 'th-TH') : '-'}
+                documentDate={header.created_at ? new Date(header.created_at).toLocaleDateString('en-GB') : '-'}
                 documentNo={header.request_no}
                 documentTitle={t('customer_deposit_print_title')}
                 language={language}

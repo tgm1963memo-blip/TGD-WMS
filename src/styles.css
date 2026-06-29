@@ -726,6 +726,8 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 }
 
 @page {
+  size: A4 portrait;
+  margin: 15mm 12mm;
   @bottom-right {
     content: "หน้า " counter(page);
     font-size: 8pt;
@@ -760,7 +762,8 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
     display: none !important;
   }
 
-  .operational-report-a4 {
+  .operational-report-a4,
+  .operational-report-print-document {
     box-shadow: none;
     margin: 0;
     max-width: none;
@@ -1754,17 +1757,6 @@ table .status-badge,
 }
 
 @media print {
-  @page {
-    size: A4 landscape;
-    margin: 8mm;
-    @bottom-right {
-      content: "หน้า " counter(page);
-      font-size: 8pt;
-      font-family: sans-serif;
-      color: #555;
-    }
-  }
-
   .operational-report-a4-landscape {
     box-shadow: none;
     margin: 0;

@@ -8,6 +8,7 @@ export function ReportPrintActions({
   title,
   renderReport,
   disabled = false,
+  orientation = 'portrait',
 }) {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
@@ -46,6 +47,7 @@ export function ReportPrintActions({
         open={open}
         title={title}
         language={language}
+        orientation={orientation}
         onClose={() => setOpen(false)}
       >
         {renderReport(language)}
