@@ -35,6 +35,7 @@ import {
 import {
   mapDepositHeaderForCopy,
   mapDepositLinesForCopy,
+  resolveCatalogProductId,
 } from '../../utils/customerRequestCopyUtils.js';
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -176,23 +177,35 @@ export function CustomerDepositRequestCreatePage() {
         setCatalogProducts(catalogRows);
         setHeader(mapDepositHeaderForCopy(headerResult.data));
 
-        const editLines = sourceLines.map((line, index) => ({
-          key: index + 1,
-          lineId: line.id,
-          customer_product_code: line.customer_product_code ?? '',
-          product_code: line.internal_product_code ?? '',
-          product_name: line.product_name ?? '',
-          weight_per_box: String(line.weight_per_box ?? ''),
-          expected_boxes: String(line.expected_boxes ?? ''),
-          expected_weight: String(line.expected_weight ?? ''),
-          pack_entry_mode: 'BOXES',
-          line_note: line.note ?? '',
-          lot_no: line.lot_no ?? '',
-          mfg_date: line.mfg_date ?? '',
-          exp_date: line.exp_date ?? '',
-          temperature_type: line.temperature_type ?? 'FROZEN',
-          catalog_product_id: line.product_id ?? '',
-        }));
+        const editLines = sourceLines.map((line, index) => {
+          const resolvedCatalogId = resolveCatalogProductId(line, catalogRows);
+          const catalogProductId = resolvedCatalogId === '__manual__' ? '' : (resolvedCatalogId || '');
+          const catalogMatch = catalogRows.find((p) => p.id === catalogProductId);
+          const weightPerBox = String(line.weight_per_box ?? '');
+          const weightFromMaster = Boolean(
+            catalogMatch?.pack_weight_kg != null
+            && String(catalogMatch.pack_weight_kg) === weightPerBox
+            && weightPerBox !== '',
+          );
+          return {
+            key: index + 1,
+            lineId: line.id,
+            catalog_product_id: catalogProductId,
+            customer_product_code: line.customer_product_code ?? '',
+            product_code: line.internal_product_code ?? '',
+            product_name: line.product_name ?? '',
+            weight_per_box: weightPerBox,
+            weight_from_master: weightFromMaster,
+            expected_boxes: String(line.expected_boxes ?? ''),
+            expected_weight: String(line.expected_weight ?? ''),
+            pack_entry_mode: 'BOXES',
+            line_note: line.note ?? '',
+            lot_no: line.lot_no ?? '',
+            mfg_date: line.mfg_date ?? '',
+            exp_date: line.exp_date ?? '',
+            temperature_type: line.temperature_type ?? 'FROZEN',
+          };
+        });
 
         const padded = [...editLines];
         for (let i = editLines.length; i < Math.max(DEPOSIT_LINE_DEFAULT_COUNT, editLines.length); i += 1) {
