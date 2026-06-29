@@ -369,7 +369,7 @@ export function CustomerDepositRequestCreatePage() {
       const activeLineIds = new Set(activeLines.map((l) => l.lineId).filter(Boolean));
       const toDelete = editOriginalLineIds.filter((id) => !activeLineIds.has(id));
       for (const deletedId of toDelete) {
-        await deleteCustomerDepositRequestLine(deletedId);
+        await deleteCustomerDepositRequestLine(editId, deletedId);
       }
     }
 
@@ -380,6 +380,7 @@ export function CustomerDepositRequestCreatePage() {
         lineNo: index + 1,
         customerProductCode: line.customer_product_code,
         internalProductCode: line.product_code,
+        productId: line.catalog_product_id || null,
         productName: line.product_name,
         expectedQty: line.expected_boxes,
         expectedBoxes: line.expected_boxes,

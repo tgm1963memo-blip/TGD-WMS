@@ -26,7 +26,9 @@ export function createInitialDepositLines(count = DEPOSIT_LINE_DEFAULT_COUNT) {
 }
 
 export function isCatalogDepositLineSelected(line) {
-  return Boolean(line?.catalog_product_id && line.catalog_product_id !== '__manual__');
+  const hasCatalogId = Boolean(line?.catalog_product_id && line.catalog_product_id !== '__manual__');
+  const hasProductCode = Boolean(line?.customer_product_code?.trim());
+  return hasCatalogId || hasProductCode;
 }
 
 export function getFilledDepositLines(lines) {
