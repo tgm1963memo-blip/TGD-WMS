@@ -71,7 +71,6 @@ export function CustomerDepositLinesTable({
           <tr>
             <th>#</th>
             <th>{t('catalog_col_customer_code')} <span className="field-required">*</span></th>
-            <th>{t('catalog_col_product_name')}</th>
             <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
             <th>การจัดเก็บ <span className="field-required">*</span></th>
             <th>{t('customer_col_pack_entry_mode')}</th>
@@ -105,15 +104,6 @@ export function CustomerDepositLinesTable({
                       </option>
                     ))}
                   </select>
-                </td>
-                <td>
-                  <input
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'customer-deposit-product-name' : `${rowTestId}-product-name`}
-                    disabled
-                    readOnly
-                    value={line.product_name}
-                  />
                 </td>
                 <td>
                   <input

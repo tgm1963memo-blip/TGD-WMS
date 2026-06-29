@@ -55,6 +55,7 @@ export function mapDepositHeaderForCopy(source) {
     contact_name: source?.contact_name ?? '',
     contact_phone: source?.contact_phone ?? '',
     vehicle_registration: source?.vehicle_registration ?? '',
+    arrival_time: source?.arrival_time ?? '',
   };
 }
 

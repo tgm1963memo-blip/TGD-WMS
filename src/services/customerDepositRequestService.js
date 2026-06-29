@@ -17,6 +17,7 @@ const DEPOSIT_HEADER_SELECT = [
   'contact_phone',
   'note',
   'vehicle_registration',
+  'arrival_time',
   'created_by_email',
   'created_by_role',
   'submitted_at',
@@ -192,6 +193,7 @@ export async function createCustomerDepositRequest({
   contactPhone,
   note,
   vehicleRegistration,
+  arrivalTime,
   customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
@@ -202,6 +204,7 @@ export async function createCustomerDepositRequest({
     p_contact_phone: contactPhone,
     p_note: toNullableText(note),
     p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_arrival_time: toNullableText(arrivalTime),
     p_customer_id: customerId,
   });
 
@@ -214,6 +217,7 @@ export async function updateCustomerDepositRequestDraft(requestId, {
   contactPhone,
   note,
   vehicleRegistration,
+  arrivalTime,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -224,6 +228,7 @@ export async function updateCustomerDepositRequestDraft(requestId, {
     p_contact_phone: contactPhone,
     p_note: toNullableText(note),
     p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_arrival_time: toNullableText(arrivalTime),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

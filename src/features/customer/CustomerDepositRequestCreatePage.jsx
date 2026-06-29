@@ -48,6 +48,7 @@ const INITIAL_HEADER = {
   contact_name: '',
   contact_phone: '',
   vehicle_registration: '',
+  arrival_time: '',
 };
 
 function formatFileSize(size) {
@@ -337,6 +338,7 @@ export function CustomerDepositRequestCreatePage() {
         contactPhone: header.contact_phone,
         note: header.note,
         vehicleRegistration: header.vehicle_registration,
+        arrivalTime: header.arrival_time,
       });
 
       if (updateResult.error) {
@@ -353,6 +355,7 @@ export function CustomerDepositRequestCreatePage() {
         contactPhone: header.contact_phone,
         note: header.note,
         vehicleRegistration: header.vehicle_registration,
+        arrivalTime: header.arrival_time,
         customerId: isRequestProxy ? proxyCustomerId : null,
       });
 
@@ -539,6 +542,10 @@ export function CustomerDepositRequestCreatePage() {
           <label className="form-field">
             <span>{t('customer_field_vehicle_registration')}</span>
             <input className="form-control" data-testid="customer-deposit-vehicle-registration" onChange={(e) => updateHeaderField('vehicle_registration', e.target.value)} value={header.vehicle_registration} />
+          </label>
+          <label className="form-field">
+            <span>{t('customer_field_arrival_time')}</span>
+            <input className="form-control" data-testid="customer-deposit-arrival-time" onChange={(e) => updateHeaderField('arrival_time', e.target.value)} type="time" value={header.arrival_time} />
           </label>
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>

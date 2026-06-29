@@ -133,8 +133,10 @@ export function CustomerDepositRequestDetailPage() {
         </div>
         <div className="form-grid customer-request-detail-meta">
           <div><strong>{t('customer_field_expected_arrival_date')}:</strong> {header.expected_arrival_date ?? '-'}</div>
+          <div><strong>{t('customer_field_arrival_time')}:</strong> {header.arrival_time ?? '-'}</div>
           <div><strong>{t('customer_field_contact_name')}:</strong> {header.contact_name ?? '-'}</div>
           <div><strong>{t('customer_field_contact_phone')}:</strong> {header.contact_phone ?? '-'}</div>
+          <div><strong>{t('customer_field_vehicle_registration')}:</strong> {header.vehicle_registration ?? '-'}</div>
           <div><strong>{t('customer_col_note')}:</strong> {header.note || '-'}</div>
         </div>
       </div>

@@ -755,6 +755,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_pack_mode_boxes: { th: 'กรอกจำนวนกล่อง', en: 'Enter box count' },
   customer_pack_mode_weight: { th: 'กรอกน้ำหนักรวม', en: 'Enter total weight' },
   customer_field_vehicle_registration: { th: 'ทะเบียนรถ', en: 'Vehicle registration' },
+  customer_field_arrival_time: { th: 'เวลาที่รถถึง', en: 'Vehicle arrival time' },
   customer_deposit_status_timeline_title: { th: 'สถานะใบแจ้งฝาก', en: 'Deposit status timeline' },
   customer_deposit_attachments_title: { th: 'ไฟล์แนบประกอบ', en: 'Supporting attachments' },
   customer_deposit_attachments_deferred_note: { th: 'การอัปโหลดไฟล์จริงจะเปิดใช้ในเฟสถัดไป — ตอนนี้แสดงตัวอย่างในเบราว์เซอร์เท่านั้น', en: 'Storage upload is deferred — files stay in browser preview only until Gate 2G.' },
