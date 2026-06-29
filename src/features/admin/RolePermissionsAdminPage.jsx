@@ -29,7 +29,7 @@ const GROUP_LABELS_TH = {
   system_administration: 'ระบบผู้ดูแล',
 };
 
-const MATRIX_ROLE_ORDER = ['admin', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff', 'accounting', 'viewer', 'customer_user'];
+const MATRIX_ROLE_ORDER = ['admin', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff', 'accounting', 'viewer', 'customer_admin', 'customer_user'];
 
 function sortMatrixRoles(roles) {
   const orderIndex = new Map(MATRIX_ROLE_ORDER.map((code, index) => [code, index]));
@@ -331,7 +331,7 @@ function RoleCard({ role, userCount, onEdit, onEditPermissions, isPermissionExpa
   );
 }
 
-const ROLE_ORDER = ['admin','warehouse_manager','warehouse_admin','warehouse_staff','accounting','viewer','customer_user'];
+const ROLE_ORDER = ['admin','warehouse_manager','warehouse_admin','warehouse_staff','accounting','viewer','customer_admin','customer_user'];
 
 function buildFunctionMatrix(roleCodes, permissions) {
   const { matrix } = buildRoleFunctionMatrix(roleCodes, permissions);
