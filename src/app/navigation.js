@@ -86,6 +86,12 @@ export const navigationGroups = [
         path: '/customer/product-catalog',
         testId: 'customer-product-catalog-menu-item',
       },
+      {
+        label: 'รายงานการเคลื่อนไหวสินค้า',
+        key: 'customer_movement_ledger',
+        path: '/customer/movement-ledger',
+        testId: 'customer-movement-ledger-menu-item',
+      },
     ],
   },
   {
