@@ -468,9 +468,6 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th>{t('lot')}</th>
-                      <th>น้ำหนักที่ขอ (กก.)</th>
-                      <th>กล่องที่ขอ</th>
-                      <th>จำนวนที่ขอ</th>
                       <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
                       <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
                       <th>{t('catalog_col_actions')}</th>
@@ -483,15 +480,6 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.lot_no ?? '-'}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {line.requested_weight != null
-                            ? Number(line.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            : '-'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>{line.requested_boxes ?? '-'}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {line.requested_qty != null ? `${line.requested_qty} ${line.uom ?? ''}`.trim() : '-'}
-                        </td>
                         <td style={{ textAlign: 'right' }}>
                           {line.picked_boxes != null ? (
                             <>
@@ -541,7 +529,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

@@ -18,8 +18,8 @@ function fmtDT(iso) {
 const NCOLS = 10;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
-const META_KEY = { fontWeight: 600, fontSize: 11, paddingBottom: 2 };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2 };
+const META_KEY = { fontWeight: 600, fontSize: 11, paddingBottom: 2, whiteSpace: 'nowrap' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' };
 
 export function CustomerWithdrawalRequestPrintDocument({
   header,
@@ -77,18 +77,18 @@ export function CustomerWithdrawalRequestPrintDocument({
                   <tr>
                     {!hideCustomerName ? (
                       <>
-                        <td style={{ ...META_KEY, width: '18%' }}>CUSTOMER NAME</td>
+                        <td style={{ ...META_KEY, width: '16%' }}>CUSTOMER NAME</td>
                         <td style={META_VAL}>{fmt(header.customer_name)}</td>
                       </>
                     ) : (
                       <td colSpan={2} style={{ border: 'none' }}></td>
                     )}
-                    <td style={{ ...META_KEY, width: '10%' }}>DATE</td>
-                    <td style={{ ...META_VAL, width: '20%' }}>{fmt(docDate)}</td>
+                    <td style={{ ...META_KEY, width: '14%' }}>DATE</td>
+                    <td style={{ ...META_VAL, width: '22%' }}>{fmt(docDate)}</td>
                   </tr>
                   <tr>
                     <td style={META_KEY}>ADDRESS</td>
-                    <td colSpan={3} style={META_VAL}>{fmt(header.customer_address)}</td>
+                    <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
                   </tr>
                   <tr>
                     <td style={META_KEY}>TEL</td>
@@ -117,7 +117,7 @@ export function CustomerWithdrawalRequestPrintDocument({
                   {header.note ? (
                     <tr>
                       <td style={META_KEY}>REMARK</td>
-                      <td colSpan={3} style={META_VAL}>{header.note}</td>
+                      <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{header.note}</td>
                     </tr>
                   ) : null}
                 </tbody>
