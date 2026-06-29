@@ -8,11 +8,7 @@ const ROOT = process.cwd();
 // Previously applied: 053–081 (applied via earlier runs of this script)
 // Newly pending: 082–086
 const MIGRATIONS = [
-  '082_add_temperature_type_to_storage_rates.sql',
-  '083_add_freeze_frozen_temperature_type.sql',
-  '084_add_arrival_time_to_deposit_requests.sql',
-  '085_fix_enqueue_notification_duplicate_overload.sql',
-  '086_add_vehicle_registration_to_withdrawal_request.sql',
+  '087_drop_5param_notification_overload.sql',
 ];
 
 function runSql(sql, label) {

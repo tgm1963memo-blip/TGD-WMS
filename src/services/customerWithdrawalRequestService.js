@@ -235,11 +235,12 @@ export async function enqueueCustomerWithdrawalNotification(requestId, customerI
   if (!supabase) return missingSupabaseClientResult();
 
   const { data, error } = await supabase.rpc('tgd_enqueue_customer_request_notifications', {
-    p_document_type: 'WITHDRAWAL',
+    p_document_type: 'CUSTOMER_WITHDRAWAL_REQUEST',
     p_document_id: requestId,
     p_customer_id: customerId,
     p_document_no: documentNo,
     p_submitter_email: submitterEmail ?? null,
+    p_notification_event: 'DISPATCH_CONFIRMED',
   });
 
   return { data, error };
