@@ -50,6 +50,7 @@ import { CustomerFacilityUsageRequestPage } from '../features/customer/CustomerF
 import { CustomerRequestHistoryPage } from '../features/customer/CustomerRequestHistoryPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../features/customer/CustomerAdminDepositReviewPage.jsx';
 import { CustomerAdminWithdrawalReviewPage } from '../features/customer/CustomerAdminWithdrawalReviewPage.jsx';
+import { CustomerProductCatalogPage } from '../features/customer/CustomerProductCatalogPage.jsx';
 
 export function AppRoutes() {
   return (
@@ -103,6 +104,7 @@ export function AppRoutes() {
             <Route path="/customer/withdrawal-request/:requestId" element={<CustomerWithdrawalRequestDetailPage />} />
             <Route path="/customer/requests" element={<CustomerRequestHistoryPage />} />
             <Route path="/customer/facility-usage" element={<CustomerFacilityUsageRequestPage />} />
+            <Route path="/customer/product-catalog" element={<CustomerProductCatalogPage />} />
             <Route path="/customer/admin/deposit-review" element={<CustomerAdminDepositReviewPage />} />
             <Route path="/customer/admin/deposit-review/:requestId" element={<CustomerAdminDepositReviewPage />} />
             <Route path="/customer/admin/withdrawal-review" element={<CustomerAdminWithdrawalReviewPage />} />

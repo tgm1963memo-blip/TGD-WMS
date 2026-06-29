@@ -80,6 +80,12 @@ export const navigationGroups = [
         path: '/customer/facility-usage',
         testId: 'customer-facility-usage-menu-item',
       },
+      {
+        label: 'แคตตาล็อกสินค้า',
+        key: 'customer_product_catalog',
+        path: '/customer/product-catalog',
+        testId: 'customer-product-catalog-menu-item',
+      },
     ],
   },
   {
