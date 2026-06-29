@@ -441,18 +441,22 @@ export function CustomerAdminDepositReviewPage() {
                           )}
                         </td>
                         <td>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            type="button"
-                            onClick={() => {
-                              setRecountLine(line);
-                              setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
-                              setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
-                              setRecountNote(line.actual_note ?? '');
-                            }}
-                          >
-                            {t('admin_recount_button')}
-                          </button>
+                          {!['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(selected?.status) ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              onClick={() => {
+                                setRecountLine(line);
+                                setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
+                                setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
+                                setRecountNote(line.actual_note ?? '');
+                              }}
+                            >
+                              {t('admin_recount_button')}
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
+                          )}
                         </td>
                       </tr>
                     )) : (

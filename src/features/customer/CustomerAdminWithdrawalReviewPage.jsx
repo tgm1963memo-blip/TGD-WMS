@@ -521,19 +521,23 @@ export function CustomerAdminWithdrawalReviewPage() {
                           )}
                         </td>
                         <td>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            type="button"
-                            onClick={() => {
-                              setRecountLine(line);
-                              setRecountBoxes((line.picked_boxes ?? line.requested_boxes ?? '').toString());
-                              setRecountWeight((line.picked_weight ?? line.requested_weight ?? '').toString());
-                              setRecountQty((line.picked_qty ?? line.requested_qty ?? '').toString());
-                              setError('');
-                            }}
-                          >
-                            {t('admin_recount_button')}
-                          </button>
+                          {!['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status) ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              onClick={() => {
+                                setRecountLine(line);
+                                setRecountBoxes((line.picked_boxes ?? line.requested_boxes ?? '').toString());
+                                setRecountWeight((line.picked_weight ?? line.requested_weight ?? '').toString());
+                                setRecountQty((line.picked_qty ?? line.requested_qty ?? '').toString());
+                                setError('');
+                              }}
+                            >
+                              {t('admin_recount_button')}
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
+                          )}
                         </td>
                       </tr>
                     )) : (
