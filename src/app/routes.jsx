@@ -30,6 +30,7 @@ import { CustomerProductCatalogAdminPage } from '../features/admin/CustomerProdu
 import { CustomerRequestPolicyAdminPage } from '../features/admin/CustomerRequestPolicyAdminPage.jsx';
 import { CustomerProductServiceRatesPage } from '../features/admin/CustomerProductServiceRatesPage.jsx';
 import { RolePermissionsAdminPage } from '../features/admin/RolePermissionsAdminPage.jsx';
+import { OpeningBalanceImportPage } from '../features/admin/OpeningBalanceImportPage.jsx';
 
 import { AuthGuard } from '../features/auth/AuthGuard.jsx';
 import { RoutePermissionGuard } from '../features/auth/RoutePermissionGuard.jsx';
@@ -92,6 +93,7 @@ export function AppRoutes() {
             <Route path="/admin/customer-request-policy" element={<CustomerRequestPolicyAdminPage />} />
             <Route path="/admin/product-service-rates" element={<CustomerProductServiceRatesPage />} />
             <Route path="/admin/role-permissions" element={<RolePermissionsAdminPage />} />
+            <Route path="/admin/opening-balance-import" element={<OpeningBalanceImportPage />} />
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
             <Route path="/settings/email" element={<EmailSettingsPage />} />
             <Route path="/settings/change-password" element={<ChangePasswordPage />} />
