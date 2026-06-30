@@ -1474,6 +1474,33 @@ table .status-badge,
   width: 88px;
 }
 
+.customer-withdrawal-lines-table-wrap {
+  overflow-x: auto;
+}
+
+.customer-withdrawal-lines-table {
+  table-layout: auto;
+}
+
+.customer-withdrawal-lines-table .form-control-table {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+}
+
+.customer-withdrawal-lines-table td,
+.customer-withdrawal-lines-table th {
+  padding: 8px 10px;
+}
+
+.customer-withdrawal-lines-table td.col-line-no {
+  white-space: nowrap;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
 .customer-history-filter-panel {
   padding: 12px 16px 0;
   border-bottom: 1px solid var(--tgd-border);

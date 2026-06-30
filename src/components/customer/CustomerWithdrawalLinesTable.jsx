@@ -169,17 +169,17 @@ export function CustomerWithdrawalLinesTable({
       <table className="data-table customer-withdrawal-lines-table">
         <thead>
           <tr>
-            <th style={{ width: 36 }}>#</th>
-            <th style={{ minWidth: 200 }}>รหัสสินค้า <span className="field-required">*</span></th>
-            <th style={{ minWidth: 220 }}>อ้างอิงคงเหลือจาก (LOT/วันที่/หมายเหตุ)</th>
-            <th style={{ minWidth: 110 }}>วันผลิต</th>
-            <th style={{ minWidth: 110 }}>วันหมดอายุ</th>
-            <th style={{ minWidth: 140 }}>ระบุเป็น</th>
-            <th style={{ minWidth: 100 }}>กล่อง <span className="field-required">*</span></th>
-            <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
-            <th style={{ minWidth: 160 }}>แหล่งที่มา (ใบฝาก)</th>
-            <th style={{ minWidth: 180 }}>หมายเหตุ</th>
-            <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
+            <th className="col-line-no" style={{ width: 32, whiteSpace: 'nowrap' }}>#</th>
+            <th style={{ minWidth: 180 }}>รหัสสินค้า <span className="field-required">*</span></th>
+            <th style={{ minWidth: 170 }}>อ้างอิงคงเหลือจาก (LOT/วันที่/หมายเหตุ)</th>
+            <th style={{ minWidth: 130, whiteSpace: 'nowrap' }}>วันผลิต</th>
+            <th style={{ minWidth: 130, whiteSpace: 'nowrap' }}>วันหมดอายุ</th>
+            <th style={{ minWidth: 110, whiteSpace: 'nowrap' }}>ระบุเป็น</th>
+            <th style={{ minWidth: 80, whiteSpace: 'nowrap' }}>กล่อง <span className="field-required">*</span></th>
+            <th style={{ minWidth: 100, whiteSpace: 'nowrap' }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
+            <th style={{ minWidth: 140 }}>แหล่งที่มา (ใบฝาก)</th>
+            <th style={{ minWidth: 150 }}>หมายเหตุ</th>
+            <th style={{ width: 70, whiteSpace: 'nowrap' }}>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -225,7 +225,7 @@ export function CustomerWithdrawalLinesTable({
 
             return (
               <tr data-testid={rowTestId} key={line.key}>
-                <td style={{ textAlign: 'center', color: 'var(--tgd-muted-text)', fontWeight: 600 }}>{index + 1}</td>
+                <td className="col-line-no" style={{ textAlign: 'center', color: 'var(--tgd-muted-text)', fontWeight: 600 }}>{index + 1}</td>
 
                 {/* Product code dropdown */}
                 <td>
@@ -320,8 +320,11 @@ export function CustomerWithdrawalLinesTable({
                     <option value={WITHDRAWAL_QTY_MODES.BOXES}>ระบุกล่อง</option>
                   </select>
                   {!weightPerBox && (
-                    <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
-                      ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุทั้งสองค่า
+                    <div
+                      style={{ fontSize: 11, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' }}
+                      title="ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุทั้งสองค่า"
+                    >
+                      ⚠ ระบุทั้งสองค่า
                     </div>
                   )}
                 </td>
