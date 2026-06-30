@@ -21,20 +21,13 @@ const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', '
 
 const initialState = { rows: [], summary: null, loading: false, error: null };
 
-function buildFilters(customerId, dateFrom, dateTo) {
-  return {
-    customerId: customerId || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-  };
-}
-
 export function CustomerMovementLedgerPage() {
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
   const { session } = useAuth();
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
@@ -42,7 +35,6 @@ export function CustomerMovementLedgerPage() {
   const branding = getDocumentBrandingConfig();
   const printedBy = session?.user?.email ?? null;
 
-  // Fetch customer details once we know the customerId
   useEffect(() => {
     if (!customerId) return;
     getCustomers().then(({ data }) => {
@@ -63,7 +55,11 @@ export function CustomerMovementLedgerPage() {
     let isMounted = true;
     setState((cur) => ({ ...cur, loading: true, error: null }));
 
-    const filters = buildFilters(customerId, dateFrom, dateTo);
+    const filters = {
+      customerId: customerId || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    };
 
     Promise.all([
       getMovementLedgerRows(filters),
@@ -98,6 +94,24 @@ export function CustomerMovementLedgerPage() {
     return () => { isMounted = false; };
   }, [searched, customerId, profileLoading, dateFrom, dateTo]);
 
+  // Product options derived from loaded rows
+  const productOptions = searched && state.rows.length > 0
+    ? [...new Map(
+        state.rows
+          .filter((r) => r.product_name || r.customer_product_code)
+          .map((r) => [
+            r.product_id ?? r.customer_product_code,
+            { id: r.product_id ?? r.customer_product_code, label: r.product_name ?? r.customer_product_code },
+          ])
+      ).values()].sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
+    : [];
+
+  // Apply client-side product filter
+  const filteredRows = productFilter
+    ? state.rows.filter((r) => (r.product_id ?? r.customer_product_code) === productFilter)
+    : state.rows;
+
+  const filteredSummary = summarizeMovements(filteredRows);
   const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
 
   return (
@@ -112,6 +126,7 @@ export function CustomerMovementLedgerPage() {
         <div className="banner banner-warning" role="status">ไม่พบขอบเขตลูกค้า กรุณาติดต่อผู้ดูแลระบบ</div>
       ) : null}
 
+      {/* ── Filter form ── */}
       <form className="table-card no-print" style={{ padding: '20px 24px' }} onSubmit={handleSearch}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
@@ -132,39 +147,29 @@ export function CustomerMovementLedgerPage() {
               onChange={(e) => { setDateTo(e.target.value); setSearched(false); }}
             />
           </div>
+          {productOptions.length > 0 && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>สินค้า</label>
+              <select
+                className="form-input"
+                value={productFilter}
+                onChange={(e) => setProductFilter(e.target.value)}
+              >
+                <option value="">ทุกสินค้า</option>
+                {productOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button className="btn btn-primary" type="submit" disabled={!customerId || profileLoading}>
             ดูรายงาน
           </button>
-          {searched && state.rows.length > 0 && (
-            <ReportPrintActions
-              title="Entry-Delivery Inventory Report"
-              disabled={false}
-              orientation="landscape"
-              renderReport={(reportLanguage) => (
-                <InventoryMovementReportTemplate
-                  branding={branding}
-                  printedBy={printedBy}
-                  customerDetails={customerDetails}
-                  data={mapMovementLedgerToInventoryReportData({
-                    rows: state.rows,
-                    filters: {
-                      customer_name: customerLabel,
-                      customer_address: customerDetails?.address,
-                      date_from: dateFrom,
-                      date_to: dateTo,
-                    },
-                    summary: state.summary,
-                  })}
-                  language={reportLanguage}
-                />
-              )}
-            />
-          )}
-          {(dateFrom || dateTo) && (
+          {(dateFrom || dateTo || productFilter) && (
             <button
               className="btn btn-secondary"
               type="button"
-              onClick={() => { setDateFrom(''); setDateTo(''); setSearched(false); }}
+              onClick={() => { setDateFrom(''); setDateTo(''); setProductFilter(''); setSearched(false); }}
             >
               ล้างตัวกรอง
             </button>
@@ -178,30 +183,65 @@ export function CustomerMovementLedgerPage() {
         <div className="banner banner-danger" role="alert">{state.error.message ?? 'เกิดข้อผิดพลาด'}</div>
       ) : null}
 
-      {searched && !state.loading && state.summary ? (
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '16px 0' }}>
-          <div className="kpi-card">
-            <div className="kpi-value">{state.summary.totalMovementRows}</div>
-            <div className="kpi-label">รายการทั้งหมด</div>
+      {searched && !state.loading && filteredSummary.totalMovementRows > 0 ? (
+        <>
+          {/* ── KPI summary ── */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '16px 0' }}>
+            <div className="kpi-card">
+              <div className="kpi-value">{filteredSummary.totalMovementRows}</div>
+              <div className="kpi-label">รายการทั้งหมด</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-value" style={{ color: 'var(--tgd-success, #16a34a)' }}>+{filteredSummary.totalInboundQty}</div>
+              <div className="kpi-label">รับเข้า (ลัง)</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-value" style={{ color: 'var(--tgd-danger, #dc2626)' }}>-{filteredSummary.totalOutboundQty}</div>
+              <div className="kpi-label">เบิกออก (ลัง)</div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-value" style={{ color: 'var(--tgd-success, #16a34a)' }}>+{state.summary.totalInboundQty}</div>
-            <div className="kpi-label">รับเข้า (ลัง)</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-value" style={{ color: 'var(--tgd-danger, #dc2626)' }}>-{state.summary.totalOutboundQty}</div>
-            <div className="kpi-label">เบิกออก (ลัง)</div>
-          </div>
-        </div>
-      ) : null}
 
-      {searched && !state.loading ? (
-        <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
+          {/* ── Print action — below KPIs, above table ── */}
+          <div className="no-print" style={{ marginBottom: 12 }}>
+            <ReportPrintActions
+              title="Entry-Delivery Inventory Report"
+              disabled={false}
+              orientation="landscape"
+              renderReport={(reportLanguage) => (
+                <InventoryMovementReportTemplate
+                  branding={branding}
+                  printedBy={printedBy}
+                  customerDetails={customerDetails}
+                  data={mapMovementLedgerToInventoryReportData({
+                    rows: filteredRows,
+                    filters: {
+                      customer_name: customerLabel,
+                      customer_address: customerDetails?.address,
+                      date_from: dateFrom,
+                      date_to: dateTo,
+                    },
+                    summary: filteredSummary,
+                  })}
+                  language={reportLanguage}
+                />
+              )}
+            />
+          </div>
+
+          {/* ── Data table ── */}
+          <MovementLedgerTable data={filteredRows} loading={false} error={null} />
+        </>
       ) : null}
 
       {searched && !state.loading && state.rows.length === 0 && !state.error ? (
         <div className="banner banner-info" role="status" style={{ marginTop: 12 }}>
           ไม่พบข้อมูลการเคลื่อนไหวสินค้าในช่วงที่เลือก
+        </div>
+      ) : null}
+
+      {searched && !state.loading && state.rows.length > 0 && filteredRows.length === 0 ? (
+        <div className="banner banner-info" role="status" style={{ marginTop: 12 }}>
+          ไม่พบรายการสำหรับสินค้าที่เลือก — ลองเลือกสินค้าอื่นหรือดูทุกสินค้า
         </div>
       ) : null}
     </section>
