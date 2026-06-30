@@ -424,6 +424,7 @@ export function CustomerProductCatalogAdminPage() {
           productName: row.productName,
           internalProductCode: row.internalProductCode,
           uom: row.uom,
+          packWeightKg: row.packWeightKg,
           temperatureType: row.temperatureType,
           argentType: row.argentType,
           storageChargeBasis: row.storageChargeBasis,

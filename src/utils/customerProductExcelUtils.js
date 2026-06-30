@@ -5,6 +5,7 @@ export const CUSTOMER_PRODUCT_EXCEL_HEADERS = [
   'product_name',
   'barcode_code',
   'uom',
+  'pack_weight_kg',
   'temperature_type',
   'argent_type',
   'storage_charge_basis',
@@ -33,6 +34,7 @@ export function mapProductToExcelRow(product = {}) {
     product_name: product.product_name ?? '',
     barcode_code: normalizeCatalogBarcode(product),
     uom: product.uom ?? '',
+    pack_weight_kg: product.pack_weight_kg ?? '',
     temperature_type: product.temperature_type ?? 'FROZEN',
     argent_type: product.argent_type ?? 'NON_ARGENT',
     storage_charge_basis: product.storage_charge_basis ?? 'WEIGHT',
@@ -48,6 +50,7 @@ export function downloadCustomerProductTemplate(customer = null, filename = 'cus
         product_name: 'Sample product name',
         barcode_code: '',
         uom: 'KG',
+        pack_weight_kg: '1.500',
         temperature_type: 'FROZEN',
         argent_type: 'NON_ARGENT',
         storage_charge_basis: 'WEIGHT',
@@ -109,11 +112,23 @@ export async function parseCustomerProductImportFile(file) {
       return;
     }
 
+    const packWeightRaw = String(row.pack_weight_kg ?? '').trim();
+    let packWeightKg = null;
+    if (packWeightRaw) {
+      const parsedWeight = Number(packWeightRaw);
+      if (Number.isNaN(parsedWeight) || parsedWeight < 0) {
+        errors.push(`Row ${row.__row}: pack_weight_kg must be a number >= 0.`);
+        return;
+      }
+      packWeightKg = parsedWeight;
+    }
+
     parsed.push({
       customerProductCode,
       productName,
       internalProductCode: resolveBarcodeCode(customerProductCode, row.barcode_code),
       uom: String(row.uom ?? '').trim(),
+      packWeightKg,
       temperatureType,
       argentType,
       storageChargeBasis: chargeBasis,

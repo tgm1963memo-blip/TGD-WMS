@@ -64,7 +64,8 @@ export function OpeningBalanceImportPage() {
       <div className="section-card" style={{ marginBottom: 16 }}>
         <h3 style={{ marginBottom: 8, fontSize: 15 }}>ขั้นตอนที่ 1 — ดาวน์โหลด Template และกรอกข้อมูล</h3>
         <p style={{ fontSize: 13, color: 'var(--tgd-text-secondary)', marginBottom: 12 }}>
-          กรอกข้อมูลในไฟล์ Excel ตาม template คอลัมน์ที่จำเป็น: <strong>customer_product_code, location_code, qty_boxes</strong>
+          กรอกข้อมูลในไฟล์ Excel ตาม template คอลัมน์ที่จำเป็น: <strong>customer_product_code, product_name, qty_boxes</strong>
+          <br />ถ้าระบุ <strong>location_code</strong> ด้วย จะบันทึกยอดสต็อกลงระบบทันที หากไม่ระบุ จะสร้างข้อมูลสินค้าและ Lot เพื่อรอระบุ location ภายหลัง
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -87,13 +88,14 @@ export function OpeningBalanceImportPage() {
           <tbody>
             {[
               ['customer_product_code', 'รหัสสินค้าของลูกค้า', '✓', '10154-10'],
-              ['product_name', 'ชื่อสินค้า', '', 'หมูสามชั้นแช่แข็ง'],
+              ['product_name', 'ชื่อสินค้า', '✓', 'หมูสามชั้นแช่แข็ง'],
               ['lot_no', 'Lot Number', '', 'LOT-2025-001'],
               ['mfg_date', 'วันผลิต (YYYY-MM-DD)', '', '2025-01-15'],
               ['expiry_date', 'วันหมดอายุ (YYYY-MM-DD)', '', '2026-01-15'],
-              ['location_code', 'รหัส Location', '✓', 'A-L-01-1'],
               ['qty_boxes', 'จำนวน (ลัง)', '✓', '100'],
               ['weight_kg', 'น้ำหนัก (กก.)', '', '500'],
+              ['note', 'หมายเหตุ', '', 'นำเข้าจากเยอรมัน'],
+              ['location_code', 'รหัส Location (ถ้ามี)', '', 'A-L-01-1'],
             ].map(([col, desc, req, ex]) => (
               <tr key={col}>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', fontFamily: 'monospace' }}>{col}</td>
@@ -163,7 +165,7 @@ export function OpeningBalanceImportPage() {
             <table style={{ fontSize: 12, borderCollapse: 'collapse', width: '100%', minWidth: 700 }}>
               <thead>
                 <tr style={{ background: 'var(--tgd-surface-2, #f5f5f5)' }}>
-                  {['#', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot No', 'วันผลิต', 'วันหมดอายุ', 'Location', 'ลัง', 'น้ำหนัก (กก.)'].map((h) => (
+                  {['#', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot No', 'วันผลิต', 'วันหมดอายุ', 'ลัง', 'น้ำหนัก (กก.)', 'หมายเหตุ', 'Location'].map((h) => (
                     <th key={h} style={{ padding: '6px 10px', border: '1px solid var(--tgd-border)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -177,9 +179,12 @@ export function OpeningBalanceImportPage() {
                     <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)' }}>{row.lot_no ?? '-'}</td>
                     <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)' }}>{row.mfg_date ?? '-'}</td>
                     <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)' }}>{row.expiry_date ?? '-'}</td>
-                    <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', fontFamily: 'monospace' }}>{row.location_code}</td>
                     <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'right' }}>{row.qty_boxes}</td>
-                    <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'right' }}>{row.weight_kg}</td>
+                    <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'right' }}>{row.weight_kg || '-'}</td>
+                    <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', color: '#555' }}>{row.note ?? '-'}</td>
+                    <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', fontFamily: 'monospace', color: row.location_code ? 'inherit' : '#aaa' }}>
+                      {row.location_code ?? '(ระบุภายหลัง)'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
