@@ -9,6 +9,7 @@ import {
   ALL_ASSIGNABLE_ROLES,
   CUSTOMER_PORTAL_ROLES,
   createAuthUser,
+  deleteUserProfile,
   getUserProfiles,
   resetUserPassword,
   setUserProfileActive,
@@ -48,6 +49,8 @@ export function UserManagementPage() {
   const [resetRow, setResetRow] = useState(null);
   const [resetPwd, setResetPwd] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [deleteRow, setDeleteRow] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
@@ -105,6 +108,16 @@ export function UserManagementPage() {
             type="button"
           >
             {row.is_active ? '⏸' : '▶'}
+          </button>
+          <button
+            className="btn btn-danger icon-btn"
+            disabled={saving}
+            onClick={() => { setDeleteRow(row); setError(''); setSuccess(''); }}
+            title="ลบผู้ใช้"
+            aria-label="ลบผู้ใช้"
+            type="button"
+          >
+            🗑
           </button>
         </div>
       ),
@@ -175,6 +188,11 @@ export function UserManagementPage() {
   function closeResetModal() {
     setResetRow(null);
     setResetPwd('');
+    setError('');
+  }
+
+  function closeDeleteModal() {
+    setDeleteRow(null);
     setError('');
   }
 
@@ -274,6 +292,22 @@ export function UserManagementPage() {
     setSuccess(`รีเซตรหัสผ่านสำเร็จสำหรับ ${resetRow.email}`);
     setResetRow(null);
     setResetPwd('');
+  }
+
+  async function handleDeleteUser() {
+    if (!deleteRow) return;
+    setDeleting(true);
+    setError('');
+    setSuccess('');
+    const result = await deleteUserProfile(deleteRow.id);
+    setDeleting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'ลบผู้ใช้ไม่สำเร็จ');
+      return;
+    }
+    setSuccess(`ลบผู้ใช้ ${deleteRow.email} แล้ว — ประวัติการทำงานยังถูกเก็บไว้`);
+    setDeleteRow(null);
+    await loadData();
   }
 
   if (!loading && !canManage) {
@@ -445,6 +479,20 @@ export function UserManagementPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(deleteRow)} onClose={closeDeleteModal} title="ลบผู้ใช้" size="sm">
+        {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
+        <p>{'ยืนยันลบผู้ใช้ '}<strong>{deleteRow?.email}</strong>{' ?'}</p>
+        <p className="form-helper">
+          ผู้ใช้จะถูกปิดใช้งานและซ่อนออกจากรายการ แต่ประวัติการทำงานทั้งหมดของผู้ใช้นี้จะยังถูกเก็บไว้ในระบบ
+        </p>
+        <div className="action-row">
+          <button className="btn btn-secondary" onClick={closeDeleteModal} type="button">{t('close')}</button>
+          <button className="btn btn-danger" disabled={deleting} onClick={handleDeleteUser} type="button">
+            {deleting ? 'กำลังลบ...' : 'ยืนยันลบผู้ใช้'}
+          </button>
+        </div>
       </Modal>
 
       <DataTable

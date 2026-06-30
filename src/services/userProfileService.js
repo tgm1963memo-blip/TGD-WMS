@@ -46,8 +46,12 @@ export async function getUserProfiles(filters = {}) {
 
   let query = supabase
     .from('tgd_user_profiles')
-    .select('id, auth_user_id, email, display_name, first_name, last_name, role, customer_id, is_active, pin_code, created_at, updated_at')
+    .select('id, auth_user_id, email, display_name, first_name, last_name, role, customer_id, is_active, is_deleted, pin_code, created_at, updated_at')
     .order('email', { ascending: true });
+
+  if (!filters.includeDeleted) {
+    query = query.eq('is_deleted', false);
+  }
 
   if (filters.role) {
     query = query.eq('role', filters.role);

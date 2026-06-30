@@ -131,3 +131,14 @@ export async function setUserProfileActive(profileId, isActive) {
   if (error) return { data: null, error };
   return { data: normalizeCustomerPortalRpcData(data), error: null };
 }
+
+export async function deleteUserProfile(profileId) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_admin_delete_user_profile', {
+    p_profile_id: profileId,
+  });
+
+  if (error) return { data: null, error };
+  return { data: normalizeCustomerPortalRpcData(data), error: null };
+}

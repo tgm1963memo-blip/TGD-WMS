@@ -5,9 +5,9 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 
-// Previously applied: 053–088 (applied via earlier runs of this script)
+// Previously applied: 053–089 (applied via earlier runs of this script)
 const MIGRATIONS = [
-  '089_add_receipt_variance_flag.sql',
+  '090_add_user_profile_soft_delete.sql',
 ];
 
 function runSql(sql, label) {
