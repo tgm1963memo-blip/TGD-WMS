@@ -80,7 +80,11 @@ export function CustomerMovementLedgerPage() {
       ].sort((a, b) => {
         const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
         const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
-        return aTime - bTime;
+        if (aTime !== bTime) return aTime - bTime;
+        // Same date: inbound (RECEIVE_CONFIRM) before outbound (DISPATCH)
+        const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+        const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+        return aOut - bOut;
       });
 
       setState({

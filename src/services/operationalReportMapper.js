@@ -112,8 +112,13 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     };
   });
 
-  // Sort by date oldest → newest, then compute running balance per lot key
-  mappedLines.sort((a, b) => (a._sortKey < b._sortKey ? -1 : a._sortKey > b._sortKey ? 1 : 0));
+  // Sort by date oldest → newest; on same date put inbound before outbound
+  mappedLines.sort((a, b) => {
+    if (a._sortKey !== b._sortKey) return a._sortKey < b._sortKey ? -1 : 1;
+    const aOut = a.deliveryVolume > 0 ? 1 : 0;
+    const bOut = b.deliveryVolume > 0 ? 1 : 0;
+    return aOut - bOut;
+  });
 
   const lotBalances = {}; // lotKey → { vol, weight }
   mappedLines.forEach((line) => {

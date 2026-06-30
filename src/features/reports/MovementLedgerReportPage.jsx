@@ -127,11 +127,14 @@ export function MovementLedgerReportPage() {
         }
       }
 
-      // Merge and sort by movement_date ascending (ledger order)
+      // Merge and sort by movement_date ascending; same date: inbound before outbound
       let rows = [...depositRows, ...withdrawalRows, ...outboundRows].sort((a, b) => {
         const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
         const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
-        return aTime - bTime;
+        if (aTime !== bTime) return aTime - bTime;
+        const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+        const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+        return aOut - bOut;
       });
 
       // Enrich with display names

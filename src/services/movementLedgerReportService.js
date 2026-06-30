@@ -126,8 +126,11 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
 
   const rows = [];
   for (const req of (data ?? [])) {
-    const receiptDate = req.expected_arrival_date ??
-      (req.last_action_at ? req.last_action_at.split('T')[0] : null);
+    // Use actual confirmation date (last_action_at) so the row sorts chronologically
+    // after the deposit was truly received, not by the customer's planned arrival date.
+    const receiptDate = req.last_action_at
+      ? req.last_action_at.split('T')[0]
+      : req.expected_arrival_date ?? null;
 
     const confirmedLines = (req.tgd_customer_deposit_request_lines ?? [])
       .filter((l) => l.actual_boxes != null && Number(l.actual_boxes) > 0);
