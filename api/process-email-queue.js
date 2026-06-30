@@ -103,7 +103,7 @@ export default async function handler(req, res) {
               <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px;">
                 <tr>
                   <td style="width:52px;height:52px;background-color:#eff6ff;border-radius:50%;text-align:center;vertical-align:middle;font-size:24px;line-height:52px;">
-                    🔔
+                    &#128276;
                   </td>
                 </tr>
               </table>
