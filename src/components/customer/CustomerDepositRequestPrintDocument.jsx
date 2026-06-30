@@ -1,16 +1,27 @@
-import { DocumentHeader } from '../documents/DocumentHeader.jsx';
+import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
+import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 
-function fmtDate(iso) {
-  if (!iso) return '-';
-  try { return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }); }
-  catch { return iso; }
+function fmt(v) { return v != null && v !== '' ? v : '-'; }
+function fmtDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const p = s.split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
+}
+function fmtDT(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
 }
 
-const TH = { border: '1px solid #bbb', padding: '5px 7px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 };
-const TD = { border: '1px solid #bbb', padding: '5px 7px', fontSize: 10 };
-const META_LABEL = { fontWeight: 600, fontSize: 12, paddingRight: 8 };
-const META_VALUE = { fontSize: 12 };
+const TH = { border: '1px solid #bbb', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' };
+const TD = { border: '1px solid #bbb', padding: '4px 6px', fontSize: 10 };
+const MK = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingRight: 4, paddingBottom: 2 };
+const MV = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 export function CustomerDepositRequestPrintDocument({
   header,
@@ -22,92 +33,173 @@ export function CustomerDepositRequestPrintDocument({
 
   const t = (key) => getTranslation(key, language);
 
+  const norm = normalizeDocumentBrandingConfig(branding ?? getDefaultDocumentBranding());
+  const companyName = norm[`company_name_${language}`] || norm.company_name_th || norm.company_name_en || '';
+
+  const customer = header.customer ?? {};
+  const customerName = header.customer_name ?? customer.customer_name ?? customer.name ?? '-';
+  const customerAddress = header.customer_address ?? customer.address ?? '-';
+  const customerPhone = header.contact_phone ?? customer.phone ?? '-';
+  const customerFax = header.contact_fax ?? customer.fax ?? '-';
+
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const hasLot    = lines.some((l) => l.lot_no || l.mfg_date || l.exp_date);
 
-  const colCount = 7 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0);
+  const colCount = 5 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + 1;
+
+  // Signature data
+  const issuedBy = header.reviewed_by_email ?? null;
+  const issuedAt = fmtDT(header.reviewed_at);
+  const receivedBy = header.handheld_received_by_email ?? null;
+  const receivedAt = (receivedBy && header.last_action_at && !header.web_approved_by_email)
+    ? fmtDT(header.last_action_at) : null;
+  const approvedBy = header.web_approved_by_email ?? null;
+  const approvedAt = approvedBy ? fmtDT(header.last_action_at) : null;
+
+  const SigBox = ({ label, sublabel, name, dt }) => (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ minHeight: 28 }} />
+      <div style={{ borderTop: '1px solid #000', paddingTop: 3, fontWeight: 700, fontSize: 10 }}>{label}</div>
+      {sublabel && <div style={{ fontSize: 9, color: '#666', marginTop: 1 }}>{sublabel}</div>}
+      <div style={{ color: '#333', fontSize: 10, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {name ?? <span style={{ color: '#bbb' }}>____________________</span>}
+      </div>
+      <div style={{ color: '#888', fontSize: 9 }}>{dt ?? ''}</div>
+    </div>
+  );
 
   return (
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-deposit-print-document"
-      style={{ padding: 0 }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
     >
+      {/* ── Compact page header ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '3mm 0 3mm', borderBottom: '2px solid #000', marginBottom: 8, gap: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+          {norm.logo_url && (
+            <img src={norm.logo_url} alt="logo" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+          )}
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={{ fontWeight: 800, fontSize: 12 }}>{companyName}</div>
+            {norm.tax_id && (
+              <div style={{ fontSize: 10, color: '#555' }}>เลขประจำตัวผู้เสียภาษี: {norm.tax_id}</div>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_print_title')}</div>
+          <div style={{ fontSize: 11, color: '#333' }}>
+            {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
+            {header.created_at && (
+              <span style={{ marginLeft: 10 }}>
+                {getTranslation('document_date', language) || 'วันที่'}: {fmtDate(header.created_at)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── RECEIVING INFORMATION meta table ── */}
+      <div style={{ borderBottom: '2px solid #ccc', marginBottom: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 6, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '36%' }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td style={MK}>CUSTOMER NAME</td>
+              <td style={MV}>{fmt(customerName)}</td>
+              <td style={MK}>ATTN</td>
+              <td style={MV}>{fmt(header.contact_name)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>ADDRESS</td>
+              <td colSpan={3} style={{ ...MV, whiteSpace: 'normal' }}>{fmt(customerAddress)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>TEL</td>
+              <td style={MV}>{fmt(customerPhone)}</td>
+              <td style={MK}>FAX</td>
+              <td style={MV}>{fmt(customerFax)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>RECEIVE DATE</td>
+              <td style={MV}>{fmtDate(header.expected_arrival_date)}</td>
+              <td style={{ ...MK, fontSize: 10 }}>OPERATION DATE</td>
+              <td style={MV}>{fmtDate(header.created_at)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>ARR / START / FINISH</td>
+              <td style={MV}>{fmt(header.arrival_time)}{header.start_time ? ` / ${header.start_time}` : ''}{header.finish_time ? ` / ${header.finish_time}` : ''}</td>
+              <td style={MK}>SEAL NO</td>
+              <td style={MV}>{fmt(header.seal_no)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>GOODS TEMP</td>
+              <td style={MV}>{fmt(header.goods_temp)}</td>
+              <td style={MK}>TRUCK / CON. TEMP</td>
+              <td style={MV}>{fmt(header.truck_temp)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>TRUCK & CONTAINER NO</td>
+              <td style={MV}>{fmt(header.vehicle_registration)}</td>
+              <td style={MK}>RECEIVE FROM</td>
+              <td style={MV}>{fmt(header.receive_from)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>สถานะ</td>
+              <td style={MV}>{getDepositStatusLabel(header.status, t) || fmt(header.status)}</td>
+              <td style={MK}>REMARK</td>
+              <td style={{ ...MV, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmt(header.note)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Lines table ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <thead>
-          {/* Document header + meta — repeats on every page */}
-          <tr>
-            <td colSpan={colCount} style={{ padding: '8mm', borderBottom: '2px solid #ccc' }}>
-              <DocumentHeader
-                branding={branding}
-                documentDate={header.created_at ? new Date(header.created_at).toLocaleDateString('en-GB') : '-'}
-                documentNo={header.request_no}
-                documentTitle={t('customer_deposit_print_title')}
-                language={language}
-              />
-
-              {/* Document meta */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 12 }}>
-                <tbody>
-                  <tr>
-                    <td style={META_LABEL}>{t('customer_col_status')}:</td>
-                    <td style={META_VALUE}>{header.status}</td>
-                    <td style={META_LABEL}>{t('customer_field_expected_arrival_date')}:</td>
-                    <td style={META_VALUE}>{header.expected_arrival_date ?? '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style={META_LABEL}>{t('customer_field_contact_name')}:</td>
-                    <td style={META_VALUE}>{header.contact_name ?? '-'}</td>
-                    <td style={META_LABEL}>{t('customer_field_contact_phone')}:</td>
-                    <td style={META_VALUE}>{header.contact_phone ?? '-'}</td>
-                  </tr>
-                  {header.note ? (
-                    <tr>
-                      <td style={META_LABEL}>{t('customer_col_note')}:</td>
-                      <td colSpan={3} style={META_VALUE}>{header.note}</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </td>
-          </tr>
-
-          {/* Column headers */}
           <tr>
             <th style={{ ...TH, width: '4%', textAlign: 'center' }}>#</th>
-            <th style={{ ...TH, width: '12%' }}>{t('catalog_col_customer_code')}</th>
-            <th style={{ ...TH, width: hasLot ? '19%' : '25%' }}>{t('catalog_col_product_name')}</th>
-            <th style={{ ...TH, width: '9%', textAlign: 'right' }}>{t('customer_col_weight_per_box')}</th>
-            <th style={{ ...TH, width: '9%', textAlign: 'right' }}>{t('customer_col_total_deposit_weight')}</th>
-            <th style={{ ...TH, width: '7%', textAlign: 'center' }}>{t('customer_col_box_count')}</th>
-            {hasLot && <th style={{ ...TH, width: '8%' }}>เลข LOT</th>}
+            <th style={{ ...TH, width: '11%' }}>{t('catalog_col_customer_code')}</th>
+            <th style={{ ...TH, width: hasLot ? '18%' : '24%' }}>{t('catalog_col_product_name')}</th>
+            <th style={{ ...TH, width: '8%', textAlign: 'right' }}>กก./หน่วย</th>
+            <th style={{ ...TH, width: '8%', textAlign: 'right' }}>กก.ฝาก</th>
+            <th style={{ ...TH, width: '6%', textAlign: 'center' }}>กล่อง</th>
+            {hasLot && <th style={{ ...TH, width: '7%' }}>LOT</th>}
             {hasLot && <th style={{ ...TH, width: '8%', textAlign: 'center' }}>วันผลิต</th>}
             {hasLot && <th style={{ ...TH, width: '8%', textAlign: 'center' }}>วันหมดอายุ</th>}
-            {hasActual && <th style={{ ...TH, width: '7%', textAlign: 'center' }}>รับจริง (กล่อง)</th>}
-            {hasActual && <th style={{ ...TH, width: '7%', textAlign: 'right' }}>รับจริง (กก.)</th>}
+            {hasActual && <th style={{ ...TH, width: '6%', textAlign: 'center' }}>รับจริง<br />(กล่อง)</th>}
+            {hasActual && <th style={{ ...TH, width: '6%', textAlign: 'right' }}>รับจริง<br />(กก.)</th>}
             <th style={{ ...TH, width: hasActual ? '10%' : '14%' }}>{t('customer_col_line_note')}</th>
           </tr>
         </thead>
-
         <tbody>
           {lines.length ? lines.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
-              <td style={{ ...TD, textAlign: 'center' }}>{line.line_no}</td>
-              <td style={TD}>{line.customer_product_code ?? '-'}</td>
+              <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{line.line_no}</td>
+              <td style={{ ...TD, whiteSpace: 'nowrap' }}>{line.customer_product_code ?? '-'}</td>
               <td style={TD}>{line.product_name ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'right' }}>{line.weight_per_box ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'center' }}>{line.expected_boxes ?? '-'}</td>
-              {hasLot && <td style={{ ...TD, fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
+              <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.weight_per_box ?? '-'}</td>
+              <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.expected_weight ?? '-'}</td>
+              <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{line.expected_boxes ?? '-'}</td>
+              {hasLot && <td style={{ ...TD, whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
               {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.exp_date)}</td>}
               {hasActual && (
-                <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: line.actual_boxes != null ? '#16a34a' : undefined }}>
+                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 700, color: line.actual_boxes != null ? '#16a34a' : undefined }}>
                   {line.actual_boxes ?? '-'}
                 </td>
               )}
               {hasActual && (
-                <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: line.actual_weight != null ? '#16a34a' : undefined }}>
+                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, color: line.actual_weight != null ? '#16a34a' : undefined }}>
                   {line.actual_weight ?? '-'}
                 </td>
               )}
@@ -122,6 +214,33 @@ export function CustomerDepositRequestPrintDocument({
           )}
         </tbody>
       </table>
+
+      {/* ── Spacer ── */}
+      <div style={{ flex: '1 1 auto' }} />
+
+      {/* ── Signature section ── */}
+      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32, marginBottom: 4 }}>
+          <SigBox
+            label="Issue / Checked by"
+            sublabel="พนักงาน TGC ผู้เปิดใบงาน"
+            name={issuedBy}
+            dt={issuedAt}
+          />
+          <SigBox
+            label="Received by"
+            sublabel="พนักงานที่รับสินค้า (Handheld)"
+            name={receivedBy}
+            dt={receivedAt}
+          />
+          <SigBox
+            label="Approved by"
+            sublabel="พนักงานที่ยืนยันส่งลูกค้า"
+            name={approvedBy}
+            dt={approvedAt}
+          />
+        </div>
+      </div>
     </article>
   );
 }
