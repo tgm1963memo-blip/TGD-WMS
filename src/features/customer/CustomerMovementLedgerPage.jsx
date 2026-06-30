@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { MovementLedgerTable } from '../../components/reports/MovementLedgerTable.jsx';
+import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
+import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import {
   getMovementLedgerRows,
@@ -9,7 +11,11 @@ import {
   getConfirmedWithdrawalRows,
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
+import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
+import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
+import { getCustomers } from '../../services/masterDataService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
 
@@ -25,11 +31,25 @@ function buildFilters(customerId, dateFrom, dateTo) {
 
 export function CustomerMovementLedgerPage() {
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
+  const { session } = useAuth();
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState(null);
+
+  const branding = getDocumentBrandingConfig();
+  const printedBy = session?.user?.email ?? null;
+
+  // Fetch customer details once we know the customerId
+  useEffect(() => {
+    if (!customerId) return;
+    getCustomers().then(({ data }) => {
+      const cust = (data ?? []).find((c) => c.id === customerId);
+      setCustomerDetails(cust ?? null);
+    });
+  }, [customerId]);
 
   function handleSearch(e) {
     e.preventDefault();
@@ -78,6 +98,8 @@ export function CustomerMovementLedgerPage() {
     return () => { isMounted = false; };
   }, [searched, customerId, profileLoading, dateFrom, dateTo]);
 
+  const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-movement-ledger-page">
       <PageHeader
@@ -114,24 +136,29 @@ export function CustomerMovementLedgerPage() {
             ดูรายงาน
           </button>
           {searched && state.rows.length > 0 && (
-            <button
-              className="btn btn-secondary no-print"
-              type="button"
-              onClick={() => {
-                const style = document.createElement('style');
-                style.textContent = [
-                  '@page { size: A4 landscape; margin: 8mm; }',
-                  '[data-testid="customer-movement-ledger-page"],',
-                  '[data-testid="customer-movement-ledger-page"] * { visibility: visible !important; }',
-                  '[data-testid="customer-movement-ledger-page"] { position: absolute; inset: 0; background: #fff; }',
-                ].join(' ');
-                document.head.appendChild(style);
-                window.print();
-                document.head.removeChild(style);
-              }}
-            >
-              พิมพ์ (แนวนอน)
-            </button>
+            <ReportPrintActions
+              title="Entry-Delivery Inventory Report"
+              disabled={false}
+              orientation="landscape"
+              renderReport={(reportLanguage) => (
+                <InventoryMovementReportTemplate
+                  branding={branding}
+                  printedBy={printedBy}
+                  customerDetails={customerDetails}
+                  data={mapMovementLedgerToInventoryReportData({
+                    rows: state.rows,
+                    filters: {
+                      customer_name: customerLabel,
+                      customer_address: customerDetails?.address,
+                      date_from: dateFrom,
+                      date_to: dateTo,
+                    },
+                    summary: state.summary,
+                  })}
+                  language={reportLanguage}
+                />
+              )}
+            />
           )}
           {(dateFrom || dateTo) && (
             <button
