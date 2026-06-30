@@ -90,13 +90,17 @@ export async function checkLocationHasInventory(locationId) {
     return true;
   }
 
-  // Check unconfirmed deposit lines
+  // Check deposit lines at this location (any active status — unconfirmed or already confirmed)
   if (!supabase) return false;
   const { data: lines, error } = await supabase
     .from('tgd_customer_deposit_request_lines')
     .select('id, tgd_customer_deposit_requests!inner(status)')
     .eq('location_id', locationId)
-    .in('tgd_customer_deposit_requests.status', ['DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'])
+    .in('tgd_customer_deposit_requests.status', [
+      'DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED',
+      'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW',
+      'ADMIN_RECOUNT_REQUESTED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED',
+    ])
     .limit(1);
 
   if (!error && lines && lines.length > 0) {
