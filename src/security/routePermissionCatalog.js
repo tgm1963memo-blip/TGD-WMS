@@ -34,6 +34,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/admin/product-service-rates', route_name: 'CustomerProductServiceRatesPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
   { route_path: '/admin/role-permissions', route_name: 'RolePermissionsAdminPage', permission_area: 'user_management', minimum_role: 'admin', access_level: 'admin', notes: '' },
   { route_path: '/admin/auth-readiness', route_name: 'AuthReadinessPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
+  { route_path: '/admin/opening-balance-import', route_name: 'OpeningBalanceImportPage', permission_area: 'admin', minimum_role: 'warehouse_admin', access_level: 'write', notes: 'Import initial stock from Excel' },
   { route_path: '/settings/profile', route_name: 'ProfileSettingsPage', permission_area: 'admin', minimum_role: 'viewer', access_level: 'read', notes: '' },
   { route_path: '/settings/change-password', route_name: 'ChangePasswordPage', permission_area: 'admin', minimum_role: 'viewer', access_level: 'read', notes: '' },
   { route_path: '/settings/email', route_name: 'EmailSettingsPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
