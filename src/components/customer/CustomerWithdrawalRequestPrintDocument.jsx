@@ -1,4 +1,4 @@
-import { DocumentHeader } from '../documents/DocumentHeader.jsx';
+import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
@@ -52,18 +52,44 @@ export function CustomerWithdrawalRequestPrintDocument({
       data-testid="customer-withdrawal-print-document"
       style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
     >
-      {/* ── Page header: company info + delivery meta ── */}
-      <div style={{ padding: '4mm 0 3mm', borderBottom: '2px solid #ccc', marginBottom: 6 }}>
-        <DocumentHeader
-          branding={branding}
-          documentDate={docDate}
-          documentNo={header.withdrawal_no ?? header.request_no}
-          documentTitle={t('customer_withdrawal_print_title')}
-          language={language}
-        />
+      {/* ── Compact page header ── */}
+      {(() => {
+        const norm = normalizeDocumentBrandingConfig(branding ?? getDefaultDocumentBranding());
+        const companyName = norm[`company_name_${language}`] || norm.company_name_th || norm.company_name_en || '';
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '3mm 0 3mm', borderBottom: '2px solid #000', marginBottom: 8, gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+              {norm.logo_url && (
+                <img src={norm.logo_url} alt="logo" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+              )}
+              <div style={{ lineHeight: 1.3 }}>
+                <div style={{ fontWeight: 800, fontSize: 12 }}>{companyName}</div>
+                {norm.tax_id && (
+                  <div style={{ fontSize: 10, color: '#555' }}>เลขประจำตัวผู้เสียภาษี: {norm.tax_id}</div>
+                )}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_withdrawal_print_title')}</div>
+              <div style={{ fontSize: 11, color: '#333' }}>
+                {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.withdrawal_no ?? header.request_no}</strong>
+                {docDate && docDate !== '-' && (
+                  <span style={{ marginLeft: 10 }}>
+                    {getTranslation('document_date', language) || 'วันที่'}: {docDate}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
-        {/* Delivery meta */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 8, tableLayout: 'fixed' }}>
+      {/* ── Delivery meta ── */}
+      <div style={{ borderBottom: '2px solid #ccc', marginBottom: 6 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 6, tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '16%' }} />
             <col style={{ width: '34%' }} />
@@ -114,7 +140,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             {header.note ? (
               <tr>
                 <td style={META_KEY}>REMARK</td>
-                <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{header.note}</td>
+                <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.note}</td>
               </tr>
             ) : null}
           </tbody>
@@ -211,9 +237,12 @@ export function CustomerWithdrawalRequestPrintDocument({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
           {sigs.map(({ label, name, dt }) => (
             <div key={label} style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: 4, fontWeight: 700 }}>{label}</div>
-              <div style={{ color: '#444', fontSize: 9, marginTop: 2 }}>{name ?? '____________________'}</div>
-              {dt && <div style={{ color: '#888', fontSize: 8 }}>{dt}</div>}
+              <div style={{ minHeight: 20 }} />
+              <div style={{ borderTop: '1px solid #000', paddingTop: 3, fontWeight: 700, fontSize: 10 }}>{label}</div>
+              <div style={{ color: '#444', fontSize: 9, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {name ?? <span style={{ color: '#bbb' }}>____________________</span>}
+                {dt && <span style={{ color: '#888', marginLeft: 4 }}>{dt}</span>}
+              </div>
             </div>
           ))}
         </div>
