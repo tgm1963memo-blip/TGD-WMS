@@ -263,6 +263,8 @@ export function InventoryBalancePage() {
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กล่อง)</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กก.)</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุลูกค้า</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุ Admin</th>
                               <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รายละเอียด</th>
                             </tr>
                           </thead>
@@ -289,6 +291,18 @@ export function InventoryBalancePage() {
                                   {l.actual_weight?.toLocaleString() ?? (
                                     <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
                                   )}
+                                </td>
+                                <td
+                                  style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={l.note ?? ''}
+                                >
+                                  {l.note ?? '-'}
+                                </td>
+                                <td
+                                  style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={l.actual_note ?? ''}
+                                >
+                                  {l.actual_note ?? '-'}
                                 </td>
                                 <td style={{ padding: '16px 16px', textAlign: 'center' }}>
                                   {l.request?.id && (

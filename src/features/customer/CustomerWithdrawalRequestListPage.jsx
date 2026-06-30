@@ -174,7 +174,7 @@ export function CustomerWithdrawalRequestListPage() {
                 <th>{t('customer_field_requested_dispatch_date')}</th>
                 <th>{t('customer_field_delivery_type')}</th>
                 <th>{t('customer_field_pickup_contact')}</th>
-                <th onClick={() => requestSort('note')} style={{ cursor: 'pointer' }}>{t('customer_col_note')} {getSortIndicator('note')}</th>
+                <th onClick={() => requestSort('note')} style={{ cursor: 'pointer', maxWidth: 140 }}>{t('customer_col_note')} {getSortIndicator('note')}</th>
                 <th onClick={() => requestSort('updated_at')} style={{ cursor: 'pointer' }}>{t('customer_history_latest_action')} {getSortIndicator('updated_at')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
@@ -209,7 +209,25 @@ export function CustomerWithdrawalRequestListPage() {
                   <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>{row.pickup_contact ?? '-'}</td>
-                  <td>{row.note || '-'}</td>
+                  <td style={{ maxWidth: 140 }}>
+                    {row.note ? (
+                      row.note.length > 24 ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }} title={row.note}>
+                            {row.note}
+                          </span>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openDetail(row)}
+                            style={{ flexShrink: 0, padding: '2px 8px', fontSize: 11 }}
+                            type="button"
+                          >
+                            ดูรายละเอียด
+                          </button>
+                        </span>
+                      ) : row.note
+                    ) : '-'}
+                  </td>
                   <td>
                     <small>{formatDocumentDate(row.last_action_at)}</small>
                   </td>

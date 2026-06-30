@@ -226,7 +226,9 @@ export function CustomerStockBalancePage() {
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันผลิต</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันหมดอายุ</th>
                             <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กล่อง)</th>
-                            <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กก.)</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กก.)</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, maxWidth: 140 }}>หมายเหตุลูกค้า</th>
+                            <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, maxWidth: 140 }}>หมายเหตุ Admin</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -248,10 +250,22 @@ export function CustomerStockBalancePage() {
                                   <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_boxes ?? '-'}</span>
                                 )}
                               </td>
-                              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
                                 {l.actual_weight?.toLocaleString() ?? (
                                   <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
                                 )}
+                              </td>
+                              <td
+                                style={{ padding: '10px 12px', color: 'var(--tgd-muted-text)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={l.note ?? ''}
+                              >
+                                {l.note ?? '-'}
+                              </td>
+                              <td
+                                style={{ padding: '10px 16px', color: 'var(--tgd-muted-text)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={l.actual_note ?? ''}
+                              >
+                                {l.actual_note ?? '-'}
                               </td>
                             </tr>
                           ))}

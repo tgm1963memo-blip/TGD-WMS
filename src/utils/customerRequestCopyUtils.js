@@ -106,13 +106,17 @@ export function mapWithdrawalLinesForCopy(sourceLines = [], catalogProducts = []
     product_code: line.internal_product_code ?? '',
     product_name: line.product_name ?? '',
     source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
+    identifier_type: 'LOT',
+    identifier_value: line.source_lot_no ?? line.lot_no ?? '',
     lot_no: line.source_lot_no ?? line.lot_no ?? '',
     mfg_date: line.mfg_date ?? '',
     exp_date: line.exp_date ?? '',
+    withdrawal_qty_mode: String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT',
     requested_qty: toFormValue(line.requested_qty),
     requested_boxes: toFormValue(line.requested_boxes),
     requested_weight: toFormValue(line.requested_weight),
     picking_rule: line.picking_rule ?? 'FEFO',
+    note: line.note ?? '',
   }));
 
   if (!copied.length) {

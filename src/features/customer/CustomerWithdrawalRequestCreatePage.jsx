@@ -27,6 +27,7 @@ import {
   createEmptyWithdrawalLine,
   createInitialWithdrawalLines,
   getFilledWithdrawalLines,
+  getMatchedDepositLine,
   WITHDRAWAL_LINE_DEFAULT_COUNT,
 } from '../../utils/customerWithdrawalLineDefaults.js';
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
@@ -173,13 +174,17 @@ export function CustomerWithdrawalRequestCreatePage() {
           product_id: line.product_id ?? '',
           product_name: line.product_name ?? '',
           source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
+          identifier_type: 'LOT',
+          identifier_value: line.source_lot_no ?? line.lot_no ?? '',
           lot_no: line.source_lot_no ?? line.lot_no ?? '',
           mfg_date: line.mfg_date ?? '',
           exp_date: line.exp_date ?? '',
+          withdrawal_qty_mode: String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT',
           requested_qty: String(line.requested_qty ?? ''),
           requested_boxes: String(line.requested_boxes ?? ''),
           requested_weight: String(line.requested_weight ?? ''),
           picking_rule: line.picking_rule ?? 'FEFO',
+          note: line.note ?? '',
         }));
 
         const padded = [...editLines];
@@ -306,12 +311,25 @@ export function CustomerWithdrawalRequestCreatePage() {
         return;
       }
 
+      const allDepositLines = Object.values(depositLinesMap).flat();
+
       for (let i = 0; i < activeLines.length; i++) {
         const line = activeLines[i];
         const lot = normalizeLotNo(line.lot_no);
         if (!lot && !line.source_deposit_request_id) {
-          setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่ระบุ LOT กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
+          setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่สามารถระบุ LOT ที่ชัดเจนได้ กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
           return;
+        }
+
+        const matchedDepositLine = getMatchedDepositLine(line, allDepositLines);
+        const weightPerBox = matchedDepositLine?.weight_per_box ? Number(matchedDepositLine.weight_per_box) : null;
+        if (!weightPerBox) {
+          const boxesFilled = String(line.requested_boxes ?? '').trim() !== '';
+          const weightFilled = String(line.requested_weight ?? '').trim() !== '';
+          if (!boxesFilled || !weightFilled) {
+            setSubmitError(`รายการที่ ${i + 1}: ไม่ทราบน้ำหนักต่อกล่อง กรุณาระบุทั้งจำนวนกล่องและน้ำหนัก`);
+            return;
+          }
         }
       }
 
@@ -385,7 +403,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           requestedBoxes: line.requested_boxes,
           requestedWeight: line.requested_weight,
           pickingRule: line.picking_rule,
-          note: header.note,
+          note: line.note,
         });
 
         if (lineResult.error) {

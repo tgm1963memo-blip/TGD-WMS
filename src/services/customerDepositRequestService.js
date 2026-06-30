@@ -95,6 +95,8 @@ export async function getCustomerStockBalance(customerId) {
     // expose balance values as the display columns
     actual_boxes: r.balance_boxes,
     actual_weight: r.balance_weight,
+    note: r.note,
+    actual_note: r.actual_note,
   }));
 
   return { data: rows, error: null };
@@ -118,6 +120,8 @@ export async function getAllCustomerStockBalances() {
     },
     actual_boxes: r.balance_boxes,
     actual_weight: r.balance_weight,
+    note: r.note,
+    actual_note: r.actual_note,
   }));
 
   return { data: rows, error: null };

@@ -2,8 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import {
+  NULL_LOT_SENTINEL,
+  WITHDRAWAL_IDENTIFIER_TYPES,
+  WITHDRAWAL_QTY_MODES,
+  getIdentifierMatchedDepositLines,
+  getMatchedDepositLine,
+  getProductMatchedDepositLines,
+} from '../../utils/customerWithdrawalLineDefaults.js';
 
-const NULL_LOT_SENTINEL = '__null_lot__';
+const IDENTIFIER_TYPE_LABELS = {
+  [WITHDRAWAL_IDENTIFIER_TYPES.LOT]: 'LOT',
+  [WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE]: 'วันผลิต',
+  [WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE]: 'วันหมดอายุ',
+  [WITHDRAWAL_IDENTIFIER_TYPES.NOTE]: 'หมายเหตุ (admin)',
+};
 
 export function CustomerWithdrawalLinesTable({
   customerId,
@@ -64,6 +77,11 @@ export function CustomerWithdrawalLinesTable({
         product_name: '',
         temperature_type: 'FROZEN',
         argent_type: '',
+        identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.LOT,
+        identifier_value: '',
+        lot_no: '',
+        mfg_date: '',
+        exp_date: '',
       });
       return;
     }
@@ -75,32 +93,58 @@ export function CustomerWithdrawalLinesTable({
       product_name: product.product_name ?? '',
       temperature_type: product.temperature_type ?? 'FROZEN',
       argent_type: product.argent_type ?? 'NON_ARGENT',
+      identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.LOT,
+      identifier_value: '',
       lot_no: '',
       mfg_date: '',
       exp_date: '',
     });
   }
 
-  function selectLotFromBalance(line, lotValue) {
-    if (!lotValue) {
-      updateLine(line.key, { lot_no: '', mfg_date: '', exp_date: '' });
+  function selectIdentifierType(lineKey, type) {
+    updateLine(lineKey, { identifier_type: type, identifier_value: '', lot_no: '', mfg_date: '', exp_date: '' });
+  }
+
+  function selectIdentifierValue(line, value) {
+    if (!value) {
+      updateLine(line.key, { identifier_value: '', lot_no: '', mfg_date: '', exp_date: '' });
       return;
     }
-    const isNullLot = lotValue === NULL_LOT_SENTINEL;
-    const matchedDepositLine = allDepositLines.find(
-      (dl) =>
-        (isNullLot ? !dl.lot_no : dl.lot_no === lotValue) &&
-        (dl.customer_product_code === line.customer_product_code || dl.product_name === line.product_name),
-    );
+
+    const type = line.identifier_type || WITHDRAWAL_IDENTIFIER_TYPES.LOT;
+    const isNullLot = type === WITHDRAWAL_IDENTIFIER_TYPES.LOT && value === NULL_LOT_SENTINEL;
+    const productMatched = getProductMatchedDepositLines(line, allDepositLines);
+    const matches = productMatched.filter((dl) => {
+      if (type === WITHDRAWAL_IDENTIFIER_TYPES.LOT) return isNullLot ? !dl.lot_no : dl.lot_no === value;
+      if (type === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) return dl.mfg_date === value;
+      if (type === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE) return dl.exp_date === value;
+      if (type === WITHDRAWAL_IDENTIFIER_TYPES.NOTE) return dl.actual_note === value;
+      return false;
+    });
+    const first = matches[0];
+    const lotSet = [...new Set(matches.map((m) => m.lot_no || ''))].filter(Boolean);
+
     updateLine(line.key, {
-      lot_no: lotValue,
-      mfg_date: matchedDepositLine?.mfg_date ?? '',
-      exp_date: matchedDepositLine?.exp_date ?? '',
+      identifier_value: value,
+      lot_no: type === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? value : (lotSet.length === 1 ? lotSet[0] : ''),
+      mfg_date: type === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE ? value : (first?.mfg_date ?? ''),
+      exp_date: type === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE ? value : (first?.exp_date ?? ''),
+      note: line.note ? line.note : (first?.actual_note ?? ''),
     });
   }
 
   function selectSourceDeposit(lineKey, depositId) {
-    updateLine(lineKey, { source_deposit_request_id: depositId, lot_no: '', mfg_date: '', exp_date: '' });
+    updateLine(lineKey, {
+      source_deposit_request_id: depositId,
+      identifier_value: '',
+      lot_no: '',
+      mfg_date: '',
+      exp_date: '',
+    });
+  }
+
+  function pullNoteFromDeposit(line, matchedDepositLine) {
+    updateLine(line.key, { note: matchedDepositLine?.actual_note ?? '' });
   }
 
   const noCustomer = !customerId;
@@ -127,12 +171,14 @@ export function CustomerWithdrawalLinesTable({
           <tr>
             <th style={{ width: 36 }}>#</th>
             <th style={{ minWidth: 200 }}>รหัสสินค้า <span className="field-required">*</span></th>
-            <th style={{ minWidth: 180 }}>LOT (จากยอดคงเหลือ)</th>
+            <th style={{ minWidth: 220 }}>อ้างอิงคงเหลือจาก (LOT/วันที่/หมายเหตุ)</th>
             <th style={{ minWidth: 110 }}>วันผลิต</th>
             <th style={{ minWidth: 110 }}>วันหมดอายุ</th>
+            <th style={{ minWidth: 140 }}>ระบุเป็น</th>
             <th style={{ minWidth: 100 }}>กล่อง <span className="field-required">*</span></th>
             <th style={{ minWidth: 120 }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
             <th style={{ minWidth: 160 }}>แหล่งที่มา (ใบฝาก)</th>
+            <th style={{ minWidth: 180 }}>หมายเหตุ</th>
             <th style={{ width: 80 }}>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
@@ -145,33 +191,37 @@ export function CustomerWithdrawalLinesTable({
               ? (depositLinesMap[line.source_deposit_request_id] ?? [])
               : allDepositLines;
 
-            // Product-matching lines including null-lot entries
-            const productMatchedLines = sourceDepositLines.filter((dl) =>
-              !line.customer_product_code ||
-              dl.customer_product_code === line.customer_product_code ||
-              dl.product_name === line.product_name,
-            );
+            const identifierType = line.identifier_type || WITHDRAWAL_IDENTIFIER_TYPES.LOT;
+            const productMatchedLines = getProductMatchedDepositLines(line, sourceDepositLines);
 
-            const hasNullLot = productMatchedLines.some((dl) => !dl.lot_no);
-            const displayLots = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
+            const hasNullLot = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
+              && productMatchedLines.some((dl) => !dl.lot_no);
 
-            const effectiveLotNo = line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '');
-            const isNullLotSelected = line.lot_no === NULL_LOT_SENTINEL;
+            let identifierOptions = [];
+            if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
+              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
+            } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) {
+              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.mfg_date).map((dl) => dl.mfg_date))].sort();
+            } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE) {
+              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.exp_date).map((dl) => dl.exp_date))].sort();
+            } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.NOTE) {
+              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.actual_note).map((dl) => dl.actual_note))];
+            }
 
-            const lotForMatch = isNullLotSelected ? null : (effectiveLotNo || null);
-            const matchedDL = productMatchedLines.find((dl) =>
-              lotForMatch === null ? !dl.lot_no : dl.lot_no === lotForMatch
-            ) ?? productMatchedLines[0];
+            const showManualLotInput = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
+              && identifierOptions.length === 0 && !hasNullLot;
+
+            const matchedDL = getMatchedDepositLine(line, sourceDepositLines);
             const weightPerBox = matchedDL?.weight_per_box ? Number(matchedDL.weight_per_box) : null;
-            const balanceLines = productMatchedLines.filter((dl) => {
-              if (isNullLotSelected) return !dl.lot_no;
-              if (!effectiveLotNo) return true;
-              return dl.lot_no === effectiveLotNo;
-            });
+            const balanceLines = getIdentifierMatchedDepositLines(line, sourceDepositLines);
             const maxBoxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
             const exceedsBoxBalance = maxBoxBalance > 0 && line.requested_boxes !== '' && Number(line.requested_boxes) > maxBoxBalance;
             const maxWtBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
             const exceedsWtBalance = maxWtBalance > 0 && line.requested_weight !== '' && Number(line.requested_weight) > maxWtBalance;
+
+            const qtyMode = line.withdrawal_qty_mode || WITHDRAWAL_QTY_MODES.WEIGHT;
+            const boxesDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.WEIGHT;
+            const weightDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.BOXES;
 
             return (
               <tr data-testid={rowTestId} key={line.key}>
@@ -195,32 +245,46 @@ export function CustomerWithdrawalLinesTable({
                   </select>
                 </td>
 
-                {/* LOT dropdown including null-lot deposits */}
+                {/* Identifier reference type + value dropdown */}
                 <td>
-                  {displayLots.length > 0 || hasNullLot ? (
-                    <select
-                      className="form-control form-control-table"
-                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
-                      value={line.lot_no || ''}
-                      onChange={(e) => selectLotFromBalance(line, e.target.value)}
-                    >
-                      <option value="">— เลือก LOT —</option>
-                      {hasNullLot && (
-                        <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
-                      )}
-                      {displayLots.map((lot) => (
-                        <option key={lot} value={lot}>{lot}</option>
-                      ))}
-                    </select>
-                  ) : (
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={`${rowTestId}-identifier-type`}
+                    onChange={(e) => selectIdentifierType(line.key, e.target.value)}
+                    style={{ marginBottom: 4 }}
+                    value={identifierType}
+                  >
+                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.LOT}>อ้างอิง: LOT</option>
+                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE}>อ้างอิง: วันผลิต</option>
+                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE}>อ้างอิง: วันหมดอายุ</option>
+                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.NOTE}>อ้างอิง: หมายเหตุ (admin)</option>
+                  </select>
+
+                  {showManualLotInput ? (
                     <input
                       className="form-control form-control-table"
                       data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
                       type="text"
                       placeholder="เลข LOT"
                       value={line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '')}
-                      onChange={(e) => updateLine(line.key, { lot_no: e.target.value })}
+                      onChange={(e) => updateLine(line.key, { lot_no: e.target.value, identifier_value: e.target.value })}
                     />
+                  ) : (
+                    <select
+                      className="form-control form-control-table"
+                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                      disabled={identifierOptions.length === 0 && !hasNullLot}
+                      onChange={(e) => selectIdentifierValue(line, e.target.value)}
+                      value={line.identifier_value || ''}
+                    >
+                      <option value="">— เลือก{IDENTIFIER_TYPE_LABELS[identifierType]} —</option>
+                      {hasNullLot && (
+                        <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
+                      )}
+                      {identifierOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
                   )}
                 </td>
 
@@ -244,10 +308,29 @@ export function CustomerWithdrawalLinesTable({
                   />
                 </td>
 
+                {/* Qty mode */}
+                <td>
+                  <select
+                    className="form-control form-control-table"
+                    data-testid={`${rowTestId}-qty-mode`}
+                    onChange={(e) => updateLine(line.key, { withdrawal_qty_mode: e.target.value })}
+                    value={qtyMode}
+                  >
+                    <option value={WITHDRAWAL_QTY_MODES.WEIGHT}>ระบุน้ำหนัก</option>
+                    <option value={WITHDRAWAL_QTY_MODES.BOXES}>ระบุกล่อง</option>
+                  </select>
+                  {!weightPerBox && (
+                    <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
+                      ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุทั้งสองค่า
+                    </div>
+                  )}
+                </td>
+
                 {/* Box quantity with weight auto-calc */}
                 <td>
                   <input
                     className="form-control form-control-table"
+                    disabled={boxesDisabled}
                     min="0"
                     type="number"
                     placeholder="กล่อง"
@@ -270,6 +353,7 @@ export function CustomerWithdrawalLinesTable({
                 <td>
                   <input
                     className="form-control form-control-table"
+                    disabled={weightDisabled}
                     min="0"
                     step="0.01"
                     type="number"
@@ -302,6 +386,36 @@ export function CustomerWithdrawalLinesTable({
                       <option key={opt.id} value={opt.id}>{opt.label ?? opt.id}</option>
                     ))}
                   </select>
+                </td>
+
+                {/* Note */}
+                <td>
+                  <input
+                    className="form-control form-control-table"
+                    data-testid={`${rowTestId}-note`}
+                    type="text"
+                    placeholder="หมายเหตุ"
+                    value={line.note || ''}
+                    onChange={(e) => updateLine(line.key, { note: e.target.value })}
+                  />
+                  {matchedDL?.actual_note ? (
+                    <button
+                      data-testid={`${rowTestId}-pull-note-button`}
+                      onClick={() => pullNoteFromDeposit(line, matchedDL)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--tgd-link-color, #2563eb)',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        padding: '2px 0',
+                        textDecoration: 'underline',
+                      }}
+                      type="button"
+                    >
+                      ดึงหมายเหตุจากใบฝาก
+                    </button>
+                  ) : null}
                 </td>
 
                 {/* Remove */}
