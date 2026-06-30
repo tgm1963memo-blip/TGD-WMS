@@ -29,6 +29,7 @@ const DEPOSIT_HEADER_SELECT = [
   'web_approved_by_email',
   'created_at',
   'updated_at',
+  'has_receipt_variance',
 ].join(', ');
 
 const DEPOSIT_LINE_SELECT = [
@@ -352,6 +353,21 @@ export async function enqueueCustomerDepositNotification(requestId, customerId, 
     p_customer_id: customerId,
     p_document_no: documentNo,
     p_submitter_email: submitterEmail ?? null,
+  });
+
+  return { data, error };
+}
+
+export async function enqueueDepositRecountNotification(requestId, customerId, documentNo, requestorEmail = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_enqueue_customer_request_notifications', {
+    p_document_type: 'DEPOSIT',
+    p_document_id: requestId,
+    p_customer_id: customerId,
+    p_document_no: documentNo,
+    p_submitter_email: requestorEmail ?? null,
+    p_notification_event: 'RECOUNT_REQUESTED',
   });
 
   return { data, error };

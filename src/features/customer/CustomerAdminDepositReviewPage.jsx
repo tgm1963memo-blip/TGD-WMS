@@ -18,9 +18,11 @@ import {
   cancelCustomerDepositRequest,
   recordDepositLineActualReceipt,
   enqueueCustomerDepositNotification,
+  enqueueDepositRecountNotification,
 } from '../../services/customerDepositRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -53,6 +55,8 @@ export function CustomerAdminDepositReviewPage() {
   const [recountQty, setRecountQty] = useState('');
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountNote, setRecountNote] = useState('');
+  const [recountRequestOpen, setRecountRequestOpen] = useState(false);
+  const [recountRequestComment, setRecountRequestComment] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -259,6 +263,26 @@ export function CustomerAdminDepositReviewPage() {
     setNotifyOpen(false);
   }
 
+  async function handleSendRecountNotification() {
+    if (!selected) return;
+    setNotifying(true);
+    setError('');
+    const result = await enqueueDepositRecountNotification(
+      selected.id,
+      selected.customer_id,
+      selected.request_no,
+      selected.created_by_email ?? null,
+    );
+    setNotifying(false);
+    if (result.error) {
+      setError(result.error.message ?? 'ส่งแจ้งเตือนไม่สำเร็จ');
+      return;
+    }
+    setActionMsg('ส่งคำขอตรวจนับใหม่ไปยังหัวหน้า Admin แล้ว');
+    setRecountRequestOpen(false);
+    setRecountRequestComment('');
+  }
+
   if (loading) {
     return (
       <section className="page-shell customer-portal-page" data-testid="customer-admin-deposit-review-page">
@@ -318,7 +342,7 @@ export function CustomerAdminDepositReviewPage() {
                       {getDepositStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{row.expected_arrival_date ?? '-'}</td>
+                  <td>{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
                   <td>{row.contact_name ?? '-'}</td>
                   <td>
                     <button
@@ -361,7 +385,7 @@ export function CustomerAdminDepositReviewPage() {
               </div>
               <div>
                 <div className="form-label">{t('customer_field_expected_arrival_date')}</div>
-                <div>{selected.expected_arrival_date ?? '-'}</div>
+                <div>{formatDocumentDate(selected.expected_arrival_date, { dateOnly: true })}</div>
               </div>
               <div>
                 <div className="form-label">{t('customer_field_contact_name')}</div>
@@ -453,6 +477,14 @@ export function CustomerAdminDepositReviewPage() {
                               }}
                             >
                               {t('admin_recount_button')}
+                            </button>
+                          ) : ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(selected?.status) ? (
+                            <button
+                              className="btn btn-warning btn-sm"
+                              type="button"
+                              onClick={() => { setRecountRequestComment(''); setRecountRequestOpen(true); }}
+                            >
+                              ขอนับใหม่
                             </button>
                           ) : (
                             <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
@@ -647,6 +679,41 @@ export function CustomerAdminDepositReviewPage() {
             value={cancelComment}
             onChange={(e) => setCancelComment(e.target.value)}
             placeholder="ระบุสาเหตุการยกเลิก..."
+          />
+        </label>
+      </Modal>
+
+      {/* Recount request notification modal (for confirmed deposits) */}
+      <Modal
+        isOpen={recountRequestOpen}
+        onClose={() => setRecountRequestOpen(false)}
+        title="ขอตรวจนับสินค้าใหม่"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-warning" disabled={notifying} onClick={handleSendRecountNotification} type="button">
+              {notifying ? '...' : 'ส่งคำขอไปยัง Admin'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRecountRequestOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="banner banner-warning" style={{ marginBottom: 12 }}>
+          เอกสารนี้ยืนยันแล้ว — การขอตรวจนับใหม่จะส่งแจ้งเตือนให้หัวหน้า Admin อนุมัติก่อน
+        </div>
+        <p style={{ marginTop: 0, fontSize: 13 }}>
+          ใบฝาก: <strong>{selected?.request_no}</strong>
+        </p>
+        <label className="form-field">
+          <span>เหตุผลที่ขอตรวจนับใหม่</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={recountRequestComment}
+            onChange={(e) => setRecountRequestComment(e.target.value)}
+            placeholder="ระบุเหตุผล เช่น ตรวจพบความคลาดเคลื่อนหลังยืนยัน..."
           />
         </label>
       </Modal>

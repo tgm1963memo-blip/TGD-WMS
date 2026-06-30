@@ -18,6 +18,7 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
@@ -382,7 +383,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       {getWithdrawalStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{row.requested_dispatch_date ?? '-'}</td>
+                  <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>
                     <button
@@ -425,7 +426,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               </div>
               <div>
                 <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
-                <div>{selected.requested_dispatch_date ?? '-'}</div>
+                <div>{formatDocumentDate(selected.requested_dispatch_date, { dateOnly: true })}</div>
               </div>
               <div>
                 <div className="form-label">{t('customer_field_delivery_type')}</div>

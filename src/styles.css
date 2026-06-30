@@ -1015,6 +1015,19 @@ table .status-badge,
   justify-content: flex-end;
 }
 
+.action-row--compact {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
 .btn-secondary {
   background: var(--tgd-surface);
   border: 1px solid var(--tgd-border);
@@ -1175,13 +1188,13 @@ table .status-badge,
     grid-template-columns: 1fr;
   }
 
-  .action-row {
+  .action-row:not(.action-row--compact) {
     justify-content: stretch;
   }
 
-  .action-row .btn,
-  .action-row .btn-primary,
-  .action-row .btn-primary-gold {
+  .action-row:not(.action-row--compact) .btn,
+  .action-row:not(.action-row--compact) .btn-primary,
+  .action-row:not(.action-row--compact) .btn-primary-gold {
     flex: 1;
   }
 
@@ -1718,10 +1731,10 @@ table .status-badge,
   .filter-toolbar-actions { justify-content: flex-start; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .search-input { max-width: 100%; min-width: 0; }
-  .action-row { justify-content: stretch; flex-wrap: wrap; }
-  .action-row .btn,
-  .action-row .btn-primary,
-  .action-row .btn-primary-gold { flex: 1; min-width: 120px; }
+  .action-row:not(.action-row--compact) { justify-content: stretch; flex-wrap: wrap; }
+  .action-row:not(.action-row--compact) .btn,
+  .action-row:not(.action-row--compact) .btn-primary,
+  .action-row:not(.action-row--compact) .btn-primary-gold { flex: 1; min-width: 120px; }
 
   /* ── Login / Auth ── */
   .layout-auth, .login-layout { flex-direction: column; }

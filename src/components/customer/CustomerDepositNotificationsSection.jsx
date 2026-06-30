@@ -5,6 +5,7 @@ import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { CustomerDepositDetailModal } from './CustomerDepositDetailModal.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 const WAREHOUSE_DEPOSIT_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -177,7 +178,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
                     {getDepositStatusLabel(row.status, t)}
                   </span>
                 </td>
-                <td>{row.expected_arrival_date ?? '-'}</td>
+                <td>{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
                 <td>{row.contact_name ?? '-'}</td>
                 <td>{row.contact_phone ?? '-'}</td>
                 <td>{row.note || '-'}</td>

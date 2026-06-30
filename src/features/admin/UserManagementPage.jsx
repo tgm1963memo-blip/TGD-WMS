@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../components/ui/DataTable.jsx';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
@@ -38,6 +39,7 @@ export function UserManagementPage() {
   const [profiles, setProfiles] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -72,27 +74,37 @@ export function UserManagementPage() {
       key: 'actions',
       header: t('user_mgmt_col_actions'),
       render: (row) => (
-        <div className="action-row">
-          <button className="btn btn-secondary btn-sm" onClick={() => startEdit(row)} type="button">
-            {t('edit')}
+        <div className="action-row action-row--compact">
+          <button
+            className="btn btn-secondary icon-btn"
+            onClick={() => startEdit(row)}
+            title={t('edit')}
+            aria-label={t('edit')}
+            type="button"
+          >
+            ✎
           </button>
           {row.auth_user_id ? (
             <button
-              className="btn btn-secondary btn-sm"
+              className="btn btn-secondary icon-btn"
               disabled={saving || resetting}
               onClick={() => { setResetRow(row); setResetPwd(''); setError(''); setSuccess(''); }}
+              title="รีเซตรหัสผ่าน"
+              aria-label="รีเซตรหัสผ่าน"
               type="button"
             >
-              {'รีเซตรหัสผ่าน'}
+              🔑
             </button>
           ) : null}
           <button
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary icon-btn"
             disabled={saving}
             onClick={() => toggleActive(row)}
+            title={row.is_active ? t('user_mgmt_deactivate') : t('user_mgmt_activate')}
+            aria-label={row.is_active ? t('user_mgmt_deactivate') : t('user_mgmt_activate')}
             type="button"
           >
-            {row.is_active ? t('user_mgmt_deactivate') : t('user_mgmt_activate')}
+            {row.is_active ? '⏸' : '▶'}
           </button>
         </div>
       ),
@@ -131,6 +143,7 @@ export function UserManagementPage() {
     setForm(EMPTY_FORM);
     setSuccess('');
     setError('');
+    setIsFormOpen(true);
   }
 
   function startEdit(row) {
@@ -148,6 +161,20 @@ export function UserManagementPage() {
       isActive: row.is_active !== false,
     });
     setSuccess('');
+    setError('');
+    setIsFormOpen(true);
+  }
+
+  function closeForm() {
+    setIsFormOpen(false);
+    setForm(EMPTY_FORM);
+    setError('');
+    setSuccess('');
+  }
+
+  function closeResetModal() {
+    setResetRow(null);
+    setResetPwd('');
     setError('');
   }
 
@@ -208,6 +235,7 @@ export function UserManagementPage() {
 
     setSuccess(t('user_mgmt_save_success'));
     setForm(EMPTY_FORM);
+    setIsFormOpen(false);
     await loadData();
   }
 
@@ -274,8 +302,14 @@ export function UserManagementPage() {
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
       {success ? <div className="alert-success-panel" role="status">{success}</div> : null}
 
-      <form className="form-card" data-testid="user-management-form" onSubmit={handleSubmit}>
-        <h3>{form.profileId ? t('user_mgmt_edit_title') : t('user_mgmt_create_title')}</h3>
+      <Modal
+        isOpen={isFormOpen}
+        onClose={closeForm}
+        title={form.profileId ? t('user_mgmt_edit_title') : t('user_mgmt_create_title')}
+        size="lg"
+      >
+      <form data-testid="user-management-form" onSubmit={handleSubmit}>
+        {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
         <div className="form-grid">
           <label className="form-field">
             <span>{t('user_mgmt_col_email')}</span>
@@ -378,17 +412,18 @@ export function UserManagementPage() {
           ) : null}
         </div>
         <div className="action-row">
-          <button className="btn btn-secondary" onClick={startCreate} type="button">{t('close')}</button>
+          <button className="btn btn-secondary" onClick={closeForm} type="button">{t('close')}</button>
           <button className="btn btn-primary" data-testid="user-mgmt-save-button" disabled={saving} type="submit">
             {saving ? t('user_mgmt_saving') : t('save')}
           </button>
         </div>
       </form>
+      </Modal>
 
-      {resetRow ? (
-        <form className="form-card" onSubmit={handleResetPassword} style={{ border: '2px solid var(--tgd-warning, #d97706)' }}>
-          <h3>{'รีเซตรหัสผ่าน'}</h3>
-          <p className="form-helper">{'ผู้ใช้: '}<strong>{resetRow.email}</strong></p>
+      <Modal isOpen={Boolean(resetRow)} onClose={closeResetModal} title="รีเซตรหัสผ่าน" size="sm">
+        <form onSubmit={handleResetPassword}>
+          {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
+          <p className="form-helper">{'ผู้ใช้: '}<strong>{resetRow?.email}</strong></p>
           <div className="form-grid">
             <label className="form-field">
               <span>{'รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)'}</span>
@@ -404,13 +439,13 @@ export function UserManagementPage() {
             </label>
           </div>
           <div className="action-row">
-            <button className="btn btn-secondary" onClick={() => setResetRow(null)} type="button">{t('close')}</button>
+            <button className="btn btn-secondary" onClick={closeResetModal} type="button">{t('close')}</button>
             <button className="btn btn-primary" disabled={resetting} type="submit">
               {resetting ? 'กำลังรีเซต...' : 'ยืนยันรีเซตรหัสผ่าน'}
             </button>
           </div>
         </form>
-      ) : null}
+      </Modal>
 
       <DataTable
         columns={columns}

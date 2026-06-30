@@ -131,7 +131,7 @@ export function CustomerWithdrawalRequestListPage() {
         <div className="table-card-header">
           <h3>{t('customer_withdrawal_list_title')}</h3>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 20px 16px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 20px 16px' }}>
           <input
             className="form-input"
             onChange={(e) => setSearchText(e.target.value)}
@@ -206,7 +206,7 @@ export function CustomerWithdrawalRequestListPage() {
                       {getWithdrawalStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{row.requested_dispatch_date ?? '-'}</td>
+                  <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>{row.pickup_contact ?? '-'}</td>
                   <td>{row.note || '-'}</td>
@@ -327,7 +327,7 @@ export function CustomerWithdrawalRequestListPage() {
             </div>
             <div>
               <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
-              <div>{detailRow.requested_dispatch_date ?? '-'}</div>
+              <div>{formatDocumentDate(detailRow.requested_dispatch_date, { dateOnly: true })}</div>
             </div>
             <div>
               <div className="form-label">{t('customer_field_delivery_type')}</div>

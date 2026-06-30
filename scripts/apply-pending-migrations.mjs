@@ -5,10 +5,9 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 
-// Previously applied: 053–081 (applied via earlier runs of this script)
-// Newly pending: 082–086
+// Previously applied: 053–088 (applied via earlier runs of this script)
 const MIGRATIONS = [
-  '087_drop_5param_notification_overload.sql',
+  '089_add_receipt_variance_flag.sql',
 ];
 
 function runSql(sql, label) {

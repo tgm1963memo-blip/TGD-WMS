@@ -147,7 +147,7 @@ export function CustomerWithdrawalNotificationsSection({
                     {row.status}
                   </span>
                 </td>
-                <td>{row.requested_dispatch_date ?? '-'}</td>
+                <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                 <td>{row.delivery_type ?? '-'}</td>
                 <td>{row.pickup_contact ?? '-'}</td>
                 <td>{row.note || '-'}</td>

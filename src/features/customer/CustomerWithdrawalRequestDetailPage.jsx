@@ -17,6 +17,7 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { getWithdrawalCancelEligibility } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function CustomerWithdrawalRequestDetailPage() {
   const t = useTranslation();
@@ -132,8 +133,8 @@ export function CustomerWithdrawalRequestDetailPage() {
             {header.status}
           </span>
         </div>
-        <div className="form-grid customer-request-detail-meta">
-          <div><strong>{t('customer_field_requested_dispatch_date')}:</strong> {header.requested_dispatch_date ?? '-'}</div>
+        <div className="form-grid customer-request-detail-meta" style={{ padding: '8px 20px 24px', gap: 16 }}>
+          <div><strong>{t('customer_field_requested_dispatch_date')}:</strong> {formatDocumentDate(header.requested_dispatch_date, { dateOnly: true })}</div>
           <div><strong>{t('customer_field_delivery_type')}:</strong> {header.delivery_type ?? '-'}</div>
           <div><strong>{t('customer_field_pickup_contact')}:</strong> {header.pickup_contact ?? '-'}</div>
           <div><strong>{t('customer_field_vehicle_registration')}:</strong> {header.vehicle_registration || '-'}</div>

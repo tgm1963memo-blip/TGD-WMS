@@ -133,7 +133,7 @@ export function CustomerDepositRequestListPage() {
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 20px 16px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 20px 16px' }}>
           <input
             className="form-input"
             onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
@@ -190,14 +190,17 @@ export function CustomerDepositRequestListPage() {
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getDepositStatusLabel(row.status, t)}
                     </span>
-                    {row.status === 'RECEIVED_CONFIRMED' || row.status === 'CUSTOMER_NOTIFIED' || row.status === 'CLOSED' ? (
+                    {(row.status === 'RECEIVED_CONFIRMED' || row.status === 'CUSTOMER_NOTIFIED' || row.status === 'CLOSED') && !row.has_receipt_variance ? (
                       <div style={{ fontSize: 11, color: 'var(--tgd-success, #16a34a)', marginTop: 3 }}>&#10003; ได้รับสินค้าครบทุกจำนวน</div>
+                    ) : null}
+                    {(row.status === 'RECEIVED_CONFIRMED' || row.status === 'CUSTOMER_NOTIFIED' || row.status === 'CLOSED') && row.has_receipt_variance ? (
+                      <div style={{ fontSize: 11, color: 'var(--tgd-warning, #d97706)', marginTop: 3 }}>&#9888; รับสินค้าครบแต่จำนวนไม่ตรง</div>
                     ) : null}
                     {row.status === 'RECEIVING_VARIANCE' || row.status === 'COUNT_VARIANCE_REVIEW' ? (
                       <div style={{ fontSize: 11, color: 'var(--tgd-warning, #d97706)', marginTop: 3 }}>&#9888; ได้รับสินค้าไม่ครบทุกรายการ</div>
                     ) : null}
                   </td>
-                  <td>{row.expected_arrival_date ?? '-'}</td>
+                  <td>{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
                   <td>{row.contact_name ?? '-'}</td>
                   <td>{row.contact_phone ?? '-'}</td>
                   <td>{row.note || '-'}</td>

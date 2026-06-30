@@ -18,6 +18,7 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { getDepositCancelEligibility } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function CustomerDepositRequestDetailPage() {
   const t = useTranslation();
@@ -170,8 +171,8 @@ export function CustomerDepositRequestDetailPage() {
           </div>
         )}
 
-        <div className="form-grid customer-request-detail-meta">
-          <div><strong>{t('customer_field_expected_arrival_date')}:</strong> {header.expected_arrival_date ?? '-'}</div>
+        <div className="form-grid customer-request-detail-meta" style={{ padding: '8px 20px 24px', gap: 16 }}>
+          <div><strong>{t('customer_field_expected_arrival_date')}:</strong> {formatDocumentDate(header.expected_arrival_date, { dateOnly: true })}</div>
           <div><strong>{t('customer_field_arrival_time')}:</strong> {header.arrival_time ?? '-'}</div>
           <div><strong>{t('customer_field_contact_name')}:</strong> {header.contact_name ?? '-'}</div>
           <div><strong>{t('customer_field_contact_phone')}:</strong> {header.contact_phone ?? '-'}</div>
