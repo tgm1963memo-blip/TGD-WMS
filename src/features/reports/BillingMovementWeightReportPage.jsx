@@ -9,7 +9,12 @@ import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js'
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
-import { getBillingMovementWeightRows } from '../../services/billingMovementWeightService.js';
+import { shapeBillingMovementWeightRow } from '../../services/billingMovementWeightService.js';
+import {
+  getMovementLedgerRows,
+  getConfirmedDepositReceiptRows,
+  getConfirmedWithdrawalRows,
+} from '../../services/movementLedgerReportService.js';
 import {
   createBillingInvoiceDraftFromMovements,
   findActiveDuplicateDraftLines,
@@ -43,7 +48,8 @@ export function BillingMovementWeightReportPage() {
   const goLive = isGoLivePresentationEnabled();
   const canCreateDraft = roleReady && canWriteBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
-  const [state, setState] = useState(initialState);
+  const [committedFilters, setCommittedFilters] = useState(null);
+  const [state, setState] = useState({ ...initialState, loading: false });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedMovementIds, setSelectedMovementIds] = useState(() => new Set());
@@ -66,70 +72,69 @@ export function BillingMovementWeightReportPage() {
   }, []);
 
   useEffect(() => {
+    if (!committedFilters) return;
+
     let isMounted = true;
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    getBillingMovementWeightRows(filters).then(async (result) => {
+    const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
+
+    Promise.all([
+      getMovementLedgerRows(committedFilters),
+      getConfirmedDepositReceiptRows(committedFilters),
+      getConfirmedWithdrawalRows(committedFilters),
+    ]).then(async ([movResult, depositResult, withdrawalResult]) => {
       if (!isMounted) return;
 
-      if (result.error) {
-        setState({
-          rows: [],
-          loading: false,
-          error: result.error,
-          source: result.source ?? null,
-        });
+      const err = movResult.error ?? depositResult.error ?? withdrawalResult.error;
+      if (err) {
+        setState({ rows: [], loading: false, error: err, source: null });
         return;
       }
 
-      const rawRows = result.data ?? [];
-      const rows = rawRows.map(row => {
-        const customer = customers.find(c => c.id === row.customer_id);
-        const product = products.find(p => p.id === row.product_id);
-        return {
-          ...row,
-          customer_name: customer ? (customer.customer_name ?? customer.name) : row.customer_name,
-          product_name: product ? (product.product_name ?? product.sku ?? product.name) : row.product_name,
-        };
-      });
-      let guardedRows = rows;
+      const customerMap = Object.fromEntries(customers.map((c) => [c.id, c.customer_name ?? c.name]));
+      const productMap = Object.fromEntries(products.map((p) => [p.id, p.product_name ?? p.sku ?? p.name]));
 
+      let outboundRows = (movResult.data ?? []).filter((r) => {
+        const mt = String(r.movement_type_raw || '').toUpperCase();
+        return !mt.includes('DRAFT') && !INBOUND_SKIP.has(mt);
+      });
+
+      const allRaw = [
+        ...(depositResult.data ?? []),
+        ...(withdrawalResult.data ?? []),
+        ...outboundRows,
+      ].sort((a, b) => new Date(a.movement_date ?? 0) - new Date(b.movement_date ?? 0));
+
+      const shaped = allRaw.map((row) => ({
+        ...shapeBillingMovementWeightRow(row),
+        customer_name: customerMap[row.customer_id] ?? row.customer_name ?? null,
+        product_name: productMap[row.product_id] ?? row.product_name ?? null,
+      }));
+
+      const filtered = applyBillingMovementWeightFilters(shaped, committedFilters);
+
+      let guardedRows = filtered;
       if (canCreateDraft) {
-        const movementIds = rows.map((row) => row.movement_id).filter(Boolean);
+        const movementIds = filtered.map((r) => r.movement_id).filter(Boolean);
         const duplicateResult = await findActiveDuplicateDraftLines(movementIds);
         if (!isMounted) return;
-
-        if (duplicateResult.error) {
-          setState({
-            rows: [],
-            loading: false,
-            error: duplicateResult.error,
-            source: result.source ?? null,
-          });
-          return;
+        if (!duplicateResult.error) {
+          guardedRows = applyActiveDuplicateDraftGuards(filtered, duplicateResult.data ?? []);
         }
-
-        guardedRows = applyActiveDuplicateDraftGuards(rows, duplicateResult.data ?? []);
       }
 
-      setState({
-        rows: guardedRows,
-        loading: false,
-        error: null,
-        source: result.source ?? null,
-      });
+      setState({ rows: guardedRows, loading: false, error: null, source: 'merged' });
     });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [canCreateDraft, filters, customers, products]);
+    return () => { isMounted = false; };
+  }, [canCreateDraft, committedFilters, customers, products]);
 
   useEffect(() => {
     setSelectedMovementIds(new Set());
     setDraftValidationError(null);
     setDraftSuccess(null);
-  }, [filters, state.rows]);
+  }, [committedFilters, state.rows]);
 
   const selectedRows = useMemo(
     () => state.rows.filter((row) => selectedMovementIds.has(String(row.movement_id))),
@@ -143,15 +148,17 @@ export function BillingMovementWeightReportPage() {
 
   const classifiedError = state.error ? classifyBillingMovementWeightError(state.error) : null;
 
-  const hasActiveFilter = filters.customerId || filters.productId || filters.dateFrom || filters.dateTo || filters.movementType || filters.billingStatus || filters.isBillable;
+  const hasActiveFilter = committedFilters && (committedFilters.customerId || committedFilters.productId || committedFilters.dateFrom || committedFilters.dateTo || committedFilters.movementType || committedFilters.billingStatus || committedFilters.isBillable);
 
   const emptyMessage = state.loading
     ? null
-    : classifiedError
-      ? null
-      : hasActiveFilter
-        ? 'ไม่พบรายการที่ตรงกับเงื่อนไขที่เลือก — ลองล้างตัวกรองเพื่อดูข้อมูลทั้งหมด'
-        : 'ยังไม่มีข้อมูลการเคลื่อนไหว — ข้อมูลจะปรากฏเมื่อมีการยืนยันรับสินค้าเข้าคลังผ่านหน้า Operations › Receiving';
+    : !committedFilters
+      ? 'รอการค้นหา — กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูล'
+      : classifiedError
+        ? null
+        : hasActiveFilter
+          ? 'ไม่พบรายการที่ตรงกับเงื่อนไขที่เลือก — ลองล้างตัวกรองเพื่อดูข้อมูลทั้งหมด'
+          : 'ยังไม่มีข้อมูลการเคลื่อนไหว — ข้อมูลจะปรากฏเมื่อมีการยืนยันรับสินค้าเข้าคลังผ่านหน้า Operations › Receiving';
 
   function handleExport() {
     if (!state.rows.length) return;
@@ -244,7 +251,7 @@ export function BillingMovementWeightReportPage() {
 
       <BillingMovementWeightFilterPanel
         value={filters}
-        onChange={setFilters}
+        onChange={(f) => { setFilters(f); setCommittedFilters(f); }}
         customers={customers}
         products={products}
       />

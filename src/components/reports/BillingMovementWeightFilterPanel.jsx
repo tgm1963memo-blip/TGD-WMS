@@ -26,9 +26,7 @@ export function BillingMovementWeightFilterPanel({
   const [filters, setFilters] = useState({ ...initialFilters, ...value });
 
   function updateField(event) {
-    const nextFilters = { ...filters, [event.target.name]: event.target.value };
-    setFilters(nextFilters);
-    onChange?.(nextFilters);
+    setFilters((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   }
 
   function resetFilters() {
