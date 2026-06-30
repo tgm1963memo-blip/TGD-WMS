@@ -1,4 +1,4 @@
-import { DocumentHeader } from '../documents/DocumentHeader.jsx';
+import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
@@ -11,6 +11,9 @@ function fmtDT(iso) {
       + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   } catch { return iso; }
 }
+
+const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingBottom: 2 };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2 };
 
 export function CustomerDepositStaffWorkOrderPrint({
   header,
@@ -30,81 +33,134 @@ export function CustomerDepositStaffWorkOrderPrint({
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
 
   return (
-    <article className="operational-report-print-document customer-staff-work-order-print" data-testid="customer-deposit-staff-work-order-print">
-      <DocumentHeader
-        branding={branding}
-        documentDate={header.expected_arrival_date ?? '-'}
-        documentNo={header.request_no}
-        documentTitle={t('customer_deposit_staff_work_order_title')}
-        language={language}
-      />
+    <article
+      className="operational-report-print-document customer-staff-work-order-print"
+      data-testid="customer-deposit-staff-work-order-print"
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
+    >
+      {/* ── Compact page header ── */}
+      {(() => {
+        const norm = normalizeDocumentBrandingConfig(branding ?? getDefaultDocumentBranding());
+        const companyName = norm[`company_name_${language}`] || norm.company_name_th || norm.company_name_en || '';
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '3mm 0 3mm', borderBottom: '2px solid #000', marginBottom: 8, gap: 12,
+          }}>
+            {/* Left: logo + company name + tax id */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+              {norm.logo_url && (
+                <img src={norm.logo_url} alt="logo" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+              )}
+              <div style={{ lineHeight: 1.3 }}>
+                <div style={{ fontWeight: 800, fontSize: 12 }}>{companyName}</div>
+                {norm.tax_id && (
+                  <div style={{ fontSize: 10, color: '#555' }}>เลขประจำตัวผู้เสียภาษี: {norm.tax_id}</div>
+                )}
+              </div>
+            </div>
+            {/* Right: document title + no + date */}
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_staff_work_order_title')}</div>
+              <div style={{ fontSize: 11, color: '#333' }}>
+                {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
+                {header.expected_arrival_date && (
+                  <span style={{ marginLeft: 10 }}>
+                    {getTranslation('document_date', language) || 'วันที่'}: {header.expected_arrival_date}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
-      {/* Operational header grid matching RECEIVING INFORMATION format */}
-      <table className="receiving-info-meta-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 10 }}>
+      {/* ── Meta table ── */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 10, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '22%' }} />
+          <col style={{ width: '28%' }} />
+          <col style={{ width: '22%' }} />
+          <col style={{ width: '28%' }} />
+        </colgroup>
         <tbody>
           <tr>
-            <td style={{ width: '15%', fontWeight: 600 }}>CUSTOMER NAME</td>
-            <td style={{ width: '35%', borderBottom: '1px solid #000' }}>{fmt(header.customer_name)}</td>
-            <td style={{ width: '15%', fontWeight: 600 }}>ATTN</td>
-            <td style={{ width: '35%', borderBottom: '1px solid #000' }}>{fmt(header.contact_name)}</td>
+            <td style={META_KEY}>CUSTOMER NAME</td>
+            <td style={META_VAL}>{fmt(header.customer_name)}</td>
+            <td style={META_KEY}>ATTN</td>
+            <td style={META_VAL}>{fmt(header.contact_name)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>ADDRESS</td>
-            <td colSpan={3} style={{ borderBottom: '1px solid #000' }}>{fmt(header.customer_address)}</td>
+            <td style={META_KEY}>ADDRESS</td>
+            <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>TEL</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.contact_phone)}</td>
-            <td style={{ fontWeight: 600 }}>FAX</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.contact_fax)}</td>
+            <td style={META_KEY}>TEL</td>
+            <td style={META_VAL}>{fmt(header.contact_phone)}</td>
+            <td style={META_KEY}>FAX</td>
+            <td style={META_VAL}>{fmt(header.contact_fax)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>RECEIVE DATE</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.expected_arrival_date)}</td>
-            <td style={{ fontWeight: 600 }}>ARRIVAL TIME / START / FINISH</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.arrival_time)}</td>
+            <td style={META_KEY}>RECEIVE DATE</td>
+            <td style={META_VAL}>{fmt(header.expected_arrival_date)}</td>
+            <td style={META_KEY}>ARRIVAL TIME / START / FINISH</td>
+            <td style={META_VAL}>{fmt(header.arrival_time)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>GOODS TEMP</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.goods_temp)}</td>
-            <td style={{ fontWeight: 600 }}>TRUCK/CON.TEMP</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.truck_temp)}</td>
+            <td style={META_KEY}>GOODS TEMP</td>
+            <td style={META_VAL}>{fmt(header.goods_temp)}</td>
+            <td style={META_KEY}>TRUCK / CON. TEMP</td>
+            <td style={META_VAL}>{fmt(header.truck_temp)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>TRUCK & CONTAINER NO</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.vehicle_registration)}</td>
-            <td style={{ fontWeight: 600 }}>SEAL NO</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.seal_no)}</td>
+            <td style={META_KEY}>TRUCK & CONTAINER NO</td>
+            <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
+            <td style={META_KEY}>SEAL NO</td>
+            <td style={META_VAL}>{fmt(header.seal_no)}</td>
           </tr>
           <tr>
-            <td style={{ fontWeight: 600 }}>RECEIVE FROM</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.receive_from)}</td>
-            <td style={{ fontWeight: 600 }}>REMARK</td>
-            <td style={{ borderBottom: '1px solid #000' }}>{fmt(header.note)}</td>
+            <td style={META_KEY}>RECEIVE FROM</td>
+            <td style={META_VAL}>{fmt(header.receive_from)}</td>
+            <td style={META_KEY}>REMARK</td>
+            <td style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.note)}</td>
           </tr>
         </tbody>
       </table>
 
-      {/* Lines table */}
-      <table className="data-table operational-report-table" style={{ fontSize: 11, width: '100%' }}>
+      {/* ── Lines table ── */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+        <colgroup>
+          <col style={{ width: '4%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: hasActual ? '22%' : '26%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '8%' }} />
+          {hasActual && <col style={{ width: '7%' }} />}
+          {hasActual && <col style={{ width: '8%' }} />}
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: hasActual ? '0%' : '6%' }} />
+        </colgroup>
         <thead>
           <tr>
-            <th rowSpan={2} style={{ textAlign: 'center' }}>#</th>
-            <th rowSpan={2}>LOT NO</th>
-            <th rowSpan={2}>CUSTOMER PRODUCT</th>
-            <th rowSpan={2}>CODE</th>
-            <th colSpan={2} style={{ textAlign: 'center', background: '#f0f0f0' }}>จำนวนที่ลูกค้าแจ้ง</th>
-            {hasActual && <th colSpan={2} style={{ textAlign: 'center', background: '#e8f5e9' }}>จำนวนที่รับจริง</th>}
-            <th rowSpan={2}>วันผลิต</th>
-            <th rowSpan={2}>วันหมดอายุ</th>
-            <th rowSpan={2}>ARGENT</th>
-            <th rowSpan={2}>REMARK</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>#</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CUSTOMER PRODUCT</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CODE</th>
+            <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่ลูกค้าแจ้ง</th>
+            {hasActual && <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#e8f5e9', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่รับจริง</th>}
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>วันผลิต</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>วันหมดอายุ</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>ARGENT</th>
+            {!hasActual && <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>REMARK</th>}
           </tr>
           <tr>
-            <th style={{ textAlign: 'center', background: '#f0f0f0' }}>BOX</th>
-            <th style={{ textAlign: 'center', background: '#f0f0f0' }}>KG</th>
-            {hasActual && <th style={{ textAlign: 'center', background: '#e8f5e9' }}>BOX</th>}
-            {hasActual && <th style={{ textAlign: 'center', background: '#e8f5e9' }}>KG</th>}
+            <th style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>BOX</th>
+            <th style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>KG</th>
+            {hasActual && <th style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#e8f5e9', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>BOX</th>}
+            {hasActual && <th style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#e8f5e9', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>KG</th>}
           </tr>
         </thead>
         <tbody>
@@ -113,52 +169,55 @@ export function CustomerDepositStaffWorkOrderPrint({
               (line.actual_boxes != null && line.actual_boxes !== line.expected_boxes) ||
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
+            const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
-                <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                <td>{fmt(line.lot_no)}</td>
-                <td>{fmt(line.product_name)}</td>
-                <td>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
-                <td style={{ textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
-                <td style={{ textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
+                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{idx + 1}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.lot_no)}</td>
+                <td style={TD}>{fmt(line.product_name)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_boxes)}</td>
+                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_weight)}</td>
                 {hasActual && (
-                  <td style={{ textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_boxes != null ? fmtNum(line.actual_boxes) : '-'}
                   </td>
                 )}
                 {hasActual && (
-                  <td style={{ textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_weight != null ? fmtNum(line.actual_weight) : '-'}
                   </td>
                 )}
-                <td>{fmt(line.mfg_date)}</td>
-                <td>{fmt(line.exp_date)}</td>
-                <td>{fmt(line.argent_type)}</td>
-                <td>{fmt(line.actual_note ?? line.note)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.mfg_date)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.exp_date)}</td>
+                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt(line.argent_type)}</td>
+                {!hasActual && <td style={TD}>{fmt(line.actual_note ?? line.note)}</td>}
               </tr>
             );
           })}
         </tbody>
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={4} style={{ textAlign: 'right' }}>TOTAL</td>
-            <td style={{ textAlign: 'right' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
-            <td style={{ textAlign: 'right' }}>{fmtNum(totalDeclaredWeight || null)}</td>
-            {hasActual && <td style={{ textAlign: 'right' }}>{fmtNum(totalActualBoxes || null)}</td>}
-            {hasActual && <td style={{ textAlign: 'right' }}>{fmtNum(totalActualWeight || null)}</td>}
-            <td colSpan={4} />
+            <td colSpan={4} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
+            <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
+            <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredWeight || null)}</td>
+            {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualBoxes || null)}</td>}
+            {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualWeight || null)}</td>}
+            <td colSpan={hasActual ? 3 : 4} />
           </tr>
         </tfoot>
       </table>
 
-      {/* Modified items note */}
+      {/* Modified items note — single line */}
       {hasActual && lines.some((l) => (l.actual_boxes != null && l.actual_boxes !== l.expected_boxes) || (l.actual_weight != null && String(l.actual_weight) !== String(l.expected_weight))) && (
-        <div style={{ marginTop: 8, padding: '6px 10px', background: '#fff9e6', border: '1px solid #f59e0b', borderRadius: 4, fontSize: 11 }}>
-          <strong>รายการที่แก้ไข (จำนวนจริงไม่ตรงกับที่แจ้ง):</strong>{' '}
-          {lines.filter((l) =>
-            (l.actual_boxes != null && l.actual_boxes !== l.expected_boxes) ||
-            (l.actual_weight != null && String(l.actual_weight) !== String(l.expected_weight))
-          ).map((l) => `${l.product_name ?? l.customer_product_code} (LOT ${l.lot_no ?? '-'})`).join(', ')}
+        <div style={{ marginTop: 8, padding: '5px 10px', background: '#fff9e6', border: '1px solid #f59e0b', borderRadius: 4, fontSize: 11, display: 'flex', gap: 6, overflow: 'hidden' }}>
+          <strong style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>รายการที่แก้ไข (จำนวนจริงไม่ตรงกับที่แจ้ง):</strong>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {lines.filter((l) =>
+              (l.actual_boxes != null && l.actual_boxes !== l.expected_boxes) ||
+              (l.actual_weight != null && String(l.actual_weight) !== String(l.expected_weight))
+            ).map((l) => `${l.product_name ?? l.customer_product_code} (LOT ${l.lot_no ?? '-'})`).join(', ')}
+          </span>
         </div>
       )}
 
@@ -166,25 +225,60 @@ export function CustomerDepositStaffWorkOrderPrint({
         {t('customer_deposit_argent_sticker_hint')}
       </p>
 
-      {/* Signature section */}
+      {/* ── Flex spacer pushes signature to bottom ── */}
+      <div style={{ flex: '1 1 auto' }} />
+
+      {/* ── Signature section ── */}
       {(() => {
-        const reporterBy = header.created_by_email ?? null;
-        const reporterAt = fmtDT(header.submitted_at ?? header.created_at);
-        const issuedBy = header.handheld_received_by_email ?? header.last_action_by_email ?? header.created_by_email ?? null;
-        const issuedAt = fmtDT(header.last_action_at);
+        // 1. Issue/checked by = TGC staff who opened the work order (ACCEPT action)
+        const issuedBy = header.reviewed_by_email ?? null;
+        const issuedAt = header.reviewed_at ? fmtDT(header.reviewed_at) : null;
+
+        // 2. Received by = handheld staff who received goods
+        const receivedBy = header.handheld_received_by_email ?? null;
+        const receivedAt = (receivedBy && header.last_action_at && !header.web_approved_by_email)
+          ? fmtDT(header.last_action_at)
+          : null;
+
+        // 3. Approved by = staff who confirmed to customer (CONFIRM_RECEIPT)
         const approvedBy = header.web_approved_by_email ?? null;
-        const SigBox = ({ label, name, dt }) => (
-          <div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center', fontWeight: 700 }}>{label}</div>
-            <div style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 2 }}>{name ?? '____________________'}</div>
-            {dt && <div style={{ textAlign: 'center', color: '#888', fontSize: 10 }}>{dt}</div>}
+        const approvedAt = (approvedBy && header.last_action_at) ? fmtDT(header.last_action_at) : null;
+
+        const SigBox = ({ label, sublabel, name, dt }) => (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, minHeight: 28 }} />
+            <div style={{ borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, fontSize: 11 }}>{label}</div>
+              {sublabel && <div style={{ fontSize: 10, color: '#666', marginTop: 1 }}>{sublabel}</div>}
+            </div>
+            <div style={{ textAlign: 'center', color: '#333', fontSize: 11, marginTop: 4, minHeight: 16 }}>
+              {name ?? <span style={{ color: '#bbb' }}>____________________</span>}
+            </div>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 10, minHeight: 14 }}>{dt ?? ''}</div>
           </div>
         );
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginTop: 32, fontSize: 12 }}>
-            <SigBox label="ผู้แจ้งฝาก" name={reporterBy} dt={reporterAt} />
-            <SigBox label="ISSUED / CHECKED BY" name={issuedBy ?? '(CUSTOMER SERVICE)'} dt={issuedAt} />
-            <SigBox label="APPROVED BY" name={approvedBy ?? '(SUPV / ASST.MGR / MGR)'} dt={null} />
+          <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32, marginBottom: 4 }}>
+              <SigBox
+                label="Issue / Checked by"
+                sublabel="พนักงาน TGC ผู้เปิดใบงาน"
+                name={issuedBy}
+                dt={issuedAt}
+              />
+              <SigBox
+                label="Received by"
+                sublabel="พนักงานที่รับสินค้า (Handheld)"
+                name={receivedBy}
+                dt={receivedAt}
+              />
+              <SigBox
+                label="Approved by"
+                sublabel="พนักงานที่ยืนยันส่งลูกค้า"
+                name={approvedBy}
+                dt={approvedAt}
+              />
+            </div>
           </div>
         );
       })()}
