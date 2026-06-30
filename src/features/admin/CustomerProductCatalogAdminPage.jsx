@@ -416,6 +416,7 @@ export function CustomerProductCatalogAdminPage() {
       if (!rows.length) { setError(t('excel_import_empty')); return; }
 
       let imported = 0;
+      const rowErrors = [];
       for (const row of rows) {
         const result = await upsertCustomerProduct({
           customerId: filterCustomerId,
@@ -429,11 +430,15 @@ export function CustomerProductCatalogAdminPage() {
           note: row.note,
           isActive: true,
         });
-        if (result.error) { setError(result.error.message ?? t('catalog_save_error')); return; }
+        if (result.error) {
+          rowErrors.push(`${row.customerProductCode ?? '?'}: ${result.error.message ?? t('catalog_save_error')}`);
+          continue;
+        }
         imported += 1;
       }
 
-      setSuccess(`${imported} ${t('excel_import_success')}`);
+      if (imported) setSuccess(`${imported} ${t('excel_import_success')}`);
+      if (rowErrors.length) setError(rowErrors.join(' | '));
       await loadProducts();
     } catch (importError) {
       setError(importError.message ?? t('excel_import_error'));
