@@ -86,7 +86,7 @@ export async function checkLocationHasInventory(locationId) {
 
   // Check confirmed stock balance first
   const { data: balances } = await getStockBalances({ locationId });
-  if (balances && balances.some(s => s.quantity_boxes > 0 || s.quantity_weight > 0)) {
+  if (balances && balances.some(s => s.qty_on_hand > 0)) {
     return true;
   }
 
