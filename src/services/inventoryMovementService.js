@@ -90,20 +90,19 @@ export async function checkLocationHasInventory(locationId) {
     return true;
   }
 
-  // Check deposit lines at this location (any active status — unconfirmed or already confirmed)
+  // Check deposit lines that have actual received goods at this location.
+  // A line with actual_boxes recorded means warehouse physically placed goods here.
+  // No join needed — avoids PostgREST filter-on-related-table issues.
   if (!supabase) return false;
-  const { data: lines, error } = await supabase
+  const { data: lines } = await supabase
     .from('tgd_customer_deposit_request_lines')
-    .select('id, tgd_customer_deposit_requests!inner(status)')
+    .select('id')
     .eq('location_id', locationId)
-    .in('tgd_customer_deposit_requests.status', [
-      'DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED',
-      'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW',
-      'ADMIN_RECOUNT_REQUESTED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED',
-    ])
+    .not('actual_boxes', 'is', null)
+    .gt('actual_boxes', 0)
     .limit(1);
 
-  if (!error && lines && lines.length > 0) {
+  if (lines && lines.length > 0) {
     return true;
   }
 
