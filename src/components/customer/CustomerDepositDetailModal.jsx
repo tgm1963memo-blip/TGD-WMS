@@ -18,6 +18,14 @@ import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+
+function fmtDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const p = s.split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
+}
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
   const t = useTranslation();
@@ -258,7 +266,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               </div>
               <div>
                 <div className="form-label">{t('customer_field_expected_arrival_date')}</div>
-                <div>{header.expected_arrival_date ?? '-'}</div>
+                <div>{fmtDate(header.expected_arrival_date)}</div>
               </div>
               <div>
                 <div className="form-label">{t('customer_field_contact_name')}</div>
@@ -293,16 +301,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <table className="data-table" style={{ fontSize: 13 }}>
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>{t('catalog_col_customer_code')}</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>#</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
-                      <th style={{ textAlign: 'center' }}>LOT</th>
-                      <th style={{ textAlign: 'right' }}>น้ำหนักต่อหน่วย (กก.)</th>
-                      <th style={{ textAlign: 'right' }}>กล่อง (รับจริง / แจ้งฝาก)</th>
-                      <th style={{ textAlign: 'right' }}>น้ำหนัก กก. (รับจริง / แจ้งฝาก)</th>
-                      <th>หมายเหตุ (Admin)</th>
-                      <th>Location</th>
-                      <th>{t('catalog_col_actions')}</th>
+                      <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>LOT</th>
+                      <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กก./หน่วย</th>
+                      <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กล่อง</th>
+                      <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>น้ำหนัก กก.</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>หมายเหตุ</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Location</th>
+                      <th style={{ whiteSpace: 'nowrap' }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -346,12 +354,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               ? (allLocations.find((loc) => loc.id === line.location_id)?.code ?? line.location_id)
                               : <small>ยังไม่ระบุ</small>}
                           </td>
-                          <td style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <button
                               className="btn btn-secondary btn-sm"
                               type="button"
                               title="อัปเดตตำแหน่งจัดเก็บ"
                               aria-label="Update Location"
+                              style={{ marginRight: 4 }}
                               onClick={() => {
                                 setLocationLine(line);
                                 const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
@@ -362,11 +371,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 setLocLevel(p?.level ? String(p.level) : '');
                               }}
                             >
-                              📍 Location
+                              📍
                             </button>
                             <button
                               className="btn btn-secondary btn-sm"
                               type="button"
+                              title="ตรวจนับใหม่"
                               aria-label="Edit Item Quantities"
                               onClick={() => {
                                 setRecountLine(line);
@@ -374,7 +384,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
                               }}
                             >
-                              🔄 ตรวจนับใหม่
+                              🔄
                             </button>
                           </td>
                         </tr>
