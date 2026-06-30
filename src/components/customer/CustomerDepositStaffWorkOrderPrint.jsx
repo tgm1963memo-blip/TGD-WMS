@@ -3,6 +3,13 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtNum(v) { return v != null && v !== '' ? Number(v).toLocaleString() : '-'; }
+function fmtDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const parts = s.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return v;
+}
 function fmtDT(iso) {
   if (!iso) return null;
   try {
@@ -66,7 +73,7 @@ export function CustomerDepositStaffWorkOrderPrint({
                 {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
                 {header.expected_arrival_date && (
                   <span style={{ marginLeft: 10 }}>
-                    {getTranslation('document_date', language) || 'วันที่'}: {header.expected_arrival_date}
+                    {getTranslation('document_date', language) || 'วันที่'}: {fmtDate(header.expected_arrival_date)}
                   </span>
                 )}
               </div>
@@ -102,8 +109,8 @@ export function CustomerDepositStaffWorkOrderPrint({
           </tr>
           <tr>
             <td style={META_KEY}>RECEIVE DATE</td>
-            <td style={META_VAL}>{fmt(header.expected_arrival_date)}</td>
-            <td style={META_KEY}>ARRIVAL TIME / START / FINISH</td>
+            <td style={META_VAL}>{fmtDate(header.expected_arrival_date)}</td>
+            <td style={{ ...META_KEY, fontSize: 10 }}>ARR TIME / START / FINISH</td>
             <td style={META_VAL}>{fmt(header.arrival_time)}</td>
           </tr>
           <tr>
@@ -188,8 +195,8 @@ export function CustomerDepositStaffWorkOrderPrint({
                     {line.actual_weight != null ? fmtNum(line.actual_weight) : '-'}
                   </td>
                 )}
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.mfg_date)}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.exp_date)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmtDate(line.mfg_date)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmtDate(line.exp_date)}</td>
                 <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt(line.argent_type)}</td>
                 {!hasActual && <td style={TD}>{fmt(line.actual_note ?? line.note)}</td>}
               </tr>
