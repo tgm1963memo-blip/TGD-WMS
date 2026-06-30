@@ -8,6 +8,7 @@ import { ReportPrintActions } from '../../components/reports/ReportPrintActions.
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
+import { useAuth } from '../auth/AuthContext.jsx';
 import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
@@ -28,6 +29,7 @@ const initialState = {
 
 export function MovementLedgerReportPage() {
   const { language } = useLanguage();
+  const { session } = useAuth();
   const goLive = isGoLivePresentationEnabled();
   const [pendingFilters, setPendingFilters] = useState({});
   const [committedFilters, setCommittedFilters] = useState(null);
@@ -184,6 +186,7 @@ export function MovementLedgerReportPage() {
               const customerLabel = selectedCustomer?.label ?? committedFilters.customerId ?? 'ทั้งหมด';
               return (
                 <InventoryMovementReportTemplate
+                  printedBy={session?.user?.email ?? session?.user?.user_metadata?.full_name ?? null}
                   data={mapMovementLedgerToInventoryReportData({
                     rows: state.rows,
                     filters: {

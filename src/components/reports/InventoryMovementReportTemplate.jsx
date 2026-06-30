@@ -2,6 +2,14 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { ReportSignatureSection } from './ReportSignatureSection.jsx';
 import { normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 
+function fmtDate(v) {
+  if (!v || v === '-') return '-';
+  const s = String(v).split('T')[0];
+  const parts = s.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return v;
+}
+
 function fmtNum(v, decimals = 3) {
   const n = Number(v);
   return Number.isFinite(n) && n !== 0
@@ -44,6 +52,7 @@ export function InventoryMovementReportTemplate({
   language = 'th',
   branding,
   customerDetails,
+  printedBy,
 }) {
   const t = (key, fallback) => getTranslation(key, language) || fallback;
   const normalizedBranding = normalizeDocumentBrandingConfig(branding || {});
@@ -103,8 +112,8 @@ export function InventoryMovementReportTemplate({
                   <div style={{ fontSize: 9 }}>ATTN : {customerDetails?.contact_name || '-'}</div>
                 </div>
                 <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: 10 }}>
-                  <div>FOR MONTH : {data?.dateFrom} - {data?.dateTo}</div>
-                  <div>ISSUED DATE : {data?.issuedDate}</div>
+                  <div>FOR MONTH : {fmtDate(data?.dateFrom)} - {fmtDate(data?.dateTo)}</div>
+                  <div>ISSUED DATE : {fmtDate(data?.issuedDate)}</div>
                 </div>
               </div>
               <div style={{
@@ -157,8 +166,8 @@ export function InventoryMovementReportTemplate({
           ) : lines.map((line, index) => (
             <tr key={line.id ?? index} style={{ background: index % 2 === 1 ? '#fafafa' : '#fff' }}>
               <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{index + 1}</td>
-              <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{line.receivedDate}</td>
-              <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{line.deliveryDate}</td>
+              <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{fmtDate(line.receivedDate)}</td>
+              <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{fmtDate(line.deliveryDate)}</td>
               <td style={{ ...CELL, fontSize: 8 }}>{line.descCode}</td>
               <td style={{ ...CELL, fontSize: 8 }}>{line.customerProduct}</td>
               <td style={{ ...CELL, fontSize: 8 }}>{line.lotNo}</td>
@@ -206,7 +215,7 @@ export function InventoryMovementReportTemplate({
           </tr>
           <tr>
             <td colSpan={NCOLS} style={{ ...CELL, border: 'none', paddingTop: 16 }}>
-              <ReportSignatureSection branding={branding} language={language} />
+              <ReportSignatureSection branding={branding} language={language} preparedBy={printedBy} />
             </td>
           </tr>
         </tfoot>
