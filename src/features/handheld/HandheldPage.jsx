@@ -121,7 +121,7 @@ function useCameraScanner(onScanned) {
 }
 
 // ── Print sticker ─────────────────────────────────────────────
-function printSticker({ customerName, productName, lotNo, mfgDate, expDate, locationCode, locationDetail }) {
+function printSticker({ customerName, productName, lotNo, mfgDate, expDate, locationCode, locationDetail, goodsTemp }) {
   const qrData = JSON.stringify({
     c: customerName,
     p: productName,
@@ -160,6 +160,7 @@ function printSticker({ customerName, productName, lotNo, mfgDate, expDate, loca
     ${lotNo ? `<div class="row"><span class="label">LOT:</span><span class="val">${lotNo}</span></div>` : ''}
     ${mfgDate ? `<div class="row"><span class="label">ผลิต:</span><span class="val">${mfgDate}</span></div>` : ''}
     ${expDate ? `<div class="row"><span class="label">หมดอายุ:</span><span class="val">${expDate}</span></div>` : ''}
+    ${goodsTemp ? `<div class="row"><span class="label">อุณหภูมิ:</span><span class="val">${goodsTemp}</span></div>` : ''}
     <div class="location-box">
       <div class="loc-main">${locationCode ?? '-'}</div>
       ${locationDetail ? `<div class="loc-detail">${locationDetail}</div>` : ''}
@@ -438,6 +439,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const [stickerItem, setStickerItem] = useState(null);
   const [locationOccupied, setLocationOccupied] = useState(null);
   const [locationCheckLoading, setLocationCheckLoading] = useState(false);
+  const [locationOccupiedWarned, setLocationOccupiedWarned] = useState(false);
   const [addExtraOpen, setAddExtraOpen] = useState(false);
   const [extraProductName, setExtraProductName] = useState('');
   const [extraProductCode, setExtraProductCode] = useState('');
@@ -491,6 +493,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
   useEffect(() => {
     setLocationOccupied(null);
+    setLocationOccupiedWarned(false);
     if (!selectedLocation?.id) return;
     setLocationCheckLoading(true);
     checkLocationHasInventory(selectedLocation.id).then((occupied) => {
@@ -568,6 +571,10 @@ function ReceivingWorkflow({ onBack, t }) {
       setMismatchWarned(true);
       return;
     }
+    if (selectedLocation && locationOccupied && !locationOccupiedWarned) {
+      setLocationOccupiedWarned(true);
+      return;
+    }
     setSaving(true); setSaveError('');
     const r = await recordDepositLineActualReceipt(matchedLine.id, {
       actualBoxes: boxes,
@@ -587,6 +594,7 @@ function ReceivingWorkflow({ onBack, t }) {
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
       confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
+      goodsTemp: selectedDoc?.goods_temp ?? null,
     };
     setConfirmed((prev) => [confirmedItem, ...prev]);
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
@@ -594,7 +602,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
     setStickerItem(confirmedItem);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
-    setSelectedLocation(null); setMismatchWarned(false); setLocationOccupied(null);
+    setSelectedLocation(null); setMismatchWarned(false); setLocationOccupied(null); setLocationOccupiedWarned(false);
     setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
     setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
   }
@@ -831,6 +839,7 @@ function ReceivingWorkflow({ onBack, t }) {
               <div><strong>สินค้า:</strong> {stickerItem.line?.product_name}</div>
               <div><strong>LOT:</strong> {stickerItem.lotNo || '-'}</div>
               <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'} / <strong>หมดอายุ:</strong> {stickerItem.expDate || '-'}</div>
+              {stickerItem.goodsTemp && <div><strong>อุณหภูมิ:</strong> {stickerItem.goodsTemp}</div>}
               <div><strong>Location:</strong> {stickerItem.location?.code ?? 'ยังไม่ได้เลือก'}</div>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
@@ -844,6 +853,7 @@ function ReceivingWorkflow({ onBack, t }) {
                     expDate: stickerItem.expDate,
                     locationCode: stickerItem.location?.code,
                     locationDetail: stickerItem.location ? `${stickerItem.location.sectionName ?? stickerItem.location.sectionCode ?? '-'}` : '',
+                    goodsTemp: stickerItem.goodsTemp,
                   });
                 }}
                 style={{ flex: 1, padding: '16px', borderRadius: 16, background: C.primary, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>
@@ -1031,7 +1041,7 @@ function ReceivingWorkflow({ onBack, t }) {
                 boxShadow: (!boxes && !weight) ? 'none' : (mismatchWarned ? '0 8px 24px rgba(245,158,11,0.4)' : (matchedLine?.actual_boxes != null ? '0 8px 24px rgba(29,111,207,0.4)' : '0 8px 24px rgba(16,185,129,0.4)')),
                 transition: 'all 0.2s',
               }}>
-              {saving ? '⏳ กำลังบันทึก...' : (mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : (matchedLine?.actual_boxes != null ? '✎ แก้ไขยอดรับเข้า' : '✓ ยืนยันรับสินค้า'))}
+              {saving ? '⏳ กำลังบันทึก...' : mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : locationOccupiedWarned ? '⚠ ยืนยันอีกครั้ง (Location มีสินค้าอยู่แล้ว)' : matchedLine?.actual_boxes != null ? '✎ แก้ไขยอดรับเข้า' : '✓ ยืนยันรับสินค้า'}
             </button>
           </div>
         ) : (

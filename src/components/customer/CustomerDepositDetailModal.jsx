@@ -51,6 +51,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [lineNotes, setLineNotes] = useState({});
+  const [savingNote, setSavingNote] = useState({});
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -66,7 +68,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     ]).then(([hRes, lRes]) => {
       if (!active) return;
       setHeader(hRes.data ?? null);
-      setLines(lRes.data ?? []);
+      const loadedLines = lRes.data ?? [];
+      setLines(loadedLines);
+      const initNotes = {};
+      loadedLines.forEach((l) => { initNotes[l.id] = l.actual_note ?? ''; });
+      setLineNotes(initNotes);
       setLoading(false);
       if (hRes.data?.customer_id) {
         getCustomers().then((cResult) => {
@@ -247,7 +253,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         isOpen={isOpen}
         onClose={onClose}
         title={header?.request_no ?? t('admin_deposit_review_title')}
-        size="lg"
+        size="xl"
       >
         {loading ? <LoadingState /> : !header ? (
           <p style={{ color: 'var(--tgd-muted-text)' }}>ไม่พบข้อมูลเอกสาร</p>
@@ -275,6 +281,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <div>
                 <div className="form-label">{t('customer_field_vehicle_registration')}</div>
                 <div>{header.vehicle_registration ?? '-'}</div>
+              </div>
+              <div>
+                <div className="form-label">อุณหภูมิจัดเก็บ (ที่ลูกค้าแจ้ง)</div>
+                <div style={{ fontWeight: 600, color: header.goods_temp ? 'var(--tgd-primary)' : 'var(--tgd-muted-text)' }}>
+                  {header.goods_temp ?? '-'}
+                </div>
               </div>
             </div>
 
@@ -308,7 +320,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กก./หน่วย</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กล่อง</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>น้ำหนัก กก.</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>หมายเหตุ</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>หมายเหตุ (Admin)</th>
                       <th style={{ whiteSpace: 'nowrap' }}>Location</th>
                       <th style={{ whiteSpace: 'nowrap' }}></th>
                     </tr>
@@ -348,7 +360,42 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                             </span>
                             {' '}<span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>/ {line.expected_weight ?? '-'}</span>
                           </td>
-                          <td style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{line.actual_note || '—'}</td>
+                          <td style={{ minWidth: 140 }}>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                className="form-control"
+                                style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                                placeholder="หมายเหตุ..."
+                                value={lineNotes[line.id] ?? line.actual_note ?? ''}
+                                onChange={(e) => setLineNotes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={savingNote[line.id]}
+                                style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                                onClick={async () => {
+                                  setSavingNote((prev) => ({ ...prev, [line.id]: true }));
+                                  const r = await recordDepositLineActualReceipt(line.id, {
+                                    actualBoxes: line.actual_boxes,
+                                    actualWeight: line.actual_weight,
+                                    note: lineNotes[line.id] ?? null,
+                                    lotNo: line.lot_no,
+                                    mfgDate: line.mfg_date,
+                                    expDate: line.exp_date,
+                                    locationId: line.location_id,
+                                  });
+                                  setSavingNote((prev) => ({ ...prev, [line.id]: false }));
+                                  if (!r.error) {
+                                    setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, actual_note: lineNotes[line.id] } : l));
+                                  }
+                                }}
+                              >
+                                {savingNote[line.id] ? '…' : '💾'}
+                              </button>
+                            </div>
+                          </td>
                           <td style={{ fontSize: 12, color: line.location_id ? 'var(--tgd-success)' : 'var(--tgd-muted-text)' }}>
                             {line.location_id
                               ? (allLocations.find((loc) => loc.id === line.location_id)?.code ?? line.location_id)

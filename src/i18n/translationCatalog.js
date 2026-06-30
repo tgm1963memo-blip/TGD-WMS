@@ -400,6 +400,17 @@ Object.assign(TRANSLATION_CATALOG, {
   'nav.masterData': { th: 'ข้อมูลลูกค้า', en: 'Customer Data' },
   'nav.usersAndRoles': { th: 'ผู้ใช้และสิทธิ์', en: 'Users and Roles' },
   'nav.auditLog': { th: 'บันทึกการตรวจสอบ', en: 'Audit Log' },
+  'nav.warehouseLocationSetup': { th: 'Location คลังสินค้า', en: 'Warehouse Locations' },
+  'nav.userManagement': { th: 'จัดการผู้ใช้', en: 'User Management' },
+  'nav.customerProductCatalogAdmin': { th: 'แคตตาล็อกสินค้าลูกค้า', en: 'Customer Product Catalog' },
+  'nav.customerRequestPolicyAdmin': { th: 'นโยบายการยกเลิกคำขอ', en: 'Customer Request Policy' },
+  'nav.productServiceRatesAdmin': { th: 'อัตราค่าบริการตามสินค้า', en: 'Product Service Rates' },
+  'nav.rolePermissionsAdmin': { th: 'สิทธิ์และบทบาท', en: 'Roles & Permissions' },
+  'nav.emailSettings': { th: 'ตั้งค่าอีเมล', en: 'Email Settings' },
+  'nav.billingInvoiceDrafts': { th: 'ใบแจ้งหนี้ร่าง', en: 'Invoice Drafts' },
+  'nav.customerFacilityUsage': { th: 'Facility Usage', en: 'Facility Usage' },
+  'nav.customerProductCatalog': { th: 'แคตตาล็อกสินค้า', en: 'Product Catalog' },
+  'nav.customerMovementLedger': { th: 'รายงานการเคลื่อนไหวสินค้า', en: 'Movement Ledger' },
 });
 
 Object.assign(TRANSLATION_CATALOG, {

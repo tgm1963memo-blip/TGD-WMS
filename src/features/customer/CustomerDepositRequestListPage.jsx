@@ -133,7 +133,7 @@ export function CustomerDepositRequestListPage() {
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '12px 20px 16px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px 16px', marginTop: 4 }}>
           <input
             className="form-input"
             onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}

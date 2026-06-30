@@ -148,7 +148,7 @@ export function CustomerDepositRequestPrintDocument({
               <td style={MV}>{fmt(header.truck_temp)}</td>
             </tr>
             <tr>
-              <td style={MK}>TRUCK & CONTAINER NO</td>
+              <td style={{ ...MK, whiteSpace: 'normal' }}>TRUCK &amp; CONT. NO</td>
               <td style={MV}>{fmt(header.vehicle_registration)}</td>
               <td style={MK}>RECEIVE FROM</td>
               <td style={MV}>{fmt(header.receive_from)}</td>
@@ -167,15 +167,15 @@ export function CustomerDepositRequestPrintDocument({
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <thead>
           <tr>
-            <th style={{ ...TH, width: '4%', textAlign: 'center' }}>#</th>
-            <th style={{ ...TH, width: '11%' }}>{t('catalog_col_customer_code')}</th>
-            <th style={{ ...TH, width: hasLot ? '18%' : '24%' }}>{t('catalog_col_product_name')}</th>
-            <th style={{ ...TH, width: '8%', textAlign: 'right' }}>กก./หน่วย</th>
-            <th style={{ ...TH, width: '8%', textAlign: 'right' }}>กก.ฝาก</th>
+            <th style={{ ...TH, width: '3%', textAlign: 'center' }}>#</th>
+            <th style={{ ...TH, width: '10%' }}>{t('catalog_col_customer_code')}</th>
+            <th style={{ ...TH, width: hasLot ? '16%' : '23%' }}>{t('catalog_col_product_name')}</th>
+            <th style={{ ...TH, width: '7%', textAlign: 'right' }}>กก./หน่วย</th>
+            <th style={{ ...TH, width: '7%', textAlign: 'right' }}>กก.ฝาก</th>
             <th style={{ ...TH, width: '6%', textAlign: 'center' }}>กล่อง</th>
             {hasLot && <th style={{ ...TH, width: '7%' }}>LOT</th>}
-            {hasLot && <th style={{ ...TH, width: '8%', textAlign: 'center' }}>วันผลิต</th>}
-            {hasLot && <th style={{ ...TH, width: '8%', textAlign: 'center' }}>วันหมดอายุ</th>}
+            {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันผลิต</th>}
+            {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันหมดอายุ</th>}
             {hasActual && <th style={{ ...TH, width: '6%', textAlign: 'center' }}>รับจริง<br />(กล่อง)</th>}
             {hasActual && <th style={{ ...TH, width: '6%', textAlign: 'right' }}>รับจริง<br />(กก.)</th>}
             <th style={{ ...TH, width: hasActual ? '10%' : '14%' }}>{t('customer_col_line_note')}</th>

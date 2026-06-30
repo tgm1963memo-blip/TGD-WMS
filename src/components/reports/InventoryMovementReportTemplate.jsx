@@ -22,6 +22,20 @@ function fmtQty(v) {
   return Number.isFinite(n) && n !== 0 ? String(n) : '-';
 }
 
+function fmtBalance(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '-';
+  return n === 0 ? '0' : (n > 0 ? `+${n}` : String(n));
+}
+
+function fmtBalanceWt(v, decimals = 3) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '-';
+  if (n === 0) return '0.000';
+  const s = Math.abs(n).toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return n > 0 ? `+${s}` : `-${s}`;
+}
+
 const CELL = { border: '1px solid #bbb', padding: '3px 4px', verticalAlign: 'middle' };
 const TH = { ...CELL, background: '#f0f0f0', fontWeight: 700, fontSize: 8 };
 
@@ -178,10 +192,17 @@ export function InventoryMovementReportTemplate({
               <td style={{ ...CELL, textAlign: 'right',  background: '#f1f8f2', fontSize: 8 }}>{fmtNum(line.receivedWeight)}</td>
               <td style={{ ...CELL, textAlign: 'center', background: '#fdf2f5', fontSize: 8 }}>{fmtQty(line.deliveryVolume)}</td>
               <td style={{ ...CELL, textAlign: 'right',  background: '#fdf2f5', fontSize: 8 }}>{fmtNum(line.deliveryWeight)}</td>
-              <td style={{ ...CELL, textAlign: 'center', background: '#fffbf0', fontSize: 8 }}>{fmtQty(line.balanceVolume)}</td>
-              <td style={{ ...CELL, textAlign: 'right',  background: '#fffbf0', fontSize: 8 }}>{fmtNum(line.balanceWeight)}</td>
+              <td style={{ ...CELL, textAlign: 'center', background: '#fffbf0', fontSize: 8, color: Number(line.balanceVolume) < 0 ? '#dc2626' : Number(line.balanceVolume) === 0 ? '#888' : undefined }}>{fmtBalance(line.balanceVolume)}</td>
+              <td style={{ ...CELL, textAlign: 'right',  background: '#fffbf0', fontSize: 8, color: Number(line.balanceWeight) < 0 ? '#dc2626' : Number(line.balanceWeight) === 0 ? '#888' : undefined }}>{fmtBalanceWt(line.balanceWeight)}</td>
               <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{line.volumeUnit}</td>
-              <td style={{ ...CELL, fontSize: 8 }}>{line.remark}</td>
+              <td style={{ ...CELL, fontSize: 8 }}>
+                <div>{line.remark !== '-' ? line.remark : ''}</div>
+                {line.isClosed && (
+                  <div style={{ marginTop: 2, display: 'inline-block', background: '#dc2626', color: '#fff', fontSize: 7, fontWeight: 800, padding: '1px 4px', borderRadius: 3, letterSpacing: '0.05em' }}>
+                    CLOSED
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

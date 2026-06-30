@@ -86,31 +86,44 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     const isOutbound = OUTBOUND_TYPES.some((t) => movType.includes(t));
     const qty = Number(row.qty ?? row.quantity ?? 0);
     const weight = Number(row.weight ?? row.chargeable_weight ?? row.gross_weight ?? 0);
+    const dateStr = formatDate(row.movement_date ?? row.created_at);
 
     return {
       id: row.id ?? `row-${index}`,
-      date: formatDate(row.movement_date ?? row.created_at),
-      receivedDate: isInbound ? formatDate(row.movement_date ?? row.created_at) : '-',
-      deliveryDate: isOutbound ? formatDate(row.movement_date ?? row.created_at) : '-',
+      _sortKey: row.movement_date ?? row.created_at ?? '',
+      date: dateStr,
+      receivedDate: isInbound ? dateStr : '-',
+      deliveryDate: isOutbound ? dateStr : '-',
       lotNo: row.lot_no || '-',
       customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
       descCode: row.product_code ?? row.customer_product_code ?? '-',
       weightKg: weight || '-',
-      // Balance forward (opening) — from view if available, else 0
       balanceForwardVolume: row.balance_forward_vol ?? row.opening_balance_vol ?? 0,
       balanceForwardWeight: row.balance_forward_weight ?? row.opening_balance_weight ?? 0,
-      // Received section
       receivedVolume: isInbound ? qty : 0,
       receivedWeight: isInbound ? weight : 0,
-      // Delivery section
       deliveryVolume: isOutbound ? qty : 0,
       deliveryWeight: isOutbound ? weight : 0,
-      // Balance (closing) — from view if available, else calculate
-      balanceVolume: row.balance_vol ?? row.closing_balance_vol ?? (isInbound ? qty : -qty),
-      balanceWeight: row.balance_weight ?? row.closing_balance_weight ?? (isInbound ? weight : -weight),
-      volumeUnit: row.volume_unit ?? row.uom ?? 'Box',
+      balanceVolume: 0,
+      balanceWeight: 0,
+      isClosed: false,
+      volumeUnit: row.volume_unit ?? row.uom ?? 'กล่อง',
       remark: row.remark ?? row.source_reference ?? '-',
     };
+  });
+
+  // Sort by date oldest → newest, then compute running balance per lot key
+  mappedLines.sort((a, b) => (a._sortKey < b._sortKey ? -1 : a._sortKey > b._sortKey ? 1 : 0));
+
+  const lotBalances = {}; // lotKey → { vol, weight }
+  mappedLines.forEach((line) => {
+    const key = `${line.lotNo}|${line.descCode}`;
+    if (!lotBalances[key]) lotBalances[key] = { vol: 0, weight: 0 };
+    lotBalances[key].vol += line.receivedVolume - line.deliveryVolume;
+    lotBalances[key].weight += line.receivedWeight - line.deliveryWeight;
+    line.balanceVolume = lotBalances[key].vol;
+    line.balanceWeight = lotBalances[key].weight;
+    line.isClosed = line.deliveryVolume > 0 && lotBalances[key].vol <= 0;
   });
 
   const subtotalReceivedVol = mappedLines.reduce((s, l) => s + (Number(l.receivedVolume) || 0), 0);

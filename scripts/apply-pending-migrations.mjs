@@ -7,7 +7,8 @@ const ROOT = process.cwd();
 
 // Previously applied: 053–089 (applied via earlier runs of this script)
 const MIGRATIONS = [
-  '090_add_user_profile_soft_delete.sql',
+  '090_fix_review_deposit_restore_behaviors.sql',
+  '091_add_admin_note_to_withdrawal_lines.sql',
 ];
 
 function runSql(sql, label) {

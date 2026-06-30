@@ -15,6 +15,7 @@ import {
   cancelCustomerWithdrawalRequest,
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
+  updateWithdrawalLineAdminNote,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -40,6 +41,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountWeight, setRecountWeight] = useState('');
   const [recounting, setRecounting] = useState(false);
+  const [lineAdminNotes, setLineAdminNotes] = useState({});
+  const [savingAdminNote, setSavingAdminNote] = useState({});
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -103,7 +106,11 @@ export function CustomerAdminWithdrawalReviewPage() {
 
     listCustomerWithdrawalRequestLines(selectedId).then((result) => {
       if (!active) return;
-      setLines(result.data ?? []);
+      const loadedLines = result.data ?? [];
+      setLines(loadedLines);
+      const initNotes = {};
+      loadedLines.forEach((l) => { initNotes[l.id] = l.admin_note ?? ''; });
+      setLineAdminNotes(initNotes);
     });
 
     return () => { active = false; };
@@ -409,7 +416,7 @@ export function CustomerAdminWithdrawalReviewPage() {
         isOpen={detailOpen}
         onClose={() => setDetailOpen(false)}
         title={selected?.withdrawal_no ?? t('admin_withdrawal_review_title')}
-        size="lg"
+        size="xl"
       >
         {selected ? (
           <>
@@ -471,6 +478,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>{t('lot')}</th>
                       <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
                       <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
+                      <th>หมายเหตุ (Admin)</th>
                       <th>{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
@@ -509,6 +517,34 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </span>
                           )}
                         </td>
+                        <td style={{ minWidth: 160 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                              placeholder="หมายเหตุ..."
+                              value={lineAdminNotes[line.id] ?? line.admin_note ?? ''}
+                              onChange={(e) => setLineAdminNotes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={savingAdminNote[line.id]}
+                              style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                              onClick={async () => {
+                                setSavingAdminNote((prev) => ({ ...prev, [line.id]: true }));
+                                const r = await updateWithdrawalLineAdminNote(line.id, lineAdminNotes[line.id] ?? '');
+                                setSavingAdminNote((prev) => ({ ...prev, [line.id]: false }));
+                                if (!r.error) {
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, admin_note: lineAdminNotes[line.id] } : l));
+                                }
+                              }}
+                            >
+                              {savingAdminNote[line.id] ? '…' : '💾'}
+                            </button>
+                          </div>
+                        </td>
                         <td>
                           {!['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status) ? (
                             <button
@@ -530,7 +566,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

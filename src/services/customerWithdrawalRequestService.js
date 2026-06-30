@@ -231,6 +231,17 @@ export async function recordWithdrawalLinePick(lineId, pickedBoxes, pickedWeight
   return { data, error };
 }
 
+export async function updateWithdrawalLineAdminNote(lineId, adminNote) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_update_withdrawal_line_admin_note', {
+    p_line_id: lineId,
+    p_admin_note: toNullableText(adminNote),
+  });
+
+  return { data, error };
+}
+
 export async function enqueueCustomerWithdrawalNotification(requestId, customerId, documentNo, submitterEmail = null, note = null) {
   if (!supabase) return missingSupabaseClientResult();
 
