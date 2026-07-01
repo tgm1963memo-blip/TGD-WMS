@@ -49,6 +49,7 @@ const WITHDRAWAL_LINE_SELECT = [
   'uom',
   'picking_rule',
   'note',
+  'admin_note',
   'picked_boxes',
   'picked_weight',
   'picked_at',

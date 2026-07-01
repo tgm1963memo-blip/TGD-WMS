@@ -198,7 +198,14 @@ export function CustomerWithdrawalRequestPrintDocument({
               <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
-              <td style={TD}>{fmt(line.note)}</td>
+              <td style={TD}>
+                {(line.note || line.admin_note) ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {line.note ? <span>{line.note}</span> : null}
+                    {line.admin_note ? <span style={{ color: '#555', fontSize: 9 }}>({line.admin_note})</span> : null}
+                  </div>
+                ) : '-'}
+              </td>
             </tr>
           )) : (
             <tr>
