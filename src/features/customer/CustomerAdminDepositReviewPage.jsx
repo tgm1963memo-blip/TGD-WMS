@@ -23,6 +23,9 @@ import {
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
+import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
+import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -39,6 +42,8 @@ const REVIEW_STATUSES = [
 
 export function CustomerAdminDepositReviewPage() {
   const t = useTranslation();
+  const { role: userRole } = useUserRole();
+  const canWrite = hasRoleFunctionWriteAccess(userRole, 'receiving');
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
@@ -126,19 +131,19 @@ export function CustomerAdminDepositReviewPage() {
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
-  const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
-  const canRequestRecount = selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'].includes(selected.status);
+  const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  const canRequestRecount = canWrite && selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'].includes(selected.status);
   const allLinesHaveActualQty = lines.length > 0 && lines.every((l) => l.actual_boxes != null || l.actual_weight != null);
-  const canConfirmReceiving = selected &&
+  const canConfirmReceiving = canWrite && selected &&
     ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
     allLinesHaveActualQty;
-  const confirmBlockedReason = selected &&
+  const confirmBlockedReason = canWrite && selected &&
     ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
     !allLinesHaveActualQty
     ? 'กรุณาบันทึกจำนวนรับจริงทุกรายการก่อนยืนยัน'
     : '';
-  const canReject = selected && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(selected.status);
-  const canCancel = selected && !['COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED', 'REJECTED'].includes(selected.status);
+  const canReject = canWrite && selected && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(selected.status);
+  const canCancel = canWrite && selected && !['COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED', 'REJECTED'].includes(selected.status);
 
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
@@ -369,6 +374,61 @@ export function CustomerAdminDepositReviewPage() {
         onClose={() => setDetailOpen(false)}
         title={selected?.request_no ?? t('admin_deposit_review_title')}
         size="lg"
+        footer={selected ? (
+          <div className="action-row">
+            {canOpenWorkOrder ? (
+              <button
+                className="btn btn-primary"
+                disabled={submitting}
+                onClick={handleOpenWorkOrder}
+                type="button"
+              >
+                {t('admin_open_work_order')}
+              </button>
+            ) : null}
+            {canRequestRecount ? (
+              <button
+                className="btn btn-warning"
+                disabled={submitting}
+                onClick={handleRequestRecount}
+                type="button"
+              >
+                ตรวจนับใหม่ หากไม่ตรง
+              </button>
+            ) : null}
+            {selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) ? (
+              <button
+                className="btn btn-primary"
+                disabled={submitting || !canConfirmReceiving}
+                onClick={handleConfirmReceiving}
+                title={confirmBlockedReason}
+                type="button"
+              >
+                {t('admin_confirm_receiving')}
+              </button>
+            ) : null}
+            {canReject ? (
+              <button
+                className="btn btn-danger"
+                disabled={submitting}
+                onClick={() => setRejectOpen(true)}
+                type="button"
+              >
+                {t('admin_reject_request')}
+              </button>
+            ) : null}
+            {canCancel ? (
+              <button
+                className="btn btn-secondary"
+                disabled={submitting}
+                onClick={() => { setCancelComment(''); setCancelOpen(true); }}
+                type="button"
+              >
+                ยกเลิกเอกสาร
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       >
         {selected ? (
           <>
@@ -424,6 +484,7 @@ export function CustomerAdminDepositReviewPage() {
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th>{t('customer_col_weight_per_box')}</th>
+                      <th>การจัดเก็บ</th>
                       <th>กล่อง (รับจริง / แจ้งฝาก)</th>
                       <th>น้ำหนัก กก. (รับจริง / แจ้งฝาก)</th>
                       <th>หมายเหตุ (Admin)</th>
@@ -437,6 +498,7 @@ export function CustomerAdminDepositReviewPage() {
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.weight_per_box ?? '-'}</td>
+                        <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
                         <td>
                           {line.actual_boxes != null ? (
                             <span style={{ fontWeight: 700, color: 'var(--tgd-success)' }}>
@@ -465,7 +527,9 @@ export function CustomerAdminDepositReviewPage() {
                           )}
                         </td>
                         <td>
-                          {!['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(selected?.status) ? (
+                          {!canWrite ? (
+                            <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
+                          ) : !['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(selected?.status) ? (
                             <button
                               className="btn btn-secondary btn-sm"
                               type="button"
@@ -492,7 +556,7 @@ export function CustomerAdminDepositReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -511,61 +575,6 @@ export function CustomerAdminDepositReviewPage() {
                 ⚠️ {confirmBlockedReason}
               </div>
             ) : null}
-
-            {/* Action buttons */}
-            <div className="action-row">
-              {canOpenWorkOrder ? (
-                <button
-                  className="btn btn-primary"
-                  disabled={submitting}
-                  onClick={handleOpenWorkOrder}
-                  type="button"
-                >
-                  {t('admin_open_work_order')}
-                </button>
-              ) : null}
-              {canRequestRecount ? (
-                <button
-                  className="btn btn-warning"
-                  disabled={submitting}
-                  onClick={handleRequestRecount}
-                  type="button"
-                >
-                  ตรวจนับใหม่ หากไม่ตรง
-                </button>
-              ) : null}
-              {selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) ? (
-                <button
-                  className="btn btn-primary"
-                  disabled={submitting || !canConfirmReceiving}
-                  onClick={handleConfirmReceiving}
-                  title={confirmBlockedReason}
-                  type="button"
-                >
-                  {t('admin_confirm_receiving')}
-                </button>
-              ) : null}
-              {canReject ? (
-                <button
-                  className="btn btn-danger"
-                  disabled={submitting}
-                  onClick={() => setRejectOpen(true)}
-                  type="button"
-                >
-                  {t('admin_reject_request')}
-                </button>
-              ) : null}
-              {canCancel ? (
-                <button
-                  className="btn btn-secondary"
-                  disabled={submitting}
-                  onClick={() => { setCancelComment(''); setCancelOpen(true); }}
-                  type="button"
-                >
-                  ยกเลิกเอกสาร
-                </button>
-              ) : null}
-            </div>
 
             {/* Persistent email notification section */}
             {selected && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(selected.status) ? (

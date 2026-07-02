@@ -1,5 +1,6 @@
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtNum(v) { return v != null && v !== '' ? Number(v).toLocaleString() : '-'; }
@@ -139,8 +140,9 @@ export function CustomerDepositStaffWorkOrderPrint({
         <colgroup>
           <col style={{ width: '4%' }} />
           <col style={{ width: '10%' }} />
-          <col style={{ width: hasActual ? '22%' : '26%' }} />
-          <col style={{ width: '10%' }} />
+          <col style={{ width: hasActual ? '19%' : '23%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '7%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
           {hasActual && <col style={{ width: '7%' }} />}
@@ -156,6 +158,7 @@ export function CustomerDepositStaffWorkOrderPrint({
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CODE</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>การจัดเก็บ</th>
             <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่ลูกค้าแจ้ง</th>
             {hasActual && <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#e8f5e9', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่รับจริง</th>}
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>วันผลิต</th>
@@ -183,6 +186,7 @@ export function CustomerDepositStaffWorkOrderPrint({
                 <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.lot_no)}</td>
                 <td style={TD}>{fmt(line.product_name)}</td>
                 <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
                 <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_boxes)}</td>
                 <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_weight)}</td>
                 {hasActual && (
@@ -205,7 +209,7 @@ export function CustomerDepositStaffWorkOrderPrint({
         </tbody>
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={4} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={5} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredWeight || null)}</td>
             {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualBoxes || null)}</td>}

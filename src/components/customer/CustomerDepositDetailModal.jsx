@@ -5,6 +5,7 @@ import { ReportPrintActions } from '../reports/ReportPrintActions.jsx';
 import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOrderPrint.jsx';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
+import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -318,6 +319,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       <th>{t('catalog_col_product_name')}</th>
                       <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>LOT</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กก./หน่วย</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>การจัดเก็บ</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กล่อง</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>น้ำหนัก กก.</th>
                       <th style={{ whiteSpace: 'nowrap' }}>หมายเหตุ (Admin)</th>
@@ -348,6 +350,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                           <td>{line.product_name ?? '-'}</td>
                           <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>
                           <td style={{ textAlign: 'right', color: 'var(--tgd-muted-text)' }}>{weightPerBox ?? '-'}</td>
+                          <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
                           <td style={{ textAlign: 'right' }}>
                             <span style={{ fontWeight: 700, color: actualBoxColor }}>
                               {line.actual_boxes != null ? line.actual_boxes : <small>ยังไม่บันทึก</small>}
@@ -437,7 +440,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={11}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

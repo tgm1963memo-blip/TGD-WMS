@@ -2,6 +2,7 @@ import { useTableSort } from '../../hooks/useTableSort.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatRequestWeight } from '../../utils/customerRequestCancelUtils.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
 
 function formatDate(iso) {
   if (!iso) return '-';
@@ -31,6 +32,7 @@ export function CustomerDepositRequestLinesDisplay({
             <th onClick={() => requestSort('expected_weight')} style={{ cursor: 'pointer' }}>{t('customer_col_total_deposit_weight')} {getSortIndicator('expected_weight')}</th>
             <th onClick={() => requestSort('expected_boxes')} style={{ cursor: 'pointer' }}>{t('customer_col_box_count')} {getSortIndicator('expected_boxes')}</th>
             {hasLot && <th onClick={() => requestSort('lot_no')} style={{ cursor: 'pointer' }}>เลข LOT {getSortIndicator('lot_no')}</th>}
+            <th onClick={() => requestSort('temperature_type')} style={{ cursor: 'pointer' }}>การจัดเก็บ {getSortIndicator('temperature_type')}</th>
             {hasLot && <th onClick={() => requestSort('mfg_date')} style={{ cursor: 'pointer' }}>วันผลิต {getSortIndicator('mfg_date')}</th>}
             {hasLot && <th onClick={() => requestSort('exp_date')} style={{ cursor: 'pointer' }}>วันหมดอายุ {getSortIndicator('exp_date')}</th>}
             {hasActual && <th onClick={() => requestSort('actual_boxes')} style={{ cursor: 'pointer', textAlign: 'right' }}>กล่อง (รับจริง / แจ้งฝาก) {getSortIndicator('actual_boxes')}</th>}
@@ -48,6 +50,7 @@ export function CustomerDepositRequestLinesDisplay({
               <td>{formatRequestWeight(line.expected_weight)}</td>
               <td>{line.expected_boxes ?? '-'}</td>
               {hasLot && <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.lot_no || '-'}</td>}
+              <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.exp_date)}</td>}
               {hasActual && (() => {
@@ -71,7 +74,7 @@ export function CustomerDepositRequestLinesDisplay({
               <td>{line.note ?? line.actual_note ?? '-'}</td>
             </tr>
           )) : (
-            <tr><td colSpan={7 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0)}>{t('customer_request_detail_lines_empty')}</td></tr>
+            <tr><td colSpan={8 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0)}>{t('customer_request_detail_lines_empty')}</td></tr>
           )}
         </tbody>
       </table>

@@ -1,6 +1,7 @@
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtDate(v) {
@@ -45,7 +46,7 @@ export function CustomerDepositRequestPrintDocument({
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const hasLot    = lines.some((l) => l.lot_no || l.mfg_date || l.exp_date);
 
-  const colCount = 5 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + 1;
+  const colCount = 6 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + 1;
 
   // Signature data
   const issuedBy = header.reviewed_by_email ?? null;
@@ -168,11 +169,12 @@ export function CustomerDepositRequestPrintDocument({
         <thead>
           <tr>
             <th style={{ ...TH, width: '3%', textAlign: 'center' }}>#</th>
-            <th style={{ ...TH, width: '10%' }}>{t('catalog_col_customer_code')}</th>
-            <th style={{ ...TH, width: hasLot ? '16%' : '23%' }}>{t('catalog_col_product_name')}</th>
+            <th style={{ ...TH, width: '9%' }}>{t('catalog_col_customer_code')}</th>
+            <th style={{ ...TH, width: hasLot ? '13%' : '19%' }}>{t('catalog_col_product_name')}</th>
             <th style={{ ...TH, width: '7%', textAlign: 'right' }}>กก./หน่วย</th>
             <th style={{ ...TH, width: '7%', textAlign: 'right' }}>กก.ฝาก</th>
             <th style={{ ...TH, width: '6%', textAlign: 'center' }}>กล่อง</th>
+            <th style={{ ...TH, width: '8%' }}>การจัดเก็บ</th>
             {hasLot && <th style={{ ...TH, width: '7%' }}>LOT</th>}
             {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันผลิต</th>}
             {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันหมดอายุ</th>}
@@ -190,6 +192,7 @@ export function CustomerDepositRequestPrintDocument({
               <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.weight_per_box ?? '-'}</td>
               <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.expected_weight ?? '-'}</td>
               <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{line.expected_boxes ?? '-'}</td>
+              <td style={{ ...TD, whiteSpace: 'nowrap' }}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
               {hasLot && <td style={{ ...TD, whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
               {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.exp_date)}</td>}
