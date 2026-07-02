@@ -29,6 +29,7 @@ import {
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import {
+  applyBillingMovementWeightFilters,
   calculateBillingMovementWeightSummary,
   classifyBillingMovementWeightError,
   downloadBillingMovementWeightCsv,

@@ -35,6 +35,7 @@ describe('customerRequestCopyUtils', () => {
       contact_phone: '081',
       note: 'note',
       vehicle_registration: '',
+      arrival_time: '',
     });
 
     const lines = mapDepositLinesForCopy([

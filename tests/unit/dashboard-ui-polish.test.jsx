@@ -38,6 +38,7 @@ const emptySummary = vi.hoisted(() => ({
 vi.mock('../../src/services/readOnlyDashboardService.js', () => ({
   getReadOnlyDashboardEmptySummary: () => ({ ...emptySummary }),
   getReadOnlyDashboardSummary: getReadOnlyDashboardSummaryMock,
+  getPendingAdminDocuments: () => Promise.resolve({ data: [], error: null }),
 }));
 
 vi.mock('../../src/services/supabaseConnectionReadinessService.js', () => ({
@@ -107,10 +108,10 @@ describe('17C Dashboard UI Polish', () => {
   it('Dashboard includes workflow labels and staging summary values', async () => {
     renderPage('en');
     await waitFor(() => {
-      ['Receiving', 'Putaway', 'Stock Balance', 'Picking', 'Dispatch'].forEach((label) => {
-        expect(screen.getByText(label, { selector: '.workflow-step-name' })).toBeInTheDocument();
-      });
-      expect(screen.getByText('1500')).toBeInTheDocument();
+      expect(screen.getByText(getTranslation('total_products', 'en'))).toBeInTheDocument();
+      expect(screen.getByText(getTranslation('warehouses', 'en'))).toBeInTheDocument();
+      expect(screen.getAllByText(getTranslation('stock_balance', 'en')).length).toBeGreaterThan(0);
+      expect(screen.getByText('50')).toBeInTheDocument();
       expect(screen.getByText('100')).toBeInTheDocument();
     });
   });

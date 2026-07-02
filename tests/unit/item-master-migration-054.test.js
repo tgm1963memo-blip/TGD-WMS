@@ -59,11 +59,11 @@ describe('054 frontend wiring', () => {
     });
   });
 
-  it('hides customer product catalog from customer portal navigation', () => {
+  it('keeps the admin customer product catalog route permission-gated to admin', () => {
     const navigation = read(path.join(process.cwd(), 'src/app/navigation.js'));
     const permissions = read(path.join(process.cwd(), 'src/security/routePermissionCatalog.js'));
 
-    expect(navigation).not.toContain("key: 'customer_product_catalog'");
+    expect(navigation).toContain("key: 'customer_product_catalog_admin'");
     expect(permissions).toContain("route_path: '/admin/customer-products'");
     expect(permissions).toContain("minimum_role: 'admin'");
   });

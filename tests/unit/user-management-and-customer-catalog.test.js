@@ -90,7 +90,7 @@ describe('User management + catalog frontend wiring', () => {
     expect(routes).toContain('/admin/users');
     expect(routes).toContain('/admin/customer-products');
     expect(navigation).toContain('user_management');
-    expect(navigation).not.toContain("key: 'customer_product_catalog'");
+    expect(navigation).toContain("key: 'customer_product_catalog_admin'");
     expect(permissions).toContain("route_path: '/admin/users'");
     expect(permissions).toContain("route_path: '/admin/customer-products', route_name: 'CustomerProductCatalogAdminPage', permission_area: 'customer_catalog', minimum_role: 'admin'");
   });

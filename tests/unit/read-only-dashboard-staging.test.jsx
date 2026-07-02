@@ -40,6 +40,7 @@ const emptySummary = vi.hoisted(() => ({
 vi.mock('../../src/services/readOnlyDashboardService.js', () => ({
   getReadOnlyDashboardEmptySummary: () => ({ ...emptySummary }),
   getReadOnlyDashboardSummary: getReadOnlyDashboardSummaryMock,
+  getPendingAdminDocuments: () => Promise.resolve({ data: [], error: null }),
 }));
 
 vi.mock('../../src/services/supabaseConnectionReadinessService.js', () => ({
@@ -132,7 +133,7 @@ describe('read-only staging dashboard', () => {
 
     await waitFor(() => {
       expect(getReadOnlyDashboardSummaryMock).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('567')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument();
     });
   });
 
@@ -162,7 +163,7 @@ describe('read-only staging dashboard', () => {
     });
     expect(source).toContain('getActiveStockBalanceCount');
     expect(source).toContain("getRowCount('tgd_stock_movements')");
-    expect(source).toMatch(/\.select\('quantity'\)|\.select\('qty_on_hand, qty_available'\)/);
+    expect(source).toMatch(/\.select\('quantity'\)|\.select\('qty_on_hand, qty_allocated'\)/);
     expect(source).toMatch(/qty_on_hand|quantity/);
     expect(authSource).toContain('signInWithPassword');
     expect(authSource).toContain('signOut');

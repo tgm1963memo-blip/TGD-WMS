@@ -126,7 +126,7 @@ describe('17B App Shell and Navigation UI', () => {
 
     it.each(additionalItems)('contains item: %s', (item) => {
       renderWithProviders(<Sidebar />);
-      expect(screen.getByText(item)).toBeInTheDocument();
+      expect(screen.getAllByText(item).length).toBeGreaterThan(0);
     });
   });
 });

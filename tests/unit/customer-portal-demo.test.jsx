@@ -100,6 +100,7 @@ vi.mock('../../src/services/customerDepositRequestService.js', () => ({
       customer_product_code: 'CUS-CHKN-01',
       product_name: 'Frozen Chicken Breast',
       lot_no: 'LOT-TEST-01',
+      weight_per_box: 20,
       actual_weight: 100,
       expected_weight: 100,
       request: {

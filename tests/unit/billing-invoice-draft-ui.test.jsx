@@ -14,6 +14,9 @@ const {
   getBillingInvoiceDraftBplusExportReadinessMock,
   findActiveDuplicateDraftLinesMock,
   getBillingMovementWeightRowsMock,
+  getMovementLedgerRowsMock,
+  getConfirmedDepositReceiptRowsMock,
+  getConfirmedWithdrawalRowsMock,
   getCustomersMock,
   getProductsMock,
 } = vi.hoisted(() => ({
@@ -25,6 +28,9 @@ const {
   getBillingInvoiceDraftBplusExportReadinessMock: vi.fn(),
   findActiveDuplicateDraftLinesMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
+  getMovementLedgerRowsMock: vi.fn(),
+  getConfirmedDepositReceiptRowsMock: vi.fn(),
+  getConfirmedWithdrawalRowsMock: vi.fn(),
   getCustomersMock: vi.fn(),
   getProductsMock: vi.fn(),
 }));
@@ -43,6 +49,12 @@ vi.mock('../../src/services/billingMovementWeightService.js', () => ({
   getBillingMovementWeightRows: getBillingMovementWeightRowsMock,
   shapeBillingMovementWeightRow: (row) => row,
   BILLING_MOVEMENT_WEIGHT_VIEW_NAME: 'tgd_billing_movement_weight_v',
+}));
+
+vi.mock('../../src/services/movementLedgerReportService.js', () => ({
+  getMovementLedgerRows: getMovementLedgerRowsMock,
+  getConfirmedDepositReceiptRows: getConfirmedDepositReceiptRowsMock,
+  getConfirmedWithdrawalRows: getConfirmedWithdrawalRowsMock,
 }));
 
 vi.mock('../../src/services/masterDataService.js', () => ({
@@ -114,8 +126,15 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     getBillingInvoiceDraftBplusExportReadinessMock.mockReset();
     findActiveDuplicateDraftLinesMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
+    getMovementLedgerRowsMock.mockReset();
+    getConfirmedDepositReceiptRowsMock.mockReset();
+    getConfirmedWithdrawalRowsMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
+
+    getMovementLedgerRowsMock.mockResolvedValue({ data: [], error: null });
+    getConfirmedDepositReceiptRowsMock.mockResolvedValue({ data: [], error: null });
+    getConfirmedWithdrawalRowsMock.mockResolvedValue({ data: [validMovement, blockedMovement], error: null });
 
     listBillingInvoiceDraftsMock.mockResolvedValue({
       data: [{
@@ -321,8 +340,9 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
       </MemoryRouter>,
     );
 
-    const checkbox = await screen.findAllByTestId('billing-movement-row-checkbox');
-    fireEvent.click(checkbox[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select movement mv-1' }));
 
     const createButton = screen.getByTestId('create-invoice-draft-button');
     expect(createButton).toBeEnabled();
@@ -338,13 +358,12 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
   });
 
   it('shows validation error for mixed customer selection', async () => {
-    getBillingMovementWeightRowsMock.mockResolvedValue({
+    getConfirmedWithdrawalRowsMock.mockResolvedValue({
       data: [
         validMovement,
         { ...validMovement, movement_id: 'mv-3', customer_id: 'cust-2', customer_name: 'Beta' },
       ],
       error: null,
-      source: 'billing_database_view',
     });
 
     render(
@@ -354,6 +373,8 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
         </Routes>
       </MemoryRouter>,
     );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
 
     const checkboxes = await screen.findAllByTestId('billing-movement-row-checkbox');
     fireEvent.click(checkboxes[0]);
@@ -372,10 +393,9 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
   it('disables guarded movement and excludes it from select-all', async () => {
     const guardedMovement = { ...validMovement, movement_id: 'mv-guarded' };
     const releasedMovement = { ...validMovement, movement_id: 'mv-released' };
-    getBillingMovementWeightRowsMock.mockResolvedValue({
+    getConfirmedWithdrawalRowsMock.mockResolvedValue({
       data: [guardedMovement, releasedMovement],
       error: null,
-      source: 'billing_database_view',
     });
     findActiveDuplicateDraftLinesMock.mockResolvedValue({
       data: [{
@@ -393,6 +413,8 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
         </Routes>
       </MemoryRouter>,
     );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
 
     const guardedCheckbox = await screen.findByRole('checkbox', { name: 'Select movement mv-guarded' });
     const releasedCheckbox = screen.getByRole('checkbox', { name: 'Select movement mv-released' });
@@ -581,9 +603,16 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
     listBillingInvoiceDraftsMock.mockReset();
     getBillingInvoiceDraftByIdMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
+    getMovementLedgerRowsMock.mockReset();
+    getConfirmedDepositReceiptRowsMock.mockReset();
+    getConfirmedWithdrawalRowsMock.mockReset();
     findActiveDuplicateDraftLinesMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
+
+    getMovementLedgerRowsMock.mockResolvedValue({ data: [], error: null });
+    getConfirmedDepositReceiptRowsMock.mockResolvedValue({ data: [], error: null });
+    getConfirmedWithdrawalRowsMock.mockResolvedValue({ data: [validMovement], error: null });
 
     listBillingInvoiceDraftsMock.mockResolvedValue({ data: [], error: null });
     getBillingInvoiceDraftByIdMock.mockResolvedValue({
@@ -640,6 +669,9 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
     );
 
     expect(await screen.findByTestId('create-invoice-draft-button')).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
+
     expect(await screen.findAllByTestId('billing-movement-row-checkbox')).toHaveLength(1);
   });
 
