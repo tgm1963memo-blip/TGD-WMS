@@ -3,9 +3,13 @@
  *
  * GAPS COVERED:
  *
- * 1. tgd_review_customer_withdrawal_request role split (migration 007):
- *    ACCEPT/REJECT/REVIEWING → admin/accounting ONLY
- *    SEND_TO_PICKING/CONFIRM_DISPATCH → warehouse_staff/admin/accounting/warehouse_admin/warehouse_manager
+ * 1. tgd_review_customer_withdrawal_request permission split (migration 101):
+ *    ACCEPT/REJECT/REVIEWING → configurable via tgd_role_function_permissions
+ *      (function_key = customer_request_approve); default admin/accounting,
+ *      with warehouse_admin granted by default per business request.
+ *    SEND_TO_PICKING/CONFIRM_DISPATCH → configurable via function_key
+ *      customer_withdrawal_send_to_picking; default admin/accounting/
+ *      warehouse_admin/warehouse_manager/warehouse_staff.
  *
  * 2. tgd_record_withdrawal_line_pick: all active authenticated users allowed
  *
@@ -13,13 +17,14 @@
  *
  * 4. Proxy access: staff with proxy access can create/update/delete CWR drafts on behalf of customer
  *
- * Per the permission matrix defined in migration 007:
+ * Default permission matrix as of migration 101 (overridable per role from
+ * the Roles & Permissions admin page):
  *
  * | Decision        | admin | accounting | warehouse_admin | warehouse_manager | warehouse_staff | customer |
  * |-----------------|-------|------------|----------------|-------------------|-----------------|----------|
- * | REVIEWING       | ✓     | ✓          | ✗              | ✗                 | ✗               | ✗        |
- * | ACCEPT          | ✓     | ✓          | ✗              | ✗                 | ✗               | ✗        |
- * | REJECT          | ✓     | ✓          | ✗              | ✗                 | ✗               | ✗        |
+ * | REVIEWING       | ✓     | ✓          | ✓ (granted)    | ✗                 | ✗               | ✗        |
+ * | ACCEPT          | ✓     | ✓          | ✓ (granted)    | ✗                 | ✗               | ✗        |
+ * | REJECT          | ✓     | ✓          | ✓ (granted)    | ✗                 | ✗               | ✗        |
  * | SEND_TO_PICKING | ✓     | ✓          | ✓              | ✓                 | ✓               | ✗        |
  * | CONFIRM_DISPATCH| ✓     | ✓          | ✓              | ✓                 | ✓               | ✗        |
  */
@@ -214,9 +219,13 @@ test.describe('Post-UAT: Warehouse Role Permissions', () => {
     test.skip(true, 'No WAREHOUSE_PICKING row — skip');
   });
 
-  test('08 — Warehouse CANNOT see REVIEWING/ACCEPT buttons', async ({ page }) => {
-    // Warehouse staff should not see btn-open-work-order (which triggers REVIEWING+ACCEPT+SEND_TO_PICKING)
-    // because role guard would reject REVIEWING and ACCEPT. The UI should not show the button to them.
+  test('08 — Warehouse REVIEWING/ACCEPT depends on the granted permission (customer_request_approve)', async ({ page }) => {
+    // btn-open-work-order triggers REVIEWING+ACCEPT+SEND_TO_PICKING. Since migration 101,
+    // whether this succeeds depends on the tgd_role_function_permissions override for
+    // 'customer_request_approve': warehouse_admin is granted this by default (business
+    // request), warehouse_manager/warehouse_staff are not unless configured on the Roles &
+    // Permissions admin page. Either outcome is valid here — we only assert that a failure,
+    // if any, is a role/permission error rather than some other bug.
     // NOTE: This test is necessarily data-dependent and may be a soft check.
     if (!hasWarehouseCredentials()) {
       test.skip(true, 'No warehouse credentials — skip');
@@ -242,7 +251,6 @@ test.describe('Post-UAT: Warehouse Role Permissions', () => {
         const isVisible = await openWorkOrderBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
         if (isVisible) {
-          // If visible: clicking it should fail at DB level (role guard)
           await openWorkOrderBtn.click();
           await page.waitForTimeout(3000);
 
@@ -250,11 +258,13 @@ test.describe('Post-UAT: Warehouse Role Permissions', () => {
           const hasErr = await errBanner.isVisible({ timeout: 5000 }).catch(() => false);
           if (hasErr) {
             const errText = await errBanner.textContent();
-            // Should mention role/permission
+            // If it failed, it must fail for a role/permission reason, not some other bug
             expect(errText?.toLowerCase()).toMatch(/admin|accounting|role|permission/i);
           }
+          // If no error banner: the account's role has been granted customer_request_approve
+          // (e.g. warehouse_admin by default) — this is now a valid, expected outcome.
         }
-        await screenshot(page, '08-warehouse-no-admin-action.png');
+        await screenshot(page, '08-warehouse-open-work-order.png');
         return;
       }
     }

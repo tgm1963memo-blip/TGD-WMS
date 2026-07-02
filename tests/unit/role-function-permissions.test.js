@@ -41,17 +41,43 @@ describe('role function permissions', () => {
   it('builds matrix and diffs only non-default overrides', () => {
     const roleCodes = ['viewer', 'warehouse_admin'];
     const { matrix } = buildRoleFunctionMatrix(roleCodes, [
-      { role_code: 'viewer', function_key: 'receiving', is_allowed: true },
+      { role_code: 'viewer', function_key: 'movement_ledger', is_allowed: false },
     ]);
 
-    expect(matrix.viewer.receiving).toBe(true);
+    expect(matrix.viewer.movement_ledger).toBe(false);
 
     const diff = diffRoleFunctionOverrides('viewer', {
       ...matrix.viewer,
-      receiving: false,
+      movement_ledger: true,
     });
 
     expect(diff.toUpsert).toEqual([]);
-    expect(diff.toDelete).toContain('receiving');
+    expect(diff.toDelete).toContain('movement_ledger');
+  });
+
+  it('builds a tri-state (none/read/write) matrix cell for write-capable functions like receiving', () => {
+    const roleCodes = ['warehouse_admin', 'accounting'];
+    const { matrix } = buildRoleFunctionMatrix(roleCodes, []);
+
+    // warehouse_admin has default write access; accounting has no default
+    // page access at all (receiving is hidden from the accounting nav group)
+    expect(matrix.warehouse_admin.receiving).toBe('write');
+    expect(matrix.accounting.receiving).toBe('none');
+
+    // Granting accounting access without specifying a level defaults to
+    // read-only (accounting is listed as a read-only role for 'receiving').
+    const { matrix: grantedMatrix } = buildRoleFunctionMatrix(roleCodes, [
+      { role_code: 'accounting', function_key: 'receiving', is_allowed: true, access_level: 'read' },
+    ]);
+    expect(grantedMatrix.accounting.receiving).toBe('read');
+
+    const diff = diffRoleFunctionOverrides('accounting', {
+      receiving: 'write',
+    });
+
+    expect(diff.toDelete).toEqual([]);
+    expect(diff.toUpsert).toEqual([
+      { function_key: 'receiving', is_allowed: true, access_level: 'write' },
+    ]);
   });
 });

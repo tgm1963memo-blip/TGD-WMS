@@ -25,11 +25,11 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer })
           <h2 style={{ margin: 0, fontSize: 16 }}>{title}</h2>
           <button className="btn btn-secondary btn-sm" onClick={onClose} type="button" aria-label="ปิด">✕</button>
         </div>
-        <div style={{ padding: 20 }}>
+        <div className="operational-report-modal-scroll-body">
           {children}
         </div>
         {footer ? (
-          <div style={{ padding: '12px 20px', borderTop: '1px solid var(--tgd-border)', background: 'var(--tgd-surface)' }}>
+          <div className="operational-report-modal-footer">
             {footer}
           </div>
         ) : null}

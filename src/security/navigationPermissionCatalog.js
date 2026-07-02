@@ -5,6 +5,37 @@ import { resolveNavigationItemPath } from './navigationPaths.js';
 const FUNCTION_BY_KEY = new Map();
 const FUNCTIONS_BY_PATH = new Map();
 
+// Action-level permissions that gate specific buttons/RPCs rather than an
+// entire page. These have no navigation path — their defaults come from
+// defaultAllowedRoles instead of route minimum_role — but they are enforced
+// server-side (see tgd_role_function_allowed calls in the RPCs) and can be
+// overridden per role from the Roles & Permissions settings page.
+const ACTION_PERMISSION_GROUP_KEY = 'customer_request_actions';
+const ACTION_PERMISSION_GROUP_LABEL = 'การอนุมัติ/ดำเนินการคำขอลูกค้า';
+
+const ACTION_PERMISSIONS = [
+  {
+    functionKey: 'customer_request_approve',
+    label: 'อนุมัติคำขอฝาก/เบิกสินค้า (อนุมัติ/ปฏิเสธ)',
+    defaultAllowedRoles: ['admin', 'accounting'],
+  },
+  {
+    functionKey: 'customer_withdrawal_send_to_picking',
+    label: 'เบิกใบงาน (ส่งหยิบสินค้า / ยืนยันจ่ายสินค้า)',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_admin', 'warehouse_manager', 'warehouse_staff'],
+  },
+  {
+    functionKey: 'customer_deposit_confirm_receipt',
+    label: 'ยืนยันการรับเข้าคลัง',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin'],
+  },
+  {
+    functionKey: 'customer_request_proxy',
+    label: 'สร้าง/แจ้งเบิกแทนลูกค้า (Proxy)',
+    defaultAllowedRoles: ['admin', 'warehouse_admin', 'warehouse_manager', 'warehouse_staff'],
+  },
+];
+
 function registerFunction(entry) {
   FUNCTION_BY_KEY.set(entry.functionKey, entry);
   const path = entry.path;
@@ -35,6 +66,18 @@ function buildCatalog() {
       });
     }
   }
+
+  for (const action of ACTION_PERMISSIONS) {
+    registerFunction({
+      functionKey: action.functionKey,
+      label: action.label,
+      groupKey: ACTION_PERMISSION_GROUP_KEY,
+      groupLabel: ACTION_PERMISSION_GROUP_LABEL,
+      path: null,
+      minimumRole: null,
+      defaultAllowedRoles: action.defaultAllowedRoles,
+    });
+  }
 }
 
 export function listNavigationPermissionFunctions() {
@@ -61,6 +104,33 @@ export function getFunctionKeysForPath(routePath) {
     }
   }
   return [...new Set(matches)];
+}
+
+// Function keys whose page has data-entry forms/actions (save, confirm,
+// edit, submit) — for these, the Roles & Permissions settings page offers a
+// three-way control (no access / read-only / read-write) instead of a plain
+// on-off checkbox. Pages that are purely informational (dashboards, reports,
+// read-only lists) are intentionally left out — "read-only" wouldn't mean
+// anything different from "allowed" there.
+const WRITE_CAPABLE_FUNCTION_KEYS = new Set([
+  'receiving',
+  'withdrawal_request',
+  'scan_center',
+  'customer_deposit_request',
+  'customer_withdrawal_request',
+  'customer_product_catalog_admin',
+  'customer_request_policy_admin',
+  'product_service_rates_admin',
+  'opening_balance_import',
+  'master_data',
+  'warehouse_location_setup',
+  'user_management',
+  'email_settings',
+  'billing_invoice_drafts',
+]);
+
+export function isWriteCapableFunctionKey(functionKey) {
+  return WRITE_CAPABLE_FUNCTION_KEYS.has(String(functionKey ?? ''));
 }
 
 export function listNavigationPermissionFunctionsByGroup() {

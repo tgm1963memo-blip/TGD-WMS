@@ -20,11 +20,15 @@ import {
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
+import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
+  const { role: userRole } = useUserRole();
+  const canWrite = hasRoleFunctionWriteAccess(userRole, 'withdrawal_request');
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -127,11 +131,11 @@ export function CustomerAdminWithdrawalReviewPage() {
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
 
-  const canOpenWorkOrder = selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
-  const canSendToHandheld = selected && selected.status === 'ADMIN_ACCEPTED';
-  const canConfirmWithdrawal = selected && selected.status === 'WAREHOUSE_PICKING';
-  const canReject = selected && !['ADMIN_REJECTED', 'REJECTED', 'COMPLETED', 'DISPATCHED', 'CANCELLED'].includes(selected.status);
-  const canCancel = selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
+  const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  const canSendToHandheld = canWrite && selected && selected.status === 'ADMIN_ACCEPTED';
+  const canConfirmWithdrawal = canWrite && selected && selected.status === 'WAREHOUSE_PICKING';
+  const canReject = canWrite && selected && !['ADMIN_REJECTED', 'REJECTED', 'COMPLETED', 'DISPATCHED', 'CANCELLED'].includes(selected.status);
+  const canCancel = canWrite && selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
 
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
@@ -417,6 +421,64 @@ export function CustomerAdminWithdrawalReviewPage() {
         onClose={() => setDetailOpen(false)}
         title={selected?.withdrawal_no ?? t('admin_withdrawal_review_title')}
         size="xl"
+        footer={selected ? (
+          <div className="action-row">
+            {canOpenWorkOrder ? (
+              <button
+                className="btn btn-primary"
+                data-testid="btn-open-work-order"
+                disabled={submitting}
+                onClick={handleOpenWorkOrder}
+                type="button"
+              >
+                {submitting ? '...' : t('admin_open_work_order')}
+              </button>
+            ) : null}
+            {canSendToHandheld ? (
+              <button
+                className="btn btn-primary"
+                data-testid="btn-send-to-handheld"
+                disabled={submitting}
+                onClick={handleSendToHandheld}
+                type="button"
+              >
+                {submitting ? '...' : t('admin_send_to_handheld')}
+              </button>
+            ) : null}
+            {canConfirmWithdrawal ? (
+              <button
+                className="btn btn-primary"
+                data-testid="btn-confirm-withdrawal"
+                disabled={submitting}
+                onClick={handleConfirmWithdrawal}
+                type="button"
+              >
+                {submitting ? '...' : t('admin_confirm_withdrawal')}
+              </button>
+            ) : null}
+            {canReject ? (
+              <button
+                className="btn btn-danger"
+                data-testid="btn-reject-withdrawal"
+                disabled={submitting}
+                onClick={() => setRejectOpen(true)}
+                type="button"
+              >
+                {t('admin_reject_request')}
+              </button>
+            ) : null}
+            {canCancel ? (
+              <button
+                className="btn btn-secondary"
+                disabled={submitting}
+                onClick={() => { setCancelComment(''); setCancelOpen(true); }}
+                type="button"
+              >
+                ยกเลิกเอกสาร
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       >
         {selected ? (
           <>
@@ -530,7 +592,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
-                              disabled={savingAdminNote[line.id]}
+                              disabled={!canWrite || savingAdminNote[line.id]}
                               style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
                               onClick={async () => {
                                 setSavingAdminNote((prev) => ({ ...prev, [line.id]: true }));
@@ -546,7 +608,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                           </div>
                         </td>
                         <td>
-                          {!['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status) ? (
+                          {canWrite && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status) ? (
                             <button
                               className="btn btn-secondary btn-sm"
                               type="button"
@@ -578,64 +640,6 @@ export function CustomerAdminWithdrawalReviewPage() {
               <span>{t('admin_review_comment_label')}</span>
               <textarea className="form-control" sortedData={2} value={comment} onChange={(e) => setComment(e.target.value)} />
             </label>
-
-            {/* Action buttons */}
-            <div className="action-row">
-              {canOpenWorkOrder ? (
-                <button
-                  className="btn btn-primary"
-                  data-testid="btn-open-work-order"
-                  disabled={submitting}
-                  onClick={handleOpenWorkOrder}
-                  type="button"
-                >
-                  {submitting ? '...' : t('admin_open_work_order')}
-                </button>
-              ) : null}
-              {canSendToHandheld ? (
-                <button
-                  className="btn btn-primary"
-                  data-testid="btn-send-to-handheld"
-                  disabled={submitting}
-                  onClick={handleSendToHandheld}
-                  type="button"
-                >
-                  {submitting ? '...' : t('admin_send_to_handheld')}
-                </button>
-              ) : null}
-              {canConfirmWithdrawal ? (
-                <button
-                  className="btn btn-primary"
-                  data-testid="btn-confirm-withdrawal"
-                  disabled={submitting}
-                  onClick={handleConfirmWithdrawal}
-                  type="button"
-                >
-                  {submitting ? '...' : t('admin_confirm_withdrawal')}
-                </button>
-              ) : null}
-              {canReject ? (
-                <button
-                  className="btn btn-danger"
-                  data-testid="btn-reject-withdrawal"
-                  disabled={submitting}
-                  onClick={() => setRejectOpen(true)}
-                  type="button"
-                >
-                  {t('admin_reject_request')}
-                </button>
-              ) : null}
-              {canCancel ? (
-                <button
-                  className="btn btn-secondary"
-                  disabled={submitting}
-                  onClick={() => { setCancelComment(''); setCancelOpen(true); }}
-                  type="button"
-                >
-                  ยกเลิกเอกสาร
-                </button>
-              ) : null}
-            </div>
           </>
         ) : null}
       </Modal>

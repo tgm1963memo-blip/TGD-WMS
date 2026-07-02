@@ -6,7 +6,7 @@ import { PRODUCTION_ROLES, PRODUCTION_ROLE_DESCRIPTIONS } from '../../security/p
 import { getUserProfiles } from '../../services/userManagementService.js';
 import { listRoleFunctionPermissions, resetRoleFunctionPermissions, saveRoleFunctionPermissionOverrides } from '../../services/roleFunctionPermissionService.js';
 import { refreshRolePermissionCache } from '../../services/roleAreaPermissionCacheService.js';
-import { listNavigationPermissionFunctionsByGroup } from '../../security/navigationPermissionCatalog.js';
+import { listNavigationPermissionFunctionsByGroup, isWriteCapableFunctionKey } from '../../security/navigationPermissionCatalog.js';
 import {
   buildRoleFunctionMatrix,
   diffAllRoleFunctionOverrides,
@@ -16,6 +16,16 @@ import {
   getDefaultFunctionAccess,
   getRoleFunctionOverride,
 } from '../../security/roleFunctionPermissions.js';
+
+const ACCESS_STATE_OPTIONS = [
+  { value: 'none', label: 'ไม่มีสิทธิ์' },
+  { value: 'read', label: 'อ่านอย่างเดียว' },
+  { value: 'write', label: 'แก้ไขได้' },
+];
+
+function toAccessState(rawValue) {
+  return rawValue === 'read' || rawValue === 'write' ? rawValue : 'none';
+}
 
 const GROUP_LABELS_TH = {
   main_operation: 'การดำเนินงานหลัก',
@@ -27,6 +37,7 @@ const GROUP_LABELS_TH = {
   billing: 'การเรียกเก็บเงิน',
   reports: 'รายงาน',
   system_administration: 'ระบบผู้ดูแล',
+  customer_request_actions: 'การอนุมัติ/ดำเนินการคำขอลูกค้า',
 };
 
 const MATRIX_ROLE_ORDER = ['admin', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff', 'accounting', 'viewer', 'customer_admin', 'customer_user'];
@@ -143,18 +154,55 @@ function EditablePermissionMatrix({
                     {matrixRoles.map((role) => {
                       const roleCode = role.role_code;
                       const isAdminLocked = roleCode === 'admin';
-                      const displayValue = Boolean(draftMatrix?.[roleCode]?.[fn.functionKey]);
-                      const savedValue = Boolean(savedMatrix?.[roleCode]?.[fn.functionKey]);
-                      const isOverride = getRoleFunctionOverride(roleCode, fn.functionKey) !== undefined
-                        || displayValue !== getDefaultFunctionAccess(roleCode, fn.functionKey);
+                      const isWriteCapable = isWriteCapableFunctionKey(fn.functionKey);
 
                       if (isAdminLocked) {
                         return (
                           <td key={roleCode} style={{ padding: '8px', textAlign: 'center', background: '#fafafa' }}>
-                            <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} style={{ width: 24, height: 24, accentColor: '#cbd5e1' }} />
+                            {isWriteCapable ? (
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>แก้ไขได้</span>
+                            ) : (
+                              <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} style={{ width: 24, height: 24, accentColor: '#cbd5e1' }} />
+                            )}
                           </td>
                         );
                       }
+
+                      if (isWriteCapable) {
+                        const displayState = toAccessState(draftMatrix?.[roleCode]?.[fn.functionKey]);
+                        const savedState = toAccessState(savedMatrix?.[roleCode]?.[fn.functionKey]);
+                        const isOverride = getRoleFunctionOverride(roleCode, fn.functionKey) !== undefined
+                          || displayState !== savedState;
+
+                        return (
+                          <td key={roleCode} style={{ padding: '8px', textAlign: 'center' }}>
+                            <select
+                              data-testid={`role-permission-level-${roleCode}-${fn.functionKey}`}
+                              value={displayState}
+                              onChange={(e) => onToggle(roleCode, fn.functionKey, e.target.value)}
+                              aria-label={`${role.display_name} ${fn.label}`}
+                              style={{
+                                fontSize: 11,
+                                padding: '4px 6px',
+                                borderRadius: 6,
+                                border: `1px solid ${isOverride ? '#1d6fcf' : '#e5e7eb'}`,
+                                color: isOverride ? '#1d6fcf' : '#374151',
+                                background: '#fff',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {ACCESS_STATE_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                        );
+                      }
+
+                      const displayValue = Boolean(draftMatrix?.[roleCode]?.[fn.functionKey]);
+                      const savedValue = Boolean(savedMatrix?.[roleCode]?.[fn.functionKey]);
+                      const isOverride = getRoleFunctionOverride(roleCode, fn.functionKey) !== undefined
+                        || displayValue !== getDefaultFunctionAccess(roleCode, fn.functionKey);
 
                       return (
                         <td key={roleCode} style={{ padding: '8px', textAlign: 'center' }}>
@@ -201,6 +249,10 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
     setDraft((prev) => ({ ...prev, [functionKey]: !prev[functionKey] }));
   }
 
+  function setAccessState(functionKey, value) {
+    setDraft((prev) => ({ ...prev, [functionKey]: value }));
+  }
+
   return (
     <div style={{
       margin: '0 0 8px',
@@ -245,6 +297,33 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
             {group.items.map((fn) => {
+              if (isWriteCapableFunctionKey(fn.functionKey)) {
+                const state = toAccessState(draft[fn.functionKey]);
+                const isCustomized = state !== toAccessState(initialDraft[fn.functionKey]);
+                return (
+                  <div
+                    key={fn.functionKey}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      padding: '10px 14px',
+                      background: '#fff', borderRadius: 8,
+                      border: `1px solid ${isCustomized ? '#93c5fd' : '#e5e7eb'}`,
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{fn.label}</div>
+                    <select
+                      value={state}
+                      onChange={(e) => setAccessState(fn.functionKey, e.target.value)}
+                      style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid #e5e7eb', cursor: 'pointer' }}
+                    >
+                      {ACCESS_STATE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
               const isOn = Boolean(draft[fn.functionKey]);
               const isDefault = getDefaultFunctionAccess(role.role_code, fn.functionKey);
               const isCustomized = isOn !== isDefault;

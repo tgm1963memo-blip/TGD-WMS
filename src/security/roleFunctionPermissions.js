@@ -1,9 +1,18 @@
-import { listNavigationPermissionFunctions } from './navigationPermissionCatalog.js';
+import { listNavigationPermissionFunctions, isWriteCapableFunctionKey } from './navigationPermissionCatalog.js';
 import { isLegacyNavigationItemVisibleForRole } from './legacyNavigationVisibility.js';
 import { resolveRoleForDefaults } from './roleAreaPermissions.js';
 
 const overridesByRole = new Map();
+const accessLevelOverridesByRole = new Map();
 const baseRoleByCode = new Map();
+
+// Roles that historically only had view access on a write-capable page
+// (everyone else who has access defaults to read-write). Kept explicit and
+// per-function so turning this system on doesn't silently grant write access
+// nobody had before.
+const DEFAULT_READ_ONLY_ROLES_BY_FUNCTION = {
+  receiving: ['accounting'],
+};
 
 function normalizeRoleCode(roleCode) {
   return String(roleCode ?? '').trim().toLowerCase();
@@ -11,6 +20,7 @@ function normalizeRoleCode(roleCode) {
 
 export function setRoleFunctionPermissionCache(rows = [], roleDefinitions = []) {
   overridesByRole.clear();
+  accessLevelOverridesByRole.clear();
   baseRoleByCode.clear();
 
   for (const row of rows) {
@@ -21,6 +31,14 @@ export function setRoleFunctionPermissionCache(rows = [], roleDefinitions = []) 
       overridesByRole.set(roleCode, new Map());
     }
     overridesByRole.get(roleCode).set(functionKey, Boolean(row.is_allowed));
+
+    // Any stored row carries a concrete access_level (DB column is NOT NULL
+    // default 'write'); mirror that default here so this matches
+    // buildRoleFunctionMatrix's handling of the same rows.
+    if (!accessLevelOverridesByRole.has(roleCode)) {
+      accessLevelOverridesByRole.set(roleCode, new Map());
+    }
+    accessLevelOverridesByRole.get(roleCode).set(functionKey, row.access_level === 'read' ? 'read' : 'write');
   }
 
   for (const def of roleDefinitions) {
@@ -56,6 +74,11 @@ export function getDefaultFunctionAccess(roleCode, functionKey) {
   }
 
   const baseRole = resolveRoleForDefaults(roleCode);
+
+  if (fn.defaultAllowedRoles) {
+    return fn.defaultAllowedRoles.includes(baseRole);
+  }
+
   return isLegacyNavigationItemVisibleForRole(
     { key: fn.functionKey, path: fn.path },
     fn.groupKey,
@@ -79,6 +102,50 @@ export function hasRoleFunctionAccess(roleCode, functionKey) {
   return getDefaultFunctionAccess(role, key);
 }
 
+export function getRoleFunctionAccessLevelOverride(roleCode, functionKey) {
+  const role = normalizeRoleCode(roleCode);
+  const key = String(functionKey ?? '');
+  const roleLevels = accessLevelOverridesByRole.get(role);
+  if (!roleLevels || !roleLevels.has(key)) {
+    return undefined;
+  }
+  return roleLevels.get(key);
+}
+
+export function getDefaultFunctionAccessLevel(roleCode, functionKey) {
+  const role = normalizeRoleCode(roleCode);
+  const key = String(functionKey ?? '');
+  const readOnlyRoles = DEFAULT_READ_ONLY_ROLES_BY_FUNCTION[key] ?? [];
+  return readOnlyRoles.includes(role) ? 'read' : 'write';
+}
+
+/**
+ * Combined access state for a write-capable function: 'none' | 'read' | 'write'.
+ * For functions that are not write-capable, treat any access as 'write' (the
+ * read/write distinction only applies to pages with data-entry forms).
+ */
+export function getFunctionAccessState(roleCode, functionKey) {
+  const role = normalizeRoleCode(roleCode);
+  const key = String(functionKey ?? '');
+
+  if (role === 'admin') {
+    return 'write';
+  }
+  if (!hasRoleFunctionAccess(role, key)) {
+    return 'none';
+  }
+  if (!isWriteCapableFunctionKey(key)) {
+    return 'write';
+  }
+
+  const override = getRoleFunctionAccessLevelOverride(role, key);
+  return override ?? getDefaultFunctionAccessLevel(role, key);
+}
+
+export function hasRoleFunctionWriteAccess(roleCode, functionKey) {
+  return getFunctionAccessState(roleCode, functionKey) === 'write';
+}
+
 export function listPermissionFunctions() {
   return listNavigationPermissionFunctions();
 }
@@ -87,7 +154,10 @@ export function buildRoleFunctionMatrix(roleCodes = [], overrides = []) {
   const overrideMap = new Map();
   for (const row of overrides) {
     const mapKey = `${normalizeRoleCode(row.role_code)}:${row.function_key}`;
-    overrideMap.set(mapKey, Boolean(row.is_allowed));
+    overrideMap.set(mapKey, {
+      isAllowed: Boolean(row.is_allowed),
+      accessLevel: row.access_level === 'read' ? 'read' : 'write',
+    });
   }
 
   const functions = listPermissionFunctions().map((fn) => fn.functionKey);
@@ -98,9 +168,19 @@ export function buildRoleFunctionMatrix(roleCodes = [], overrides = []) {
     matrix[role] = {};
     for (const functionKey of functions) {
       const mapKey = `${role}:${functionKey}`;
-      matrix[role][functionKey] = overrideMap.has(mapKey)
-        ? overrideMap.get(mapKey)
-        : getDefaultFunctionAccess(role, functionKey);
+      const override = overrideMap.get(mapKey);
+      const isAllowed = override ? override.isAllowed : getDefaultFunctionAccess(role, functionKey);
+
+      if (!isWriteCapableFunctionKey(functionKey)) {
+        matrix[role][functionKey] = isAllowed;
+        continue;
+      }
+
+      if (!isAllowed) {
+        matrix[role][functionKey] = 'none';
+      } else {
+        matrix[role][functionKey] = override?.accessLevel ?? getDefaultFunctionAccessLevel(role, functionKey);
+      }
     }
   }
 
@@ -112,9 +192,24 @@ export function diffRoleFunctionOverrides(roleCode, desiredMatrix = {}) {
   const toUpsert = [];
   const toDelete = [];
 
-  for (const [functionKey, isAllowed] of Object.entries(desiredMatrix)) {
+  for (const [functionKey, desiredValue] of Object.entries(desiredMatrix)) {
+    if (isWriteCapableFunctionKey(functionKey)) {
+      const desiredState = desiredValue === 'write' || desiredValue === 'read' ? desiredValue : 'none';
+      const desiredAllowed = desiredState !== 'none';
+      const desiredLevel = desiredState === 'read' ? 'read' : 'write';
+      const defaultAllowed = getDefaultFunctionAccess(role, functionKey);
+      const defaultLevel = getDefaultFunctionAccessLevel(role, functionKey);
+
+      if (desiredAllowed === defaultAllowed && (!desiredAllowed || desiredLevel === defaultLevel)) {
+        toDelete.push(functionKey);
+      } else {
+        toUpsert.push({ function_key: functionKey, is_allowed: desiredAllowed, access_level: desiredLevel });
+      }
+      continue;
+    }
+
     const defaultAllowed = getDefaultFunctionAccess(role, functionKey);
-    const wantsAllowed = Boolean(isAllowed);
+    const wantsAllowed = Boolean(desiredValue);
     if (wantsAllowed === defaultAllowed) {
       toDelete.push(functionKey);
     } else {
@@ -147,10 +242,16 @@ export function diffAllRoleFunctionOverrides(baselineMatrix = {}, draftMatrix = 
   return changedRoles;
 }
 
+function normalizeCellValue(value) {
+  // Tri-state cells ('none' | 'read' | 'write') must compare by exact string —
+  // coercing to boolean would treat 'read' and 'write' as the same value.
+  return typeof value === 'string' ? value : Boolean(value);
+}
+
 function draftsAreEqual(left, right) {
   const keys = new Set([...Object.keys(left ?? {}), ...Object.keys(right ?? {})]);
   for (const key of keys) {
-    if (Boolean(left?.[key]) !== Boolean(right?.[key])) {
+    if (normalizeCellValue(left?.[key]) !== normalizeCellValue(right?.[key])) {
       return false;
     }
   }
