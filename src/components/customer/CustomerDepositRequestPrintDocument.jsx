@@ -21,8 +21,11 @@ function fmtDT(iso) {
 
 const TH = { border: '1px solid #bbb', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' };
 const TD = { border: '1px solid #bbb', padding: '4px 6px', fontSize: 10 };
+// Reference numbers must stay fully readable, so wrap onto a second line
+// instead of clipping — an ellipsis would hide digits needed for reference.
+const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
 const MK = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingRight: 4, paddingBottom: 2 };
-const MV = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const MV = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerDepositRequestPrintDocument({
   header,
@@ -62,7 +65,7 @@ export function CustomerDepositRequestPrintDocument({
       <div style={{ minHeight: 28 }} />
       <div style={{ borderTop: '1px solid #000', paddingTop: 3, fontWeight: 700, fontSize: 10 }}>{label}</div>
       {sublabel && <div style={{ fontSize: 9, color: '#666', marginTop: 1 }}>{sublabel}</div>}
-      <div style={{ color: '#333', fontSize: 10, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ color: '#333', fontSize: 10, marginTop: 3, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
         {name ?? <span style={{ color: '#bbb' }}>____________________</span>}
       </div>
       <div style={{ color: '#888', fontSize: 9 }}>{dt ?? ''}</div>
@@ -73,7 +76,7 @@ export function CustomerDepositRequestPrintDocument({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-deposit-print-document"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       <div style={{
@@ -158,7 +161,7 @@ export function CustomerDepositRequestPrintDocument({
               <td style={MK}>สถานะ</td>
               <td style={MV}>{getDepositStatusLabel(header.status, t) || fmt(header.status)}</td>
               <td style={MK}>REMARK</td>
-              <td style={{ ...MV, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmt(header.note)}</td>
+              <td style={MV}>{fmt(header.note)}</td>
             </tr>
           </tbody>
         </table>
@@ -186,23 +189,23 @@ export function CustomerDepositRequestPrintDocument({
         <tbody>
           {lines.length ? lines.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
-              <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{line.line_no}</td>
-              <td style={{ ...TD, whiteSpace: 'nowrap' }}>{line.customer_product_code ?? '-'}</td>
+              <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.line_no}</td>
+              <td style={TD_SAFE}>{line.customer_product_code ?? '-'}</td>
               <td style={TD}>{line.product_name ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.weight_per_box ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{line.expected_weight ?? '-'}</td>
-              <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{line.expected_boxes ?? '-'}</td>
-              <td style={{ ...TD, whiteSpace: 'nowrap' }}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
-              {hasLot && <td style={{ ...TD, whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
-              {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.mfg_date)}</td>}
-              {hasLot && <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.exp_date)}</td>}
+              <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.weight_per_box ?? '-'}</td>
+              <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
+              <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.expected_boxes ?? '-'}</td>
+              <td style={TD_SAFE}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
+              {hasLot && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
+              {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>}
+              {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>}
               {hasActual && (
-                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 700, color: line.actual_boxes != null ? '#16a34a' : undefined }}>
+                <td style={{ ...TD_SAFE, textAlign: 'center', fontWeight: 700, color: line.actual_boxes != null ? '#16a34a' : undefined }}>
                   {line.actual_boxes ?? '-'}
                 </td>
               )}
               {hasActual && (
-                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, color: line.actual_weight != null ? '#16a34a' : undefined }}>
+                <td style={{ ...TD_SAFE, textAlign: 'right', fontWeight: 700, color: line.actual_weight != null ? '#16a34a' : undefined }}>
                   {line.actual_weight ?? '-'}
                 </td>
               )}

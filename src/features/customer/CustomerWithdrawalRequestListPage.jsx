@@ -316,6 +316,7 @@ export function CustomerWithdrawalRequestListPage() {
               )}
               <ReportPrintActions
                 disabled={!detailRow}
+                orientation="landscape"
                 renderReport={(reportLanguage) => (
                   <CustomerWithdrawalRequestPrintDocument
                     branding={branding}

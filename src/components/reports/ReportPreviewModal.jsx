@@ -2,6 +2,21 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
+// Shared by ReportPreviewModal's own print button and ReportPrintActions'
+// toolbar shortcut, so both paths honor `orientation` instead of only the
+// one that goes through the modal's print button.
+export function printWithOrientation(orientation) {
+  let injected = null;
+  if (orientation === 'landscape') {
+    injected = document.createElement('style');
+    injected.id = '__print-page-orientation__';
+    injected.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    document.head.appendChild(injected);
+  }
+  window.print();
+  if (injected) document.head.removeChild(injected);
+}
+
 export function ReportPreviewModal({
   open = false,
   title,
@@ -33,17 +48,7 @@ export function ReportPreviewModal({
   const printLabel = getTranslation('print', language) || 'Print';
   const closeLabel = getTranslation('close', language) || 'Close';
 
-  const handlePrint = () => {
-    let injected = null;
-    if (orientation === 'landscape') {
-      injected = document.createElement('style');
-      injected.id = '__print-page-orientation__';
-      injected.textContent = '@page { size: A4 landscape; margin: 8mm; }';
-      document.head.appendChild(injected);
-    }
-    window.print();
-    if (injected) document.head.removeChild(injected);
-  };
+  const handlePrint = () => printWithOrientation(orientation);
 
   return createPortal(
     <div className="operational-report-modal-backdrop" role="presentation" onClick={onClose}>

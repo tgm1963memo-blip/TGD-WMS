@@ -515,6 +515,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             <div className="action-row" style={{ marginBottom: 16 }}>
               <ReportPrintActions
                 disabled={false}
+                orientation="landscape"
                 renderReport={(language) => (
                   <CustomerWithdrawalRequestPrintDocument
                     branding={branding}

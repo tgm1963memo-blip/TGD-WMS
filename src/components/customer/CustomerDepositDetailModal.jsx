@@ -295,6 +295,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             <div className="action-row" style={{ marginBottom: 16 }}>
               <ReportPrintActions
                 disabled={false}
+                orientation="landscape"
                 renderReport={(language) => (
                   <CustomerDepositStaffWorkOrderPrint
                     branding={branding}

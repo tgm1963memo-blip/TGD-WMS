@@ -44,7 +44,7 @@ export function CustomerDepositStaffWorkOrderPrint({
     <article
       className="operational-report-print-document customer-staff-work-order-print"
       data-testid="customer-deposit-staff-work-order-print"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       {(() => {
@@ -182,9 +182,10 @@ export function CustomerDepositStaffWorkOrderPrint({
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
             const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
-            // Cells with fixed-width nowrap text must clip instead of overflowing into the
-            // neighboring cell (table-layout: fixed lets overflow bleed visually otherwise).
-            const TD_NOWRAP = { ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+            // Reference numbers (LOT, tracking code, product code) must stay fully
+            // readable — wrap onto a second line rather than clip with an ellipsis,
+            // which would hide digits staff need for verification.
+            const TD_NOWRAP = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
                 <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{idx + 1}</td>

@@ -107,6 +107,7 @@ export function CustomerWithdrawalRequestDetailPage() {
             )}
             <ReportPrintActions
               disabled={!header}
+              orientation="landscape"
               renderReport={(reportLanguage) => (
                 <CustomerWithdrawalRequestPrintDocument
                   branding={branding}

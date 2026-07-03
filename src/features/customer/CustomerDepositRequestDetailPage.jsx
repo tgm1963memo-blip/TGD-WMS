@@ -113,6 +113,7 @@ export function CustomerDepositRequestDetailPage() {
             )}
             <ReportPrintActions
               disabled={!header}
+              orientation="landscape"
               renderReport={(reportLanguage) => (
                 <CustomerDepositRequestPrintDocument
                   branding={branding}

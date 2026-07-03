@@ -1696,6 +1696,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState(null);
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -1754,6 +1755,33 @@ function LocationUpdateWorkflow({ onBack, t }) {
       setLines(r.data ?? []);
       setLinesLoading(false);
       setSelectedLine(null);
+    });
+    if (doc.customer_id) {
+      listCustomerProducts({ customerId: doc.customer_id }).then((r) => setCatalogProducts(r.data ?? []));
+    } else {
+      setCatalogProducts([]);
+    }
+  }
+
+  function handlePrintSticker(line, event) {
+    event.stopPropagation();
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
+    const locationCode = locations.find((loc) => loc.id === line.location_id)?.code;
+    const quantityParts = [];
+    if (line.actual_boxes ?? line.expected_boxes) quantityParts.push(`${Number(line.actual_boxes ?? line.expected_boxes).toLocaleString()} กล่อง`);
+    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${Number(line.actual_weight ?? line.expected_weight).toLocaleString()} กก.`);
+    printSticker({
+      depositDate: selectedDoc?.expected_arrival_date,
+      customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
+      productCode: line.customer_product_code ?? line.internal_product_code ?? '',
+      productName: line.product_name,
+      lotNo: line.lot_no,
+      storageLabel: getTemperatureTypeShortLabel(line.temperature_type),
+      quantityLabel: quantityParts.join(' / ') || '-',
+      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      mfgDate: line.mfg_date,
+      locationCode,
+      trackingCode: line.tracking_code ?? '-',
     });
   }
 
@@ -1906,12 +1934,22 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2 }}>{l.product_name ?? l.customer_product_code}</div>
                       <div style={{ fontSize: 12, color: C.textSec }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง · วันที่รับ: {selectedDoc.expected_arrival_date ?? '-'}</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                       {hasloc ? (
                         <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
                       ) : (
                         <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13 }}>📍 ระบุ Location</span>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => handlePrintSticker(l, e)}
+                        style={{
+                          background: C.primary, color: '#fff', border: 'none', borderRadius: 10,
+                          padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        🖨 พิมพ์สติกเกอร์
+                      </button>
                     </div>
                   </div>
                 </div>

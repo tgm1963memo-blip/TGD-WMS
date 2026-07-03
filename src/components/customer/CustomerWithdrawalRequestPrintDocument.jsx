@@ -18,8 +18,11 @@ function fmtDT(iso) {
 const NCOLS = 10;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
+// Reference numbers must stay fully readable, so wrap onto a second line
+// instead of clipping — hidden overflow would silently drop characters.
+const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
 const META_KEY = { fontWeight: 600, fontSize: 11, paddingBottom: 2, whiteSpace: 'nowrap' };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerWithdrawalRequestPrintDocument({
   header,
@@ -50,7 +53,7 @@ export function CustomerWithdrawalRequestPrintDocument({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-withdrawal-print-document"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '237mm' }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       {(() => {
@@ -140,7 +143,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             {header.note ? (
               <tr>
                 <td style={META_KEY}>REMARK</td>
-                <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.note}</td>
+                <td colSpan={3} style={META_VAL}>{header.note}</td>
               </tr>
             ) : null}
           </tbody>
@@ -184,7 +187,7 @@ export function CustomerWithdrawalRequestPrintDocument({
           {lines.length ? lines.map((line, idx) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
-              <td style={TD}>
+              <td style={TD_SAFE}>
                 <div style={{ fontWeight: 600 }}>{fmt(line.lot_no)}</div>
                 {line.location ? <div style={{ fontSize: 9, color: '#555' }}>{line.location}</div> : null}
               </td>
@@ -192,7 +195,7 @@ export function CustomerWithdrawalRequestPrintDocument({
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
-              <td style={TD}>{fmt(line.customer_product_code ?? line.product_code)}</td>
+              <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
               <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(line.requested_weight)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
@@ -246,7 +249,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             <div key={label} style={{ textAlign: 'center' }}>
               <div style={{ minHeight: 20 }} />
               <div style={{ borderTop: '1px solid #000', paddingTop: 3, fontWeight: 700, fontSize: 10 }}>{label}</div>
-              <div style={{ color: '#444', fontSize: 9, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ color: '#444', fontSize: 9, marginTop: 2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {name ?? <span style={{ color: '#bbb' }}>____________________</span>}
                 {dt && <span style={{ color: '#888', marginLeft: 4 }}>{dt}</span>}
               </div>

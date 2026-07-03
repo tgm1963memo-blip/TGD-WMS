@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
-import { ReportPreviewModal } from './ReportPreviewModal.jsx';
+import { ReportPreviewModal, printWithOrientation } from './ReportPreviewModal.jsx';
 
 export function ReportPrintActions({
   title,
@@ -37,7 +37,7 @@ export function ReportPrintActions({
           disabled={disabled}
           onClick={() => {
             setOpen(true);
-            requestAnimationFrame(() => window.print());
+            requestAnimationFrame(() => printWithOrientation(orientation));
           }}
         >
           {printLabel}
