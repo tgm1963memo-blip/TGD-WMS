@@ -388,11 +388,14 @@ export function CustomerWithdrawalRequestCreatePage() {
       for (let index = 0; index < activeLines.length; index += 1) {
         const line = activeLines[index];
         const normalizedLot = normalizeLotNo(line.lot_no);
+        const matchedDepositLine = getMatchedDepositLine(line, allDepositLines);
         const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
           lineId: isEditMode ? (line.lineId ?? null) : null,
           lineNo: index + 1,
           sourceDepositRequestId: line.source_deposit_request_id || null,
+          sourceDepositRequestLineId: line.source_deposit_request_line_id || null,
           sourceLotNo: normalizedLot,
+          trackingCode: matchedDepositLine?.tracking_code || null,
           customerProductCode: line.customer_product_code,
           internalProductCode: line.product_code,
           productName: line.product_name,

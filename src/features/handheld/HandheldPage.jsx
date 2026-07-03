@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import QRCode from 'react-qr-code';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
@@ -143,17 +145,26 @@ function printSticker({
       <span class="f-value" style="${opts.bold ? 'font-weight:900;' : ''}">${value ?? '-'}</span>
     </div>`;
 
+  // The QR encodes just the bare tracking code (no JSON) so scanning it during
+  // picking can match a withdrawal line by a simple string lookup.
+  const qrSvg = renderToStaticMarkup(
+    <QRCode value={trackingCode || ''} size={72} style={{ width: '100%', height: 'auto' }} />
+  );
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Sticker</title>
 <style>
-  @page { size: 100mm 70mm; margin: 3mm; }
+  @page { size: 120mm 70mm; margin: 3mm; }
   body { font-family: 'Sarabun', 'TH Sarabun New', sans-serif; font-size: 11px; margin: 0; padding: 0; }
-  .sticker { border: 2px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 92mm; height: 62mm; box-sizing: border-box; display: flex; flex-direction: column; }
+  .sticker { border: 2px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 112mm; height: 62mm; box-sizing: border-box; display: flex; gap: 4mm; }
+  .info-col { flex: 1; display: flex; flex-direction: column; }
+  .qr-col { width: 22mm; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1mm; }
+  .qr-col svg { width: 20mm; height: 20mm; }
+  .qr-caption { font-size: 8px; font-weight: 700; text-align: center; }
   .date-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; font-size: 12px; }
-  .date-row .f-label { font-weight: 700; }
   .field { display: flex; align-items: baseline; gap: 4px; border-bottom: 1px dotted #333; padding-bottom: 1px; margin-bottom: 1.6mm; }
   .f-label { font-weight: 700; white-space: nowrap; }
   .f-value { flex: 1; font-weight: 400; }
@@ -163,30 +174,36 @@ function printSticker({
 </head>
 <body>
 <div class="sticker">
-  <div class="date-row">${field('Date: วันที่ฝากเข้า', formatStickerDate(depositDate))}</div>
-  ${field('ชื่อลูกค้า', customerName)}
-  ${field('รหัสสินค้า', productCode)}
-  ${field('ชื่อสินค้า', productName)}
-  <div class="field-row">
-    ${field('Lot (ของลูกค้า)', lotNo)}
-    ${field('การจัดเก็บ', storageLabel)}
+  <div class="info-col">
+    <div class="date-row">${field('วันที่ฝากเข้า', formatStickerDate(depositDate))}</div>
+    ${field('ชื่อลูกค้า', customerName)}
+    ${field('รหัสสินค้า', productCode)}
+    ${field('ชื่อสินค้า', productName)}
+    <div class="field-row">
+      ${field('Lot (ของลูกค้า)', lotNo)}
+      ${field('การจัดเก็บ', storageLabel)}
+    </div>
+    <div class="field-row">
+      ${field('จำนวน', quantityLabel)}
+      ${field('สารก่อภูมิแพ้ (Allergen)', '')}
+    </div>
+    <div class="field-row">
+      ${field('วันผลิต', formatStickerDate(mfgDate))}
+      ${field('', allergenLabel, { bold: true })}
+    </div>
+    <div class="field-row">
+      ${field('Location', locationCode || '-')}
+      ${field('Tracking Code', trackingCode, { bold: true })}
+    </div>
   </div>
-  <div class="field-row">
-    ${field('จำนวน', quantityLabel)}
-    ${field('สารก่อภูมิแพ้ (Allergen)', '')}
-  </div>
-  <div class="field-row">
-    ${field('วันผลิต', formatStickerDate(mfgDate))}
-    ${field('', allergenLabel, { bold: true })}
-  </div>
-  <div class="field-row">
-    ${field('Location', locationCode || '-')}
-    ${field('Tracking Code', trackingCode, { bold: true })}
+  <div class="qr-col">
+    ${qrSvg}
+    <div class="qr-caption">${trackingCode || '-'}</div>
   </div>
 </div>
 </body>
 </html>`;
-  const win = window.open('', '_blank', 'width=400,height=320');
+  const win = window.open('', '_blank', 'width=460,height=320');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
@@ -1221,6 +1238,7 @@ function PickingWorkflow({ onBack, t }) {
   const [linesLoading, setLinesLoading] = useState(false);
   const [scanValue, setScanValue] = useState('');
   const [matchedLine, setMatchedLine] = useState(null);
+  const [autoConfirmedItem, setAutoConfirmedItem] = useState(null);
   const [boxes, setBoxes] = useState('');
   const [weight, setWeight] = useState('');
   const [confirmed, setConfirmed] = useState([]);
@@ -1269,7 +1287,43 @@ function PickingWorkflow({ onBack, t }) {
     });
   }
 
-  function handleScan(val) {
+  function isDone(line) {
+    return confirmed.some((c) => c.line.id === line.id) || line.picked_at != null;
+  }
+
+  // Shared by the manual "ยืนยันหยิบสินค้า" button and the tracking-code
+  // auto-confirm path below, so both persist a pick the same way.
+  async function confirmPick(line, boxesVal, weightVal) {
+    setSaving(true);
+    setSaveError('');
+    const result = await recordWithdrawalLinePick(
+      line.id,
+      boxesVal ? Number(boxesVal) : null,
+      weightVal ? Number(weightVal) : null,
+    );
+    setSaving(false);
+    if (result.error) {
+      setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+      return false;
+    }
+    triggerSuccessFeedback();
+    const alreadyDone = isDone(line);
+    const confirmedItem = {
+      line, boxes: boxesVal, weight: weightVal,
+      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setConfirmed((prev) =>
+      alreadyDone
+        ? prev.map((c) => (c.line.id === line.id ? confirmedItem : c))
+        : [confirmedItem, ...prev]
+    );
+    setLines((prev) => prev.map((l) => l.id === line.id
+      ? { ...l, picked_boxes: boxesVal ? Number(boxesVal) : null, picked_weight: weightVal ? Number(weightVal) : null, picked_at: new Date().toISOString() }
+      : l));
+    return true;
+  }
+
+  async function handleScan(val) {
     setScanValue(val);
     setEditWarned(false);
     const raw = val.trim();
@@ -1281,6 +1335,7 @@ function PickingWorkflow({ onBack, t }) {
     }
 
     let match = null;
+    let matchedByTrackingCode = false;
     if (qrData) {
       const qrLot = (qrData.l ?? '').toLowerCase();
       const qrProduct = (qrData.p ?? '').toLowerCase();
@@ -1290,25 +1345,40 @@ function PickingWorkflow({ onBack, t }) {
         ?? lines.find((l) => qrLoc && (l.location ?? '').toLowerCase() === qrLoc)
         ?? lines.find((l) => qrProduct && (l.product_name ?? '').toLowerCase().includes(qrProduct));
     } else {
-      const q = raw.toLowerCase();
-      match = lines.find((l) =>
-        (l.customer_product_code ?? '').toLowerCase() === q ||
-        (l.product_name ?? '').toLowerCase().includes(q) ||
-        (l.lot_no ?? '').toLowerCase() === q,
-      );
+      // A scanned tracking-code sticker QR is a bare string like "FR03072026001" —
+      // check it first since it's a globally unique key, unlike product code/name/LOT.
+      match = lines.find((l) => l.tracking_code && l.tracking_code === raw);
+      if (match) {
+        matchedByTrackingCode = true;
+      } else {
+        const q = raw.toLowerCase();
+        match = lines.find((l) =>
+          (l.customer_product_code ?? '').toLowerCase() === q ||
+          (l.product_name ?? '').toLowerCase().includes(q) ||
+          (l.lot_no ?? '').toLowerCase() === q,
+        );
+      }
     }
 
-    if (match) {
-      triggerSuccessFeedback();
-      setMatchedLine(match);
-      setBoxes(match.requested_boxes?.toString() ?? '');
-      setWeight(match.requested_weight?.toString() ?? '');
-      setEditWarned(false);
-    } else { setMatchedLine(null); }
-  }
+    if (!match) { setMatchedLine(null); return; }
 
-  function isDone(line) {
-    return confirmed.some((c) => c.line.id === line.id) || line.picked_at != null;
+    // A tracking-code scan uniquely identifies the physical box in hand, so
+    // mark it prepared immediately instead of requiring a separate button tap.
+    if (matchedByTrackingCode && match.picked_at == null) {
+      const ok = await confirmPick(match, match.requested_boxes, match.requested_weight);
+      if (ok) {
+        setScanValue('');
+        setAutoConfirmedItem(match);
+        setTimeout(() => setAutoConfirmedItem((current) => (current === match ? null : current)), 2500);
+      }
+      return;
+    }
+
+    triggerSuccessFeedback();
+    setMatchedLine(match);
+    setBoxes(match.requested_boxes?.toString() ?? '');
+    setWeight(match.requested_weight?.toString() ?? '');
+    setEditWarned(false);
   }
 
   async function handleConfirm() {
@@ -1318,31 +1388,8 @@ function PickingWorkflow({ onBack, t }) {
       setEditWarned(true);
       return;
     }
-    setSaving(true);
-    setSaveError('');
-    const result = await recordWithdrawalLinePick(
-      matchedLine.id,
-      boxes ? Number(boxes) : null,
-      weight ? Number(weight) : null,
-    );
-    setSaving(false);
-    if (result.error) {
-      setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ');
-      return;
-    }
-    triggerSuccessFeedback();
-    const confirmedItem = {
-      line: matchedLine, boxes, weight,
-      confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setConfirmed((prev) =>
-      alreadyDone
-        ? prev.map((c) => (c.line.id === matchedLine.id ? confirmedItem : c))
-        : [confirmedItem, ...prev]
-    );
-    setLines((prev) => prev.map((l) => l.id === matchedLine.id
-      ? { ...l, picked_boxes: boxes ? Number(boxes) : null, picked_weight: weight ? Number(weight) : null, picked_at: new Date().toISOString() }
-      : l));
+    const ok = await confirmPick(matchedLine, boxes, weight);
+    if (!ok) return;
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setEditWarned(false);
   }
 
@@ -1554,7 +1601,34 @@ function PickingWorkflow({ onBack, t }) {
         maxHeight: '65vh',
         overflowY: 'auto',
       }}>
-        {matchedLine ? (
+        {autoConfirmedItem ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ color: C.green, fontWeight: 900, fontSize: 20 }}>✓ จัดเตรียมเรียบร้อย</div>
+              <button type="button" onClick={() => setAutoConfirmedItem(null)}
+                style={{
+                  background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, color: C.textSec, cursor: 'pointer',
+                }}>✕</button>
+            </div>
+            <div style={{
+              background: C.greenLight, borderRadius: 20, padding: '16px',
+              border: `2px solid ${C.greenBorder}`,
+            }}>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 15, marginBottom: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                {autoConfirmedItem.product_name ?? autoConfirmedItem.customer_product_code ?? '—'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                {autoConfirmedItem.tracking_code && <span style={{ background: '#fff', color: C.green, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>{autoConfirmedItem.tracking_code}</span>}
+                {autoConfirmedItem.lot_no && <span style={{ background: '#fff', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>LOT {autoConfirmedItem.lot_no}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>
+                {autoConfirmedItem.requested_boxes ?? '-'} กล่อง / {autoConfirmedItem.requested_weight != null ? Number(autoConfirmedItem.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'} กก.
+              </div>
+            </div>
+          </div>
+        ) : matchedLine ? (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ color: C.pickAccent, fontWeight: 900, fontSize: 20 }}>ยืนยันหยิบสินค้า</div>

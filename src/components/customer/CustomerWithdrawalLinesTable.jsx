@@ -132,6 +132,10 @@ export function CustomerWithdrawalLinesTable({
       mfg_date: type === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE ? value : (first?.mfg_date ?? ''),
       exp_date: type === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE ? value : (first?.exp_date ?? ''),
       note: line.note ? line.note : (first?.actual_note ?? ''),
+      // Only link to a specific deposit line (and its tracking code) when the
+      // identifier unambiguously resolves to exactly one — LOT/date/note can
+      // still match more than one deposit line.
+      source_deposit_request_line_id: matches.length === 1 ? matches[0].id : '',
     });
   }
 
@@ -142,6 +146,7 @@ export function CustomerWithdrawalLinesTable({
     if (!trackingCode) {
       updateLine(line.key, {
         source_deposit_request_id: '',
+        source_deposit_request_line_id: '',
         identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.LOT,
         identifier_value: '',
         lot_no: '',
@@ -153,6 +158,7 @@ export function CustomerWithdrawalLinesTable({
     const match = getProductMatchedDepositLines(line, allDepositLines).find((dl) => dl.tracking_code === trackingCode);
     updateLine(line.key, {
       source_deposit_request_id: match?.deposit_request_id ?? '',
+      source_deposit_request_line_id: match?.id ?? '',
       identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE,
       identifier_value: trackingCode,
       lot_no: match?.lot_no ?? '',
