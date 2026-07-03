@@ -22,7 +22,6 @@ const IDENTIFIER_TYPE_LABELS = {
 
 export function CustomerWithdrawalLinesTable({
   customerId,
-  depositOptions = [],
   depositLinesMap = {},
   lines,
   onChange,
@@ -136,13 +135,30 @@ export function CustomerWithdrawalLinesTable({
     });
   }
 
-  function selectSourceDeposit(lineKey, depositId) {
-    updateLine(lineKey, {
-      source_deposit_request_id: depositId,
-      identifier_value: '',
-      lot_no: '',
-      mfg_date: '',
-      exp_date: '',
+  // Tracking code uniquely identifies one deposit line, so picking it here sets
+  // the source deposit + LOT + dates in one step, replacing the old "pick a
+  // deposit note, then pick a LOT within it" two-step flow.
+  function selectSourceTrackingCode(line, trackingCode) {
+    if (!trackingCode) {
+      updateLine(line.key, {
+        source_deposit_request_id: '',
+        identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.LOT,
+        identifier_value: '',
+        lot_no: '',
+        mfg_date: '',
+        exp_date: '',
+      });
+      return;
+    }
+    const match = getProductMatchedDepositLines(line, allDepositLines).find((dl) => dl.tracking_code === trackingCode);
+    updateLine(line.key, {
+      source_deposit_request_id: match?.deposit_request_id ?? '',
+      identifier_type: WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE,
+      identifier_value: trackingCode,
+      lot_no: match?.lot_no ?? '',
+      mfg_date: match?.mfg_date ?? '',
+      exp_date: match?.exp_date ?? '',
+      note: line.note ? line.note : (match?.actual_note ?? ''),
     });
   }
 
@@ -180,7 +196,7 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 110, whiteSpace: 'nowrap' }}>ระบุเป็น</th>
             <th style={{ minWidth: 80, whiteSpace: 'nowrap' }}>กล่อง <span className="field-required">*</span></th>
             <th style={{ minWidth: 100, whiteSpace: 'nowrap' }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
-            <th style={{ minWidth: 140 }}>แหล่งที่มา (ใบฝาก)</th>
+            <th style={{ minWidth: 160 }}>แหล่งที่มา (รหัสติดตาม)</th>
             <th style={{ minWidth: 150 }}>หมายเหตุ</th>
             <th style={{ width: 70, whiteSpace: 'nowrap' }}>{t('catalog_col_actions')}</th>
           </tr>
@@ -200,10 +216,12 @@ export function CustomerWithdrawalLinesTable({
             const hasNullLot = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
               && productMatchedLines.some((dl) => !dl.lot_no);
 
+            const trackingCodeOptions = [...new Set(
+              getProductMatchedDepositLines(line, allDepositLines).filter((dl) => dl.tracking_code).map((dl) => dl.tracking_code),
+            )].sort();
+
             let identifierOptions = [];
-            if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE) {
-              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.tracking_code).map((dl) => dl.tracking_code))].sort();
-            } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
+            if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
               identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
             } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) {
               identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.mfg_date).map((dl) => dl.mfg_date))].sort();
@@ -248,45 +266,59 @@ export function CustomerWithdrawalLinesTable({
 
                 {/* Identifier reference type + value dropdown */}
                 <td>
-                  <select
-                    className="form-control form-control-table"
-                    data-testid={`${rowTestId}-identifier-type`}
-                    onChange={(e) => selectIdentifierType(line.key, e.target.value)}
-                    style={{ marginBottom: 4 }}
-                    value={identifierType}
-                  >
-                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE}>อ้างอิง: รหัสติดตาม</option>
-                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.LOT}>อ้างอิง: LOT</option>
-                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE}>อ้างอิง: วันผลิต</option>
-                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE}>อ้างอิง: วันหมดอายุ</option>
-                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.NOTE}>อ้างอิง: หมายเหตุ (admin)</option>
-                  </select>
-
-                  {showManualLotInput ? (
-                    <input
-                      className="form-control form-control-table"
-                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
-                      type="text"
-                      placeholder="เลข LOT"
-                      value={line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '')}
-                      onChange={(e) => updateLine(line.key, { lot_no: e.target.value, identifier_value: e.target.value })}
-                    />
+                  {identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE ? (
+                    <div className="form-control form-control-table" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--tgd-surface-muted, #f1f5f9)' }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{line.identifier_value}</span>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => selectSourceTrackingCode(line, '')}
+                      >
+                        เปลี่ยน
+                      </button>
+                    </div>
                   ) : (
-                    <select
-                      className="form-control form-control-table"
-                      data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
-                      disabled={identifierOptions.length === 0 && !hasNullLot}
-                      onChange={(e) => selectIdentifierValue(line, e.target.value)}
-                      value={line.identifier_value || ''}
-                    >
-                      <option value="">— เลือก{IDENTIFIER_TYPE_LABELS[identifierType]} —</option>
-                      {hasNullLot && (
-                        <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
+                    <>
+                      <select
+                        className="form-control form-control-table"
+                        data-testid={`${rowTestId}-identifier-type`}
+                        onChange={(e) => selectIdentifierType(line.key, e.target.value)}
+                        style={{ marginBottom: 4 }}
+                        value={identifierType}
+                      >
+                        <option value={WITHDRAWAL_IDENTIFIER_TYPES.LOT}>อ้างอิง: LOT</option>
+                        <option value={WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE}>อ้างอิง: วันผลิต</option>
+                        <option value={WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE}>อ้างอิง: วันหมดอายุ</option>
+                        <option value={WITHDRAWAL_IDENTIFIER_TYPES.NOTE}>อ้างอิง: หมายเหตุ (admin)</option>
+                      </select>
+
+                      {showManualLotInput ? (
+                        <input
+                          className="form-control form-control-table"
+                          data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                          type="text"
+                          placeholder="เลข LOT"
+                          value={line.lot_no === NULL_LOT_SENTINEL ? '' : (line.lot_no || '')}
+                          onChange={(e) => updateLine(line.key, { lot_no: e.target.value, identifier_value: e.target.value })}
+                        />
+                      ) : (
+                        <select
+                          className="form-control form-control-table"
+                          data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                          disabled={identifierOptions.length === 0 && !hasNullLot}
+                          onChange={(e) => selectIdentifierValue(line, e.target.value)}
+                          value={line.identifier_value || ''}
+                        >
+                          <option value="">— เลือก{IDENTIFIER_TYPE_LABELS[identifierType]} —</option>
+                          {hasNullLot && (
+                            <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
+                          )}
+                          {identifierOptions.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
                       )}
-                      {identifierOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    </>
                   )}
                 </td>
 
@@ -376,17 +408,17 @@ export function CustomerWithdrawalLinesTable({
                   )}
                 </td>
 
-                {/* Source deposit */}
+                {/* Source: tracking code (uniquely pins the deposit line) */}
                 <td>
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
-                    onChange={(e) => selectSourceDeposit(line.key, e.target.value)}
-                    value={line.source_deposit_request_id || ''}
+                    onChange={(e) => selectSourceTrackingCode(line, e.target.value)}
+                    value={identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE ? (line.identifier_value || '') : ''}
                   >
                     <option value="">— ทั้งหมด —</option>
-                    {depositOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>{opt.label ?? opt.id}</option>
+                    {trackingCodeOptions.map((code) => (
+                      <option key={code} value={code}>{code}</option>
                     ))}
                   </select>
                 </td>

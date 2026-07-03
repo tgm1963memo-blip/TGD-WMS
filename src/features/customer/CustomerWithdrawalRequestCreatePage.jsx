@@ -59,7 +59,6 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [lines, setLines] = useState(() => createInitialWithdrawalLines());
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
-  const [depositOptions, setDepositOptions] = useState([]);
   const [depositLinesMap, setDepositLinesMap] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -211,7 +210,6 @@ export function CustomerWithdrawalRequestCreatePage() {
   useEffect(() => {
     let active = true;
     if (!effectiveCustomerId) {
-      setDepositOptions([]);
       setDepositLinesMap({});
       return undefined;
     }
@@ -219,29 +217,13 @@ export function CustomerWithdrawalRequestCreatePage() {
     getDepositInventoryLines({ customerId: effectiveCustomerId }).then((result) => {
       if (!active) return;
       const allLines = result.data ?? [];
-      
-      const linesByDeposit = {};
-      const requestById = {};
 
+      const linesByDeposit = {};
       allLines.forEach((l) => {
         if (!linesByDeposit[l.deposit_request_id]) linesByDeposit[l.deposit_request_id] = [];
         linesByDeposit[l.deposit_request_id].push(l);
-        if (l.request) requestById[l.deposit_request_id] = l.request;
       });
 
-      // Tracking codes are the preferred reference (replace request_no as the
-      // identifier staff match against) — show them in the option label when present.
-      const depositOptions = Object.entries(linesByDeposit).map(([depositId, depositLines]) => {
-        const request = requestById[depositId];
-        const trackingCodes = [...new Set(depositLines.map((l) => l.tracking_code).filter(Boolean))].sort();
-        const codesSuffix = trackingCodes.length ? ` — ${trackingCodes.join(', ')}` : '';
-        return {
-          id: depositId,
-          label: `${request?.request_no ?? '-'} (${request?.expected_arrival_date ?? '-'})${codesSuffix}`,
-        };
-      });
-
-      setDepositOptions(depositOptions);
       setDepositLinesMap(linesByDeposit);
     });
 
@@ -519,7 +501,6 @@ export function CustomerWithdrawalRequestCreatePage() {
 
           <CustomerWithdrawalLinesTable
             customerId={effectiveCustomerId}
-            depositOptions={depositOptions}
             depositLinesMap={depositLinesMap}
             lines={lines}
             onChange={setLines}
