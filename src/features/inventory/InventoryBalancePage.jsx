@@ -84,6 +84,7 @@ export function InventoryBalancePage() {
       (l.product_name ?? '').toLowerCase().includes(q) ||
       (l.customer_product_code ?? '').toLowerCase().includes(q) ||
       (l.lot_no ?? '').toLowerCase().includes(q) ||
+      (l.tracking_code ?? '').toLowerCase().includes(q) ||
       (l.request?.request_no ?? '').toLowerCase().includes(q)
     );
   });
@@ -152,7 +153,7 @@ export function InventoryBalancePage() {
           <input
             className="form-control"
             type="search"
-            placeholder="ชื่อสินค้า / รหัส / LOT / เลขที่ใบฝาก"
+            placeholder="ชื่อสินค้า / รหัส / LOT / รหัสติดตาม / เลขที่ใบฝาก"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
@@ -261,6 +262,7 @@ export function InventoryBalancePage() {
                               <th style={{ padding: '12px 16px 12px 48px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>เลขที่ใบฝาก</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
+                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รหัสติดตาม</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กล่อง)</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กก.)</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุลูกค้า</th>
@@ -281,6 +283,9 @@ export function InventoryBalancePage() {
                                 </td>
                                 <td style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', fontFamily: 'monospace' }}>
                                   {l.lot_no ?? '-'}
+                                </td>
+                                <td style={{ padding: '16px 12px', color: 'var(--tgd-text)', fontFamily: 'monospace', fontWeight: 600 }}>
+                                  {l.tracking_code ?? '-'}
                                 </td>
                                 <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
                                   {l.actual_boxes?.toLocaleString() ?? (

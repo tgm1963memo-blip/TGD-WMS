@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CustomerDepositLinesTable } from '../../components/customer/CustomerDepositLinesTable.jsx';
+import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import {
   CUSTOMER_DEPOSIT_STATUSES,
@@ -552,7 +553,7 @@ export function CustomerDepositRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_expected_arrival_date')} <span className="field-required">*</span></span>
-            <input className="form-control" data-testid="customer-deposit-expected-arrival-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required type="date" value={header.expected_arrival_date} />
+            <DateInputDMY className="form-control" data-testid="customer-deposit-expected-arrival-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required value={header.expected_arrival_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_contact_name')} <span className="field-required">*</span></span>

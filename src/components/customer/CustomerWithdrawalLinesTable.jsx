@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import {
   NULL_LOT_SENTINEL,
   WITHDRAWAL_IDENTIFIER_TYPES,
   WITHDRAWAL_QTY_MODES,
-  getIdentifierMatchedDepositLines,
   getMatchedDepositLine,
   getProductMatchedDepositLines,
+  getWithdrawalBalanceInfo,
 } from '../../utils/customerWithdrawalLineDefaults.js';
 
 const IDENTIFIER_TYPE_LABELS = {
+  [WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE]: 'รหัสติดตาม',
   [WITHDRAWAL_IDENTIFIER_TYPES.LOT]: 'LOT',
   [WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE]: 'วันผลิต',
   [WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE]: 'วันหมดอายุ',
@@ -115,6 +117,7 @@ export function CustomerWithdrawalLinesTable({
     const isNullLot = type === WITHDRAWAL_IDENTIFIER_TYPES.LOT && value === NULL_LOT_SENTINEL;
     const productMatched = getProductMatchedDepositLines(line, allDepositLines);
     const matches = productMatched.filter((dl) => {
+      if (type === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE) return dl.tracking_code === value;
       if (type === WITHDRAWAL_IDENTIFIER_TYPES.LOT) return isNullLot ? !dl.lot_no : dl.lot_no === value;
       if (type === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) return dl.mfg_date === value;
       if (type === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE) return dl.exp_date === value;
@@ -198,7 +201,9 @@ export function CustomerWithdrawalLinesTable({
               && productMatchedLines.some((dl) => !dl.lot_no);
 
             let identifierOptions = [];
-            if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
+            if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE) {
+              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.tracking_code).map((dl) => dl.tracking_code))].sort();
+            } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
               identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
             } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) {
               identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.mfg_date).map((dl) => dl.mfg_date))].sort();
@@ -213,11 +218,7 @@ export function CustomerWithdrawalLinesTable({
 
             const matchedDL = getMatchedDepositLine(line, sourceDepositLines);
             const weightPerBox = matchedDL?.weight_per_box ? Number(matchedDL.weight_per_box) : null;
-            const balanceLines = getIdentifierMatchedDepositLines(line, sourceDepositLines);
-            const maxBoxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
-            const exceedsBoxBalance = maxBoxBalance > 0 && line.requested_boxes !== '' && Number(line.requested_boxes) > maxBoxBalance;
-            const maxWtBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
-            const exceedsWtBalance = maxWtBalance > 0 && line.requested_weight !== '' && Number(line.requested_weight) > maxWtBalance;
+            const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, sourceDepositLines);
 
             const qtyMode = line.withdrawal_qty_mode || WITHDRAWAL_QTY_MODES.WEIGHT;
             const boxesDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.WEIGHT;
@@ -254,6 +255,7 @@ export function CustomerWithdrawalLinesTable({
                     style={{ marginBottom: 4 }}
                     value={identifierType}
                   >
+                    <option value={WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE}>อ้างอิง: รหัสติดตาม</option>
                     <option value={WITHDRAWAL_IDENTIFIER_TYPES.LOT}>อ้างอิง: LOT</option>
                     <option value={WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE}>อ้างอิง: วันผลิต</option>
                     <option value={WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE}>อ้างอิง: วันหมดอายุ</option>
@@ -290,9 +292,8 @@ export function CustomerWithdrawalLinesTable({
 
                 {/* Mfg date */}
                 <td>
-                  <input
+                  <DateInputDMY
                     className="form-control form-control-table"
-                    type="date"
                     value={line.mfg_date || ''}
                     onChange={(e) => updateLine(line.key, { mfg_date: e.target.value })}
                   />
@@ -300,9 +301,8 @@ export function CustomerWithdrawalLinesTable({
 
                 {/* Exp date */}
                 <td>
-                  <input
+                  <DateInputDMY
                     className="form-control form-control-table"
-                    type="date"
                     value={line.exp_date || ''}
                     onChange={(e) => updateLine(line.key, { exp_date: e.target.value })}
                   />

@@ -138,24 +138,26 @@ export function CustomerDepositStaffWorkOrderPrint({
       {/* ── Lines table ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
-          <col style={{ width: '4%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: hasActual ? '19%' : '23%' }} />
+          <col style={{ width: '3%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: hasActual ? '15%' : '14%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '7%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '8%' }} />
-          {hasActual && <col style={{ width: '7%' }} />}
-          {hasActual && <col style={{ width: '8%' }} />}
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '9%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: hasActual ? '0%' : '6%' }} />
+          <col style={{ width: '7%' }} />
+          {hasActual && <col style={{ width: '6%' }} />}
+          {hasActual && <col style={{ width: '7%' }} />}
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: hasActual ? '0%' : '14%' }} />
         </colgroup>
         <thead>
           <tr>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>#</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>รหัสติดตาม</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CODE</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>การจัดเก็บ</th>
@@ -180,29 +182,33 @@ export function CustomerDepositStaffWorkOrderPrint({
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
             const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
+            // Cells with fixed-width nowrap text must clip instead of overflowing into the
+            // neighboring cell (table-layout: fixed lets overflow bleed visually otherwise).
+            const TD_NOWRAP = { ...TD, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
-                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{idx + 1}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.lot_no)}</td>
+                <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{idx + 1}</td>
+                <td style={TD_NOWRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
+                <td style={{ ...TD_NOWRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmt(line.tracking_code)}</td>
                 <td style={TD}>{fmt(line.product_name)}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
-                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_boxes)}</td>
-                <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(line.expected_weight)}</td>
+                <td style={TD_NOWRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={TD_NOWRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
+                <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
+                <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
                 {hasActual && (
-                  <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD_NOWRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_boxes != null ? fmtNum(line.actual_boxes) : '-'}
                   </td>
                 )}
                 {hasActual && (
-                  <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD_NOWRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_weight != null ? fmtNum(line.actual_weight) : '-'}
                   </td>
                 )}
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmtDate(line.mfg_date)}</td>
-                <td style={{ ...TD, whiteSpace: 'nowrap' }}>{fmtDate(line.exp_date)}</td>
-                <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt(line.argent_type)}</td>
-                {!hasActual && <td style={TD}>{fmt(line.actual_note ?? line.note)}</td>}
+                <td style={TD_NOWRAP}>{fmtDate(line.mfg_date)}</td>
+                <td style={TD_NOWRAP}>{fmtDate(line.exp_date)}</td>
+                <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{fmt(line.argent_type)}</td>
+                {!hasActual && <td style={{ ...TD, overflowWrap: 'break-word' }}>{fmt(line.actual_note ?? line.note)}</td>}
               </tr>
             );
           })}
@@ -234,6 +240,9 @@ export function CustomerDepositStaffWorkOrderPrint({
 
       <p className="form-helper" style={{ marginTop: 8, fontSize: 11 }}>
         {t('customer_deposit_argent_sticker_hint')}
+      </p>
+      <p className="form-helper" style={{ marginTop: 2, fontSize: 11 }}>
+        เขียน &quot;รหัสติดตาม&quot; ของแต่ละ LOT ลงบนสติกเกอร์ที่ติดหน้าสินค้า เพื่อใช้อ้างอิงและตรวจสอบ
       </p>
 
       {/* ── Flex spacer pushes signature to bottom ── */}

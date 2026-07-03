@@ -1,6 +1,7 @@
 export const WITHDRAWAL_LINE_DEFAULT_COUNT = 5;
 export const WITHDRAWAL_QTY_MODES = { WEIGHT: 'WEIGHT', BOXES: 'BOXES' };
 export const WITHDRAWAL_IDENTIFIER_TYPES = {
+  TRACKING_CODE: 'TRACKING_CODE',
   LOT: 'LOT',
   MFG_DATE: 'MFG_DATE',
   EXP_DATE: 'EXP_DATE',
@@ -46,6 +47,10 @@ export function getIdentifierMatchedDepositLines(line, depositLines = []) {
   const productMatched = getProductMatchedDepositLines(line, depositLines);
   const type = line?.identifier_type || WITHDRAWAL_IDENTIFIER_TYPES.LOT;
 
+  if (type === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE) {
+    if (!line?.identifier_value) return productMatched;
+    return productMatched.filter((dl) => dl.tracking_code === line.identifier_value);
+  }
   if (type === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
     const isNullLot = line?.lot_no === NULL_LOT_SENTINEL;
     if (isNullLot) return productMatched.filter((dl) => !dl.lot_no);
@@ -70,6 +75,16 @@ export function getIdentifierMatchedDepositLines(line, depositLines = []) {
 /** The single best-matching deposit line for the line's chosen identifier, used to resolve weight-per-box and the admin note. */
 export function getMatchedDepositLine(line, depositLines = []) {
   return getIdentifierMatchedDepositLines(line, depositLines)[0] ?? null;
+}
+
+/** Remaining deposit balance for a withdrawal line, and whether the requested quantity exceeds it. */
+export function getWithdrawalBalanceInfo(line, depositLines = []) {
+  const balanceLines = getIdentifierMatchedDepositLines(line, depositLines);
+  const maxBoxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
+  const maxWtBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
+  const exceedsBoxBalance = maxBoxBalance > 0 && line?.requested_boxes !== '' && Number(line?.requested_boxes) > maxBoxBalance;
+  const exceedsWtBalance = maxWtBalance > 0 && line?.requested_weight !== '' && Number(line?.requested_weight) > maxWtBalance;
+  return { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance };
 }
 
 export function createInitialWithdrawalLines(count = WITHDRAWAL_LINE_DEFAULT_COUNT) {

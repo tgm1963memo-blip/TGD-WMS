@@ -41,6 +41,7 @@ const DEPOSIT_LINE_SELECT = [
   'product_id',
   'product_name',
   'lot_no',
+  'tracking_code',
   'mfg_date',
   'exp_date',
   'expected_qty',
@@ -149,7 +150,7 @@ export async function getDepositInventoryLines(filters = {}) {
 
   const { data: lines, error: lErr } = await supabase
     .from('tgd_customer_deposit_request_lines')
-    .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
+    .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
     .in('deposit_request_id', ids)
     .order('line_no', { ascending: true });
 

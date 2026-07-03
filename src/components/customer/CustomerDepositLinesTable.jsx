@@ -1,4 +1,5 @@
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import {
   applyPackFieldChange,
   calcTotalWeightFromBoxes,
@@ -176,20 +177,16 @@ export function CustomerDepositLinesTable({
                 </td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 120 }}>
-                    <input
+                    <DateInputDMY
                       className="form-control form-control-table"
                       onChange={(event) => updateLine(line.key, { mfg_date: event.target.value })}
-                      placeholder="วันผลิต"
                       title="วันผลิต"
-                      type="date"
                       value={line.mfg_date ?? ''}
                     />
-                    <input
+                    <DateInputDMY
                       className="form-control form-control-table"
                       onChange={(event) => updateLine(line.key, { exp_date: event.target.value })}
-                      placeholder="วันหมดอายุ"
                       title="วันหมดอายุ"
-                      type="date"
                       value={line.exp_date ?? ''}
                     />
                   </div>

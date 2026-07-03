@@ -5,6 +5,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CustomerWithdrawalLinesTable } from '../../components/customer/CustomerWithdrawalLinesTable.jsx';
+import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { CUSTOMER_WITHDRAWAL_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerWithdrawalRequest,
@@ -28,6 +29,7 @@ import {
   createInitialWithdrawalLines,
   getFilledWithdrawalLines,
   getMatchedDepositLine,
+  getWithdrawalBalanceInfo,
   WITHDRAWAL_LINE_DEFAULT_COUNT,
 } from '../../utils/customerWithdrawalLineDefaults.js';
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
@@ -219,21 +221,27 @@ export function CustomerWithdrawalRequestCreatePage() {
       const allLines = result.data ?? [];
       
       const linesByDeposit = {};
-      const depositMap = {};
+      const requestById = {};
 
       allLines.forEach((l) => {
         if (!linesByDeposit[l.deposit_request_id]) linesByDeposit[l.deposit_request_id] = [];
         linesByDeposit[l.deposit_request_id].push(l);
-
-        if (l.request) {
-          depositMap[l.deposit_request_id] = {
-            id: l.deposit_request_id,
-            label: `${l.request.request_no} (${l.request.expected_arrival_date ?? '-'})`,
-          };
-        }
+        if (l.request) requestById[l.deposit_request_id] = l.request;
       });
 
-      setDepositOptions(Object.values(depositMap));
+      // Tracking codes are the preferred reference (replace request_no as the
+      // identifier staff match against) — show them in the option label when present.
+      const depositOptions = Object.entries(linesByDeposit).map(([depositId, depositLines]) => {
+        const request = requestById[depositId];
+        const trackingCodes = [...new Set(depositLines.map((l) => l.tracking_code).filter(Boolean))].sort();
+        const codesSuffix = trackingCodes.length ? ` — ${trackingCodes.join(', ')}` : '';
+        return {
+          id: depositId,
+          label: `${request?.request_no ?? '-'} (${request?.expected_arrival_date ?? '-'})${codesSuffix}`,
+        };
+      });
+
+      setDepositOptions(depositOptions);
       setDepositLinesMap(linesByDeposit);
     });
 
@@ -330,6 +338,16 @@ export function CustomerWithdrawalRequestCreatePage() {
             setSubmitError(`รายการที่ ${i + 1}: ไม่ทราบน้ำหนักต่อกล่อง กรุณาระบุทั้งจำนวนกล่องและน้ำหนัก`);
             return;
           }
+        }
+
+        const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLines);
+        if (exceedsBoxBalance) {
+          setSubmitError(`รายการที่ ${i + 1}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (มี ${maxBoxBalance} กล่อง)`);
+          return;
+        }
+        if (exceedsWtBalance) {
+          setSubmitError(`รายการที่ ${i + 1}: น้ำหนักที่เบิกเกินยอดคงเหลือ (มี ${maxWtBalance.toFixed(2)} กก.)`);
+          return;
         }
       }
 
@@ -512,7 +530,7 @@ export function CustomerWithdrawalRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_requested_dispatch_date')}</span>
-            <input className="form-control" data-testid="customer-withdrawal-dispatch-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required type="date" value={header.requested_dispatch_date} />
+            <DateInputDMY className="form-control" data-testid="customer-withdrawal-dispatch-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required value={header.requested_dispatch_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_pickup_contact')}</span>

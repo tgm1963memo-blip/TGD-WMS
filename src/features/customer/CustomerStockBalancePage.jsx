@@ -77,6 +77,7 @@ export function CustomerStockBalancePage() {
       (l.product_name ?? '').toLowerCase().includes(q) ||
       (l.customer_product_code ?? '').toLowerCase().includes(q) ||
       (l.lot_no ?? '').toLowerCase().includes(q) ||
+      (l.tracking_code ?? '').toLowerCase().includes(q) ||
       (l.request?.request_no ?? '').toLowerCase().includes(q)
     );
   });
@@ -155,7 +156,7 @@ export function CustomerStockBalancePage() {
               <input
                 className="form-control"
                 type="search"
-                placeholder="ชื่อสินค้า / รหัส / LOT / เลขที่ใบฝาก"
+                placeholder="ชื่อสินค้า / รหัส / LOT / รหัสติดตาม / เลขที่ใบฝาก"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
               />
@@ -223,6 +224,7 @@ export function CustomerStockBalancePage() {
                             <th style={{ padding: '8px 16px 8px 32px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>เลขที่ใบฝาก</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันที่รับเข้า</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>LOT</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>รหัสติดตาม</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันผลิต</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันหมดอายุ</th>
                             <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กล่อง)</th>
@@ -242,6 +244,9 @@ export function CustomerStockBalancePage() {
                               </td>
                               <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: 'var(--tgd-muted-text)' }}>
                                 {l.lot_no || '-'}
+                              </td>
+                              <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                {l.tracking_code || '-'}
                               </td>
                               <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{formatDate(l.mfg_date)}</td>
                               <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{formatDate(l.exp_date)}</td>
