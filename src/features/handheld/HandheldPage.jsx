@@ -19,6 +19,8 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
@@ -121,15 +123,25 @@ function useCameraScanner(onScanned) {
 }
 
 // ── Print sticker ─────────────────────────────────────────────
-function printSticker({ customerName, productName, lotNo, mfgDate, expDate, locationCode, locationDetail, goodsTemp }) {
-  const qrData = JSON.stringify({
-    c: customerName,
-    p: productName,
-    l: lotNo,
-    e: expDate,
-    loc: locationCode
-  });
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+// Template matches the physical label TGC already prints: rounded box,
+// date top-right, then customer/product/LOT/storage/qty/allergen/mfg date/
+// location, with "เลขที่สินค้า TGC" replaced by the generated tracking code.
+function formatStickerDate(iso) {
+  if (!iso) return '-';
+  const s = String(iso).split('T')[0];
+  const [y, m, d] = s.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : s;
+}
+
+function printSticker({
+  depositDate, customerName, productCode, productName, lotNo,
+  storageLabel, quantityLabel, allergenLabel, mfgDate, locationCode, trackingCode,
+}) {
+  const field = (label, value, opts = {}) => `
+    <div class="field" style="${opts.grow ? 'flex:1;' : ''}">
+      <span class="f-label">${label}</span>
+      <span class="f-value" style="${opts.bold ? 'font-weight:900;' : ''}">${value ?? '-'}</span>
+    </div>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -137,42 +149,44 @@ function printSticker({ customerName, productName, lotNo, mfgDate, expDate, loca
 <meta charset="utf-8">
 <title>Sticker</title>
 <style>
-  @page { size: 100mm 60mm; margin: 4mm; }
-  body { font-family: sans-serif; font-size: 10px; margin: 0; padding: 0; }
-  .sticker { border: 1px solid #000; padding: 4mm; width: 92mm; height: 52mm; box-sizing: border-box; display: flex; gap: 4mm; }
-  .info-col { flex: 1; display: flex; flex-direction: column; }
-  .qr-col { width: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .title { font-size: 13px; font-weight: 900; margin-bottom: 3mm; border-bottom: 1px solid #000; padding-bottom: 2mm; }
-  .row { display: flex; gap: 4px; margin-bottom: 1mm; }
-  .label { font-weight: 700; min-width: 18mm; color: #555; }
-  .val { font-weight: 600; font-size: 11px; }
-  .location-box { margin-top: auto; padding: 1mm; border: 2px solid #000; border-radius: 2mm; text-align: center; }
-  .loc-main { font-size: 16px; font-weight: 900; letter-spacing: 1px; }
-  .loc-detail { font-size: 9px; color: #666; }
+  @page { size: 100mm 70mm; margin: 3mm; }
+  body { font-family: 'Sarabun', 'TH Sarabun New', sans-serif; font-size: 11px; margin: 0; padding: 0; }
+  .sticker { border: 2px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 92mm; height: 62mm; box-sizing: border-box; display: flex; flex-direction: column; }
+  .date-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; font-size: 12px; }
+  .date-row .f-label { font-weight: 700; }
+  .field { display: flex; align-items: baseline; gap: 4px; border-bottom: 1px dotted #333; padding-bottom: 1px; margin-bottom: 1.6mm; }
+  .f-label { font-weight: 700; white-space: nowrap; }
+  .f-value { flex: 1; font-weight: 400; }
+  .field-row { display: flex; gap: 5mm; }
+  .field-row .field { flex: 1; }
 </style>
 </head>
 <body>
 <div class="sticker">
-  <div class="info-col">
-    <div class="title">TGC Cold Storage — สติ๊กเกอร์จัดเก็บ</div>
-    <div class="row"><span class="label">ลูกค้า:</span><span class="val">${customerName ?? '-'}</span></div>
-    <div class="row"><span class="label">สินค้า:</span><span class="val">${productName ?? '-'}</span></div>
-    ${lotNo ? `<div class="row"><span class="label">LOT:</span><span class="val">${lotNo}</span></div>` : ''}
-    ${mfgDate ? `<div class="row"><span class="label">ผลิต:</span><span class="val">${mfgDate}</span></div>` : ''}
-    ${expDate ? `<div class="row"><span class="label">หมดอายุ:</span><span class="val">${expDate}</span></div>` : ''}
-    ${goodsTemp ? `<div class="row"><span class="label">อุณหภูมิ:</span><span class="val">${goodsTemp}</span></div>` : ''}
-    <div class="location-box">
-      <div class="loc-main">${locationCode ?? '-'}</div>
-      ${locationDetail ? `<div class="loc-detail">${locationDetail}</div>` : ''}
-    </div>
+  <div class="date-row">${field('Date: วันที่ฝากเข้า', formatStickerDate(depositDate))}</div>
+  ${field('ชื่อลูกค้า', customerName)}
+  ${field('รหัสสินค้า', productCode)}
+  ${field('ชื่อสินค้า', productName)}
+  <div class="field-row">
+    ${field('Lot (ของลูกค้า)', lotNo)}
+    ${field('การจัดเก็บ', storageLabel)}
   </div>
-  <div class="qr-col">
-    <img src="${qrUrl}" alt="QR Code" style="width: 25mm; height: 25mm; margin-bottom: 2mm;" />
+  <div class="field-row">
+    ${field('จำนวน', quantityLabel)}
+    ${field('สารก่อภูมิแพ้ (Allergen)', '')}
+  </div>
+  <div class="field-row">
+    ${field('วันผลิต', formatStickerDate(mfgDate))}
+    ${field('', allergenLabel, { bold: true })}
+  </div>
+  <div class="field-row">
+    ${field('Location', locationCode || '-')}
+    ${field('Tracking Code', trackingCode, { bold: true })}
   </div>
 </div>
 </body>
 </html>`;
-  const win = window.open('', '_blank', 'width=400,height=300');
+  const win = window.open('', '_blank', 'width=400,height=320');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
@@ -417,6 +431,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [scanValue, setScanValue] = useState('');
   const [matchedLine, setMatchedLine] = useState(null);
   const [boxes, setBoxes] = useState('');
@@ -531,6 +546,11 @@ function ReceivingWorkflow({ onBack, t }) {
       setLinesLoading(false);
       setScanValue(''); setMatchedLine(null);
     });
+    if (doc.customer_id) {
+      listCustomerProducts({ customerId: doc.customer_id }).then((r) => setCatalogProducts(r.data ?? []));
+    } else {
+      setCatalogProducts([]);
+    }
   }
 
   function handleScan(val) {
@@ -589,12 +609,21 @@ function ReceivingWorkflow({ onBack, t }) {
     if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
 
     triggerSuccessFeedback();
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === matchedLine.customer_product_code);
+    const quantityParts = [];
+    if (boxes) quantityParts.push(`${Number(boxes).toLocaleString()} กล่อง`);
+    if (weight) quantityParts.push(`${Number(weight).toLocaleString()} กก.`);
     const confirmedItem = {
       line: matchedLine, boxes, weight, location: selectedLocation,
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
       confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
-      goodsTemp: selectedDoc?.goods_temp ?? null,
+      productCode: matchedLine.customer_product_code ?? matchedLine.internal_product_code ?? '',
+      storageLabel: getTemperatureTypeShortLabel(matchedLine.temperature_type),
+      quantityLabel: quantityParts.join(' / ') || '-',
+      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      trackingCode: matchedLine.tracking_code ?? '-',
+      depositDate: new Date().toISOString(),
     };
     setConfirmed((prev) => [confirmedItem, ...prev]);
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
@@ -837,23 +866,30 @@ function ReceivingWorkflow({ onBack, t }) {
             <div style={{ background: C.blueLight, borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 13 }}>
               <div><strong>ลูกค้า:</strong> {stickerItem.customerName || '-'}</div>
               <div><strong>สินค้า:</strong> {stickerItem.line?.product_name}</div>
-              <div><strong>LOT:</strong> {stickerItem.lotNo || '-'}</div>
-              <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'} / <strong>หมดอายุ:</strong> {stickerItem.expDate || '-'}</div>
-              {stickerItem.goodsTemp && <div><strong>อุณหภูมิ:</strong> {stickerItem.goodsTemp}</div>}
+              <div><strong>รหัสสินค้า:</strong> {stickerItem.productCode || '-'}</div>
+              <div><strong>LOT (ของลูกค้า):</strong> {stickerItem.lotNo || '-'}</div>
+              <div><strong>การจัดเก็บ:</strong> {stickerItem.storageLabel || '-'}</div>
+              <div><strong>จำนวน:</strong> {stickerItem.quantityLabel || '-'}</div>
+              <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {stickerItem.allergenLabel}</div>
+              <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'}</div>
               <div><strong>Location:</strong> {stickerItem.location?.code ?? 'ยังไม่ได้เลือก'}</div>
+              <div><strong>Tracking Code:</strong> {stickerItem.trackingCode}</div>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button type="button"
                 onClick={() => {
                   printSticker({
+                    depositDate: stickerItem.depositDate,
                     customerName: stickerItem.customerName,
+                    productCode: stickerItem.productCode,
                     productName: stickerItem.line?.product_name,
                     lotNo: stickerItem.lotNo,
+                    storageLabel: stickerItem.storageLabel,
+                    quantityLabel: stickerItem.quantityLabel,
+                    allergenLabel: stickerItem.allergenLabel,
                     mfgDate: stickerItem.mfgDate,
-                    expDate: stickerItem.expDate,
                     locationCode: stickerItem.location?.code,
-                    locationDetail: stickerItem.location ? `${stickerItem.location.sectionName ?? stickerItem.location.sectionCode ?? '-'}` : '',
-                    goodsTemp: stickerItem.goodsTemp,
+                    trackingCode: stickerItem.trackingCode,
                   });
                 }}
                 style={{ flex: 1, padding: '16px', borderRadius: 16, background: C.primary, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>
