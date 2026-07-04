@@ -51,6 +51,11 @@ export function CustomerDepositRequestPrintDocument({
 
   const colCount = 6 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + 1;
 
+  const totalDeclaredBoxes  = lines.reduce((s, l) => s + (Number(l.expected_boxes) || 0), 0);
+  const totalDeclaredWeight = lines.reduce((s, l) => s + (Number(l.expected_weight) || 0), 0);
+  const totalActualBoxes   = lines.reduce((s, l) => s + (Number(l.actual_boxes) || 0), 0);
+  const totalActualWeight  = lines.reduce((s, l) => s + (Number(l.actual_weight) || 0), 0);
+
   // Signature data
   const issuedBy = header.reviewed_by_email ?? null;
   const issuedAt = fmtDT(header.reviewed_at);
@@ -227,6 +232,22 @@ export function CustomerDepositRequestPrintDocument({
             </tr>
           )}
         </tbody>
+        <tfoot>
+          <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
+            <td colSpan={4} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
+            <td style={{ ...TD, textAlign: 'right' }}>{totalDeclaredWeight ? totalDeclaredWeight.toLocaleString() : '-'}</td>
+            <td style={{ ...TD, textAlign: 'center' }}>{totalDeclaredBoxes ? totalDeclaredBoxes.toLocaleString() : '-'}</td>
+            <td style={TD} />
+            {hasLot && <td colSpan={3} style={TD} />}
+            {hasActual && (
+              <td style={{ ...TD, textAlign: 'center' }}>{totalActualBoxes ? totalActualBoxes.toLocaleString() : '-'}</td>
+            )}
+            {hasActual && (
+              <td style={{ ...TD, textAlign: 'right' }}>{totalActualWeight ? totalActualWeight.toLocaleString() : '-'}</td>
+            )}
+            <td style={TD} />
+          </tr>
+        </tfoot>
       </table>
 
       {/* ── Signature section ──

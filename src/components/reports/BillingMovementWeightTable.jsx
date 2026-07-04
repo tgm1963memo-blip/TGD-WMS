@@ -1,5 +1,5 @@
 import { CompactExpandableTable } from '../ui/CompactExpandableTable.jsx';
-import { formatCompactText, formatDetailValue, formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { formatDetailValue, formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 function BillingStatusBadge({ status }) {
   if (!status) return <span className="status-badge status-badge--draft" data-testid="billing-status-badge">-</span>;
@@ -31,12 +31,68 @@ function formatNumber(value) {
   return Number.isFinite(number) ? number.toLocaleString() : '0';
 }
 
+// Movement rows come in one-per-line; group them by source document so the
+// table shows one row per document (matching how staff think about billing —
+// "this receiving document" — not one row per SKU line), with totals summed
+// across the document's lines. Expanding a document row reveals its lines.
+function groupRowsByDocument(rows = []) {
+  const groups = new Map();
+
+  rows.forEach((row) => {
+    const key = row.source_document_no
+      || row.source_document_id
+      || `${row.movement_type ?? 'unknown'}-${row.movement_date ?? ''}-${row.movement_id ?? ''}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        document_key: key,
+        source_document_no: row.source_document_no,
+        source_document_id: row.source_document_id,
+        movement_date: row.movement_date,
+        customer_name: row.customer_name,
+        customer_code: row.customer_code,
+        customer_id: row.customer_id,
+        lines: [],
+      });
+    }
+    groups.get(key).lines.push(row);
+  });
+
+  return [...groups.values()].map((group) => {
+    const movementTypes = [...new Set(group.lines.map((l) => l.movement_type).filter(Boolean))];
+    const statuses = [...new Set(group.lines.map((l) => l.billing_status).filter(Boolean))];
+
+    return {
+      ...group,
+      movement_type: movementTypes.join(', ') || null,
+      billing_status: statuses.length === 1 ? statuses[0] : null,
+      billing_statuses: statuses,
+      total_qty: group.lines.reduce((s, l) => s + (Number(l.qty) || 0), 0),
+      total_chargeable_weight: group.lines.reduce((s, l) => s + (Number(l.chargeable_weight) || 0), 0),
+      movement_ids: group.lines.map((l) => String(l.movement_id ?? '')).filter(Boolean),
+    };
+  });
+}
+
+function getGroupSelectionState(group, getSelectionState) {
+  if (!getSelectionState || !group.lines.length) return { selectable: false, reason: null };
+
+  const lineStates = group.lines.map((line) => getSelectionState(line));
+  const selectable = lineStates.every((s) => s.selectable);
+  const reason = selectable
+    ? null
+    : (lineStates.find((s) => !s.selectable)?.reason ?? 'Some lines in this document are not selectable.');
+
+  return { selectable, reason };
+}
+
 function buildSummaryColumns({
+  groups,
   selectedMovementIds,
   onToggleRow,
   onToggleAllSelectable,
   getSelectionState,
-  selectableRows,
+  selectableGroups,
   allSelectableSelected,
 }) {
   const columns = [];
@@ -48,25 +104,31 @@ function buildSummaryColumns({
         <input
           type="checkbox"
           checked={allSelectableSelected}
-          disabled={!selectableRows.length}
-          onChange={() => onToggleAllSelectable?.(selectableRows.map((row) => String(row.movement_id)))}
+          disabled={!selectableGroups.length}
+          onChange={() => onToggleAllSelectable?.(selectableGroups.flatMap((group) => group.movement_ids))}
           data-testid="billing-movement-select-all-checkbox"
           aria-label="Select all billable rows"
         />
       ),
-      render: (row) => {
-        const selectionState = getSelectionState(row);
-        const movementId = String(row.movement_id ?? '');
+      render: (group) => {
+        const selectionState = getGroupSelectionState(group, getSelectionState);
+        const allSelected = group.movement_ids.length > 0
+          && group.movement_ids.every((id) => selectedMovementIds.has(id));
 
         return (
           <input
             type="checkbox"
-            checked={selectedMovementIds.has(movementId)}
+            checked={allSelected}
             disabled={!selectionState.selectable}
             title={selectionState.reason ?? 'Selectable for invoice draft'}
-            onChange={() => onToggleRow?.(movementId)}
+            onChange={() => {
+              group.movement_ids.forEach((id) => {
+                const isSelected = selectedMovementIds.has(id);
+                if (allSelected ? isSelected : !isSelected) onToggleRow?.(id);
+              });
+            }}
             data-testid="billing-movement-row-checkbox"
-            aria-label={`Select movement ${movementId}`}
+            aria-label={`Select document ${group.source_document_no ?? group.lines[0]?.movement_id ?? group.document_key}`}
           />
         );
       },
@@ -100,49 +162,68 @@ function buildSummaryColumns({
       render: (row) => <span className="compact-cell-text">{row.movement_type ?? '-'}</span>,
     },
     {
-      key: 'qty',
-      header: 'จำนวน',
-      render: (row) => <span className="compact-cell-qty">{formatNumber(row.qty)}</span>,
+      key: 'total_qty',
+      header: 'จำนวนรวม',
+      render: (row) => <span className="compact-cell-qty">{formatNumber(row.total_qty)}</span>,
     },
     {
-      key: 'chargeable_weight',
-      header: 'น้ำหนัก',
-      render: (row) => <span className="table-meta-text">{formatNumber(row.chargeable_weight)}</span>,
+      key: 'total_chargeable_weight',
+      header: 'น้ำหนักรวม (กก.)',
+      render: (row) => <span className="table-meta-text">{formatNumber(row.total_chargeable_weight)}</span>,
     },
     {
       key: 'billing_status',
       header: 'สถานะ',
-      render: (row) => <BillingStatusBadge status={row.billing_status} />,
+      render: (row) => (row.billing_statuses?.length > 1
+        ? <span className="status-badge status-badge--draft">Mixed</span>
+        : <BillingStatusBadge status={row.billing_status} />),
     },
   );
 
   return columns;
 }
 
-function renderBillingDetail(row) {
+function renderBillingDetail(group) {
   return (
-    <>
-      <DetailField label="Movement Date" value={formatDocumentDate(row.movement_date)} />
-      <DetailField label="Movement Type" value={row.movement_type} />
-      <DetailField label="Canonical Type" value={row.canonical_movement_type} />
-      <DetailField label="Customer" value={row.customer_name ?? row.customer_code ?? row.customer_id} />
-      <DetailField label="Product Code" value={row.product_code} />
-      <DetailField label="Product Name" value={row.product_name} />
-      <DetailField label="Lot No" value={row.lot_no ?? row.lot_id} />
-      <DetailField label="Pallet No" value={row.pallet_no ?? row.pallet_id} />
-      <DetailField label="Qty" value={formatNumber(row.qty)} />
-      <DetailField label="UOM" value={row.uom} />
-      <DetailField label="Net Weight" value={formatNumber(row.net_weight)} />
-      <DetailField label="Gross Weight" value={formatNumber(row.gross_weight)} />
-      <DetailField label="Chargeable Weight" value={formatNumber(row.chargeable_weight)} />
-      <DetailField label="Is Billable" value={row.is_billable ? 'Yes' : 'No'} />
-      <DetailField label="Billing Service Type" value={row.billing_service_type} />
-      <DetailField label="Billing Status" value={row.billing_status} />
-      <DetailField label="Exclusion Reason" value={row.billing_exclusion_reason} testId="billing-exclusion-reason-badge" />
-      <DetailField label="Source Document No" value={row.source_document_no} />
-      <DetailField label="Source Document ID" value={row.source_document_id} />
-      <DetailField label="Movement ID" value={row.movement_id} />
-    </>
+    <div className="table-responsive responsive-table">
+      <table className="data-table" style={{ fontSize: 12 }} data-testid="billing-movement-document-lines-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th>Lot / Pallet</th>
+            <th style={{ textAlign: 'right' }}>Qty</th>
+            <th style={{ textAlign: 'right' }}>Net Wt</th>
+            <th style={{ textAlign: 'right' }}>Gross Wt</th>
+            <th style={{ textAlign: 'right' }}>Chargeable Wt</th>
+            <th>Billing Status</th>
+            <th>Exclusion Reason</th>
+            <th>Movement ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {group.lines.map((line, idx) => (
+            <tr key={line.movement_id ?? idx}>
+              <td>{idx + 1}</td>
+              <td>{line.product_name ?? line.product_code ?? '-'}</td>
+              <td>{line.lot_no ?? line.lot_id ?? '-'}{line.pallet_no ?? line.pallet_id ? ` / ${line.pallet_no ?? line.pallet_id}` : ''}</td>
+              <td style={{ textAlign: 'right' }}>{formatNumber(line.qty)}</td>
+              <td style={{ textAlign: 'right' }}>{formatNumber(line.net_weight)}</td>
+              <td style={{ textAlign: 'right' }}>{formatNumber(line.gross_weight)}</td>
+              <td style={{ textAlign: 'right' }}>{formatNumber(line.chargeable_weight)}</td>
+              <td><BillingStatusBadge status={line.billing_status} /></td>
+              <td data-testid="billing-exclusion-reason-badge">{formatDetailValue(line.billing_exclusion_reason)}</td>
+              <td>{formatDetailValue(line.movement_id)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
+        <DetailField label="Source Document No" value={group.source_document_no} />
+        <DetailField label="Source Document ID" value={group.source_document_id} />
+        <DetailField label="Lines" value={group.lines.length} />
+      </div>
+    </div>
   );
 }
 
@@ -160,20 +241,22 @@ export function BillingMovementWeightTable({
     return emptyState;
   }
 
-  const selectableRows = data.filter((row) => getSelectionState?.(row)?.selectable);
-  const allSelectableSelected = selectableRows.length > 0
-    && selectableRows.every((row) => selectedMovementIds.has(String(row.movement_id)));
+  const groups = groupRowsByDocument(data);
+  const selectableGroups = groups.filter((group) => getGroupSelectionState(group, getSelectionState).selectable);
+  const allSelectableSelected = selectableGroups.length > 0
+    && selectableGroups.every((group) => group.movement_ids.every((id) => selectedMovementIds.has(id)));
 
   return (
     <CompactExpandableTable
-      rows={data}
-      rowKey={(row) => String(row.movement_id ?? `${row.movement_type}-${row.movement_date}`)}
+      rows={groups}
+      rowKey={(group) => group.document_key}
       summaryColumns={buildSummaryColumns({
+        groups,
         selectedMovementIds,
         onToggleRow,
         onToggleAllSelectable,
         getSelectionState,
-        selectableRows,
+        selectableGroups,
         allSelectableSelected,
       })}
       renderDetail={renderBillingDetail}

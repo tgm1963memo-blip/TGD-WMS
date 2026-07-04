@@ -342,7 +342,10 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select movement mv-1' }));
+    // Rows are grouped one-per-source-document; validMovement has no
+    // source_document_no, so the group falls back to its first line's
+    // movement_id for the accessible name.
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select document mv-1' }));
 
     const createButton = screen.getByTestId('create-invoice-draft-button');
     expect(createButton).toBeEnabled();
@@ -416,8 +419,8 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
 
-    const guardedCheckbox = await screen.findByRole('checkbox', { name: 'Select movement mv-guarded' });
-    const releasedCheckbox = screen.getByRole('checkbox', { name: 'Select movement mv-released' });
+    const guardedCheckbox = await screen.findByRole('checkbox', { name: 'Select document mv-guarded' });
+    const releasedCheckbox = screen.getByRole('checkbox', { name: 'Select document mv-released' });
     expect(guardedCheckbox).toBeDisabled();
     expect(guardedCheckbox).toHaveAttribute('title', 'Already linked to an active invoice draft');
     expect(releasedCheckbox).toBeEnabled();
