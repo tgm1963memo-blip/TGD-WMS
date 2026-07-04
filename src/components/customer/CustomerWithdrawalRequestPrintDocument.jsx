@@ -54,7 +54,7 @@ export function CustomerWithdrawalRequestPrintDocument({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-withdrawal-print-document"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
+      style={{ padding: 0, minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       {(() => {
@@ -160,7 +160,7 @@ export function CustomerWithdrawalRequestPrintDocument({
       </div>
 
       {/* ── Lines table ── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+      <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '4%' }} />
           <col style={{ width: '12%' }} />
@@ -175,6 +175,15 @@ export function CustomerWithdrawalRequestPrintDocument({
         </colgroup>
 
         <thead>
+          {/* Slim identifier row — repeats on every printed page (thead
+              behavior), so a continuation page shows which document this is
+              without re-printing the full customer/address/temp block above. */}
+          <tr>
+            <td colSpan={NCOLS} className="operational-report-running-header">
+              เลขที่เอกสาร {header.withdrawal_no ?? header.request_no}
+              {!hideCustomerName && <>&nbsp;•&nbsp; ลูกค้า {fmt(header.customer_name)}</>}
+            </td>
+          </tr>
           <tr>
             <th rowSpan={2} style={TH}>#</th>
             <th rowSpan={2} style={TH}>LOT NO<br />LOCATION</th>
@@ -248,11 +257,11 @@ export function CustomerWithdrawalRequestPrintDocument({
         </tfoot>
       </table>
 
-      {/* ── Spacer: pushes signatures to bottom of page ── */}
-      <div style={{ flex: '1 1 auto' }} />
-
-      {/* ── Page footer: signatures + truck info ── */}
-      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+      {/* ── Page footer: signatures + truck info ──
+          No flex spacer: CSS page-break/fragmentation properties are
+          unreliable inside flex containers across browsers, which would
+          undermine the pageBreakInside:'avoid' below for longer documents. */}
+      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 12, fontSize: 10 }}>
           {sigs.map(({ label, name, dt }) => (
             <div key={label} style={{ textAlign: 'center' }}>

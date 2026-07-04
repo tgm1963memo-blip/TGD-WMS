@@ -90,10 +90,35 @@ export function InventoryMovementReportTemplate({
       data-testid="inventory-movement-report-template"
       style={{ padding: 0 }}
     >
-      {/*
-        Single table wrapping everything so <thead> (logo + customer info + column headers)
-        repeats on EVERY printed page automatically.
-      */}
+      {/* One-time header + full customer/period block — appears only on
+          page 1, does NOT repeat on continuation pages (only the slim
+          identifier row inside the table's thead below does). */}
+      <div style={headerTd}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            {normalizedBranding.logo_url && (
+              <img src={normalizedBranding.logo_url} alt="Logo" style={{ height: 44, marginBottom: 4 }} />
+            )}
+            <div style={{ fontWeight: 'bold', fontSize: 10 }}>CUSTOMER: {data?.customer}</div>
+            <div style={{ fontSize: 9 }}>ADDRESS : {data?.address || '-'}</div>
+            <div style={{ fontSize: 9 }}>
+              TEL : {customerDetails?.phone || '-'} &nbsp;&nbsp; FAX : {customerDetails?.fax || '-'}
+            </div>
+            <div style={{ fontSize: 9 }}>ATTN : {customerDetails?.contact_name || '-'}</div>
+          </div>
+          <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: 10 }}>
+            <div>FOR MONTH : {fmtDate(data?.dateFrom)} - {fmtDate(data?.dateTo)}</div>
+            <div>ISSUED DATE : {fmtDate(data?.issuedDate)}</div>
+          </div>
+        </div>
+        <div style={{
+          textAlign: 'center', fontSize: 13, fontWeight: 'bold',
+          marginTop: 6, borderTop: '1px solid #ccc', paddingTop: 5,
+        }}>
+          Entry-Delivery Inventory Report
+        </div>
+      </div>
+
       <table
         className="report-print-table"
         style={{
@@ -110,32 +135,10 @@ export function InventoryMovementReportTemplate({
 
         {/* ── THEAD: repeats on every page ── */}
         <thead>
-          {/* Row 1: Logo + Customer info */}
+          {/* Slim identifier row — repeats on every printed page */}
           <tr>
-            <td colSpan={NCOLS} style={headerTd}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  {normalizedBranding.logo_url && (
-                    <img src={normalizedBranding.logo_url} alt="Logo" style={{ height: 44, marginBottom: 4 }} />
-                  )}
-                  <div style={{ fontWeight: 'bold', fontSize: 10 }}>CUSTOMER: {data?.customer}</div>
-                  <div style={{ fontSize: 9 }}>ADDRESS : {data?.address || '-'}</div>
-                  <div style={{ fontSize: 9 }}>
-                    TEL : {customerDetails?.phone || '-'} &nbsp;&nbsp; FAX : {customerDetails?.fax || '-'}
-                  </div>
-                  <div style={{ fontSize: 9 }}>ATTN : {customerDetails?.contact_name || '-'}</div>
-                </div>
-                <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: 10 }}>
-                  <div>FOR MONTH : {fmtDate(data?.dateFrom)} - {fmtDate(data?.dateTo)}</div>
-                  <div>ISSUED DATE : {fmtDate(data?.issuedDate)}</div>
-                </div>
-              </div>
-              <div style={{
-                textAlign: 'center', fontSize: 13, fontWeight: 'bold',
-                marginTop: 6, borderTop: '1px solid #ccc', paddingTop: 5,
-              }}>
-                Entry-Delivery Inventory Report
-              </div>
+            <td colSpan={NCOLS} className="operational-report-running-header">
+              ลูกค้า {data?.customer} &nbsp;•&nbsp; ช่วงเวลา {fmtDate(data?.dateFrom)} - {fmtDate(data?.dateTo)}
             </td>
           </tr>
 

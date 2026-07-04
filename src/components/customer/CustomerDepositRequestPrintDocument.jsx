@@ -76,7 +76,7 @@ export function CustomerDepositRequestPrintDocument({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-deposit-print-document"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
+      style={{ padding: 0, minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       <div style={{
@@ -168,8 +168,16 @@ export function CustomerDepositRequestPrintDocument({
       </div>
 
       {/* ── Lines table ── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+      <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <thead>
+          {/* Slim identifier row — repeats on every printed page (thead
+              behavior), so a continuation page shows which document this is
+              without re-printing the full customer/address/temp block above. */}
+          <tr>
+            <td colSpan={colCount} className="operational-report-running-header">
+              เลขที่เอกสาร {header.request_no} &nbsp;•&nbsp; ลูกค้า {fmt(customerName)}
+            </td>
+          </tr>
           <tr>
             <th style={{ ...TH, width: '3%', textAlign: 'center' }}>#</th>
             <th style={{ ...TH, width: '9%' }}>{t('catalog_col_customer_code')}</th>
@@ -221,11 +229,11 @@ export function CustomerDepositRequestPrintDocument({
         </tbody>
       </table>
 
-      {/* ── Spacer ── */}
-      <div style={{ flex: '1 1 auto' }} />
-
-      {/* ── Signature section ── */}
-      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+      {/* ── Signature section ──
+          No flex spacer: CSS page-break/fragmentation properties are
+          unreliable inside flex containers across browsers, which would
+          undermine the pageBreakInside:'avoid' below for longer documents. */}
+      <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32, marginBottom: 4 }}>
           <SigBox
             label="Issue / Checked by"

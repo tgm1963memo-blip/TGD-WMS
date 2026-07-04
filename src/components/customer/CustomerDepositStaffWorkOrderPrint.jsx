@@ -45,7 +45,7 @@ export function CustomerDepositStaffWorkOrderPrint({
     <article
       className="operational-report-print-document customer-staff-work-order-print"
       data-testid="customer-deposit-staff-work-order-print"
-      style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: '178mm' }}
+      style={{ padding: 0, minHeight: '178mm' }}
     >
       {/* ── Compact page header ── */}
       {(() => {
@@ -145,7 +145,7 @@ export function CustomerDepositStaffWorkOrderPrint({
       </table>
 
       {/* ── Lines table ── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+      <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
           <col style={{ width: '9%' }} />
@@ -163,6 +163,14 @@ export function CustomerDepositStaffWorkOrderPrint({
           <col style={{ width: hasActual ? '0%' : '14%' }} />
         </colgroup>
         <thead>
+          {/* Slim identifier row — repeats on every printed page (thead
+              behavior), so a continuation page shows which document this is
+              without re-printing the full customer/address/temp block above. */}
+          <tr>
+            <td colSpan={hasActual ? 13 : 12} className="operational-report-running-header">
+              เลขที่เอกสาร {header.request_no} &nbsp;•&nbsp; ลูกค้า {fmt(header.customer_name)}
+            </td>
+          </tr>
           <tr>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>#</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
@@ -255,10 +263,13 @@ export function CustomerDepositStaffWorkOrderPrint({
         เขียน &quot;รหัสติดตาม&quot; ของแต่ละ LOT ลงบนสติกเกอร์ที่ติดหน้าสินค้า เพื่อใช้อ้างอิงและตรวจสอบ
       </p>
 
-      {/* ── Flex spacer pushes signature to bottom ── */}
-      <div style={{ flex: '1 1 auto' }} />
-
-      {/* ── Signature section ── */}
+      {/* ── Signature section ──
+          No flex spacer here: CSS page-break/fragmentation properties are
+          unreliable inside flex containers across browsers, which would
+          undermine the pageBreakInside:'avoid' below for longer documents
+          that span multiple pages. Natural document flow keeps pagination
+          reliable; the signature just follows the content instead of being
+          pinned to the exact bottom of a short page. */}
       {(() => {
         // 1. Issue/checked by = TGC staff who opened the work order (ACCEPT action)
         const issuedBy = header.reviewed_by_email ?? null;
@@ -288,7 +299,7 @@ export function CustomerDepositStaffWorkOrderPrint({
           </div>
         );
         return (
-          <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid' }}>
+          <div style={{ borderTop: '2px solid #ccc', paddingTop: 10, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32, marginBottom: 4 }}>
               <SigBox
                 label="Issue / Checked by"

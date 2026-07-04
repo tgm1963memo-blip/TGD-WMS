@@ -30,7 +30,24 @@ export function DeliverySlipTemplate({
 
   return (
     <article className="operational-report operational-report-a4" data-testid="delivery-slip-template" style={{ padding: 0 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      {/* One-time header + full meta block — appears only on page 1, does
+          NOT repeat on continuation pages (only the slim identifier row
+          inside the table's thead below does). */}
+      <div style={{ padding: '8mm', borderBottom: '2px solid #ddd' }}>
+        <DocumentHeader
+          branding={branding}
+          language={language}
+          documentTitle={t('delivery_slip_report', 'Delivery Slip')}
+          documentNo={data?.documentNo}
+          documentDate={data?.documentDate}
+        />
+        <ReportMetaGrid fields={metaFields} />
+        <h2 style={{ fontSize: 13, margin: '8px 0 4px', borderTop: '1px solid #eee', paddingTop: 8 }}>
+          {t('document_lines', 'Lines')}
+        </h2>
+      </div>
+
+      <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: '10%' }} />
           <col style={{ width: '14%' }} />
@@ -42,20 +59,10 @@ export function DeliverySlipTemplate({
         </colgroup>
 
         <thead>
-          {/* Document header + meta — repeats on every page */}
+          {/* Slim identifier row — repeats on every printed page */}
           <tr>
-            <td colSpan={NCOLS} style={{ padding: '8mm', borderBottom: '2px solid #ddd' }}>
-              <DocumentHeader
-                branding={branding}
-                language={language}
-                documentTitle={t('delivery_slip_report', 'Delivery Slip')}
-                documentNo={data?.documentNo}
-                documentDate={data?.documentDate}
-              />
-              <ReportMetaGrid fields={metaFields} />
-              <h2 style={{ fontSize: 13, margin: '8px 0 4px', borderTop: '1px solid #eee', paddingTop: 8 }}>
-                {t('document_lines', 'Lines')}
-              </h2>
+            <td colSpan={NCOLS} className="operational-report-running-header">
+              {t('document_no', 'Document No')} {data?.documentNo} &nbsp;•&nbsp; {t('report_customer_name', 'Customer')} {data?.customerName}
             </td>
           </tr>
           {/* Column headers */}

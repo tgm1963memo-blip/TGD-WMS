@@ -100,6 +100,6 @@ describe('20B operational report templates', () => {
     expect(screen.getByTestId('inventory-movement-report-template')).toBeInTheDocument();
     expect(screen.getByText('Entry-Delivery Inventory Report')).toBeInTheDocument();
     expect(screen.getByText('LOT-1')).toBeInTheDocument();
-    expect(screen.getByText(/ACME Cold Chain/)).toBeInTheDocument();
+    expect(screen.getAllByText(/ACME Cold Chain/).length).toBeGreaterThan(0);
   });
 });
