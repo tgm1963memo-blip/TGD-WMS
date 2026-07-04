@@ -5,7 +5,8 @@ import { ReportPrintActions } from '../reports/ReportPrintActions.jsx';
 import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOrderPrint.jsx';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
+import { getTemperatureTypeLabel, getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { printSticker } from '../../utils/stickerPrint.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -18,6 +19,7 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { getCustomers } from '../../services/masterDataService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
@@ -48,6 +50,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [locRow, setLocRow] = useState('');
   const [locLevel, setLocLevel] = useState('');
   const [customerData, setCustomerData] = useState(null);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +83,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
           if (!active) return;
           const cust = (cResult.data ?? []).find((c) => c.id === hRes.data.customer_id);
           setCustomerData(cust ?? null);
+        });
+        listCustomerProducts({ customerId: hRes.data.customer_id }).then((cpResult) => {
+          if (!active) return;
+          setCatalogProducts(cpResult.data ?? []);
         });
       }
     });
@@ -221,6 +228,27 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     ));
     setActionMsg(t('admin_recount_saved'));
     setRecountLine(null);
+  }
+
+  function handlePrintSticker(line) {
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
+    const locationCode = allLocations.find((loc) => loc.id === line.location_id)?.code;
+    const quantityParts = [];
+    if (line.actual_boxes ?? line.expected_boxes) quantityParts.push(`${Number(line.actual_boxes ?? line.expected_boxes).toLocaleString()} กล่อง`);
+    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${Number(line.actual_weight ?? line.expected_weight).toLocaleString()} กก.`);
+    printSticker({
+      depositDate: header?.expected_arrival_date,
+      customerName: customerData?.customer_name ?? customerData?.name ?? header?.contact_name ?? '',
+      productCode: line.customer_product_code ?? line.internal_product_code ?? '',
+      productName: line.product_name,
+      lotNo: line.lot_no,
+      storageLabel: getTemperatureTypeShortLabel(line.temperature_type),
+      quantityLabel: quantityParts.join(' / ') || '-',
+      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      mfgDate: line.mfg_date,
+      locationCode,
+      trackingCode: line.tracking_code ?? '-',
+    });
   }
 
   async function handleSaveLocation() {
@@ -436,6 +464,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               }}
                             >
                               🔄
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              title="พิมพ์สติกเกอร์"
+                              aria-label="Print Sticker"
+                              style={{ marginLeft: 4 }}
+                              onClick={() => handlePrintSticker(line)}
+                            >
+                              🖨
                             </button>
                           </td>
                         </tr>
