@@ -141,9 +141,9 @@ function printSticker({
   storageLabel, quantityLabel, allergenLabel, mfgDate, locationCode, trackingCode,
 }) {
   const field = (label, value, opts = {}) => `
-    <div class="field" style="${opts.grow ? 'flex:1;' : ''}">
-      <span class="f-label">${label}</span>
-      <span class="f-value" style="${opts.bold ? 'font-weight:900;' : ''}">${value ?? '-'}</span>
+    <div class="d-field">
+      <span class="d-label">${label}</span>
+      <span class="d-value" style="${opts.bold ? 'font-weight:900;' : ''}">${value ?? '-'}</span>
     </div>`;
 
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
@@ -167,25 +167,30 @@ function printSticker({
   @page { margin: 8mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  .sticker { border: 3px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 112mm; min-height: 80mm; box-sizing: border-box; display: flex; gap: 4mm; }
-  .info-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .qr-col { width: 24mm; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1.5mm; }
-  .qr-col svg { width: 22mm; height: 22mm; }
-  .qr-caption { font-size: 10px; font-weight: 700; text-align: center; width: 100%; overflow-wrap: break-word; word-break: break-all; }
-  .date-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; font-size: 16px; }
-  /* Every field is a full-width row (not paired side-by-side) — at the larger
-     print-safe font size, two values sharing half the sticker's width would
-     get squeezed and wrap mid-word (e.g. tracking codes breaking every 2
-     characters). Full width keeps every value on one line. */
-  .field { display: flex; align-items: baseline; gap: 6px; border-bottom: 1.5px dotted #000; padding-bottom: 1px; margin-bottom: 1.8mm; }
-  .f-label { font-weight: 700; font-size: 12px; white-space: nowrap; color: #333; }
-  .f-value { flex: 1; font-weight: 600; overflow-wrap: break-word; word-break: break-word; }
+  /* 4 x 3 inch label (101.6mm x 76.2mm), matching the physical stock. */
+  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2.5mm 3mm; width: 101.6mm; height: 76.2mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 1mm; overflow: hidden; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
+  .date-field { font-size: 10px; font-weight: 700; }
+  .qr-box svg { width: 17mm; height: 17mm; display: block; }
+  .details { display: flex; flex-direction: column; gap: 0.6mm; flex-shrink: 0; }
+  .d-field { display: flex; align-items: baseline; gap: 5px; border-bottom: 1px dotted #999; }
+  .d-label { font-weight: 700; font-size: 9px; white-space: nowrap; color: #333; }
+  .d-value { flex: 1; font-weight: 600; font-size: 10px; overflow-wrap: break-word; word-break: break-word; }
+  /* Tracking code is the whole reason for this label: make it the single
+     biggest, most legible element, pinned bottom-right, so staff never need
+     to hand-copy it in marker onto the sticker again. */
+  .code-block { margin-top: auto; display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+  .code-label { font-size: 10px; font-weight: 700; color: #333; }
+  .code-value { font-size: 42px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.05; white-space: nowrap; }
 </style>
 </head>
 <body>
 <div class="sticker">
-  <div class="info-col">
-    <div class="date-row">${field('วันที่ฝากเข้า', formatStickerDate(depositDate))}</div>
+  <div class="top-row">
+    <div class="date-field">วันที่ฝากเข้า<br>${formatStickerDate(depositDate)}</div>
+    <div class="qr-box">${qrSvg}</div>
+  </div>
+  <div class="details">
     ${field('ชื่อลูกค้า', customerName)}
     ${field('รหัสสินค้า', productCode)}
     ${field('ชื่อสินค้า', productName)}
@@ -195,11 +200,10 @@ function printSticker({
     ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { bold: true })}
     ${field('วันผลิต', formatStickerDate(mfgDate))}
     ${field('Location', locationCode || '-')}
-    ${field('Tracking Code', trackingCode, { bold: true })}
   </div>
-  <div class="qr-col">
-    ${qrSvg}
-    <div class="qr-caption">${trackingCode || '-'}</div>
+  <div class="code-block">
+    <div class="code-label">Tracking Code</div>
+    <div class="code-value">${trackingCode || '-'}</div>
   </div>
 </div>
 </body>
