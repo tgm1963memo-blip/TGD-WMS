@@ -44,14 +44,17 @@ export function printSticker({
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
   /* 3 x 4 inch label (76.2mm x 101.6mm) — media width x length, matching
      the physical label roll. */
-  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2mm 2.5mm; width: 76.2mm; height: 101.6mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 0.8mm; overflow: hidden; }
+  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2mm 2.5mm; width: 76.2mm; height: 101.6mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 0.6mm; overflow: hidden; }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
-  .date-field { font-size: 9px; font-weight: 700; line-height: 1.3; }
-  .qr-box svg { width: 15mm; height: 15mm; display: block; }
+  .date-field { font-size: 10px; font-weight: 700; line-height: 1.25; }
+  .qr-box svg { width: 12mm; height: 12mm; display: block; }
   .details { display: flex; flex-direction: column; flex-shrink: 0; }
-  .d-field { display: flex; align-items: baseline; gap: 5px; border-bottom: 1px dotted #999; line-height: 1.35; }
-  .d-label { font-weight: 700; font-size: 8px; white-space: nowrap; color: #333; }
-  .d-value { flex: 1; font-weight: 600; font-size: 9px; overflow-wrap: break-word; word-break: break-word; }
+  /* Label on its own line above the value (not side-by-side) — at a size
+     that's actually legible printed, a same-line label+value pair doesn't
+     leave enough width for the value before it wraps awkwardly. */
+  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.12; padding-bottom: 0.1mm; }
+  .d-label { font-weight: 700; font-size: 8px; color: #555; }
+  .d-value { font-weight: 700; font-size: 12px; overflow-wrap: break-word; word-break: break-word; }
   /* Tracking code is the whole reason for this label: make it the single
      biggest, most legible element, pinned bottom-right, so staff never need
      to hand-copy it in marker onto the sticker again. The label is only
@@ -59,8 +62,8 @@ export function printSticker({
      wrapping to 2 lines is fine as long as the digits are as big as
      possible (word-break so it wraps by character, not just at spaces). */
   .code-block { margin-top: auto; display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
-  .code-label { font-size: 9px; font-weight: 700; color: #333; line-height: 1; }
-  .code-value { font-size: 56px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; }
+  .code-label { font-size: 10px; font-weight: 700; color: #333; line-height: 1; }
+  .code-value { font-size: 34px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; }
 </style>
 </head>
 <body>
