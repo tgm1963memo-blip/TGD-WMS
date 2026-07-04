@@ -233,7 +233,7 @@ export function CustomerDepositStaffWorkOrderPrint({
         </tbody>
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={5} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={6} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredWeight || null)}</td>
             {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualBoxes || null)}</td>}
