@@ -167,21 +167,25 @@ function printSticker({
   @page { margin: 8mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  /* 4 x 3 inch label (101.6mm x 76.2mm), matching the physical stock. */
-  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2.5mm 3mm; width: 101.6mm; height: 76.2mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 1mm; overflow: hidden; }
+  /* 3 x 4 inch label (76.2mm x 101.6mm) — media width x length, matching
+     the physical label roll. */
+  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2mm 2.5mm; width: 76.2mm; height: 101.6mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 0.8mm; overflow: hidden; }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
-  .date-field { font-size: 10px; font-weight: 700; }
-  .qr-box svg { width: 17mm; height: 17mm; display: block; }
-  .details { display: flex; flex-direction: column; gap: 0.6mm; flex-shrink: 0; }
-  .d-field { display: flex; align-items: baseline; gap: 5px; border-bottom: 1px dotted #999; }
-  .d-label { font-weight: 700; font-size: 9px; white-space: nowrap; color: #333; }
-  .d-value { flex: 1; font-weight: 600; font-size: 10px; overflow-wrap: break-word; word-break: break-word; }
+  .date-field { font-size: 9px; font-weight: 700; line-height: 1.3; }
+  .qr-box svg { width: 15mm; height: 15mm; display: block; }
+  .details { display: flex; flex-direction: column; flex-shrink: 0; }
+  .d-field { display: flex; align-items: baseline; gap: 5px; border-bottom: 1px dotted #999; line-height: 1.35; }
+  .d-label { font-weight: 700; font-size: 8px; white-space: nowrap; color: #333; }
+  .d-value { flex: 1; font-weight: 600; font-size: 9px; overflow-wrap: break-word; word-break: break-word; }
   /* Tracking code is the whole reason for this label: make it the single
      biggest, most legible element, pinned bottom-right, so staff never need
-     to hand-copy it in marker onto the sticker again. */
+     to hand-copy it in marker onto the sticker again. The label is only
+     3in wide, so a long code can't stay on one line at a large size —
+     wrapping to 2 lines is fine as long as the digits are as big as
+     possible (word-break so it wraps by character, not just at spaces). */
   .code-block { margin-top: auto; display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
-  .code-label { font-size: 10px; font-weight: 700; color: #333; }
-  .code-value { font-size: 42px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.05; white-space: nowrap; }
+  .code-label { font-size: 9px; font-weight: 700; color: #333; line-height: 1; }
+  .code-value { font-size: 56px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; }
 </style>
 </head>
 <body>
