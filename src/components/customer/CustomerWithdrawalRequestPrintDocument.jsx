@@ -15,8 +15,14 @@ function fmtDT(iso) {
       + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   } catch { return iso; }
 }
+function fmtDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const parts = s.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
+}
 
-const NCOLS = 10;
+const NCOLS = 12;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
 // Reference numbers must stay fully readable, so wrap onto a second line
@@ -162,16 +168,18 @@ export function CustomerWithdrawalRequestPrintDocument({
       {/* ── Lines table ── */}
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
-          <col style={{ width: '4%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '24%' }} />
-          <col style={{ width: '12%' }} />
+          <col style={{ width: '3%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '17%' }} />
           <col style={{ width: '9%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '11%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '13%' }} />
         </colgroup>
 
         <thead>
@@ -189,6 +197,8 @@ export function CustomerWithdrawalRequestPrintDocument({
             <th rowSpan={2} style={TH}>LOT NO<br />LOCATION</th>
             <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={TH}>ITEM CODE</th>
+            <th rowSpan={2} style={TH}>MFG DATE</th>
+            <th rowSpan={2} style={TH}>EXP DATE</th>
             <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}>T.WEIGHT<br />KG.</th>
             <th colSpan={4} style={{ ...TH, background: '#e8eaf6' }}>BALANCE TOTAL</th>
             <th rowSpan={2} style={TH}>REMARK</th>
@@ -214,6 +224,8 @@ export function CustomerWithdrawalRequestPrintDocument({
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
               <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
+              <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
+              <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
               <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(line.requested_weight)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
@@ -237,7 +249,7 @@ export function CustomerWithdrawalRequestPrintDocument({
 
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={4} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
+            <td colSpan={6} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
@@ -246,7 +258,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             <td style={TD} />
           </tr>
           <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
-            <td colSpan={4} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={6} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
