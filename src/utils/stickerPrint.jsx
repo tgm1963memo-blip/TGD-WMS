@@ -63,7 +63,12 @@ export function printSticker({
      possible (word-break so it wraps by character, not just at spaces). */
   .code-block { margin-top: auto; display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
   .code-label { font-size: 10px; font-weight: 700; color: #333; line-height: 1; }
-  .code-value { font-size: 34px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; }
+  /* font-weight:900 alone isn't reliably bold once the browser/printer
+     substitutes a fallback Latin font for these digits (the Thai-first
+     font stack above may not carry a true black weight for Latin/numerals)
+     — a text stroke guarantees a visibly heavier stroke regardless of which
+     font actually gets used to render it. */
+  .code-value { font-size: 34px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; -webkit-text-stroke: 0.6px #000; }
 </style>
 </head>
 <body>
