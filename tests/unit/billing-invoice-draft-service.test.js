@@ -41,6 +41,7 @@ const {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
   createBillingInvoiceDraftFromMovements,
+  deleteBillingInvoiceDraft,
   findActiveDuplicateDraftLines,
   getBillingInvoiceDraftById,
   getBillingInvoiceDraftBplusExportReadiness,
@@ -113,6 +114,13 @@ function createTableChain(tableName, handlers = {}) {
     }),
     eq: vi.fn((column, value) => {
       state.filters[column] = value;
+      if (state.operation === 'delete') {
+        return Promise.resolve(handlers.afterDelete?.(state) ?? { data: null, error: null });
+      }
+      return chain;
+    }),
+    delete: vi.fn(() => {
+      state.operation = 'delete';
       return chain;
     }),
     in: vi.fn((column, values) => {
@@ -403,6 +411,64 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
 
     expect(result.error).toBeNull();
     expect(result.data.status).toBe('CANCELLED');
+  });
+
+  it('delete draft removes lines then the header for a DRAFT-status draft', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260608-0001',
+      status: 'DRAFT',
+      customer_id: 'cust-1',
+    };
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+          afterDelete: () => ({ data: null, error: null }),
+        });
+      }
+
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({ data: [], error: null }),
+          afterDelete: () => ({ data: null, error: null }),
+        });
+      }
+
+      return createTableChain(tableName);
+    });
+
+    const result = await deleteBillingInvoiceDraft({ draftId: 'draft-1' });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ draftId: 'draft-1' });
+  });
+
+  it('delete draft is rejected once the draft is past plain DRAFT status', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260608-0001',
+      status: 'READY_TO_REVIEW',
+      customer_id: 'cust-1',
+    };
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+        });
+      }
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, { order: async () => ({ data: [], error: null }) });
+      }
+      return createTableChain(tableName);
+    });
+
+    const result = await deleteBillingInvoiceDraft({ draftId: 'draft-1' });
+
+    expect(result.data).toBeNull();
+    expect(result.error.code).toBe('INVOICE_DRAFT_VALIDATION');
   });
 
   it('approve draft updates only the header status and keeps duplicate guards untouched', async () => {

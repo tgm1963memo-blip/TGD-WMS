@@ -13,6 +13,7 @@ import {
   buildInvoiceDraftCreatePayload,
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
+  canDeleteBillingInvoiceDraft,
   findDuplicateDraftLines,
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
@@ -319,6 +320,53 @@ export async function cancelBillingInvoiceDraft({
     data: shapeBillingInvoiceDraftHeader(headerUpdate.data),
     error: null,
   };
+}
+
+// Hard delete (not the soft CANCELLED status) — only ever called for plain
+// DRAFT status. Lines are removed first (matching how create inserts lines
+// then header) so the movements those lines pointed at immediately become
+// selectable again in the billing movement weight report — there's no
+// separate "used" flag anywhere else to reset, the partial unique index on
+// tgd_billing_invoice_draft_lines is scoped by row existence.
+export async function deleteBillingInvoiceDraft({ draftId } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!draftId) {
+    return { data: null, error: validationError('Invoice draft id is required.') };
+  }
+
+  const existing = await getBillingInvoiceDraftById(draftId);
+  if (existing.error) {
+    return { data: null, error: existing.error };
+  }
+
+  if (!canDeleteBillingInvoiceDraft(existing.data.draft)) {
+    return {
+      data: null,
+      error: validationError('Only DRAFT invoice drafts can be deleted.', {
+        status: existing.data.draft.status,
+      }),
+    };
+  }
+
+  const linesDelete = await supabase
+    .from(INVOICE_DRAFT_LINE_TABLE)
+    .delete()
+    .eq('invoice_draft_id', draftId);
+
+  if (linesDelete.error) {
+    return { data: null, error: normalizeServiceError(linesDelete.error) };
+  }
+
+  const headerDelete = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .delete()
+    .eq('id', draftId);
+
+  if (headerDelete.error) {
+    return { data: null, error: normalizeServiceError(headerDelete.error) };
+  }
+
+  return { data: { draftId }, error: null };
 }
 
 export async function approveBillingInvoiceDraft({

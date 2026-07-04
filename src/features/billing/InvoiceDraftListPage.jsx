@@ -12,10 +12,14 @@ import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraft
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
-import { listBillingInvoiceDrafts, getBillingInvoiceDraftById } from '../../services/billingInvoiceDraftService.js';
+import {
+  listBillingInvoiceDrafts,
+  getBillingInvoiceDraftById,
+  deleteBillingInvoiceDraft,
+} from '../../services/billingInvoiceDraftService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
-import { canReadBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
+import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -24,6 +28,7 @@ export function InvoiceDraftListPage() {
   const { language } = useLanguage();
   const { role: userRole, ready: roleReady } = useUserRole();
   const canRead = roleReady && canReadBillingInvoiceDrafts(userRole);
+  const canWrite = roleReady && canWriteBillingInvoiceDrafts(userRole);
   const [filters, setFilters] = useState({});
   const [customers, setCustomers] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -33,6 +38,8 @@ export function InvoiceDraftListPage() {
   const [viewLines, setViewLines] = useState([]);
   const [viewLoading, setViewLoading] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +51,7 @@ export function InvoiceDraftListPage() {
     };
   }, []);
 
-  useEffect(() => {
+  function reloadDrafts() {
     if (!canRead) {
       setDrafts([]);
       setLoading(false);
@@ -52,26 +59,49 @@ export function InvoiceDraftListPage() {
       return undefined;
     }
 
-    let isMounted = true;
     setLoading(true);
     setError(null);
 
-    listBillingInvoiceDrafts({
+    return listBillingInvoiceDrafts({
       customerId: filters.customerId || undefined,
       status: filters.status || undefined,
       dateFrom: filters.dateFrom || undefined,
       dateTo: filters.dateTo || undefined,
     }).then((result) => {
-      if (!isMounted) return;
       setDrafts(result.data ?? []);
       setError(result.error ?? null);
       setLoading(false);
     });
+  }
 
+  useEffect(() => {
+    let isMounted = true;
+    Promise.resolve(reloadDrafts()).then(() => {
+      if (!isMounted) return;
+    });
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canRead, filters.customerId, filters.status, filters.dateFrom, filters.dateTo]);
+
+  async function handleDelete(draft) {
+    if (!draft?.id) return;
+    const confirmed = window.confirm(`ลบร่างใบแจ้งหนี้ ${draft.draft_no ?? ''}? รายการเคลื่อนไหวที่ใช้จะกลับไปเลือกสร้างร่างใหม่ได้`);
+    if (!confirmed) return;
+
+    setDeletingId(draft.id);
+    setDeleteError(null);
+    const result = await deleteBillingInvoiceDraft({ draftId: draft.id });
+    setDeletingId(null);
+
+    if (result.error) {
+      setDeleteError(result.error);
+      return;
+    }
+
+    reloadDrafts();
+  }
 
   function handleView(draft) {
     setViewDraft(draft);
@@ -134,8 +164,21 @@ export function InvoiceDraftListPage() {
 
       <InvoiceDraftFilterPanel value={filters} onChange={setFilters} customers={customers} />
 
+      {deleteError ? (
+        <div className="section-card" role="alert" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-danger)', background: '#fff5f5' }}>
+          {formatInvoiceDraftError(deleteError)}
+        </div>
+      ) : null}
+
       <DashboardSection title="Invoice Draft List">
-        <InvoiceDraftListTable data={filteredDrafts} loading={loading} error={error} onView={handleView} />
+        <InvoiceDraftListTable
+          data={filteredDrafts}
+          loading={loading || Boolean(deletingId)}
+          error={error}
+          onView={handleView}
+          onDelete={handleDelete}
+          canWrite={canWrite}
+        />
       </DashboardSection>
 
       {viewDraft ? (

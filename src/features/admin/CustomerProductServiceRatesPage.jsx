@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { getCustomers } from '../../services/masterDataService.js';
-import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { listCustomerProducts, upsertCustomerProduct } from '../../services/customerProductCatalogService.js';
 import {
   SERVICE_TYPES,
   UNIT_BASIS,
-  listProductServiceRates,
+  listAllProductServiceRates,
+  listCustomerProductsForRateImport,
   upsertProductServiceRate,
+  bulkUpsertProductServiceRates,
 } from '../../services/productServiceRatesService.js';
-import { upsertCustomerProduct } from '../../services/customerProductCatalogService.js';
+import {
+  buildStorageRateLookupMap,
+  downloadStorageRateTemplate,
+  exportStorageRatesExcel,
+  parseStorageRateImportFile,
+} from '../../utils/storageRateExcelUtils.js';
 
 const EMPTY_FORM = {
   rateId: '',
+  customerId: '',
+  productId: '',
   serviceType: 'STORAGE',
   rate: '',
   unitBasis: 'PER_KG',
@@ -48,13 +58,24 @@ export function CustomerProductServiceRatesPage() {
   const [customerId, setCustomerId] = useState('');
   const [products, setProducts] = useState([]);
   const [productId, setProductId] = useState('');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState('');
+
   const [rates, setRates] = useState([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+
   const [form, setForm] = useState(null);
+  const [formProducts, setFormProducts] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
   const [storageChargeBasis, setStorageChargeBasis] = useState('WEIGHT');
   const [basisSaving, setBasisSaving] = useState(false);
+
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importErrors, setImportErrors] = useState([]);
 
   useEffect(() => {
     getCustomers().then((r) => setCustomers(r.data ?? []));
@@ -63,26 +84,39 @@ export function CustomerProductServiceRatesPage() {
   useEffect(() => {
     setProductId('');
     setProducts([]);
-    setRates([]);
     if (!customerId) return;
     listCustomerProducts({ customerId }).then((r) => setProducts(r.data ?? []));
   }, [customerId]);
 
   useEffect(() => {
-    setRates([]);
-    if (!productId) return;
+    if (!productId) {
+      setStorageChargeBasis('WEIGHT');
+      return;
+    }
     const found = products.find((p) => p.id === productId);
     setStorageChargeBasis(found?.storage_charge_basis ?? 'WEIGHT');
-    loadRates();
-  }, [productId]);
+  }, [productId, products]);
 
   async function loadRates() {
-    if (!productId) return;
-    const { data } = await listProductServiceRates(productId);
+    setRatesLoading(true);
+    const { data, error: rateError } = await listAllProductServiceRates({
+      customerId: customerId || undefined,
+      customerProductId: productId || undefined,
+      serviceType: serviceTypeFilter || undefined,
+      isActive: activeFilter === '' ? undefined : activeFilter === 'true',
+    });
     setRates(data ?? []);
+    setRatesLoading(false);
+    if (rateError) setError(rateError.message ?? 'โหลดอัตราค่าบริการไม่สำเร็จ');
   }
 
+  useEffect(() => {
+    loadRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, productId, serviceTypeFilter, activeFilter]);
+
   async function handleBasisChange(newBasis) {
+    const selectedProduct = products.find((p) => p.id === productId);
     if (!selectedProduct) return;
     setStorageChargeBasis(newBasis);
     setBasisSaving(true);
@@ -111,7 +145,8 @@ export function CustomerProductServiceRatesPage() {
   }
 
   function openCreate() {
-    setForm({ ...EMPTY_FORM });
+    setForm({ ...EMPTY_FORM, customerId, productId });
+    setFormProducts(products);
     setError('');
     setSuccess('');
   }
@@ -119,24 +154,37 @@ export function CustomerProductServiceRatesPage() {
   function openEdit(row) {
     setForm({
       rateId:      row.id,
+      customerId:  row.customer_id ?? '',
+      productId:   row.customer_product_id,
       serviceType: row.service_type,
       rate:        String(row.rate ?? ''),
       unitBasis:   row.unit_basis,
       currency:    row.currency ?? 'THB',
       note:        row.note ?? '',
     });
+    setFormProducts([]);
     setError('');
     setSuccess('');
   }
 
+  function handleFormCustomerChange(newCustomerId) {
+    setForm((f) => ({ ...f, customerId: newCustomerId, productId: '' }));
+    setFormProducts([]);
+    if (!newCustomerId) return;
+    listCustomerProducts({ customerId: newCustomerId }).then((r) => setFormProducts(r.data ?? []));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!productId) return;
+    if (!form.productId) {
+      setError('กรุณาเลือกสินค้า');
+      return;
+    }
     setSaving(true);
     setError('');
     const result = await upsertProductServiceRate({
       rateId:            form.rateId || null,
-      customerProductId: productId,
+      customerProductId: form.productId,
       serviceType:       form.serviceType,
       rate:              parseFloat(form.rate),
       unitBasis:         form.unitBasis,
@@ -154,6 +202,42 @@ export function CustomerProductServiceRatesPage() {
     await loadRates();
   }
 
+  function handleExport() {
+    exportStorageRatesExcel(rates, 'storage-rates.xlsx');
+  }
+
+  async function handleImportFile(file) {
+    setImportBusy(true);
+    setImportResult(null);
+    setImportErrors([]);
+    setError('');
+    setSuccess('');
+
+    const lookupResult = await listCustomerProductsForRateImport();
+    if (lookupResult.error) {
+      setImportBusy(false);
+      setError(lookupResult.error.message ?? 'โหลดข้อมูลสินค้าสำหรับนำเข้าไม่สำเร็จ');
+      return;
+    }
+
+    const lookupMap = buildStorageRateLookupMap(
+      (lookupResult.data ?? []).map((cp) => ({ ...cp, customer_code: cp.tgd_customers?.customer_code })),
+    );
+
+    const { rows, errors } = await parseStorageRateImportFile(file, lookupMap);
+    if (errors.length && rows.length === 0) {
+      setImportBusy(false);
+      setImportErrors(errors);
+      return;
+    }
+
+    const { data } = await bulkUpsertProductServiceRates(rows);
+    setImportBusy(false);
+    setImportResult(data);
+    setImportErrors(errors);
+    await loadRates();
+  }
+
   const selectedProduct = products.find((p) => p.id === productId);
 
   return (
@@ -164,7 +248,7 @@ export function CustomerProductServiceRatesPage() {
       />
 
       {/* Filters */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
           ลูกค้า
           <select
@@ -173,7 +257,7 @@ export function CustomerProductServiceRatesPage() {
             onChange={(e) => setCustomerId(e.target.value)}
             style={{ marginTop: 4, display: 'block', width: '100%' }}
           >
-            <option value="">— เลือกลูกค้า —</option>
+            <option value="">— ลูกค้าทุกราย —</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
             ))}
@@ -188,15 +272,42 @@ export function CustomerProductServiceRatesPage() {
             disabled={!customerId}
             style={{ marginTop: 4, display: 'block', width: '100%' }}
           >
-            <option value="">— เลือกสินค้า —</option>
+            <option value="">— สินค้าทุกรายการ —</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
             ))}
           </select>
         </label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+          ประเภทค่าบริการ
+          <select
+            className="form-control"
+            value={serviceTypeFilter}
+            onChange={(e) => setServiceTypeFilter(e.target.value)}
+            style={{ marginTop: 4, display: 'block', width: '100%' }}
+          >
+            <option value="">ทุกประเภท</option>
+            {SERVICE_TYPES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+          สถานะ
+          <select
+            className="form-control"
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            style={{ marginTop: 4, display: 'block', width: '100%' }}
+          >
+            <option value="">ทั้งหมด</option>
+            <option value="true">ใช้งาน</option>
+            <option value="false">ปิด</option>
+          </select>
+        </label>
       </div>
 
-      {/* Product info strip */}
+      {/* Product info strip — only when filtered down to exactly one product */}
       {selectedProduct && (
         <div style={{
           background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
@@ -210,7 +321,6 @@ export function CustomerProductServiceRatesPage() {
             {selectedProduct.pack_weight_kg ? `  น้ำหนัก: ${selectedProduct.pack_weight_kg} กก./หน่วย` : ''}
           </span>
 
-          {/* ฐานคิดค่าฝาก — inline editable */}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', marginLeft: 8 }}>
             ฐานคิดค่าฝาก:
             <select
@@ -225,74 +335,107 @@ export function CustomerProductServiceRatesPage() {
             </select>
             {basisSaving && <span style={{ fontSize: 11, color: '#94a3b8' }}>กำลังบันทึก...</span>}
           </label>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ marginLeft: 'auto', padding: '6px 16px' }}
-            onClick={openCreate}
-          >
-            + เพิ่มอัตราค่าบริการ
-          </button>
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          + เพิ่มอัตราค่าบริการ
+        </button>
+        <ExcelImportExportToolbar
+          onTemplate={() => downloadStorageRateTemplate()}
+          onExport={handleExport}
+          onImportFile={handleImportFile}
+          disabled={importBusy}
+          exportTestId="storage-rate-export-button"
+          templateTestId="storage-rate-template-button"
+          importTestId="storage-rate-import-input"
+        />
+        {importBusy && <span style={{ fontSize: 12, color: '#94a3b8' }}>กำลังนำเข้า...</span>}
+      </div>
 
       {error && <div className="banner banner-danger" style={{ marginBottom: 12 }}>{error}</div>}
       {success && <div className="banner banner-success" style={{ marginBottom: 12 }}>{success}</div>}
 
+      {importResult ? (
+        <div
+          className={importResult.failed ? 'banner banner-warning' : 'banner banner-success'}
+          style={{ marginBottom: 12 }}
+          data-testid="storage-rate-import-result"
+        >
+          นำเข้าสำเร็จ {importResult.succeeded} รายการ{importResult.failed ? ` — ล้มเหลว ${importResult.failed} รายการ` : ''}
+        </div>
+      ) : null}
+
+      {importErrors.length > 0 ? (
+        <div className="banner banner-danger" style={{ marginBottom: 12 }} data-testid="storage-rate-import-errors">
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {importErrors.map((msg, idx) => <li key={idx}>{msg.message ?? msg}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
       {/* Rates table */}
-      {productId && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
-                {['ประเภทค่าบริการ', 'อัตรา', 'หน่วย', 'หมายเหตุ', 'สถานะ', ''].map((h) => (
-                  <th key={h} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#374151', textAlign: 'left' }}>{h}</th>
-                ))}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="storage-rate-table">
+          <thead>
+            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+              {['ลูกค้า', 'สินค้า', 'ประเภทค่าบริการ', 'อัตรา', 'หน่วย', 'หมายเหตุ', 'สถานะ', ''].map((h) => (
+                <th key={h} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#374151', textAlign: 'left' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ratesLoading ? (
+              <tr>
+                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  กำลังโหลด...
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rates.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                    ยังไม่มีอัตราค่าบริการ — กด "+ เพิ่มอัตราค่าบริการ" เพื่อเริ่มต้น
+            ) : rates.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  ยังไม่มีอัตราค่าบริการ — กด "+ เพิ่มอัตราค่าบริการ" เพื่อเริ่มต้น
+                </td>
+              </tr>
+            ) : rates.map((row) => {
+              const ub = UNIT_BASIS.find((u) => u.value === row.unit_basis);
+              return (
+                <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '10px 14px', fontSize: 13 }}>
+                    <div style={{ fontWeight: 600 }}>{row.customer_name ?? '-'}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_code ?? ''}</div>
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 13 }}>
+                    <div style={{ fontWeight: 600 }}>{row.product_name ?? '-'}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_product_code ?? ''}</div>
+                  </td>
+                  <td style={{ padding: '10px 14px' }}><ServiceBadge type={row.service_type} /></td>
+                  <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                    {Number(row.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {row.currency}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>{ub?.label ?? row.unit_basis}</td>
+                  <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>{row.note ?? '-'}</td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                      background: row.is_active ? '#f0fdf4' : '#f1f5f9',
+                      color: row.is_active ? '#2d9348' : '#94a3b8',
+                    }}>
+                      {row.is_active ? 'ใช้งาน' : 'ปิด'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openEdit(row)}>
+                      แก้ไข
+                    </button>
                   </td>
                 </tr>
-              ) : rates.map((row) => {
-                const ub = UNIT_BASIS.find((u) => u.value === row.unit_basis);
-                return (
-                  <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 14px' }}><ServiceBadge type={row.service_type} /></td>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
-                      {Number(row.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {row.currency}
-                    </td>
-                    <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>{ub?.label ?? row.unit_basis}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>{row.note ?? '-'}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                        background: row.is_active ? '#f0fdf4' : '#f1f5f9',
-                        color: row.is_active ? '#2d9348' : '#94a3b8',
-                      }}>
-                        {row.is_active ? 'ใช้งาน' : 'ปิด'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={() => openEdit(row)}
-                      >
-                        แก้ไข
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* Form modal */}
       {form !== null && (
@@ -307,6 +450,40 @@ export function CustomerProductServiceRatesPage() {
             </h3>
 
             <form onSubmit={handleSubmit}>
+              {!form.rateId && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    ลูกค้า *
+                    <select
+                      className="form-control"
+                      value={form.customerId}
+                      onChange={(e) => handleFormCustomerChange(e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    >
+                      <option value="">— เลือกลูกค้า —</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    สินค้า *
+                    <select
+                      className="form-control"
+                      value={form.productId}
+                      onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))}
+                      disabled={!form.customerId}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    >
+                      <option value="">— เลือกสินค้า —</option>
+                      {formProducts.map((p) => (
+                        <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
                   ประเภทค่าบริการ *

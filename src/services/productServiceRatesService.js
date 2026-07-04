@@ -40,6 +40,92 @@ export async function listProductServiceRatesByCustomer(customerId) {
     .order('service_type');
 }
 
+function shapeProductServiceRateRow(row = {}) {
+  const product = row.tgd_customer_products ?? {};
+  const customer = product.tgd_customers ?? {};
+  return {
+    id: row.id,
+    customer_product_id: row.customer_product_id,
+    service_type: row.service_type,
+    rate: row.rate,
+    unit_basis: row.unit_basis,
+    currency: row.currency,
+    note: row.note,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    customer_id: customer.id ?? product.customer_id ?? null,
+    customer_code: customer.customer_code ?? null,
+    customer_name: customer.customer_name ?? null,
+    customer_product_code: product.customer_product_code ?? null,
+    product_name: product.product_name ?? null,
+  };
+}
+
+// Full cross-customer/cross-product listing (with filters) that powers the
+// Storage Rate page's table view — the earlier listProductServiceRates
+// functions only ever scope to one product or one customer, so there was no
+// way to see/filter every rate in the system at once.
+export async function listAllProductServiceRates(filters = {}) {
+  if (!supabase) return missing();
+
+  let query = supabase
+    .from('tgd_customer_product_service_rates')
+    .select(`
+      id, customer_product_id, service_type, rate, unit_basis, currency, note, is_active, created_at,
+      tgd_customer_products!inner(
+        id, customer_product_code, product_name, customer_id,
+        tgd_customers!inner(id, customer_code, customer_name)
+      )
+    `)
+    .order('service_type');
+
+  if (filters.customerId) query = query.eq('tgd_customer_products.customer_id', filters.customerId);
+  if (filters.customerProductId) query = query.eq('customer_product_id', filters.customerProductId);
+  if (filters.serviceType) query = query.eq('service_type', filters.serviceType);
+  if (filters.isActive != null) query = query.eq('is_active', filters.isActive);
+
+  const result = await query;
+  if (result.error) return { data: null, error: result.error };
+
+  return { data: (result.data ?? []).map(shapeProductServiceRateRow), error: null };
+}
+
+// Customer + product lookup used to resolve "customer_code" +
+// "customer_product_code" (the human-readable pair used in the bulk
+// import/export spreadsheet) back to a customer_product_id.
+export async function listCustomerProductsForRateImport() {
+  if (!supabase) return missing();
+  return supabase
+    .from('tgd_customer_products')
+    .select('id, customer_id, customer_product_code, product_name, tgd_customers!inner(customer_code, customer_name)')
+    .order('customer_product_code');
+}
+
+// Applies a batch of parsed rate rows one at a time through the same
+// tgd_upsert_product_service_rate RPC the single-row form uses (upsert by
+// (customer_product_id, service_type), so re-importing the same file is
+// safe/idempotent), collecting per-row failures instead of aborting the
+// whole batch on the first error.
+export async function bulkUpsertProductServiceRates(rows = []) {
+  const results = [];
+  for (const row of rows) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await upsertProductServiceRate(row);
+    results.push({ row, error: result.error });
+  }
+
+  const failed = results.filter((r) => r.error);
+  return {
+    data: {
+      total: rows.length,
+      succeeded: rows.length - failed.length,
+      failed: failed.length,
+      errors: failed.map((r) => ({ row: r.row, message: r.error.message ?? String(r.error) })),
+    },
+    error: null,
+  };
+}
+
 export async function upsertProductServiceRate(payload = {}) {
   if (!supabase) return missing();
   const { data, error } = await supabase.rpc('tgd_upsert_product_service_rate', {

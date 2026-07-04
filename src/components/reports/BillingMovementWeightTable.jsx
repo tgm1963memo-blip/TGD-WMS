@@ -75,6 +75,16 @@ function buildSummaryColumns({
 
   columns.push(
     {
+      key: 'movement_date',
+      header: 'วันที่',
+      render: (row) => <span className="table-meta-text">{formatDocumentDate(row.movement_date)}</span>,
+    },
+    {
+      key: 'source_document_no',
+      header: 'เลขที่เอกสาร',
+      render: (row) => <span className="compact-cell-text">{row.source_document_no ?? '-'}</span>,
+    },
+    {
       key: 'customer_name',
       header: 'ชื่อลูกค้า',
       render: (row) => (

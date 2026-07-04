@@ -30,6 +30,14 @@ export const APPROVABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
   INVOICE_DRAFT_STATUS.READY_TO_REVIEW,
 ]);
 
+// Hard-delete (not the soft CANCELLED transition) is only offered for plain
+// DRAFT — once a draft has moved to READY_TO_REVIEW or beyond it's been
+// seen/acted on, so cancel (which preserves an audit trail) is the right
+// tool instead of removing the record outright.
+export const DELETABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
+  INVOICE_DRAFT_STATUS.DRAFT,
+]);
+
 export const BILLABLE_SOURCE_BILLING_STATUSES = Object.freeze([
   BILLING_STATUS_FOUNDATION.READY_FOR_PREVIEW,
   'READY',
@@ -257,6 +265,10 @@ export function applyActiveDuplicateDraftGuards(rows = [], activeDraftLines = []
 
 export function canCancelBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
+}
+
+export function canDeleteBillingInvoiceDraft(draft = {}) {
+  return DELETABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
 
 export function canApproveBillingInvoiceDraft(draft = {}) {

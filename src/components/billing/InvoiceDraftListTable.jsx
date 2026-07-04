@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
+import { canDeleteBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -18,6 +19,8 @@ export function InvoiceDraftListTable({
   loading = false,
   error = null,
   onView = null,
+  onDelete = null,
+  canWrite = false,
 }) {
   if (loading) return <LoadingState />;
 
@@ -66,12 +69,22 @@ export function InvoiceDraftListTable({
               <td>{formatNumber(draft.total_chargeable_weight)}</td>
               <td>{draft.total_amount == null ? '-' : formatNumber(draft.total_amount)}</td>
               <td>{formatDate(draft.created_at)}</td>
-              <td>
+              <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {onView ? (
                   <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
                 ) : (
                   <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
                 )}
+                {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    data-testid={`invoice-draft-delete-button-${draft.id}`}
+                    onClick={() => onDelete(draft)}
+                  >
+                    Delete
+                  </button>
+                ) : null}
               </td>
             </tr>
           ))}
