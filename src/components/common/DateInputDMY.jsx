@@ -44,6 +44,7 @@ export function DateInputDMY({
   onChange,
   placeholder = 'dd/mm/yyyy',
   required,
+  style,
   title,
   value,
 }) {
@@ -109,6 +110,7 @@ export function DateInputDMY({
       pattern="\d{2}/\d{2}/\d{4}"
       placeholder={placeholder}
       required={required}
+      style={style}
       title={title ?? 'วัน/เดือน/ปี'}
       type="text"
       value={text}

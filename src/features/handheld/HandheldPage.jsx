@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import QRCode from 'react-qr-code';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
 import {
@@ -770,9 +771,9 @@ function ReceivingWorkflow({ onBack, t }) {
               <option value="">ลูกค้าทุกราย</option>
               {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+            <DateInputDMY value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
               style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
-            <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+            <DateInputDMY value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
               style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
             {hasFilter && (
               <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
@@ -999,12 +1000,12 @@ function ReceivingWorkflow({ onBack, t }) {
                 </label>
                 <label>
                   <div style={{ fontSize: 11, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันผลิต</div>
-                  <input type="date" value={editMfgDate} onChange={(e) => setEditMfgDate(e.target.value)}
+                  <DateInputDMY value={editMfgDate} onChange={(e) => setEditMfgDate(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', fontSize: 13, outline: 'none' }} />
                 </label>
                 <label style={{ gridColumn: '1 / -1' }}>
                   <div style={{ fontSize: 11, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันหมดอายุ</div>
-                  <input type="date" value={editExpDate} onChange={(e) => setEditExpDate(e.target.value)}
+                  <DateInputDMY value={editExpDate} onChange={(e) => setEditExpDate(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', fontSize: 13, outline: 'none' }} />
                 </label>
               </div>
@@ -1216,12 +1217,12 @@ function ReceivingWorkflow({ onBack, t }) {
                 </label>
                 <label>
                   <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันผลิต</div>
-                  <input type="date" value={extraMfgDate} onChange={(e) => setExtraMfgDate(e.target.value)}
+                  <DateInputDMY value={extraMfgDate} onChange={(e) => setExtraMfgDate(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 13, outline: 'none' }} />
                 </label>
                 <label>
                   <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>วันหมดอายุ</div>
-                  <input type="date" value={extraExpDate} onChange={(e) => setExtraExpDate(e.target.value)}
+                  <DateInputDMY value={extraExpDate} onChange={(e) => setExtraExpDate(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 13, outline: 'none' }} />
                 </label>
                 <label>
@@ -1516,9 +1517,9 @@ function PickingWorkflow({ onBack, t }) {
                     <option value="">ลูกค้าทุกราย</option>
                     {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+                  <DateInputDMY value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
                     style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
-                  <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+                  <DateInputDMY value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
                     style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   {hasFilter && (
                     <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
@@ -1975,9 +1976,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
                     <option value="">ลูกค้าทุกราย</option>
                     {customerOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
+                  <DateInputDMY value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
                     style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
-                  <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
+                  <DateInputDMY value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
                     style={{ flex: '1 1 130px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, color: C.text, outline: 'none', minHeight: 46, boxSizing: 'border-box' }} />
                   {hasFilter && (
                     <button type="button" onClick={() => { setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
@@ -2067,12 +2068,12 @@ function LocationUpdateWorkflow({ onBack, t }) {
                     cursor: 'pointer',
                     boxShadow: C.shadow, transition: 'border-color 0.15s',
                   }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2 }}>{l.product_name ?? l.customer_product_code}</div>
-                      <div style={{ fontSize: 12, color: C.textSec }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง · วันที่รับ: {selectedDoc.expected_arrival_date ?? '-'}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{l.product_name ?? l.customer_product_code}</div>
+                      <div style={{ fontSize: 12, color: C.textSec, overflowWrap: 'break-word', wordBreak: 'break-word' }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง · วันที่รับ: {selectedDoc.expected_arrival_date ?? '-'}</div>
                     </div>
-                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       {hasloc ? (
                         <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
                       ) : (
@@ -2084,6 +2085,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                         style={{
                           background: C.primary, color: '#fff', border: 'none', borderRadius: 10,
                           padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                       >
                         🖨 พิมพ์สติกเกอร์
