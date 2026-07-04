@@ -37,7 +37,7 @@ export function ReportPrintActions({
           disabled={disabled}
           onClick={() => {
             setOpen(true);
-            requestAnimationFrame(() => printWithOrientation(orientation));
+            requestAnimationFrame(() => printWithOrientation(orientation, title));
           }}
         >
           {printLabel}

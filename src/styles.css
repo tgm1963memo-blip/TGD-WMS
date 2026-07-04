@@ -748,6 +748,10 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 .operational-report-modal-body {
   background: var(--tgm-gray-light);
   padding: 18px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .operational-report-actions-card {
@@ -784,6 +788,24 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
     inset: 0;
     padding: 0;
     position: absolute;
+  }
+
+  /* The preview modal is a fixed, viewport-height box with overflow:hidden
+     (so it scrolls on screen without the page behind it scrolling) — but
+     that clips descendants during print too, regardless of the print root's
+     own `position:absolute`. A fixed-height clipping ancestor is what made
+     the printed output cap at one screen's worth of content and repeat it
+     across every page instead of flowing the rest of the document onward.
+     Reset the whole ancestor chain to unclipped/auto-height so print content
+     flows across as many real pages as it needs. */
+  .operational-report-modal-backdrop,
+  .operational-report-modal,
+  .operational-report-modal-body {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
   }
 
   .no-print,

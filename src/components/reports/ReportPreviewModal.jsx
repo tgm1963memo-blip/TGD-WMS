@@ -2,10 +2,21 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
+// Browsers suggest `document.title` as the default filename when the user
+// picks "Save as PDF" from the print dialog. Modal titles are composed as
+// "{document number} — {description}" (or just the bare number) — take the
+// part before the dash so the suggested filename is the document number,
+// not the generic app title, and strip characters Windows rejects in
+// filenames.
+function docNumberFromTitle(title) {
+  const base = String(title ?? '').split(' — ')[0].trim();
+  return (base || 'TGC WMS').replace(/[\\/:*?"<>|]/g, '-');
+}
+
 // Shared by ReportPreviewModal's own print button and ReportPrintActions'
 // toolbar shortcut, so both paths honor `orientation` instead of only the
 // one that goes through the modal's print button.
-export function printWithOrientation(orientation) {
+export function printWithOrientation(orientation, docTitle) {
   let injected = null;
   if (orientation === 'landscape') {
     injected = document.createElement('style');
@@ -13,7 +24,10 @@ export function printWithOrientation(orientation) {
     injected.textContent = '@page { size: A4 landscape; margin: 8mm; }';
     document.head.appendChild(injected);
   }
+  const previousTitle = document.title;
+  if (docTitle) document.title = docNumberFromTitle(docTitle);
   window.print();
+  document.title = previousTitle;
   if (injected) document.head.removeChild(injected);
 }
 
@@ -48,7 +62,7 @@ export function ReportPreviewModal({
   const printLabel = getTranslation('print', language) || 'Print';
   const closeLabel = getTranslation('close', language) || 'Close';
 
-  const handlePrint = () => printWithOrientation(orientation);
+  const handlePrint = () => printWithOrientation(orientation, title);
 
   return createPortal(
     <div className="operational-report-modal-backdrop" role="presentation" onClick={onClose}>
