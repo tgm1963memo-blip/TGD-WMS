@@ -3,6 +3,7 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { DateInputDMY } from '../common/DateInputDMY.jsx';
+import { SearchableSelect } from '../common/SearchableSelect.jsx';
 import {
   NULL_LOT_SENTINEL,
   WITHDRAWAL_IDENTIFIER_TYPES,
@@ -83,6 +84,8 @@ export function CustomerWithdrawalLinesTable({
         lot_no: '',
         mfg_date: '',
         exp_date: '',
+        source_deposit_request_id: '',
+        source_deposit_request_line_id: '',
       });
       return;
     }
@@ -99,6 +102,9 @@ export function CustomerWithdrawalLinesTable({
       lot_no: '',
       mfg_date: '',
       exp_date: '',
+      // Changing product invalidates any previously-pinned tracking code source.
+      source_deposit_request_id: '',
+      source_deposit_request_line_id: '',
     });
   }
 
@@ -141,7 +147,10 @@ export function CustomerWithdrawalLinesTable({
 
   // Tracking code uniquely identifies one deposit line, so picking it here sets
   // the source deposit + LOT + dates in one step, replacing the old "pick a
-  // deposit note, then pick a LOT within it" two-step flow.
+  // deposit note, then pick a LOT within it" two-step flow. It also resolves
+  // and fills in the product code/name so staff can pick the tracking code
+  // FIRST (before touching the product dropdown at all) and immediately see
+  // everything about the item they're withdrawing.
   function selectSourceTrackingCode(line, trackingCode) {
     if (!trackingCode) {
       updateLine(line.key, {
@@ -156,6 +165,11 @@ export function CustomerWithdrawalLinesTable({
       return;
     }
     const match = getProductMatchedDepositLines(line, allDepositLines).find((dl) => dl.tracking_code === trackingCode);
+    const product = match ? catalogProducts.find((p) =>
+      (p.customer_product_code && p.customer_product_code === match.customer_product_code) ||
+      (p.product_name && p.product_name === match.product_name),
+    ) : null;
+
     updateLine(line.key, {
       source_deposit_request_id: match?.deposit_request_id ?? '',
       source_deposit_request_line_id: match?.id ?? '',
@@ -165,6 +179,24 @@ export function CustomerWithdrawalLinesTable({
       mfg_date: match?.mfg_date ?? '',
       exp_date: match?.exp_date ?? '',
       note: line.note ? line.note : (match?.actual_note ?? ''),
+      ...(product
+        ? {
+          catalog_product_id: product.id,
+          customer_product_code: product.customer_product_code ?? '',
+          product_code: normalizeCatalogBarcode(product),
+          product_name: product.product_name ?? '',
+          temperature_type: product.temperature_type ?? match?.temperature_type ?? 'FROZEN',
+          argent_type: product.argent_type ?? 'NON_ARGENT',
+        }
+        : match
+          ? {
+            // No matching catalog entry (rare) — still surface the deposit
+            // line's own product identity so the row isn't left blank.
+            customer_product_code: match.customer_product_code ?? '',
+            product_name: match.product_name ?? '',
+            temperature_type: match.temperature_type ?? 'FROZEN',
+          }
+          : {}),
     });
   }
 
@@ -195,6 +227,7 @@ export function CustomerWithdrawalLinesTable({
         <thead>
           <tr>
             <th className="col-line-no" style={{ width: 32, whiteSpace: 'nowrap' }}>#</th>
+            <th style={{ minWidth: 190 }}>รหัสติดตาม (สแกน/ค้นหา)</th>
             <th style={{ minWidth: 180 }}>รหัสสินค้า <span className="field-required">*</span></th>
             <th style={{ minWidth: 170 }}>อ้างอิงคงเหลือจาก (LOT/วันที่/หมายเหตุ)</th>
             <th style={{ minWidth: 130, whiteSpace: 'nowrap' }}>วันผลิต</th>
@@ -202,7 +235,6 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 110, whiteSpace: 'nowrap' }}>ระบุเป็น</th>
             <th style={{ minWidth: 80, whiteSpace: 'nowrap' }}>กล่อง <span className="field-required">*</span></th>
             <th style={{ minWidth: 100, whiteSpace: 'nowrap' }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
-            <th style={{ minWidth: 160 }}>แหล่งที่มา (รหัสติดตาม)</th>
             <th style={{ minWidth: 150 }}>หมายเหตุ</th>
             <th style={{ width: 70, whiteSpace: 'nowrap' }}>{t('catalog_col_actions')}</th>
           </tr>
@@ -222,20 +254,39 @@ export function CustomerWithdrawalLinesTable({
             const hasNullLot = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
               && productMatchedLines.some((dl) => !dl.lot_no);
 
-            const trackingCodeOptions = [...new Set(
-              getProductMatchedDepositLines(line, allDepositLines).filter((dl) => dl.tracking_code).map((dl) => dl.tracking_code),
-            )].sort();
+            // Tracking-code options are enriched with product/LOT text so the
+            // searchable dropdown can be typed into by code, product name, or
+            // LOT — not just the bare tracking code — and so picking one
+            // (before a product is even chosen) shows what it resolves to.
+            const trackingCodeDepositLines = getProductMatchedDepositLines(line, allDepositLines).filter((dl) => dl.tracking_code);
+            const seenTrackingCodes = new Set();
+            const trackingCodeOptions = [];
+            trackingCodeDepositLines.forEach((dl) => {
+              if (seenTrackingCodes.has(dl.tracking_code)) return;
+              seenTrackingCodes.add(dl.tracking_code);
+              const productLabel = dl.product_name ?? dl.customer_product_code ?? '';
+              trackingCodeOptions.push({
+                value: dl.tracking_code,
+                label: `${dl.tracking_code} — ${productLabel}${dl.lot_no ? ` (LOT ${dl.lot_no})` : ''}`,
+                searchText: `${dl.tracking_code} ${productLabel} ${dl.customer_product_code ?? ''} ${dl.lot_no ?? ''}`,
+              });
+            });
+            trackingCodeOptions.sort((a, b) => a.value.localeCompare(b.value));
 
-            let identifierOptions = [];
+            let identifierOptionValues = [];
             if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT) {
-              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
+              identifierOptionValues = [...new Set(productMatchedLines.filter((dl) => dl.lot_no).map((dl) => dl.lot_no))];
             } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE) {
-              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.mfg_date).map((dl) => dl.mfg_date))].sort();
+              identifierOptionValues = [...new Set(productMatchedLines.filter((dl) => dl.mfg_date).map((dl) => dl.mfg_date))].sort();
             } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE) {
-              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.exp_date).map((dl) => dl.exp_date))].sort();
+              identifierOptionValues = [...new Set(productMatchedLines.filter((dl) => dl.exp_date).map((dl) => dl.exp_date))].sort();
             } else if (identifierType === WITHDRAWAL_IDENTIFIER_TYPES.NOTE) {
-              identifierOptions = [...new Set(productMatchedLines.filter((dl) => dl.actual_note).map((dl) => dl.actual_note))];
+              identifierOptionValues = [...new Set(productMatchedLines.filter((dl) => dl.actual_note).map((dl) => dl.actual_note))];
             }
+            const identifierOptions = [
+              ...(hasNullLot ? [{ value: NULL_LOT_SENTINEL, label: 'ไม่ระบุ (ใบฝากไม่ระบุ LOT)' }] : []),
+              ...identifierOptionValues.map((opt) => ({ value: opt, label: opt })),
+            ];
 
             const showManualLotInput = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
               && identifierOptions.length === 0 && !hasNullLot;
@@ -251,6 +302,25 @@ export function CustomerWithdrawalLinesTable({
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td className="col-line-no" style={{ textAlign: 'center', color: 'var(--tgd-muted-text)', fontWeight: 600 }}>{index + 1}</td>
+
+                {/* Tracking code (first column): pick a specific box by its sticker
+                    code and everything else (product, LOT, dates) auto-fills. */}
+                <td>
+                  <SearchableSelect
+                    className="form-control form-control-table"
+                    testId={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
+                    disabled={noCustomer}
+                    onChange={(v) => selectSourceTrackingCode(line, v)}
+                    options={trackingCodeOptions}
+                    placeholder="— ทั้งหมด / พิมพ์ค้นหา —"
+                    value={identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE ? (line.identifier_value || '') : ''}
+                  />
+                  {identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE && line.lot_no && (
+                    <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginTop: 4 }}>
+                      LOT: {line.lot_no === NULL_LOT_SENTINEL ? 'ไม่ระบุ' : line.lot_no}
+                    </div>
+                  )}
+                </td>
 
                 {/* Product code dropdown */}
                 <td>
@@ -308,21 +378,15 @@ export function CustomerWithdrawalLinesTable({
                           onChange={(e) => updateLine(line.key, { lot_no: e.target.value, identifier_value: e.target.value })}
                         />
                       ) : (
-                        <select
+                        <SearchableSelect
                           className="form-control form-control-table"
-                          data-testid={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
-                          disabled={identifierOptions.length === 0 && !hasNullLot}
-                          onChange={(e) => selectIdentifierValue(line, e.target.value)}
+                          testId={index === 0 ? 'withdrawal-lot-select' : `${rowTestId}-identifier`}
+                          disabled={identifierOptions.length === 0}
+                          onChange={(v) => selectIdentifierValue(line, v)}
+                          options={identifierOptions}
+                          placeholder={`— เลือก${IDENTIFIER_TYPE_LABELS[identifierType]} —`}
                           value={line.identifier_value || ''}
-                        >
-                          <option value="">— เลือก{IDENTIFIER_TYPE_LABELS[identifierType]} —</option>
-                          {hasNullLot && (
-                            <option value={NULL_LOT_SENTINEL}>ไม่ระบุ (ใบฝากไม่ระบุ LOT)</option>
-                          )}
-                          {identifierOptions.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                        />
                       )}
                     </>
                   )}
@@ -412,21 +476,6 @@ export function CustomerWithdrawalLinesTable({
                       เกินยอดคงเหลือ (มี {maxWtBalance.toFixed(2)} กก.)
                     </div>
                   )}
-                </td>
-
-                {/* Source: tracking code (uniquely pins the deposit line) */}
-                <td>
-                  <select
-                    className="form-control form-control-table"
-                    data-testid={index === 0 ? 'withdrawal-source-deposit-select' : `${rowTestId}-source-deposit`}
-                    onChange={(e) => selectSourceTrackingCode(line, e.target.value)}
-                    value={identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE ? (line.identifier_value || '') : ''}
-                  >
-                    <option value="">— ทั้งหมด —</option>
-                    {trackingCodeOptions.map((code) => (
-                      <option key={code} value={code}>{code}</option>
-                    ))}
-                  </select>
                 </td>
 
                 {/* Note */}

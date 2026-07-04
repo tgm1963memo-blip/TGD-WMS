@@ -1,3 +1,4 @@
+import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
@@ -67,17 +68,25 @@ export function CustomerDepositStaffWorkOrderPrint({
                 )}
               </div>
             </div>
-            {/* Right: document title + no + date */}
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_staff_work_order_title')}</div>
-              <div style={{ fontSize: 11, color: '#333' }}>
-                {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
-                {header.expected_arrival_date && (
-                  <span style={{ marginLeft: 10 }}>
-                    {getTranslation('document_date', language) || 'วันที่'}: {fmtDate(header.expected_arrival_date)}
-                  </span>
-                )}
+            {/* Right: document title + no + date + scan QR */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_staff_work_order_title')}</div>
+                <div style={{ fontSize: 11, color: '#333' }}>
+                  {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
+                  {header.expected_arrival_date && (
+                    <span style={{ marginLeft: 10 }}>
+                      {getTranslation('document_date', language) || 'วันที่'}: {fmtDate(header.expected_arrival_date)}
+                    </span>
+                  )}
+                </div>
               </div>
+              {header.request_no && (
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <QRCode value={header.request_no} size={54} style={{ width: 54, height: 54 }} />
+                  <div style={{ fontSize: 8, color: '#666', marginTop: 1 }}>สแกนเปิดใบงาน</div>
+                </div>
+              )}
             </div>
           </div>
         );

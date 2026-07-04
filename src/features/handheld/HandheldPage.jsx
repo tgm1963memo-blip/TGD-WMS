@@ -535,6 +535,23 @@ function ReceivingWorkflow({ onBack, t }) {
   }, [selectedLocation?.id]);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
+  const { trigger: cameraDoc, el: cameraDocEl } = useCameraScanner((v) => handleDocScan(v));
+  const [docScanError, setDocScanError] = useState('');
+
+  // Scanning the QR printed on the deposit work order (encodes the bare
+  // request_no) jumps straight into that document instead of hunting for it
+  // in the list — handy when a truck arrives with the printed work order.
+  function handleDocScan(val) {
+    const raw = (val || '').trim();
+    if (!raw) return;
+    const match = docs.find((d) => (d.request_no || '').toLowerCase() === raw.toLowerCase());
+    if (match) {
+      setDocScanError('');
+      pickDoc(match);
+    } else {
+      setDocScanError(`ไม่พบใบงานเลขที่ "${raw}" ในรายการที่รอรับเข้า`);
+    }
+  }
 
   useEffect(() => {
     listCustomerDepositRequests({ statusIn: ['WAREHOUSE_RECEIVING', 'ADMIN_ACCEPTED', 'ADMIN_RECOUNT_REQUESTED'] }).then((r) => {
@@ -731,6 +748,21 @@ function ReceivingWorkflow({ onBack, t }) {
       <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
+          {cameraDocEl}
+          {/* Scan the QR printed on the deposit work order to jump straight in */}
+          <button type="button" onClick={cameraDoc}
+            style={{
+              width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
+              padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            }}>
+            📷 สแกน QR ใบงานฝาก
+          </button>
+          {docScanError && (
+            <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+              {docScanError}
+            </div>
+          )}
           {/* Filters */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
             <select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
@@ -1251,6 +1283,23 @@ function PickingWorkflow({ onBack, t }) {
   const [docCompleted, setDocCompleted] = useState(false);
 
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
+  const { trigger: cameraDoc, el: cameraDocEl } = useCameraScanner((v) => handleDocScan(v));
+  const [docScanError, setDocScanError] = useState('');
+
+  // Scanning the QR printed on the withdrawal work order (encodes the bare
+  // withdrawal_no) jumps straight into that document instead of hunting for
+  // it in the list.
+  function handleDocScan(val) {
+    const raw = (val || '').trim();
+    if (!raw) return;
+    const match = docs.find((d) => (d.withdrawal_no || '').toLowerCase() === raw.toLowerCase());
+    if (match) {
+      setDocScanError('');
+      pickDoc(match);
+    } else {
+      setDocScanError(`ไม่พบใบงานเลขที่ "${raw}" ในรายการที่รอหยิบสินค้า`);
+    }
+  }
 
   useEffect(() => {
     listCustomerWithdrawalRequests({ statusIn: ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'] }).then((r) => {
@@ -1431,6 +1480,21 @@ function PickingWorkflow({ onBack, t }) {
       <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>
+          {cameraDocEl}
+          {/* Scan the QR printed on the withdrawal work order to jump straight in */}
+          <button type="button" onClick={cameraDoc}
+            style={{
+              width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
+              padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            }}>
+            📷 สแกน QR ใบงานเบิก
+          </button>
+          {docScanError && (
+            <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+              {docScanError}
+            </div>
+          )}
           {(() => {
             const customerOptions = [...new Map(
               docs.map((d) => ({ id: d.customer_id, name: d.customer?.customer_name || d.customer?.name || d.customer_id }))

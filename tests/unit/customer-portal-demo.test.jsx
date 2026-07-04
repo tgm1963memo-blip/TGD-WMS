@@ -252,13 +252,16 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
 
     fireEvent.change(screen.getByTestId('customer-withdrawal-product-picker-select'), { target: { value: 'cat-prod-1' } });
 
+    // The LOT field is now a searchable combobox (input + type-to-filter
+    // dropdown) instead of a native <select>, so open it and click the option.
     await waitFor(() => {
-      const lotSelect = screen.getByTestId('withdrawal-lot-select');
-      expect(lotSelect.tagName).toBe('SELECT');
-      expect(lotSelect.querySelector('option[value="LOT-TEST-01"]')).toBeInTheDocument();
+      expect(screen.getByTestId('withdrawal-lot-select').tagName).toBe('INPUT');
     });
-
-    fireEvent.change(screen.getByTestId('withdrawal-lot-select'), { target: { value: 'LOT-TEST-01' } });
+    fireEvent.focus(screen.getByTestId('withdrawal-lot-select'));
+    await waitFor(() => {
+      expect(screen.getByText('LOT-TEST-01')).toBeInTheDocument();
+    });
+    fireEvent.mouseDown(screen.getByText('LOT-TEST-01'));
 
     const weightInput = screen.getByTestId('customer-withdrawal-lines-table').querySelector('input[type="number"]');
     fireEvent.change(weightInput, { target: { value: '5' } });

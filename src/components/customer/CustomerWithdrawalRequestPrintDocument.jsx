@@ -1,3 +1,4 @@
+import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
@@ -75,16 +76,24 @@ export function CustomerWithdrawalRequestPrintDocument({
                 )}
               </div>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_withdrawal_print_title')}</div>
-              <div style={{ fontSize: 11, color: '#333' }}>
-                {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.withdrawal_no ?? header.request_no}</strong>
-                {docDate && docDate !== '-' && (
-                  <span style={{ marginLeft: 10 }}>
-                    {getTranslation('document_date', language) || 'วันที่'}: {docDate}
-                  </span>
-                )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_withdrawal_print_title')}</div>
+                <div style={{ fontSize: 11, color: '#333' }}>
+                  {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.withdrawal_no ?? header.request_no}</strong>
+                  {docDate && docDate !== '-' && (
+                    <span style={{ marginLeft: 10 }}>
+                      {getTranslation('document_date', language) || 'วันที่'}: {docDate}
+                    </span>
+                  )}
+                </div>
               </div>
+              {(header.withdrawal_no ?? header.request_no) && (
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <QRCode value={String(header.withdrawal_no ?? header.request_no)} size={54} style={{ width: 54, height: 54 }} />
+                  <div style={{ fontSize: 8, color: '#666', marginTop: 1 }}>สแกนเปิดใบงาน</div>
+                </div>
+              )}
             </div>
           </div>
         );
