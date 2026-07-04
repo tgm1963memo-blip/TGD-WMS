@@ -158,19 +158,28 @@ function printSticker({
 <meta charset="utf-8">
 <title>Sticker</title>
 <style>
-  @page { size: 120mm 70mm; margin: 3mm; }
-  body { font-family: 'Sarabun', 'TH Sarabun New', sans-serif; font-size: 11px; margin: 0; padding: 0; }
-  .sticker { border: 2px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 112mm; height: 62mm; box-sizing: border-box; display: flex; gap: 4mm; }
-  .info-col { flex: 1; display: flex; flex-direction: column; }
-  .qr-col { width: 22mm; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1mm; }
-  .qr-col svg { width: 20mm; height: 20mm; }
-  .qr-caption { font-size: 8px; font-weight: 700; text-align: center; }
-  .date-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; font-size: 12px; }
-  .field { display: flex; align-items: baseline; gap: 4px; border-bottom: 1px dotted #333; padding-bottom: 1px; margin-bottom: 1.6mm; }
-  .f-label { font-weight: 700; white-space: nowrap; }
-  .f-value { flex: 1; font-weight: 400; }
-  .field-row { display: flex; gap: 5mm; }
-  .field-row .field { flex: 1; }
+  /* No fixed @page size: forcing a custom page size that doesn't match
+     whatever paper/label stock is actually loaded is what made printers
+     auto-rotate and scale-to-fit (blurry, sideways output). Leaving size
+     unset lets the print dialog use the printer's normal paper — the
+     sticker itself stays a fixed physical size below, so it prints true-size
+     regardless of what paper the printer has loaded. */
+  @page { margin: 8mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  .sticker { border: 3px solid #000; border-radius: 6mm; padding: 4mm 5mm; width: 112mm; min-height: 80mm; box-sizing: border-box; display: flex; gap: 4mm; }
+  .info-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .qr-col { width: 24mm; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1.5mm; }
+  .qr-col svg { width: 22mm; height: 22mm; }
+  .qr-caption { font-size: 10px; font-weight: 700; text-align: center; width: 100%; overflow-wrap: break-word; word-break: break-all; }
+  .date-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; font-size: 16px; }
+  /* Every field is a full-width row (not paired side-by-side) — at the larger
+     print-safe font size, two values sharing half the sticker's width would
+     get squeezed and wrap mid-word (e.g. tracking codes breaking every 2
+     characters). Full width keeps every value on one line. */
+  .field { display: flex; align-items: baseline; gap: 6px; border-bottom: 1.5px dotted #000; padding-bottom: 1px; margin-bottom: 1.8mm; }
+  .f-label { font-weight: 700; font-size: 12px; white-space: nowrap; color: #333; }
+  .f-value { flex: 1; font-weight: 600; overflow-wrap: break-word; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -180,22 +189,13 @@ function printSticker({
     ${field('ชื่อลูกค้า', customerName)}
     ${field('รหัสสินค้า', productCode)}
     ${field('ชื่อสินค้า', productName)}
-    <div class="field-row">
-      ${field('Lot (ของลูกค้า)', lotNo)}
-      ${field('การจัดเก็บ', storageLabel)}
-    </div>
-    <div class="field-row">
-      ${field('จำนวน', quantityLabel)}
-      ${field('สารก่อภูมิแพ้ (Allergen)', '')}
-    </div>
-    <div class="field-row">
-      ${field('วันผลิต', formatStickerDate(mfgDate))}
-      ${field('', allergenLabel, { bold: true })}
-    </div>
-    <div class="field-row">
-      ${field('Location', locationCode || '-')}
-      ${field('Tracking Code', trackingCode, { bold: true })}
-    </div>
+    ${field('Lot (ของลูกค้า)', lotNo)}
+    ${field('การจัดเก็บ', storageLabel)}
+    ${field('จำนวน', quantityLabel)}
+    ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { bold: true })}
+    ${field('วันผลิต', formatStickerDate(mfgDate))}
+    ${field('Location', locationCode || '-')}
+    ${field('Tracking Code', trackingCode, { bold: true })}
   </div>
   <div class="qr-col">
     ${qrSvg}
@@ -204,7 +204,7 @@ function printSticker({
 </div>
 </body>
 </html>`;
-  const win = window.open('', '_blank', 'width=460,height=320');
+  const win = window.open('', '_blank', 'width=480,height=420');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
