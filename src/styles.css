@@ -774,6 +774,20 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 }
 
 @media print {
+  /* The print preview modal (ReportPreviewModal) portals to document.body,
+     so it's a sibling of #root — not a descendant. visibility:hidden below
+     keeps #root's content isolated from the printed output, but it does NOT
+     collapse layout height (unlike display:none), so the entire underlying
+     app page (sidebar, whatever list/table was open behind the modal) still
+     occupies real vertical space during pagination. On a long underlying
+     page this pushed the actual print content several blank pages in —
+     a document with a single line item printed starting on page 4. Fully
+     removing #root from layout (rather than just hiding it) eliminates
+     that phantom height outright. */
+  #root {
+    display: none !important;
+  }
+
   body * {
     visibility: hidden;
   }
