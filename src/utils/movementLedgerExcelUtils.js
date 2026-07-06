@@ -159,10 +159,67 @@ function buildDateOrderedExcelRows(rows, openingBalances) {
   });
 }
 
+function totalsExcelRow(totals) {
+  return {
+    'วันที่': '',
+    'ประเภท': 'รวมทั้งหมด',
+    'ล็อต': '',
+    'สินค้า': '',
+    'ลูกค้า': '',
+    'รับเข้า (กล่อง)': totals.receivedQty,
+    'รับเข้า (KG)': Number(totals.receivedWeight.toFixed(3)),
+    'จ่ายออก (กล่อง)': totals.deliveredQty,
+    'จ่ายออก (KG)': Number(totals.deliveredWeight.toFixed(3)),
+    'ยอดคงเหลือ (กล่อง)': totals.balanceQty,
+    'ยอดคงเหลือ (KG)': Number(totals.balanceWeight.toFixed(3)),
+    'อ้างอิง': '',
+  };
+}
+
+// Grand totals across every row: received/delivered are plain sums, but the
+// remaining balance is summed once per distinct lot (its final balance —
+// opening plus this period's net movement), not once per row, since a lot's
+// balance appears on every one of its rows as a running total.
+function computeGrandTotals(rows, openingBalances) {
+  const netMovementByKey = aggregateFinalBalances(rows);
+
+  let receivedQty = 0;
+  let receivedWeight = 0;
+  let deliveredQty = 0;
+  let deliveredWeight = 0;
+  rows.forEach((row) => {
+    const qty = Number(row.qty ?? row.quantity ?? 0);
+    const weight = Number(row.weight ?? 0);
+    if (isInbound(row)) {
+      receivedQty += qty;
+      receivedWeight += weight;
+    } else {
+      deliveredQty += qty;
+      deliveredWeight += weight;
+    }
+  });
+
+  let balanceQty = 0;
+  let balanceWeight = 0;
+  netMovementByKey.forEach((net, key) => {
+    const opening = openingBalances.get(key) ?? zeroBalance();
+    balanceQty += opening.qty + net.qty;
+    balanceWeight += opening.weight + net.weight;
+  });
+
+  return { receivedQty, receivedWeight, deliveredQty, deliveredWeight, balanceQty, balanceWeight };
+}
+
 export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map(), sortMode = 'productLot') {
-  return sortMode === 'date'
+  const excelRows = sortMode === 'date'
     ? buildDateOrderedExcelRows(rows, openingBalances)
     : buildGroupedExcelRows(rows, openingBalances);
+
+  if (rows.length > 0) {
+    excelRows.push(totalsExcelRow(computeGrandTotals(rows, openingBalances)));
+  }
+
+  return excelRows;
 }
 
 export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger') {
