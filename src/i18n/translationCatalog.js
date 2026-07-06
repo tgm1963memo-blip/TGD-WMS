@@ -774,7 +774,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_deposit_attachments_deferred_note: { th: 'การอัปโหลดไฟล์จริงจะเปิดใช้ในเฟสถัดไป — ตอนนี้แสดงตัวอย่างในเบราว์เซอร์เท่านั้น', en: 'Storage upload is deferred — files stay in browser preview only until Gate 2G.' },
   customer_deposit_attachment_remove: { th: 'ลบ', en: 'Remove' },
   customer_deposit_attachment_size_error: { th: '{filename} เกินขนาดสูงสุด 10MB', en: '{filename} exceeds the 10MB preview limit.' },
-  customer_deposit_pack_required: { th: 'กรุณากรอกน้ำหนักต่อกล่อง จำนวนกล่อง และน้ำหนักรวมให้ครบทุกรายการ', en: 'Enter weight per box, box count, and total weight for every line.' },
+  customer_deposit_pack_required: { th: 'กรุณากรอกจำนวนกล่องและน้ำหนักรวมให้ครบทุกรายการ (น้ำหนักต่อกล่องระบุหรือไม่ก็ได้)', en: 'Enter box count and total weight for every line (weight per box is optional).' },
   customer_deposit_status_draft: { th: 'ร่าง', en: 'Draft' },
   customer_deposit_status_submitted: { th: 'ลูกค้าส่งแล้ว', en: 'Submitted by customer' },
   customer_deposit_status_admin_reviewing: { th: 'ธุรการตรวจสอบ', en: 'Admin reviewing' },

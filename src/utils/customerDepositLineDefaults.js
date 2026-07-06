@@ -34,9 +34,10 @@ export function isCatalogDepositLineSelected(line) {
 export function getFilledDepositLines(lines) {
   return (lines ?? []).filter((line) => {
     if (!isCatalogDepositLineSelected(line)) return false;
-    const weightPerBox = Number(line.weight_per_box);
+    // weight_per_box is optional: when the customer doesn't know the per-unit
+    // weight, total weight and box count are captured independently instead.
     const totalWeight = Number(line.expected_weight);
     const boxes = Number(line.expected_boxes);
-    return weightPerBox > 0 && totalWeight > 0 && boxes > 0;
+    return totalWeight > 0 && boxes > 0;
   });
 }

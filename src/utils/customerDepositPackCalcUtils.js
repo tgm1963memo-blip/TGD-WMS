@@ -8,6 +8,12 @@ function toPositiveNumber(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+// Without a per-unit weight there's nothing to derive the other field from —
+// total weight and box count must be entered independently in that case.
+export function hasUnitWeight(weightPerBox) {
+  return toPositiveNumber(weightPerBox) != null;
+}
+
 export function formatPackNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return '';
@@ -47,7 +53,7 @@ export function applyPackFieldChange({ mode, field, value, weightPerBox, expecte
 
   if (field === 'expected_boxes') {
     next.expected_boxes = value;
-    if (mode === PACK_ENTRY_MODES.BOXES) {
+    if (mode === PACK_ENTRY_MODES.BOXES && hasUnitWeight(next.weight_per_box)) {
       next.expected_weight = calcTotalWeightFromBoxes(value, next.weight_per_box);
     }
     return next;
@@ -55,7 +61,7 @@ export function applyPackFieldChange({ mode, field, value, weightPerBox, expecte
 
   if (field === 'expected_weight') {
     next.expected_weight = value;
-    if (mode === PACK_ENTRY_MODES.WEIGHT) {
+    if (mode === PACK_ENTRY_MODES.WEIGHT && hasUnitWeight(next.weight_per_box)) {
       next.expected_boxes = calcBoxesFromTotalWeight(value, next.weight_per_box);
     }
     return next;

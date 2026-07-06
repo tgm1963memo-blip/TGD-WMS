@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal.jsx';
 import { LoadingState } from '../ui/LoadingState.jsx';
+import { DateInputDMY } from '../common/DateInputDMY.jsx';
+import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { ReportPrintActions } from '../reports/ReportPrintActions.jsx';
 import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOrderPrint.jsx';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
@@ -32,6 +34,8 @@ function fmtDate(v) {
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
   const t = useTranslation();
+  const { role: userRole } = useUserRole();
+  const isSystemAdmin = userRole === 'admin';
   const [header, setHeader] = useState(null);
   const [lines, setLines] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -43,6 +47,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [recountLine, setRecountLine] = useState(null);
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountQty, setRecountQty] = useState('');
+  const [lotEditLine, setLotEditLine] = useState(null);
+  const [lotEditLotNo, setLotEditLotNo] = useState('');
+  const [lotEditMfgDate, setLotEditMfgDate] = useState('');
+  const [lotEditExpDate, setLotEditExpDate] = useState('');
   const [locationLine, setLocationLine] = useState(null);
   const [allLocations, setAllLocations] = useState([]);
   const [locZone, setLocZone] = useState('');
@@ -228,6 +236,31 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     ));
     setActionMsg(t('admin_recount_saved'));
     setRecountLine(null);
+  }
+
+  // System-admin-only: fix LOT no. / mfg / exp date on a line, regardless of the
+  // request's current status (confirmed lines can have wrong LOT data too).
+  async function handleSaveLotEdit() {
+    if (!lotEditLine) return;
+    setSubmitting(true); setError('');
+    const r = await recordDepositLineActualReceipt(lotEditLine.id, {
+      actualBoxes: lotEditLine.actual_boxes,
+      actualWeight: lotEditLine.actual_weight,
+      note: lotEditLine.actual_note,
+      lotNo: lotEditLotNo,
+      mfgDate: lotEditMfgDate || null,
+      expDate: lotEditExpDate || null,
+      locationId: lotEditLine.location_id,
+    });
+    setSubmitting(false);
+    if (r.error) { setError(r.error.message ?? 'Save failed'); return; }
+    setLines((prev) => prev.map((l) =>
+      l.id === lotEditLine.id
+        ? { ...l, lot_no: lotEditLotNo || l.lot_no, mfg_date: lotEditMfgDate || null, exp_date: lotEditExpDate || null }
+        : l,
+    ));
+    setActionMsg(t('save'));
+    setLotEditLine(null);
   }
 
   function handlePrintSticker(line) {
@@ -475,6 +508,23 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                             >
                               🖨
                             </button>
+                            {isSystemAdmin ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                type="button"
+                                title="แก้ไข LOT / วันผลิต / วันหมดอายุ (Admin)"
+                                aria-label="Edit LOT Details"
+                                style={{ marginLeft: 4 }}
+                                onClick={() => {
+                                  setLotEditLine(line);
+                                  setLotEditLotNo(line.lot_no ?? '');
+                                  setLotEditMfgDate(line.mfg_date ?? '');
+                                  setLotEditExpDate(line.exp_date ?? '');
+                                }}
+                              >
+                                ✏️
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       );
@@ -611,6 +661,51 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <label className="form-field">
                 <span>{t('admin_received_qty')}</span>
                 <input className="form-control" type="number" min={0} value={recountQty} onChange={(e) => setRecountQty(e.target.value)} />
+              </label>
+            </div>
+          </>
+        ) : null}
+      </Modal>
+
+      {/* Admin-only LOT edit modal — allowed regardless of request status, since a wrong
+          LOT/mfg/exp value discovered after confirmation still needs a way to be fixed. */}
+      <Modal
+        isOpen={!!lotEditLine}
+        onClose={() => setLotEditLine(null)}
+        title="แก้ไขรายละเอียด LOT (Admin)"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-primary" disabled={submitting} type="button" onClick={handleSaveLotEdit}>
+              {t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setLotEditLine(null)} type="button">{t('cancel')}</button>
+          </div>
+        )}
+      >
+        {lotEditLine ? (
+          <>
+            <p style={{ marginTop: 0 }}>
+              <strong>{lotEditLine.product_name ?? lotEditLine.customer_product_code}</strong>
+            </p>
+            <div className="form-grid" style={{ gap: 10 }}>
+              <label className="form-field">
+                <span>เลข LOT</span>
+                <input
+                  className="form-control"
+                  type="text"
+                  value={lotEditLotNo}
+                  onChange={(e) => setLotEditLotNo(e.target.value)}
+                  placeholder="LOT number"
+                />
+              </label>
+              <label className="form-field">
+                <span>วันผลิต</span>
+                <DateInputDMY value={lotEditMfgDate} onChange={(e) => setLotEditMfgDate(e.target.value)} />
+              </label>
+              <label className="form-field">
+                <span>วันหมดอายุ</span>
+                <DateInputDMY value={lotEditExpDate} onChange={(e) => setLotEditExpDate(e.target.value)} />
               </label>
             </div>
           </>

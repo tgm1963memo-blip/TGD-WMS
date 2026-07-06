@@ -42,55 +42,69 @@ export function printSticker({
   @page { margin: 8mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  /* 3 x 4 inch label (76.2mm x 101.6mm) — media width x length, matching
-     the physical label roll. */
-  .sticker { border: 3px solid #000; border-radius: 4mm; padding: 2mm 2.5mm; width: 76.2mm; height: 101.6mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 0.6mm; overflow: hidden; }
+  /* Physical label roll is still 3in wide x 4in long (76.2mm x 101.6mm) —
+     unchanged, so no printer/label-stock reconfiguration is needed. The
+     content itself is laid out landscape (101.6mm x 76.2mm) and rotated
+     90deg to fill that physical footprint sideways; turn the printed label
+     a quarter turn to read it. If it comes out rotated the wrong way on
+     your printer, flip the sign on the "rotate(90deg)" below to -90deg. */
+  .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
+  .sticker {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+    width: 101.6mm; height: 76.2mm;
+    border: 3px solid #000; border-radius: 4mm; padding: 2mm 3mm; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 1mm; overflow: hidden;
+  }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
-  .date-field { font-size: 10px; font-weight: 700; line-height: 1.25; }
-  .qr-box svg { width: 12mm; height: 12mm; display: block; }
-  .details { display: flex; flex-direction: column; flex-shrink: 0; }
-  /* Label on its own line above the value (not side-by-side) — at a size
-     that's actually legible printed, a same-line label+value pair doesn't
-     leave enough width for the value before it wraps awkwardly. */
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.12; padding-bottom: 0.1mm; }
-  .d-label { font-weight: 700; font-size: 8px; color: #555; }
-  .d-value { font-weight: 700; font-size: 12px; overflow-wrap: break-word; word-break: break-word; }
-  /* Tracking code is the whole reason for this label: make it the single
-     biggest, most legible element, pinned bottom-right, so staff never need
-     to hand-copy it in marker onto the sticker again. The label is only
-     3in wide, so a long code can't stay on one line at a large size —
-     wrapping to 2 lines is fine as long as the digits are as big as
-     possible (word-break so it wraps by character, not just at spaces). */
-  .code-block { margin-top: auto; display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
-  .code-label { font-size: 10px; font-weight: 700; color: #333; line-height: 1; }
+  .date-field { font-size: 9px; font-weight: 700; line-height: 1.2; }
+  .qr-box svg { width: 11mm; height: 11mm; display: block; }
+  /* Two columns so all the detail fields fit the shorter (76.2mm) height
+     of the landscape layout without crowding out the tracking code band. */
+  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex: 1; min-height: 0; overflow: hidden; }
+  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.1; padding-bottom: 0.3mm; }
+  .d-field--wide { grid-column: 1 / -1; }
+  .d-label { font-weight: 700; font-size: 7px; color: #555; }
+  .d-value { font-weight: 700; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Tracking code is the whole reason for this label: the single biggest,
+     boldest element, spanning the full landscape width on one line — the
+     code is always a fixed 11 characters (2-letter prefix + YYMMDD + 3-digit
+     sequence, see tgd_generate_deposit_line_tracking_code), so a single
+     large size can be sized to always fit without wrapping. */
+  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 3mm; border-top: 2px solid #000; padding-top: 1.5mm; margin-top: auto; }
+  .code-label { font-size: 10px; font-weight: 700; color: #333; }
   /* font-weight:900 alone isn't reliably bold once the browser/printer
      substitutes a fallback Latin font for these digits (the Thai-first
      font stack above may not carry a true black weight for Latin/numerals)
      — a text stroke guarantees a visibly heavier stroke regardless of which
      font actually gets used to render it. */
-  .code-value { font-size: 34px; font-weight: 900; letter-spacing: 0.3px; line-height: 1; text-align: right; word-break: break-all; -webkit-text-stroke: 0.6px #000; }
+  .code-value { font-size: 52px; font-weight: 900; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 0.8px #000; }
 </style>
 </head>
 <body>
-<div class="sticker">
-  <div class="top-row">
-    <div class="date-field">วันที่ฝากเข้า<br>${formatStickerDate(depositDate)}</div>
-    <div class="qr-box">${qrSvg}</div>
-  </div>
-  <div class="details">
-    ${field('ชื่อลูกค้า', customerName)}
-    ${field('รหัสสินค้า', productCode)}
-    ${field('ชื่อสินค้า', productName)}
-    ${field('Lot (ของลูกค้า)', lotNo)}
-    ${field('การจัดเก็บ', storageLabel)}
-    ${field('จำนวน', quantityLabel)}
-    ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { bold: true })}
-    ${field('วันผลิต', formatStickerDate(mfgDate))}
-    ${field('Location', locationCode || '-')}
-  </div>
-  <div class="code-block">
-    <div class="code-label">Tracking Code</div>
-    <div class="code-value">${trackingCode || '-'}</div>
+<div class="sticker-page">
+  <div class="sticker">
+    <div class="top-row">
+      <div class="date-field">วันที่ฝากเข้า<br>${formatStickerDate(depositDate)}</div>
+      <div class="qr-box">${qrSvg}</div>
+    </div>
+    <div class="details">
+      ${field('ชื่อลูกค้า', customerName)}
+      <div></div>
+      ${field('รหัสสินค้า', productCode)}
+      ${field('Lot (ของลูกค้า)', lotNo)}
+      ${field('ชื่อสินค้า', productName)}
+      <div></div>
+      ${field('การจัดเก็บ', storageLabel)}
+      ${field('จำนวน', quantityLabel)}
+      ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { bold: true })}
+      ${field('วันผลิต', formatStickerDate(mfgDate))}
+      ${field('Location', locationCode || '-')}
+    </div>
+    <div class="code-block">
+      <div class="code-label">Tracking Code</div>
+      <div class="code-value">${trackingCode || '-'}</div>
+    </div>
   </div>
 </div>
 </body>

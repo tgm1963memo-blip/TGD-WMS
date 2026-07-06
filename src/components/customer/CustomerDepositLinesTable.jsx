@@ -3,6 +3,7 @@ import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import {
   applyPackFieldChange,
   calcTotalWeightFromBoxes,
+  hasUnitWeight,
   PACK_ENTRY_MODES,
 } from '../../utils/customerDepositPackCalcUtils.js';
 
@@ -88,6 +89,10 @@ export function CustomerDepositLinesTable({
             const rowTestId = index === 0 ? 'customer-deposit-line-0' : `customer-deposit-line-${line.key}`;
             const packMode = line.pack_entry_mode ?? PACK_ENTRY_MODES.BOXES;
             const weightReadonly = Boolean(line.weight_from_master);
+            // With no per-unit weight there's no conversion factor between total weight
+            // and box count, so both fields must stay editable at the same time instead
+            // of one being locked as the "derived" value.
+            const canDeriveFromUnitWeight = hasUnitWeight(line.weight_per_box);
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td>{index + 1}</td>
@@ -148,7 +153,7 @@ export function CustomerDepositLinesTable({
                   <input
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-total-weight' : `${rowTestId}-total-weight`}
-                    disabled={packMode === PACK_ENTRY_MODES.BOXES}
+                    disabled={canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.BOXES}
                     min="0"
                     onChange={(event) => updatePackField(line, 'expected_weight', event.target.value)}
                     step="0.01"
@@ -160,7 +165,7 @@ export function CustomerDepositLinesTable({
                   <input
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-box-count' : `${rowTestId}-box-count`}
-                    disabled={packMode === PACK_ENTRY_MODES.WEIGHT}
+                    disabled={canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.WEIGHT}
                     min="1"
                     onChange={(event) => updatePackField(line, 'expected_boxes', event.target.value)}
                     type="number"

@@ -1715,7 +1715,10 @@ table .status-badge,
 
 /* ═══════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE — full rewrite of prior 760px blocks
-   Breakpoint: 768px (tablet/phone)
+   Breakpoint: 1024px (tablet & phone) — widened from 768px so tablets
+   (iPad portrait/landscape, ~768-1024px) also get the off-canvas sidebar
+   and touch-friendly sizing instead of squeezing the fixed sidebar +
+   desktop layout into a narrower viewport.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Hamburger button (always in DOM, hidden on desktop) ── */
@@ -1750,7 +1753,7 @@ table .status-badge,
 /* ── Hide on mobile ── */
 .hide-xs { }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
 
   /* Allow page-level scrolling on small screens */
   body { overflow-y: auto; height: auto; }
@@ -1844,6 +1847,15 @@ table .status-badge,
 
   table, .data-table, .tgd-table, .table {
     min-width: 540px; /* Prevent column collapse on small screens */
+  }
+
+  /* Cells must not word-wrap into an unreadable single-word/character
+     column — let the table grow past the viewport and scroll horizontally
+     instead (the wrapper above already provides overflow-x: auto). */
+  table th, table td,
+  .data-table th, .data-table td,
+  .tgd-table th, .tgd-table td {
+    white-space: nowrap;
   }
 
   /* ── KPI / Dashboard grids ── */

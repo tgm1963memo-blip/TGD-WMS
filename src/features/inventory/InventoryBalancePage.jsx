@@ -220,7 +220,7 @@ export function InventoryBalancePage() {
                       type="button"
                       onClick={() => toggleKey(pg.productKey)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, width: '100%',
                         textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
                         border: 'none', borderBottom: '1px solid var(--tgd-border)',
                         padding: '24px 16px 24px 32px',
@@ -231,16 +231,14 @@ export function InventoryBalancePage() {
                       <span style={{ fontSize: 14, color: 'var(--tgd-muted-text)', width: 16, flexShrink: 0 }}>
                         {isExpanded ? '▼' : '▶'}
                       </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: '1 1 180px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{pg.productCode}</span>
                         {pg.productCode !== pg.productName && (
-                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13, marginLeft: 8 }}>{pg.productName}</span>
+                          <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{pg.productName}</span>
                         )}
-                        {pg.temperatureType && (
-                          <span style={{ marginLeft: 10 }}><TempBadge type={pg.temperatureType} /></span>
-                        )}
+                        {pg.temperatureType && <TempBadge type={pg.temperatureType} />}
                       </div>
-                      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>กล่อง</div>
                           <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalBoxes.toLocaleString()}</div>
@@ -255,7 +253,7 @@ export function InventoryBalancePage() {
 
                     {/* Expanded CDR lines */}
                     {isExpanded && (
-                      <div style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                      <div style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                           <thead>
                             <tr style={{ background: '#f1f5f9' }}>
