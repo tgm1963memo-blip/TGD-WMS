@@ -38,8 +38,13 @@ export function printSticker({
      auto-rotate and scale-to-fit (blurry, sideways output). Leaving size
      unset lets the print dialog use the printer's normal paper — the
      sticker itself stays a fixed physical size below, so it prints true-size
-     regardless of what paper the printer has loaded. */
-  @page { margin: 8mm; }
+     regardless of what paper the printer has loaded.
+     margin: 0 — an 8mm page margin was insetting the whole label away from
+     the physical edges, leaving blank paper border around it on the actual
+     print instead of the label filling the page. The label's own border/
+     radius already provides visual breathing room, so the page itself
+     should have none. */
+  @page { margin: 0; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
   /* On screen (this preview popup): show the sticker as a plain landscape
