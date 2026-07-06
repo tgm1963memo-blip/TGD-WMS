@@ -95,6 +95,10 @@ export function BillingMovementWeightReportPage() {
 
       const customerMap = Object.fromEntries(customers.map((c) => [c.id, c.customer_name ?? c.name]));
       const productMap = Object.fromEntries(products.map((p) => [p.id, p.product_name ?? p.sku ?? p.name]));
+      // Movement rows don't carry temperature themselves (it's a product attribute);
+      // deposit/withdrawal lines do carry their own temperature_type snapshot, so
+      // that takes priority, falling back to the product catalog's current value.
+      const productTemperatureMap = Object.fromEntries(products.map((p) => [p.id, p.temperature_type ?? null]));
 
       let outboundRows = (movResult.data ?? []).filter((r) => {
         const mt = String(r.movement_type_raw || '').toUpperCase();
@@ -111,6 +115,7 @@ export function BillingMovementWeightReportPage() {
         ...shapeBillingMovementWeightRow(row),
         customer_name: customerMap[row.customer_id] ?? row.customer_name ?? null,
         product_name: productMap[row.product_id] ?? row.product_name ?? null,
+        temperature_type: row.temperature_type ?? productTemperatureMap[row.product_id] ?? null,
       }));
 
       const filtered = applyBillingMovementWeightFilters(shaped, committedFilters);
@@ -149,7 +154,7 @@ export function BillingMovementWeightReportPage() {
 
   const classifiedError = state.error ? classifyBillingMovementWeightError(state.error) : null;
 
-  const hasActiveFilter = committedFilters && (committedFilters.customerId || committedFilters.productId || committedFilters.dateFrom || committedFilters.dateTo || committedFilters.movementType || committedFilters.billingStatus || committedFilters.isBillable);
+  const hasActiveFilter = committedFilters && (committedFilters.customerId || committedFilters.productId || committedFilters.dateFrom || committedFilters.dateTo || committedFilters.movementType || committedFilters.billingStatus || committedFilters.isBillable || committedFilters.temperatureType);
 
   const emptyMessage = state.loading
     ? null

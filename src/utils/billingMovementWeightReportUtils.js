@@ -5,6 +5,7 @@ export const BILLING_MOVEMENT_WEIGHT_CSV_HEADERS = [
   'customer_name',
   'product_code',
   'product_name',
+  'temperature_type',
   'lot_no',
   'pallet_no',
   'qty',
@@ -23,6 +24,7 @@ export function applyBillingMovementWeightFilters(rows = [], filters = {}) {
   return rows.filter((row) => {
     if (filters.customerId && row.customer_id !== filters.customerId) return false;
     if (filters.productId && row.product_id !== filters.productId) return false;
+    if (filters.temperatureType && row.temperature_type !== filters.temperatureType) return false;
 
     if (filters.movementType) {
       const filterType = String(filters.movementType).trim().toUpperCase();

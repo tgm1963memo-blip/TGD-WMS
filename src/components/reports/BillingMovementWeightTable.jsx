@@ -191,6 +191,7 @@ function renderBillingDetail(group) {
           <tr>
             <th>#</th>
             <th>Product</th>
+            <th>Temp</th>
             <th>Lot / Pallet</th>
             <th style={{ textAlign: 'right' }}>Qty</th>
             <th style={{ textAlign: 'right' }}>Net Wt</th>
@@ -206,6 +207,7 @@ function renderBillingDetail(group) {
             <tr key={line.movement_id ?? idx}>
               <td>{idx + 1}</td>
               <td>{line.product_name ?? line.product_code ?? '-'}</td>
+              <td>{formatDetailValue(line.temperature_type)}</td>
               <td>{line.lot_no ?? line.lot_id ?? '-'}{line.pallet_no ?? line.pallet_id ? ` / ${line.pallet_no ?? line.pallet_id}` : ''}</td>
               <td style={{ textAlign: 'right' }}>{formatNumber(line.qty)}</td>
               <td style={{ textAlign: 'right' }}>{formatNumber(line.net_weight)}</td>

@@ -112,7 +112,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
       id, request_no, customer_id, status, expected_arrival_date, last_action_at,
       tgd_customer_deposit_request_lines(
         id, line_no, product_id, customer_product_code, product_name, lot_no,
-        actual_boxes, actual_weight, location_id
+        actual_boxes, actual_weight, location_id, temperature_type
       )
     `)
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
@@ -153,6 +153,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
+        temperature_type: line.temperature_type ?? null,
         from_warehouse_id: null,
         to_warehouse_id: 'RECEIVE',
         source_document_no: req.request_no,
@@ -176,7 +177,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       tgd_customer_withdrawal_request_lines(
         id, line_no, customer_product_code, product_name, lot_no,
         requested_boxes, requested_weight,
-        picked_boxes, picked_weight, picked_at, picked_by_email
+        picked_boxes, picked_weight, picked_at, picked_by_email, temperature_type
       )
     `)
     .eq('status', 'COMPLETED');
@@ -216,6 +217,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
+        temperature_type: line.temperature_type ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,
         source_document_no: req.withdrawal_no,

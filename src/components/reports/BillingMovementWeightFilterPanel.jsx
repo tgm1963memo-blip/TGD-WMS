@@ -8,6 +8,7 @@ const initialFilters = {
   movementType: '',
   billingStatus: '',
   isBillable: '',
+  temperatureType: '',
 };
 
 const BILLING_STATUS_OPTIONS = [
@@ -15,6 +16,13 @@ const BILLING_STATUS_OPTIONS = [
   'READY_FOR_PREVIEW',
   'NEEDS_WEIGHT_REVIEW',
   'EXCLUDED',
+];
+
+const TEMPERATURE_TYPE_OPTIONS = [
+  { value: '', label: 'All temperatures' },
+  { value: 'FROZEN', label: 'FROZEN — แช่แข็ง' },
+  { value: 'CHILLED', label: 'CHILLED — แช่เย็น' },
+  { value: 'AMBIENT', label: 'AMBIENT — อุณหภูมิห้อง' },
 ];
 
 export function BillingMovementWeightFilterPanel({
@@ -87,6 +95,16 @@ export function BillingMovementWeightFilterPanel({
                   </option>
                 );
               })}
+            </select>
+          </label>
+        </div>
+        <div className="form-group">
+          <label className="form-label">
+            Temperature
+            <select className="form-control" name="temperatureType" value={filters.temperatureType} onChange={updateField}>
+              {TEMPERATURE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </label>
         </div>

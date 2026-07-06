@@ -48,6 +48,8 @@ export function shapeBillingMovementWeightRow(row = {}) {
 
     product_name: row.product_name ?? null,
 
+    temperature_type: row.temperature_type ?? null,
+
     lot_id: row.lot_id ?? null,
 
     lot_no: row.lot_no ?? null,
