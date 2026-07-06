@@ -49,6 +49,11 @@ const summaryColumns = [
     render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
   },
   {
+    key: 'temperature_type',
+    header: 'อุณหภูมิ',
+    render: (row) => <span className="table-meta-text">{row.temperature_type || '-'}</span>,
+  },
+  {
     key: 'product_id',
     header: 'สินค้า',
     render: (row) => {
@@ -128,6 +133,7 @@ function renderMovementDetail(row) {
       <DetailField label="สินค้า" value={row.product_name ?? row.product_id} />
       <DetailField label="ลูกค้า" value={row.customer_name ?? row.customer_id} />
       <DetailField label="ล็อต" value={row.lot_no} />
+      <DetailField label="อุณหภูมิ" value={row.temperature_type} />
       <DetailField label="ตำแหน่งต้นทาง" value={row.from_location_id} />
       <DetailField label="ตำแหน่งปลายทาง" value={row.to_location_id} />
       {inbound ? (

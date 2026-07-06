@@ -133,6 +133,7 @@ export function MovementLedgerReportPage() {
       setProductOptions(productsData.map((p) => ({
         value: p.id,
         label: p.sku ? `${p.sku} — ${p.name}` : (p.name ?? p.id),
+        temperatureType: p.temperature_type,
       })));
 
       setLocationOptions(locsData.map((l) => ({
@@ -159,11 +160,13 @@ export function MovementLedgerReportPage() {
 
     const enrich = (rowsToEnrich) => {
       const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
+      const productTempMap = Object.fromEntries(productOptions.map((p) => [p.value, p.temperatureType]));
       const customerMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
       return rowsToEnrich.map((row) => ({
         ...row,
         product_name: row.product_name ?? productMap[row.product_id] ?? row.product_id,
         customer_name: row.customer_name ?? customerMap[row.customer_id] ?? row.customer_id,
+        temperature_type: row.temperature_type ?? productTempMap[row.product_id] ?? null,
       }));
     };
 
@@ -183,14 +186,28 @@ export function MovementLedgerReportPage() {
     ]).then(([main, prior]) => {
       if (!isMounted) return;
 
-      const rows = enrich(main.rows);
+      let rows = enrich(main.rows);
+      let priorRows = enrich(prior.rows);
+
+      if (committedFilters.temperatureType && committedFilters.temperatureType.length > 0) {
+        const types = Array.isArray(committedFilters.temperatureType) ? committedFilters.temperatureType : [committedFilters.temperatureType];
+        
+        const filterFn = (r) => {
+          const t = r.temperature_type || '-';
+          return types.includes(t);
+        };
+
+        rows = rows.filter(filterFn);
+        priorRows = priorRows.filter(filterFn);
+      }
+
       setState({
         rows,
         summary: summarizeMovements(rows),
         loading: false,
         error: main.error,
       });
-      setOpeningBalances(aggregateFinalBalances(enrich(prior.rows)));
+      setOpeningBalances(aggregateFinalBalances(priorRows));
     });
 
     return () => { isMounted = false; };

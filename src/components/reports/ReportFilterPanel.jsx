@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown.jsx';
+import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 
 const initialFilters = {
   dateFrom: '',
@@ -11,7 +12,13 @@ const initialFilters = {
   warehouseId: '',
   locationId: '',
   referenceType: '',
+  temperatureType: [],
 };
+
+const temperatureOptions = [
+  ...Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  { value: '-', label: 'ไม่มีระบุ (-)' },
+];
 
 export function ReportFilterPanel({
   value = initialFilters,
@@ -124,6 +131,18 @@ export function ReportFilterPanel({
             ) : (
               <input className="form-control" name="locationId" value={filters.locationId} onChange={updateField} placeholder="Location ID" />
             )}
+          </label>
+        </div>
+        <div className="form-group">
+          <label className="form-label">
+            อุณหภูมิ
+            <MultiSelectDropdown
+              name="temperatureType"
+              options={temperatureOptions}
+              value={filters.temperatureType}
+              onChange={(val) => setFilters((prev) => ({ ...prev, temperatureType: val }))}
+              placeholder="— ทั้งหมด —"
+            />
           </label>
         </div>
         <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>

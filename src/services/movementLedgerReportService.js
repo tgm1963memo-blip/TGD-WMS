@@ -165,6 +165,73 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   return { data: rows, error: null };
 }
 
+// Withdrawal lines carry no temperature_type of their own — customers never
+// pick a temperature when requesting a withdrawal. Look it up from the
+// confirmed deposit line(s) the withdrawal was picked from, mirroring the
+// same A/B match used by tgd_get_customer_stock_balance (migration
+// 20260625000010): prefer the direct source_customer_deposit_request_id link
+// (tie-broken by lot_no), and fall back to a lot_no + customer_product_code
+// match when the line has no direct link.
+async function getInboundTemperatureIndex(customerIds) {
+  const index = new Map();
+  if (!supabase || customerIds.length === 0) return index;
+
+  const { data, error } = await supabase
+    .from('tgd_customer_deposit_requests')
+    .select(`
+      id, customer_id, status,
+      tgd_customer_deposit_request_lines(
+        id, deposit_request_id, lot_no, customer_product_code, product_id, temperature_type
+      )
+    `)
+    .in('customer_id', customerIds)
+    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
+
+  if (error || !data) return index;
+
+  for (const req of data) {
+    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
+      if (!line.temperature_type) continue;
+      const bucket = index.get(req.customer_id) ?? [];
+      bucket.push({ ...line, deposit_request_id: line.deposit_request_id ?? req.id });
+      index.set(req.customer_id, bucket);
+    }
+  }
+
+  return index;
+}
+
+function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
+  const candidates = inboundIndex.get(customerId) ?? [];
+  if (candidates.length === 0) return null;
+
+  // A: direct link via source deposit request, tie-broken by lot_no
+  if (line.source_customer_deposit_request_id) {
+    const lotHint = line.source_lot_no ?? line.lot_no ?? null;
+    const direct = candidates.find((dl) =>
+      dl.deposit_request_id === line.source_customer_deposit_request_id &&
+      (lotHint == null || dl.lot_no === lotHint));
+    if (direct) return direct.temperature_type;
+  }
+
+  // B: no direct link — match by lot_no; product code is optional (blank = any)
+  const lotNo = line.lot_no ?? '';
+  const code = (line.customer_product_code ?? '').trim();
+  const byLot = candidates.find((dl) =>
+    (dl.lot_no ?? '') === lotNo &&
+    (code === '' || dl.customer_product_code === line.customer_product_code));
+  if (byLot) return byLot.temperature_type;
+
+  // C: last resort — same product code regardless of lot (covers lots recorded
+  // inconsistently between the deposit and withdrawal side).
+  if (code !== '') {
+    const byCode = candidates.find((dl) => dl.customer_product_code === line.customer_product_code);
+    if (byCode) return byCode.temperature_type;
+  }
+
+  return null;
+}
+
 // Returns COMPLETED customer withdrawal lines as outbound movement rows.
 // These are not in tgd_stock_movements, so they must be fetched separately.
 export async function getConfirmedWithdrawalRows(filters = {}) {
@@ -176,6 +243,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       id, withdrawal_no, customer_id, status, last_action_at,
       tgd_customer_withdrawal_request_lines(
         id, line_no, customer_product_code, product_name, lot_no, product_id,
+        source_customer_deposit_request_id, source_lot_no,
         requested_boxes, requested_weight,
         picked_boxes, picked_weight, picked_at, picked_by_email
       )
@@ -188,6 +256,9 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
 
   const { data, error } = await query;
   if (error) return { data: [], error };
+
+  const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
+  const inboundIndex = await getInboundTemperatureIndex(customerIds);
 
   const rows = [];
   for (const req of (data ?? [])) {
@@ -217,6 +288,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
+        temperature_type: resolveWithdrawalTemperature(line, req.customer_id, inboundIndex),
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,
         source_document_no: req.withdrawal_no,
