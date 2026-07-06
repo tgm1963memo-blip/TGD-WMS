@@ -42,19 +42,32 @@ export function printSticker({
   @page { margin: 8mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  /* Physical label roll is still 3in wide x 4in long (76.2mm x 101.6mm) —
-     unchanged, so no printer/label-stock reconfiguration is needed. The
-     content itself is laid out landscape (101.6mm x 76.2mm) and rotated
-     90deg to fill that physical footprint sideways; turn the printed label
-     a quarter turn to read it. If it comes out rotated the wrong way on
-     your printer, flip the sign on the "rotate(90deg)" below to -90deg. */
-  .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
+  /* On screen (this preview popup): show the sticker as a plain landscape
+     rectangle, unrotated, so what you see here is what the layout actually
+     looks like — easy to check before printing.
+     When printing: the physical label roll is still 3in wide x 4in long
+     (76.2mm x 101.6mm) — a previous attempt at this label declared the
+     sticker itself 101.6mm wide (assuming a 4x3in roll) and it printed
+     truncated because the real print head is only 76.2mm wide (see
+     "sticker is 3x4in (portrait)" fix in git history). So for print we keep
+     the outer page at the true 76.2mm x 101.6mm footprint and rotate the
+     landscape content 90deg to fit inside it sideways — nothing in the
+     print job is ever wider than the print head. Turn the printed label a
+     quarter turn to read it; if it comes out rotated the wrong way on your
+     printer, flip the sign on "rotate(90deg)" below to -90deg. */
+  .sticker-page { width: 101.6mm; height: 76.2mm; }
   .sticker {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(90deg);
-    width: 101.6mm; height: 76.2mm;
-    border: 3px solid #000; border-radius: 4mm; padding: 2mm 3mm; box-sizing: border-box;
+    width: 100%; height: 100%; box-sizing: border-box;
+    border: 3px solid #000; border-radius: 4mm; padding: 2mm 3mm;
     display: flex; flex-direction: column; gap: 1mm; overflow: hidden;
+  }
+  @media print {
+    .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
+    .sticker {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
+      width: 101.6mm; height: 76.2mm;
+    }
   }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
   .date-field { font-size: 9px; font-weight: 700; line-height: 1.2; }
@@ -109,7 +122,7 @@ export function printSticker({
 </div>
 </body>
 </html>`;
-  const win = window.open('', '_blank', 'width=480,height=420');
+  const win = window.open('', '_blank', 'width=520,height=380');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
