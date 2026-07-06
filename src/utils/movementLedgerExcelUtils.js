@@ -8,16 +8,17 @@ const HEADERS = [
   'ยอดคงเหลือ (กล่อง)', 'ยอดคงเหลือ (KG)', 'อ้างอิง',
 ];
 
-// Group strictly by customer + lot rather than customer + product + lot:
-// a physical lot already belongs to exactly one product in this business's
-// data model, and lot_no is the one identifier reliably present on every
-// row source this report merges — customer withdrawal rows never carry
-// product_id at all (see getConfirmedWithdrawalRows), so keying on
-// product_id would silently split the same lot's inbound/outbound rows
-// into different buckets and produce a wrong running balance. Rows with no
-// lot_no at all (rare adjustment-type movements) fall back to grouping by
-// whatever product identifier is available so they don't all collapse into
-// one bucket.
+// Group strictly by customer + lot rather than customer + product + lot: a
+// physical lot already belongs to exactly one product in this business's
+// data model, and lot_no is the one identifier reliably present and
+// consistently formatted across every row source this report merges —
+// deposit, withdrawal, and stock_movement rows resolve product_id through
+// different, not-always-populated paths (see getConfirmedWithdrawalRows),
+// so keying on product_id risks silently splitting the same lot's
+// inbound/outbound rows into different buckets and producing a wrong
+// running balance. Rows with no lot_no at all (rare adjustment-type
+// movements) fall back to grouping by whatever product identifier is
+// available so they don't all collapse into one bucket.
 export function movementBalanceKey(row) {
   if (row.lot_no) return `${row.customer_id ?? ''}|lot:${row.lot_no}`;
   const product = row.product_id ?? row.customer_product_code ?? row.product_name ?? '';

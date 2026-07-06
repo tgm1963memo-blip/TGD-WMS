@@ -175,9 +175,9 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     .select(`
       id, withdrawal_no, customer_id, status, last_action_at,
       tgd_customer_withdrawal_request_lines(
-        id, line_no, customer_product_code, product_name, lot_no,
+        id, line_no, customer_product_code, product_name, lot_no, product_id,
         requested_boxes, requested_weight,
-        picked_boxes, picked_weight, picked_at, picked_by_email, temperature_type
+        picked_boxes, picked_weight, picked_at, picked_by_email
       )
     `)
     .eq('status', 'COMPLETED');
@@ -208,7 +208,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         movement_type_canonical: 'DISPATCH',
         movement_date: line.picked_at ?? req.last_action_at,
         customer_id: req.customer_id,
-        product_id: null,
+        product_id: line.product_id ?? null,
         lot_id: null,
         lot_no: line.lot_no ?? null,
         qty: boxes,
@@ -217,7 +217,6 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
-        temperature_type: line.temperature_type ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,
         source_document_no: req.withdrawal_no,

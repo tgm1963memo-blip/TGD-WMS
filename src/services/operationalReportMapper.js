@@ -111,12 +111,12 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     return {
       id: row.id ?? `row-${index}`,
       // Grouping key for the running balance below — same lot-first logic as
-      // the Excel export (see movementBalanceKey), not product_code/
-      // customer_product_code: customer withdrawal rows never carry a
-      // product_id (see getConfirmedWithdrawalRows), so keying on product
-      // fields alone silently split the same lot's inbound/outbound rows
-      // into different balances and could show a withdrawal going negative
-      // even when the lot had plenty of stock received earlier.
+      // the Excel export (see movementBalanceKey): product_id/product_code
+      // resolve inconsistently across deposit/withdrawal/stock_movement rows
+      // (see getConfirmedWithdrawalRows), so keying on product fields alone
+      // risks silently splitting the same lot's inbound/outbound rows into
+      // different balances and could show a withdrawal going negative even
+      // when the lot had plenty of stock received earlier.
       _balanceKey: movementBalanceKey(row),
       date: dateStr,
       receivedDate: isInbound ? dateStr : '-',
