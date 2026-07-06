@@ -16,7 +16,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { downloadMovementLedgerExcel } from '../../utils/movementLedgerExcelUtils.js';
+import { downloadMovementLedgerExcel, aggregateFinalBalances } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -28,6 +28,73 @@ const initialState = {
   error: null,
 };
 
+// Inbound receipts from confirmed deposit lines (authoritative source with correct lot_no)
+// Outbound movements from stock_movements (DISPATCH, DELIVERY, etc.)
+const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
+
+function dayBefore(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Fetches and merges the three movement sources for a given date range,
+// applying the same product/location filters used on screen. Shared by both
+// the main (on-screen) fetch and the prior-period fetch used to compute each
+// lot's ยกมา (brought-forward) opening balance for the Excel export.
+async function fetchMergedRows(serviceFilters, filterCriteria) {
+  const [result, depositResult, withdrawalResult] = await Promise.all([
+    getMovementLedgerRows(serviceFilters),
+    getConfirmedDepositReceiptRows(serviceFilters),
+    getConfirmedWithdrawalRows(serviceFilters),
+  ]);
+
+  // Keep outbound/neutral movements; exclude draft and inbound (deposit lines cover all inbound)
+  let outboundRows = (result.data ?? []).filter((r) => {
+    const movType = String(r.movement_type_raw || '').toUpperCase();
+    return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
+  });
+
+  let depositRows = depositResult.data ?? [];
+  let withdrawalRows = withdrawalResult.data ?? [];
+
+  // Apply product filter
+  if (filterCriteria.productId && filterCriteria.productId.length > 0) {
+    const applyProd = (rowSet) => Array.isArray(filterCriteria.productId)
+      ? rowSet.filter((r) => filterCriteria.productId.includes(r.product_id))
+      : rowSet.filter((r) => r.product_id === filterCriteria.productId);
+    outboundRows = applyProd(outboundRows);
+    depositRows = applyProd(depositRows);
+  }
+
+  // Apply location filter
+  if (filterCriteria.locationId && filterCriteria.locationId.length > 0) {
+    if (Array.isArray(filterCriteria.locationId)) {
+      outboundRows = outboundRows.filter((r) =>
+        filterCriteria.locationId.includes(r.location_id) ||
+        filterCriteria.locationId.includes(r.to_location_id) ||
+        filterCriteria.locationId.includes(r.from_location_id));
+    } else {
+      outboundRows = outboundRows.filter((r) =>
+        r.location_id === filterCriteria.locationId ||
+        r.to_location_id === filterCriteria.locationId ||
+        r.from_location_id === filterCriteria.locationId);
+    }
+  }
+
+  // Merge and sort by movement_date ascending; same date: inbound before outbound
+  const rows = [...depositRows, ...withdrawalRows, ...outboundRows].sort((a, b) => {
+    const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
+    const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
+    if (aTime !== bTime) return aTime - bTime;
+    const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+    const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+    return aOut - bOut;
+  });
+
+  return { rows, error: result.error ?? null };
+}
+
 export function MovementLedgerReportPage() {
   const { language } = useLanguage();
   const { session } = useAuth();
@@ -35,6 +102,7 @@ export function MovementLedgerReportPage() {
   const [pendingFilters, setPendingFilters] = useState({});
   const [committedFilters, setCommittedFilters] = useState(null);
   const [state, setState] = useState(initialState);
+  const [openingBalances, setOpeningBalances] = useState(new Map());
   const [customerOptions, setCustomerOptions] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [locationOptions, setLocationOptions] = useState([]);
@@ -84,75 +152,40 @@ export function MovementLedgerReportPage() {
       referenceType: committedFilters.referenceType || undefined,
     };
 
-    // Inbound receipts from confirmed deposit lines (authoritative source with correct lot_no)
-    // Outbound movements from stock_movements (DISPATCH, DELIVERY, etc.)
-    const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
-
-    Promise.all([
-      getMovementLedgerRows(serviceFilters),
-      getConfirmedDepositReceiptRows(serviceFilters),
-      getConfirmedWithdrawalRows(serviceFilters),
-    ]).then(([result, depositResult, withdrawalResult]) => {
-      if (!isMounted) return;
-
-      // Keep outbound/neutral movements; exclude draft and inbound (deposit lines cover all inbound)
-      let outboundRows = (result.data ?? []).filter((r) => {
-        const movType = String(r.movement_type_raw || '').toUpperCase();
-        return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
-      });
-
-      let depositRows = depositResult.data ?? [];
-      let withdrawalRows = withdrawalResult.data ?? [];
-
-      // Apply product filter
-      if (committedFilters.productId && committedFilters.productId.length > 0) {
-        const applyProd = (rowSet) => Array.isArray(committedFilters.productId)
-          ? rowSet.filter((r) => committedFilters.productId.includes(r.product_id))
-          : rowSet.filter((r) => r.product_id === committedFilters.productId);
-        outboundRows = applyProd(outboundRows);
-        depositRows = applyProd(depositRows);
-      }
-
-      // Apply location filter
-      if (committedFilters.locationId && committedFilters.locationId.length > 0) {
-        if (Array.isArray(committedFilters.locationId)) {
-          outboundRows = outboundRows.filter((r) =>
-            committedFilters.locationId.includes(r.location_id) ||
-            committedFilters.locationId.includes(r.to_location_id) ||
-            committedFilters.locationId.includes(r.from_location_id));
-        } else {
-          outboundRows = outboundRows.filter((r) =>
-            r.location_id === committedFilters.locationId ||
-            r.to_location_id === committedFilters.locationId ||
-            r.from_location_id === committedFilters.locationId);
-        }
-      }
-
-      // Merge and sort by movement_date ascending; same date: inbound before outbound
-      let rows = [...depositRows, ...withdrawalRows, ...outboundRows].sort((a, b) => {
-        const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
-        const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
-        if (aTime !== bTime) return aTime - bTime;
-        const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
-        const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
-        return aOut - bOut;
-      });
-
-      // Enrich with display names
+    const enrich = (rowsToEnrich) => {
       const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
       const customerMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
-      rows = rows.map((row) => ({
+      return rowsToEnrich.map((row) => ({
         ...row,
         product_name: row.product_name ?? productMap[row.product_id] ?? row.product_id,
         customer_name: row.customer_name ?? customerMap[row.customer_id] ?? row.customer_id,
       }));
+    };
 
+    // Prior-period fetch (everything strictly before Date From) computes each
+    // lot's ยกมา opening balance for the Excel export — skipped when there's
+    // no Date From, since the main query already covers all history then.
+    const priorFetch = committedFilters.dateFrom
+      ? fetchMergedRows(
+          { ...serviceFilters, dateFrom: undefined, dateTo: dayBefore(committedFilters.dateFrom) },
+          committedFilters,
+        )
+      : Promise.resolve({ rows: [], error: null });
+
+    Promise.all([
+      fetchMergedRows(serviceFilters, committedFilters),
+      priorFetch,
+    ]).then(([main, prior]) => {
+      if (!isMounted) return;
+
+      const rows = enrich(main.rows);
       setState({
         rows,
         summary: summarizeMovements(rows),
         loading: false,
-        error: result.error ?? null,
+        error: main.error,
       });
+      setOpeningBalances(aggregateFinalBalances(enrich(prior.rows)));
     });
 
     return () => { isMounted = false; };
@@ -189,7 +222,7 @@ export function MovementLedgerReportPage() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => downloadMovementLedgerExcel(state.rows)}
+                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances)}
                 disabled={state.rows.length === 0}
               >
                 Export Excel
