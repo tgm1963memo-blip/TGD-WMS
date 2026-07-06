@@ -24,7 +24,7 @@ export function printSticker({
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
   const qrSvg = renderToStaticMarkup(
-    <QRCode value={trackingCode || ''} size={72} style={{ width: '100%', height: 'auto' }} />
+    <QRCode value={trackingCode || ''} size={140} style={{ width: '100%', height: 'auto' }} />
   );
 
   const html = `<!DOCTYPE html>
@@ -33,73 +33,47 @@ export function printSticker({
 <meta charset="utf-8">
 <title>Sticker</title>
 <style>
-  /* No fixed @page size: forcing a custom page size that doesn't match
-     whatever paper/label stock is actually loaded is what made printers
-     auto-rotate and scale-to-fit (blurry, sideways output). Leaving size
-     unset lets the print dialog use the printer's normal paper — the
-     sticker itself stays a fixed physical size below, so it prints true-size
-     regardless of what paper the printer has loaded.
-     margin: 0 — an 8mm page margin was insetting the whole label away from
-     the physical edges, leaving blank paper border around it on the actual
-     print instead of the label filling the page. The label's own border/
-     radius already provides visual breathing room, so the page itself
-     should have none. */
-  @page { margin: 0; }
+  /* Printing goes to whatever paper is actually loaded (A4/Letter on a
+     regular printer), not a dedicated 3x4in thermal label roll — the label
+     is meant to fill that entire sheet, so size: landscape just picks the
+     rotation that matches the landscape layout below and lets the printer's
+     own paper size stand; there is no more fixed physical footprint to fight. */
+  @page { size: landscape; margin: 6mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { height: 100%; }
   body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  /* On screen (this preview popup): show the sticker as a plain landscape
-     rectangle, unrotated, so what you see here is what the layout actually
-     looks like — easy to check before printing.
-     When printing: the physical label roll is still 3in wide x 4in long
-     (76.2mm x 101.6mm) — a previous attempt at this label declared the
-     sticker itself 101.6mm wide (assuming a 4x3in roll) and it printed
-     truncated because the real print head is only 76.2mm wide (see
-     "sticker is 3x4in (portrait)" fix in git history). So for print we keep
-     the outer page at the true 76.2mm x 101.6mm footprint and rotate the
-     landscape content 90deg to fit inside it sideways — nothing in the
-     print job is ever wider than the print head. Turn the printed label a
-     quarter turn to read it; if it comes out rotated the wrong way on your
-     printer, flip the sign on "rotate(90deg)" below to -90deg. */
-  .sticker-page { width: 101.6mm; height: 76.2mm; }
+  /* Sticker fills the full page/window on both screen and print — no more
+     fixed mm box that left blank paper around a small label-sized rectangle. */
+  .sticker-page { width: 100%; height: 100vh; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
-    border: 3px solid #000; border-radius: 4mm; padding: 1.2mm 2.5mm;
-    display: flex; flex-direction: column; gap: 0.6mm; overflow: hidden;
-  }
-  @media print {
-    .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
-    .sticker {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(90deg);
-      width: 101.6mm; height: 76.2mm;
-    }
+    border: 6px solid #000; border-radius: 10mm; padding: 8mm 14mm;
+    display: flex; flex-direction: column; gap: 4mm; overflow: hidden;
   }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
   /* font-weight alone isn't reliably bold once the browser/printer substitutes
      a fallback Latin font (the Thai-first font stack above may not carry a
      true black weight for Latin/numerals/dates) — a text stroke guarantees a
-     visibly heavier, legible stroke on an actual thermal-label print
-     regardless of which font actually gets used to render it. Applied to
-     every text element on the label, not just the tracking code, after a
-     real print test came back with the smaller detail fields too thin/faint
-     to read even though the CSS already said font-weight:700. */
-  .date-field { font-size: 10px; font-weight: 700; line-height: 1.2; -webkit-text-stroke: 0.2px #000; }
-  .qr-box svg { width: 9.5mm; height: 9.5mm; display: block; }
-  /* Two columns so all the detail fields fit the shorter (76.2mm) height
-     of the landscape layout without crowding out the tracking code band. */
-  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex: 1; min-height: 0; overflow: hidden; }
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.05; padding-bottom: 0.15mm; }
+     visibly heavier, legible stroke on an actual print regardless of which
+     font actually gets used to render it. Applied to every text element on
+     the label, not just the tracking code, after a real print test came back
+     with the smaller detail fields too thin/faint to read even though the
+     CSS already said font-weight:700. */
+  .date-field { font-size: 28px; font-weight: 700; line-height: 1.25; -webkit-text-stroke: 0.4px #000; }
+  .qr-box svg { width: 40mm; height: 40mm; display: block; }
+  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14mm; flex: 1; min-height: 0; overflow: hidden; }
+  .d-field { display: flex; flex-direction: column; border-bottom: 2px dotted #999; line-height: 1.1; padding-bottom: 1mm; }
   .d-field--wide { grid-column: 1 / -1; }
-  .d-label { font-weight: 700; font-size: 7px; color: #555; -webkit-text-stroke: 0.1px #555; }
-  .d-value { font-weight: 900; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
+  .d-label { font-weight: 700; font-size: 18px; color: #555; -webkit-text-stroke: 0.2px #555; }
+  .d-value { font-weight: 900; font-size: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.5px #000; }
   /* Tracking code is the whole reason for this label: the single biggest,
-     boldest element, spanning the full landscape width on one line — the
-     code is always a fixed 11 characters (2-letter prefix + YYMMDD + 3-digit
+     boldest element, spanning the full width on one line — the code is
+     always a fixed 11 characters (2-letter prefix + YYMMDD + 3-digit
      sequence, see tgd_generate_deposit_line_tracking_code), so a single
      large size can be sized to always fit without wrapping. */
-  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 3mm; border-top: 2px solid #000; padding-top: 0.7mm; margin-top: auto; }
-  .code-label { font-size: 11px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
-  .code-value { font-size: 50px; font-weight: 900; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 0.8px #000; }
+  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8mm; border-top: 4px solid #000; padding-top: 3mm; margin-top: auto; }
+  .code-label { font-size: 26px; font-weight: 700; color: #333; -webkit-text-stroke: 0.3px #333; }
+  .code-value { font-size: 130px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 1.2px #000; }
 </style>
 </head>
 <body>
@@ -128,7 +102,7 @@ export function printSticker({
 </div>
 </body>
 </html>`;
-  const win = window.open('', '_blank', 'width=520,height=380');
+  const win = window.open('', '_blank', 'width=1000,height=760');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
