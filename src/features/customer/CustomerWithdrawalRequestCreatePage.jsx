@@ -451,6 +451,15 @@ export function CustomerWithdrawalRequestCreatePage() {
     await saveFormData(true);
   }
 
+  // Mirrors the same check saveFormData() runs before it will actually submit —
+  // computed here too so the submit button is visibly locked up front instead
+  // of only failing with an error banner after the customer clicks it.
+  const allDepositLinesForBalanceCheck = Object.values(depositLinesMap).flat();
+  const hasBalanceExceeded = lines.some((line) => {
+    const { exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLinesForBalanceCheck);
+    return exceedsBoxBalance || exceedsWtBalance;
+  });
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-create-page">
       <PageHeader
@@ -533,12 +542,23 @@ export function CustomerWithdrawalRequestCreatePage() {
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
           </label>
         </div>
+        {hasBalanceExceeded ? (
+          <div className="banner banner-danger" role="alert" data-testid="customer-withdrawal-balance-exceeded-banner">
+            มีรายการเบิกเกินยอดคงเหลือ กรุณาแก้ไขจำนวนกล่อง/น้ำหนักให้ไม่เกินยอดคงเหลือก่อนส่งคำขอ
+          </div>
+        ) : null}
         <div className="action-row customer-portal-form-actions">
           <Link className="btn btn-secondary" to="/customer/withdrawal-request">{t('close')}</Link>
           <button className="btn btn-secondary" data-testid="customer-withdrawal-save-draft-button" disabled={submitting} onClick={handleSaveDraft} type="button">
             {submitting ? t('customer_withdrawal_submitting') : 'บันทึกร่าง'}
           </button>
-          <button className="btn btn-primary" data-testid="customer-withdrawal-submit-button" disabled={submitting} type="submit">
+          <button
+            className="btn btn-primary"
+            data-testid="customer-withdrawal-submit-button"
+            disabled={submitting || hasBalanceExceeded}
+            title={hasBalanceExceeded ? 'มีรายการเบิกเกินยอดคงเหลือ — แก้ไขก่อนส่งคำขอ' : undefined}
+            type="submit"
+          >
             {submitting ? t('customer_withdrawal_submitting') : 'ส่งยืนยันการแจ้งเบิก'}
           </button>
         </div>
