@@ -16,6 +16,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
+import { downloadMovementLedgerExcel } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -176,6 +177,8 @@ export function MovementLedgerReportPage() {
         showMovementType={false}
         multiProduct={true}
         multiLocation={true}
+        onExport={() => downloadMovementLedgerExcel(state.rows)}
+        exportDisabled={state.loading || state.rows.length === 0}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (

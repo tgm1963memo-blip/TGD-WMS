@@ -22,6 +22,8 @@ export function ReportFilterPanel({
   showMovementType = true,
   multiProduct = false,
   multiLocation = false,
+  onExport = null,
+  exportDisabled = false,
 }) {
   const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || '') });
 
@@ -132,7 +134,9 @@ export function ReportFilterPanel({
       <div className="filter-toolbar-actions">
         <button type="button" className="btn btn-outline" onClick={resetFilters}>Reset</button>
         <button type="button" className="btn btn-primary-gold" onClick={handleSearch}>Search</button>
-        <button type="button" className="btn btn-outline">Export</button>
+        {onExport ? (
+          <button type="button" className="btn btn-outline" onClick={onExport} disabled={exportDisabled}>Export Excel</button>
+        ) : null}
       </div>
     </section>
   );

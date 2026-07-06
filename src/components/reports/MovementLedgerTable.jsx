@@ -11,7 +11,7 @@ function DetailField({ label, value }) {
   );
 }
 
-function fmtWt(v) {
+export function fmtWt(v) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0
     ? n.toLocaleString('en', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -23,7 +23,7 @@ const INBOUND_TYPES = new Set([
   'RECEIVE_PENDING', 'CUSTOMER_NOTIFIED',
 ]);
 
-function isInbound(row) {
+export function isInbound(row) {
   const raw = String(row.movement_type_raw || row.movement_type || '').toUpperCase();
   return INBOUND_TYPES.has(raw) || raw.includes('RECEIVE') || raw.includes('INBOUND');
 }
