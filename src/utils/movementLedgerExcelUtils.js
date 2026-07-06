@@ -18,7 +18,7 @@ const HEADERS = [
 // lot_no at all (rare adjustment-type movements) fall back to grouping by
 // whatever product identifier is available so they don't all collapse into
 // one bucket.
-function balanceKey(row) {
+export function movementBalanceKey(row) {
   if (row.lot_no) return `${row.customer_id ?? ''}|lot:${row.lot_no}`;
   const product = row.product_id ?? row.customer_product_code ?? row.product_name ?? '';
   return `${row.customer_id ?? ''}|product:${product}`;
@@ -50,7 +50,7 @@ function addMovement(balance, row) {
 export function aggregateFinalBalances(rows = []) {
   const balances = new Map();
   rows.forEach((row) => {
-    const key = balanceKey(row);
+    const key = movementBalanceKey(row);
     balances.set(key, addMovement(balances.get(key) ?? zeroBalance(), row));
   });
   return balances;
@@ -104,7 +104,7 @@ function movementExcelRow(row, balance) {
 export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map()) {
   const groups = new Map();
   rows.forEach((row) => {
-    const key = balanceKey(row);
+    const key = movementBalanceKey(row);
     if (!groups.has(key)) groups.set(key, { meta: row, rows: [] });
     groups.get(key).rows.push(row);
   });

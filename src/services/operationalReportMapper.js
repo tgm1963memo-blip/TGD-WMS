@@ -1,3 +1,5 @@
+import { movementBalanceKey } from '../utils/movementLedgerExcelUtils.js';
+
 function formatDate(value) {
   if (!value) return '-';
   const text = String(value);
@@ -75,7 +77,7 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
   };
 }
 
-export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null }) {
+export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null, openingBalances = new Map() }) {
   // Classify each row as inbound or outbound
   const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
   const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
@@ -91,6 +93,14 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     return {
       id: row.id ?? `row-${index}`,
       _sortKey: row.movement_date ?? row.created_at ?? '',
+      // Grouping key for the running balance below — same lot-first logic as
+      // the Excel export (see movementBalanceKey), not product_code/
+      // customer_product_code: customer withdrawal rows never carry a
+      // product_id (see getConfirmedWithdrawalRows), so keying on product
+      // fields alone silently split the same lot's inbound/outbound rows
+      // into different balances and could show a withdrawal going negative
+      // even when the lot had plenty of stock received earlier.
+      _balanceKey: movementBalanceKey(row),
       date: dateStr,
       receivedDate: isInbound ? dateStr : '-',
       deliveryDate: isOutbound ? dateStr : '-',
@@ -98,8 +108,8 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
       customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
       descCode: row.product_code ?? row.customer_product_code ?? '-',
       weightKg: weight || '-',
-      balanceForwardVolume: row.balance_forward_vol ?? row.opening_balance_vol ?? 0,
-      balanceForwardWeight: row.balance_forward_weight ?? row.opening_balance_weight ?? 0,
+      balanceForwardVolume: 0,
+      balanceForwardWeight: 0,
       receivedVolume: isInbound ? qty : 0,
       receivedWeight: isInbound ? weight : 0,
       deliveryVolume: isOutbound ? qty : 0,
@@ -120,12 +130,25 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     return aOut - bOut;
   });
 
+  // Running balance per lot, seeded from openingBalances (every movement
+  // strictly before the report's Date From) so a lot received before the
+  // selected period still shows its true remaining stock instead of going
+  // negative the moment it's withdrawn from within the period.
   const lotBalances = {}; // lotKey → { vol, weight }
   mappedLines.forEach((line) => {
-    const key = `${line.lotNo}|${line.descCode}`;
-    if (!lotBalances[key]) lotBalances[key] = { vol: 0, weight: 0 };
+    const key = line._balanceKey;
+    if (!lotBalances[key]) {
+      const opening = openingBalances.get(key) ?? { qty: 0, weight: 0 };
+      lotBalances[key] = { vol: opening.qty, weight: opening.weight };
+    }
+
+    // Balance carried into this row, before applying its own movement
+    line.balanceForwardVolume = lotBalances[key].vol;
+    line.balanceForwardWeight = lotBalances[key].weight;
+
     lotBalances[key].vol += line.receivedVolume - line.deliveryVolume;
     lotBalances[key].weight += line.receivedWeight - line.deliveryWeight;
+
     line.balanceVolume = lotBalances[key].vol;
     line.balanceWeight = lotBalances[key].weight;
     line.isClosed = line.deliveryVolume > 0 && lotBalances[key].vol <= 0;
@@ -135,8 +158,15 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const subtotalReceivedWt = mappedLines.reduce((s, l) => s + (Number(l.receivedWeight) || 0), 0);
   const subtotalDeliveryVol = mappedLines.reduce((s, l) => s + (Number(l.deliveryVolume) || 0), 0);
   const subtotalDeliveryWt = mappedLines.reduce((s, l) => s + (Number(l.deliveryWeight) || 0), 0);
-  const totalBalanceVol = subtotalReceivedVol - subtotalDeliveryVol;
-  const totalBalanceWt = subtotalReceivedWt - subtotalDeliveryWt;
+
+  // Sum each distinct lot's opening balance once (not once per row in that lot)
+  const totalBalanceForwardVol = Object.keys(lotBalances).reduce(
+    (sum, key) => sum + (openingBalances.get(key)?.qty ?? 0), 0);
+  const totalBalanceForwardWt = Object.keys(lotBalances).reduce(
+    (sum, key) => sum + (openingBalances.get(key)?.weight ?? 0), 0);
+
+  const totalBalanceVol = totalBalanceForwardVol + subtotalReceivedVol - subtotalDeliveryVol;
+  const totalBalanceWt = totalBalanceForwardWt + subtotalReceivedWt - subtotalDeliveryWt;
 
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',
@@ -155,7 +185,7 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     totalDeliveryWeight: subtotalDeliveryWt,
     totalBalanceVolume: totalBalanceVol,
     totalBalanceWeight: totalBalanceWt,
-    totalBalanceForwardVolume: 0,
-    totalBalanceForwardWeight: 0,
+    totalBalanceForwardVolume: totalBalanceForwardVol,
+    totalBalanceForwardWeight: totalBalanceForwardWt,
   };
 }

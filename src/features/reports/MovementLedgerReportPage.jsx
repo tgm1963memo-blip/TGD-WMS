@@ -244,6 +244,7 @@ export function MovementLedgerReportPage() {
                       date_to: committedFilters.dateTo,
                     },
                     summary: state.summary,
+                    openingBalances,
                   })}
                   language={reportLanguage}
                   customerDetails={selectedCustomer}
