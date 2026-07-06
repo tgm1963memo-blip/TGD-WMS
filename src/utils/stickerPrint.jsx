@@ -16,9 +16,9 @@ export function printSticker({
   storageLabel, quantityLabel, allergenLabel, mfgDate, locationCode, trackingCode,
 }) {
   const field = (label, value, opts = {}) => `
-    <div class="d-field">
+    <div class="d-field${opts.wide ? ' d-field--wide' : ''}">
       <span class="d-label">${label}</span>
-      <span class="d-value" style="${opts.bold ? 'font-weight:900;' : ''}">${value ?? '-'}</span>
+      <span class="d-value">${value ?? '-'}</span>
     </div>`;
 
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
@@ -58,8 +58,8 @@ export function printSticker({
   .sticker-page { width: 101.6mm; height: 76.2mm; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
-    border: 3px solid #000; border-radius: 4mm; padding: 2mm 3mm;
-    display: flex; flex-direction: column; gap: 1mm; overflow: hidden;
+    border: 3px solid #000; border-radius: 4mm; padding: 1.2mm 2.5mm;
+    display: flex; flex-direction: column; gap: 0.6mm; overflow: hidden;
   }
   @media print {
     .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
@@ -70,28 +70,31 @@ export function printSticker({
     }
   }
   .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
-  .date-field { font-size: 9px; font-weight: 700; line-height: 1.2; }
-  .qr-box svg { width: 11mm; height: 11mm; display: block; }
+  /* font-weight alone isn't reliably bold once the browser/printer substitutes
+     a fallback Latin font (the Thai-first font stack above may not carry a
+     true black weight for Latin/numerals/dates) — a text stroke guarantees a
+     visibly heavier, legible stroke on an actual thermal-label print
+     regardless of which font actually gets used to render it. Applied to
+     every text element on the label, not just the tracking code, after a
+     real print test came back with the smaller detail fields too thin/faint
+     to read even though the CSS already said font-weight:700. */
+  .date-field { font-size: 10px; font-weight: 700; line-height: 1.2; -webkit-text-stroke: 0.2px #000; }
+  .qr-box svg { width: 9.5mm; height: 9.5mm; display: block; }
   /* Two columns so all the detail fields fit the shorter (76.2mm) height
      of the landscape layout without crowding out the tracking code band. */
   .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex: 1; min-height: 0; overflow: hidden; }
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.1; padding-bottom: 0.3mm; }
+  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.05; padding-bottom: 0.15mm; }
   .d-field--wide { grid-column: 1 / -1; }
-  .d-label { font-weight: 700; font-size: 7px; color: #555; }
-  .d-value { font-weight: 700; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .d-label { font-weight: 700; font-size: 7px; color: #555; -webkit-text-stroke: 0.1px #555; }
+  .d-value { font-weight: 900; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
   /* Tracking code is the whole reason for this label: the single biggest,
      boldest element, spanning the full landscape width on one line — the
      code is always a fixed 11 characters (2-letter prefix + YYMMDD + 3-digit
      sequence, see tgd_generate_deposit_line_tracking_code), so a single
      large size can be sized to always fit without wrapping. */
-  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 3mm; border-top: 2px solid #000; padding-top: 1.5mm; margin-top: auto; }
-  .code-label { font-size: 10px; font-weight: 700; color: #333; }
-  /* font-weight:900 alone isn't reliably bold once the browser/printer
-     substitutes a fallback Latin font for these digits (the Thai-first
-     font stack above may not carry a true black weight for Latin/numerals)
-     — a text stroke guarantees a visibly heavier stroke regardless of which
-     font actually gets used to render it. */
-  .code-value { font-size: 52px; font-weight: 900; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 0.8px #000; }
+  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 3mm; border-top: 2px solid #000; padding-top: 0.7mm; margin-top: auto; }
+  .code-label { font-size: 11px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
+  .code-value { font-size: 50px; font-weight: 900; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 0.8px #000; }
 </style>
 </head>
 <body>
@@ -102,15 +105,13 @@ export function printSticker({
       <div class="qr-box">${qrSvg}</div>
     </div>
     <div class="details">
-      ${field('ชื่อลูกค้า', customerName)}
-      <div></div>
+      ${field('ชื่อลูกค้า', customerName, { wide: true })}
       ${field('รหัสสินค้า', productCode)}
       ${field('Lot (ของลูกค้า)', lotNo)}
-      ${field('ชื่อสินค้า', productName)}
-      <div></div>
+      ${field('ชื่อสินค้า', productName, { wide: true })}
       ${field('การจัดเก็บ', storageLabel)}
       ${field('จำนวน', quantityLabel)}
-      ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { bold: true })}
+      ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { wide: true })}
       ${field('วันผลิต', formatStickerDate(mfgDate))}
       ${field('Location', locationCode || '-')}
     </div>
