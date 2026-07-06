@@ -177,8 +177,6 @@ export function MovementLedgerReportPage() {
         showMovementType={false}
         multiProduct={true}
         multiLocation={true}
-        onExport={() => downloadMovementLedgerExcel(state.rows)}
-        exportDisabled={state.loading || state.rows.length === 0}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (
@@ -187,6 +185,16 @@ export function MovementLedgerReportPage() {
             title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
             disabled={false}
             orientation="landscape"
+            extraActions={(
+              <button
+                type="button"
+                className="btn"
+                onClick={() => downloadMovementLedgerExcel(state.rows)}
+                disabled={state.rows.length === 0}
+              >
+                Export Excel
+              </button>
+            )}
             renderReport={(reportLanguage) => {
               const selectedCustomer = customerOptions.find((c) => c.value === committedFilters.customerId);
               const customerLabel = selectedCustomer?.label ?? committedFilters.customerId ?? 'ทั้งหมด';

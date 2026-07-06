@@ -9,6 +9,7 @@ export function ReportPrintActions({
   renderReport,
   disabled = false,
   orientation = 'portrait',
+  extraActions = null,
 }) {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
@@ -42,6 +43,7 @@ export function ReportPrintActions({
         >
           {printLabel}
         </button>
+        {extraActions}
       </div>
       <ReportPreviewModal
         open={open}
