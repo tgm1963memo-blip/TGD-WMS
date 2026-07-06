@@ -1,4 +1,4 @@
-import { movementBalanceKey } from '../utils/movementLedgerExcelUtils.js';
+import { movementBalanceKey, sortRowsByProductThenLot } from '../utils/movementLedgerExcelUtils.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -77,12 +77,30 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
   };
 }
 
-export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null, openingBalances = new Map() }) {
+export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null, openingBalances = new Map(), sortMode = 'date' }) {
   // Classify each row as inbound or outbound
   const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
   const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
 
-  const mappedLines = rows.map((row, index) => {
+  // Always establish chronological order first — this is what keeps each
+  // lot's running balance mathematically correct below, regardless of
+  // whether the final display order ends up grouped by product/lot.
+  const dateSortedRows = [...rows].sort((a, b) => {
+    const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
+    const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
+    if (aTime !== bTime) return aTime - bTime;
+    const movTypeA = (a.movement_type ?? a.movement_type_raw ?? '').toUpperCase();
+    const movTypeB = (b.movement_type ?? b.movement_type_raw ?? '').toUpperCase();
+    const aOut = OUTBOUND_TYPES.some((t) => movTypeA.includes(t)) ? 1 : 0;
+    const bOut = OUTBOUND_TYPES.some((t) => movTypeB.includes(t)) ? 1 : 0;
+    return aOut - bOut;
+  });
+
+  const orderedRows = sortMode === 'productLot'
+    ? sortRowsByProductThenLot(dateSortedRows)
+    : dateSortedRows;
+
+  const mappedLines = orderedRows.map((row, index) => {
     const movType = (row.movement_type ?? row.movement_type_raw ?? '').toUpperCase();
     const isInbound = INBOUND_TYPES.some((t) => movType.includes(t));
     const isOutbound = OUTBOUND_TYPES.some((t) => movType.includes(t));
@@ -92,7 +110,6 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
 
     return {
       id: row.id ?? `row-${index}`,
-      _sortKey: row.movement_date ?? row.created_at ?? '',
       // Grouping key for the running balance below — same lot-first logic as
       // the Excel export (see movementBalanceKey), not product_code/
       // customer_product_code: customer withdrawal rows never carry a
@@ -120,14 +137,6 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
       volumeUnit: row.volume_unit ?? row.uom ?? 'กล่อง',
       remark: row.remark ?? row.source_reference ?? '-',
     };
-  });
-
-  // Sort by date oldest → newest; on same date put inbound before outbound
-  mappedLines.sort((a, b) => {
-    if (a._sortKey !== b._sortKey) return a._sortKey < b._sortKey ? -1 : 1;
-    const aOut = a.deliveryVolume > 0 ? 1 : 0;
-    const bOut = b.deliveryVolume > 0 ? 1 : 0;
-    return aOut - bOut;
   });
 
   // Running balance per lot, seeded from openingBalances (every movement

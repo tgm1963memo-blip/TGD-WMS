@@ -30,6 +30,30 @@ function productDisplay(row) {
   return code ? `${code} - ${name}` : name;
 }
 
+// Regroups rows by product then lot, keeping each group's existing relative
+// order intact (rows are expected to already be date-sorted going in, so a
+// group's internal order stays chronological). Shared by the on-screen
+// table, the PDF report, and the Excel export so all three offer the same
+// "sort by date" vs "sort by product/lot" choice consistently.
+export function sortRowsByProductThenLot(rows = []) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = movementBalanceKey(row);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+    const aFirst = groups.get(a)[0];
+    const bFirst = groups.get(b)[0];
+    const productCompare = productDisplay(aFirst).localeCompare(productDisplay(bFirst), 'th');
+    if (productCompare !== 0) return productCompare;
+    return String(aFirst.lot_no ?? '').localeCompare(String(bFirst.lot_no ?? ''), 'th');
+  });
+
+  return sortedKeys.flatMap((key) => groups.get(key));
+}
+
 function zeroBalance() {
   return { qty: 0, weight: 0 };
 }
@@ -101,36 +125,48 @@ function movementExcelRow(row, balance) {
 // group opening with a ยกมา (brought forward) balance carried over from
 // openingBalances, so a reader can see each lot's full picture — opening
 // stock, every movement, and the resulting balance — in one place.
-export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map()) {
-  const groups = new Map();
-  rows.forEach((row) => {
-    const key = movementBalanceKey(row);
-    if (!groups.has(key)) groups.set(key, { meta: row, rows: [] });
-    groups.get(key).rows.push(row);
-  });
-
-  const sortedGroups = Array.from(groups.entries()).sort(([, a], [, b]) => {
-    const productCompare = productDisplay(a.meta).localeCompare(productDisplay(b.meta), 'th');
-    if (productCompare !== 0) return productCompare;
-    return String(a.meta.lot_no ?? '').localeCompare(String(b.meta.lot_no ?? ''), 'th');
-  });
+function buildGroupedExcelRows(rows, openingBalances) {
+  const ordered = sortRowsByProductThenLot(rows);
 
   const excelRows = [];
-  sortedGroups.forEach(([key, group]) => {
-    let balance = openingBalances.get(key) ?? zeroBalance();
-    excelRows.push(openingBalanceExcelRow(group.meta, balance));
+  let currentKey = null;
+  let balance = zeroBalance();
 
-    group.rows.forEach((row) => {
-      balance = addMovement(balance, row);
-      excelRows.push(movementExcelRow(row, balance));
-    });
+  ordered.forEach((row) => {
+    const key = movementBalanceKey(row);
+    if (key !== currentKey) {
+      currentKey = key;
+      balance = openingBalances.get(key) ?? zeroBalance();
+      excelRows.push(openingBalanceExcelRow(row, balance));
+    }
+    balance = addMovement(balance, row);
+    excelRows.push(movementExcelRow(row, balance));
   });
 
   return excelRows;
 }
 
-export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), filenamePrefix = 'movement-ledger') {
-  const excelRows = buildMovementLedgerExcelRows(rows, openingBalances);
+// Flat chronological export (no product/lot grouping or ยกมา rows) — each
+// row still carries its own lot's running balance, seeded from
+// openingBalances, just displayed in plain date order.
+function buildDateOrderedExcelRows(rows, openingBalances) {
+  const running = new Map();
+  return rows.map((row) => {
+    const key = movementBalanceKey(row);
+    const balance = addMovement(running.get(key) ?? openingBalances.get(key) ?? zeroBalance(), row);
+    running.set(key, balance);
+    return movementExcelRow(row, balance);
+  });
+}
+
+export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map(), sortMode = 'productLot') {
+  return sortMode === 'date'
+    ? buildDateOrderedExcelRows(rows, openingBalances)
+    : buildGroupedExcelRows(rows, openingBalances);
+}
+
+export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger') {
+  const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode);
   const stamp = new Date().toISOString().slice(0, 10);
   downloadExcelRows(excelRows, HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger');
 }

@@ -16,7 +16,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { downloadMovementLedgerExcel, aggregateFinalBalances } from '../../utils/movementLedgerExcelUtils.js';
+import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -103,6 +103,11 @@ export function MovementLedgerReportPage() {
   const [committedFilters, setCommittedFilters] = useState(null);
   const [state, setState] = useState(initialState);
   const [openingBalances, setOpeningBalances] = useState(new Map());
+  // Controls row order for the on-screen table, the PDF report, and the
+  // Excel export all at once: plain chronological order, or grouped by
+  // product then lot (a stock-card view showing each lot's full history
+  // together instead of interleaved with every other product/lot by date).
+  const [sortMode, setSortMode] = useState('productLot');
   const [customerOptions, setCustomerOptions] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [locationOptions, setLocationOptions] = useState([]);
@@ -192,6 +197,7 @@ export function MovementLedgerReportPage() {
   }, [committedFilters]);
 
   const t = (key) => getTranslation(key, language);
+  const displayRows = sortMode === 'productLot' ? sortRowsByProductThenLot(state.rows) : state.rows;
 
   return (
     <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
@@ -213,6 +219,32 @@ export function MovementLedgerReportPage() {
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (
+        <div className="section-card" style={{ marginTop: 12, padding: 12, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>เรียงตาม:</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="movement-ledger-sort-mode"
+              value="date"
+              checked={sortMode === 'date'}
+              onChange={() => setSortMode('date')}
+            />
+            วันที่
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="movement-ledger-sort-mode"
+              value="productLot"
+              checked={sortMode === 'productLot'}
+              onChange={() => setSortMode('productLot')}
+            />
+            สินค้าและ Lot
+          </label>
+        </div>
+      ) : null}
+
+      {committedFilters && !state.loading && state.rows.length > 0 ? (
         <div className="section-card operational-report-actions-card" style={{ marginTop: 12 }}>
           <ReportPrintActions
             title={t('entry_delivery_inventory_report') || 'Entry-Delivery Inventory Report'}
@@ -222,7 +254,7 @@ export function MovementLedgerReportPage() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances)}
+                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances, sortMode)}
                 disabled={state.rows.length === 0}
               >
                 Export Excel
@@ -245,6 +277,7 @@ export function MovementLedgerReportPage() {
                     },
                     summary: state.summary,
                     openingBalances,
+                    sortMode,
                   })}
                   language={reportLanguage}
                   customerDetails={selectedCustomer}
@@ -259,7 +292,7 @@ export function MovementLedgerReportPage() {
         {!committedFilters ? (
           <EmptyState message="รอการค้นหา" description="กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูลรายการเคลื่อนไหว" />
         ) : (
-          <MovementLedgerTable data={state.rows} loading={state.loading} error={state.error} />
+          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} />
         )}
       </DashboardSection>
 
