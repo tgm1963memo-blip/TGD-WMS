@@ -22,7 +22,7 @@ function fmtDate(v) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
 }
 
-const NCOLS = 14;
+const NCOLS = 15;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
 // Reference numbers must stay fully readable, so wrap onto a second line
@@ -169,8 +169,9 @@ export function CustomerWithdrawalRequestPrintDocument({
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
           <col style={{ width: '9%' }} />
-          <col style={{ width: '11%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '8%' }} />
           <col style={{ width: '7%' }} />
@@ -181,7 +182,7 @@ export function CustomerWithdrawalRequestPrintDocument({
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '8%' }} />
+          <col style={{ width: '7%' }} />
         </colgroup>
 
         <thead>
@@ -196,7 +197,8 @@ export function CustomerWithdrawalRequestPrintDocument({
           </tr>
           <tr>
             <th rowSpan={2} style={TH}>#</th>
-            <th rowSpan={2} style={TH}>LOT NO<br />LOCATION</th>
+            <th rowSpan={2} style={TH}>LOT NO</th>
+            <th rowSpan={2} style={TH}>LOCATION</th>
             <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={TH}>TRACKING NO</th>
             <th rowSpan={2} style={TH}>ITEM CODE</th>
@@ -219,10 +221,8 @@ export function CustomerWithdrawalRequestPrintDocument({
           {lines.length ? lines.map((line, idx) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
-              <td style={TD_SAFE}>
-                <div style={{ fontWeight: 600 }}>{fmt(line.lot_no)}</div>
-                {line.location ? <div style={{ fontSize: 9, color: '#555' }}>{line.location}</div> : null}
-              </td>
+              <td style={{ ...TD_SAFE, fontWeight: 600 }}>{fmt(line.lot_no)}</td>
+              <td style={TD_SAFE}>{fmt(line.location)}</td>
               <td style={TD_SAFE}>
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
@@ -260,7 +260,7 @@ export function CustomerWithdrawalRequestPrintDocument({
 
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={7} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
+            <td colSpan={8} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
@@ -270,7 +270,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             <td style={TD} />
           </tr>
           <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
-            <td colSpan={7} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={8} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>

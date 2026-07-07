@@ -1,9 +1,11 @@
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-// Template matches the physical label TGC already prints: rounded box,
-// date top-right, then customer/product/LOT/storage/qty/allergen/mfg date/
-// location, with "เลขที่สินค้า TGC" replaced by the generated tracking code.
+// Simplified label: date top-right + QR, then just product name/Location/
+// quantity, with the tracking code as the single big, bold focal element
+// at the bottom — trimmed down from the earlier 9-field version (customer
+// name, product code, lot, storage type, allergen, mfg date all dropped)
+// so the tracking code gets more of the label's area to itself.
 export function formatStickerDate(iso) {
   if (!iso) return '-';
   const s = String(iso).split('T')[0];
@@ -12,8 +14,7 @@ export function formatStickerDate(iso) {
 }
 
 export function printSticker({
-  depositDate, customerName, productCode, productName, lotNo,
-  storageLabel, quantityLabel, allergenLabel, mfgDate, locationCode, trackingCode,
+  depositDate, productName, quantityLabel, locationCode, trackingCode,
 }) {
   const field = (label, value, opts = {}) => `
     <div class="d-field${opts.wide ? ' d-field--wide' : ''}">
@@ -85,46 +86,42 @@ export function printSticker({
      every text element on the label, not just the tracking code, after a
      real print test came back with the smaller detail fields too thin/faint
      to read even though the CSS already said font-weight:700. */
-  .date-field { font-size: 12px; font-weight: 700; line-height: 1.2; -webkit-text-stroke: 0.2px #000; }
-  .qr-box svg { width: 10.5mm; height: 10.5mm; display: block; }
-  /* Two columns so all the detail fields fit the shorter (76.2mm) height
-     of the landscape layout without crowding out the tracking code band. */
-  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex: 1; min-height: 0; overflow: hidden; }
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.05; padding-bottom: 0.15mm; }
+  .date-field { font-size: 13px; font-weight: 700; line-height: 1.2; -webkit-text-stroke: 0.2px #000; }
+  .qr-box svg { width: 13mm; height: 13mm; display: block; }
+  /* Only 3 fields left (product name spans both columns; Location and
+     quantity share a row) — most of the label's height now goes to the
+     tracking code band below instead of being split across 9 detail rows. */
+  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex-shrink: 0; }
+  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.15; padding-bottom: 0.3mm; }
   .d-field--wide { grid-column: 1 / -1; }
-  .d-label { font-weight: 700; font-size: 8px; color: #555; -webkit-text-stroke: 0.1px #555; }
-  .d-value { font-weight: 900; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
+  .d-label { font-weight: 700; font-size: 9px; color: #555; -webkit-text-stroke: 0.1px #555; }
+  .d-value { font-weight: 900; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
   /* Tracking code is the whole reason for this label: the single biggest,
-     boldest element. Label and value used to share one row (space-between),
-     which left the value only the width left over after the label — not
-     enough for an 11-character code (2-letter prefix + YYMMDD + 3-digit
-     sequence, see tgd_generate_deposit_line_tracking_code) at a size big
-     enough to read, so it was clipping past the label's right edge on
-     print. Stacking the label above the value instead gives the value the
-     label's share of the width too, which is what makes the larger size
-     below actually fit on one line instead of clipping. */
-  .code-block { flex-shrink: 0; display: flex; flex-direction: column; gap: 0.3mm; border-top: 2px solid #000; padding-top: 0.7mm; margin-top: auto; }
-  .code-label { font-size: 12px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
-  .code-value { font-size: 54px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 1.1px #000; }
+     boldest element, filling nearly the whole width on one line. Label and
+     value are stacked (not sharing a row) so the value gets the full
+     width — sharing a row with the label previously left it clipping past
+     the label's edge. 56px is the largest verified-safe size for an
+     11-character code (2-letter prefix + YYMMDD + 3-digit sequence, see
+     tgd_generate_deposit_line_tracking_code) at this label's fixed
+     101.6mm width — measured against the real font stack with margin to
+     spare; do not raise this without re-measuring, since a "would still
+     look right" bump has already clipped once (see WHY above). */
+  .code-block { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.5mm; border-top: 3px solid #000; padding-top: 1.2mm; margin-top: 0.6mm; }
+  .code-label { font-size: 14px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
+  .code-value { font-size: 56px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 1.2px #000; }
 </style>
 </head>
 <body>
 <div class="sticker-page">
   <div class="sticker">
     <div class="top-row">
-      <div class="date-field">วันที่ฝากเข้า<br>${formatStickerDate(depositDate)}</div>
+      <div class="date-field">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
       <div class="qr-box">${qrSvg}</div>
     </div>
     <div class="details">
-      ${field('ชื่อลูกค้า', customerName, { wide: true })}
-      ${field('รหัสสินค้า', productCode)}
-      ${field('Lot (ของลูกค้า)', lotNo)}
       ${field('ชื่อสินค้า', productName, { wide: true })}
-      ${field('การจัดเก็บ', storageLabel)}
-      ${field('จำนวน', quantityLabel)}
-      ${field('สารก่อภูมิแพ้ (Allergen)', allergenLabel, { wide: true })}
-      ${field('วันผลิต', formatStickerDate(mfgDate))}
       ${field('Location', locationCode || '-')}
+      ${field('จำนวน', quantityLabel)}
     </div>
     <div class="code-block">
       <div class="code-label">Tracking Code</div>
