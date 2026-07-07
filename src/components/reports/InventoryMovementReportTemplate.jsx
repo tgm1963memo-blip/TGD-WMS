@@ -43,9 +43,10 @@ const COL_WIDTHS = [
   '3%',   // NO
   '7%',   // RECEIVED DATE
   '7%',   // DELIVERY DATE
-  '4%',   // LOT
-  '12%',  // CUSTOMER PRODUCT
-  '7%',   // DESC/CODE
+  '3%',   // DESC/CODE
+  '8%',   // CUSTOMER PRODUCT
+  '7%',   // LOT
+  '6%',   // TRACKING NO
   '5%',   // WEIGHT KG
   '5%',   // BF VOLUME
   '6%',   // BF WEIGHT
@@ -56,7 +57,7 @@ const COL_WIDTHS = [
   '5%',   // BAL VOLUME
   '6%',   // BAL WEIGHT
   '4%',   // UNIT
-  '7%',   // REMARK
+  '6%',   // REMARK
 ];
 
 const NCOLS = COL_WIDTHS.length;
@@ -150,6 +151,7 @@ export function InventoryMovementReportTemplate({
             <th rowSpan={2} style={{ ...TH }}>รายละเอียด/<br />รหัส</th>
             <th rowSpan={2} style={{ ...TH }}>สินค้าลูกค้า</th>
             <th rowSpan={2} style={{ ...TH }}>ล๊อต</th>
+            <th rowSpan={2} style={{ ...TH }}>TRACKING<br />NO</th>
             <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}>น้ำหนัก<br />(กก.)</th>
             <th colSpan={2} style={{ ...TH, textAlign: 'center', background: '#e8eaf6' }}>ยอดยกมา</th>
             <th colSpan={2} style={{ ...TH, textAlign: 'center', background: '#e8f5e9' }}>รับเข้า</th>
@@ -188,6 +190,7 @@ export function InventoryMovementReportTemplate({
               <td style={{ ...CELL, fontSize: 8 }}>{line.descCode}</td>
               <td style={{ ...CELL, fontSize: 8 }}>{line.customerProduct}</td>
               <td style={{ ...CELL, fontSize: 8 }}>{line.lotNo}</td>
+              <td style={{ ...CELL, fontSize: 8 }}>{line.trackingCode}</td>
               <td style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>{fmtNum(line.weightKg)}</td>
               <td style={{ ...CELL, textAlign: 'center', background: '#f3f4fd', fontSize: 8 }}>{fmtQty(line.balanceForwardVolume)}</td>
               <td style={{ ...CELL, textAlign: 'right',  background: '#f3f4fd', fontSize: 8 }}>{fmtNum(line.balanceForwardWeight)}</td>
@@ -213,7 +216,7 @@ export function InventoryMovementReportTemplate({
         {/* ── TFOOT: sub-totals + grand total + signatures ── */}
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={7} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>
+            <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>
               SUB TOTAL ({lines.length})
             </td>
             <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>-</td>
@@ -226,7 +229,7 @@ export function InventoryMovementReportTemplate({
             <td colSpan={2} style={CELL} />
           </tr>
           <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
-            <td colSpan={7} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>TOTAL</td>
+            <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>TOTAL</td>
             <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(data?.totalBalanceForwardVolume)}</td>
             <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(data?.totalBalanceForwardWeight)}</td>
             <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{data?.totalReceived ?? fmtQty(subTotalReceivedVol)}</td>

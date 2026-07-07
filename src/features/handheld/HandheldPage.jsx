@@ -259,6 +259,11 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
         <div style={{ fontSize: 15, fontWeight: 800, wordBreak: 'break-word', overflowWrap: 'anywhere', color: C.text, lineHeight: 1.4 }}>
           {line.product_name ?? line.customer_product_code}
         </div>
+        {line.tracking_code && (
+          <div style={{ fontSize: 12, color: C.primary, fontWeight: 700, marginTop: 2 }}>
+            รหัสติดตาม: {line.tracking_code}
+          </div>
+        )}
         <div style={{ fontSize: 13, color: C.textSec, marginTop: 4, fontWeight: 500, lineHeight: 1.5 }}>
           {line.expected_boxes != null ? `${line.expected_boxes} กล่อง · ` : ''}{line.expected_weight != null ? `${line.expected_weight} กก.` : ''}
           {isDone && doneLabel && (
@@ -903,6 +908,7 @@ function ReceivingWorkflow({ onBack, t }) {
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 <span style={{ background: C.blueLight, color: C.primaryDark, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, overflowWrap: 'break-word', wordBreak: 'break-all' }}>รหัส {matchedLine.customer_product_code}</span>
+                {matchedLine.tracking_code && <span style={{ background: '#fff', color: C.primaryDark, border: `1px solid ${C.primary}40`, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>{matchedLine.tracking_code}</span>}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <label>

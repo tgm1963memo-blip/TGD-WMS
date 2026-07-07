@@ -124,6 +124,7 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
       lotNo: row.lot_no || '-',
       customerProduct: row.customer_product ?? row.product_name ?? row.product_id ?? '-',
       descCode: row.product_code ?? row.customer_product_code ?? '-',
+      trackingCode: row.tracking_code ?? '-',
       weightKg: weight || '-',
       balanceForwardVolume: 0,
       balanceForwardWeight: 0,

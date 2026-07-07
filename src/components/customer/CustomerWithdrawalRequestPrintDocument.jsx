@@ -22,7 +22,7 @@ function fmtDate(v) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
 }
 
-const NCOLS = 12;
+const NCOLS = 13;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
 // Reference numbers must stay fully readable, so wrap onto a second line
@@ -169,17 +169,18 @@ export function CustomerWithdrawalRequestPrintDocument({
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '17%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: '15%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '8%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
-          <col style={{ width: '8%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '13%' }} />
+          <col style={{ width: '10%' }} />
         </colgroup>
 
         <thead>
@@ -196,6 +197,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             <th rowSpan={2} style={TH}>#</th>
             <th rowSpan={2} style={TH}>LOT NO<br />LOCATION</th>
             <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
+            <th rowSpan={2} style={TH}>TRACKING NO</th>
             <th rowSpan={2} style={TH}>ITEM CODE</th>
             <th rowSpan={2} style={TH}>MFG DATE</th>
             <th rowSpan={2} style={TH}>EXP DATE</th>
@@ -223,6 +225,7 @@ export function CustomerWithdrawalRequestPrintDocument({
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
+              <td style={TD_SAFE}>{fmt(line.tracking_code)}</td>
               <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
