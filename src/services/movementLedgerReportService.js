@@ -118,8 +118,15 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.dateFrom) query = query.gte('expected_arrival_date', filters.dateFrom);
-  if (filters.dateTo) query = query.lte('expected_arrival_date', filters.dateTo);
+  // Not filtered by date here — the row's actual reporting date is
+  // last_action_at (falling back to expected_arrival_date) below, which can
+  // differ from expected_arrival_date by days when a customer's scheduled
+  // arrival date doesn't match when staff actually confirmed receipt.
+  // Filtering the query on expected_arrival_date while classifying rows by
+  // last_action_at let some receipts fall on the wrong side of the
+  // opening-balance cutoff (or drop out of the report entirely), which is
+  // exactly what made SUB TOTAL/TOTAL undercount ยอดยกมา. Date range is
+  // applied in JS below, against the same date used for movement_date.
 
   const { data, error } = await query;
   if (error) return { data: [], error };
@@ -131,6 +138,9 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     const receiptDate = req.last_action_at
       ? req.last_action_at.split('T')[0]
       : req.expected_arrival_date ?? null;
+
+    if (filters.dateFrom && receiptDate && receiptDate < filters.dateFrom) continue;
+    if (filters.dateTo && receiptDate && receiptDate > filters.dateTo) continue;
 
     const confirmedLines = (req.tgd_customer_deposit_request_lines ?? [])
       .filter((l) => l.actual_boxes != null && Number(l.actual_boxes) > 0);
@@ -252,8 +262,13 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     .eq('status', 'COMPLETED');
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.dateFrom) query = query.gte('last_action_at', filters.dateFrom);
-  if (filters.dateTo) query = query.lte('last_action_at', `${filters.dateTo}T23:59:59`);
+  // Not filtered by date here — a line's actual reporting date is
+  // picked_at (falling back to the request's last_action_at) below, which
+  // can differ from the request-level last_action_at when lines within
+  // the same withdrawal were picked on different days. Filtering the query
+  // on last_action_at while classifying lines by picked_at let some picks
+  // fall on the wrong side of the opening-balance cutoff. Date range is
+  // applied in JS below, against the same date used for movement_date.
 
   const { data, error } = await query;
   if (error) return { data: [], error };
@@ -268,6 +283,10 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
                      Number(l.picked_boxes ?? l.requested_boxes) > 0);
 
     for (const line of lines) {
+      const movementDate = (line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null;
+      if (filters.dateFrom && movementDate && movementDate < filters.dateFrom) continue;
+      if (filters.dateTo && movementDate && movementDate > filters.dateTo) continue;
+
       const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
       // Use picked_weight if recorded; fall back to requested_weight so reports are never 0
       const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
