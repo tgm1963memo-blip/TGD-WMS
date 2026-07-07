@@ -216,14 +216,16 @@ export function InventoryBalancePage() {
                 return (
                   <div key={pg.productKey}>
                     {/* Product row (clickable to expand) */}
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => toggleKey(pg.productKey)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleKey(pg.productKey); } }}
                       style={{
                         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, width: '100%',
                         textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
                         border: 'none', borderBottom: '1px solid var(--tgd-border)',
-                        padding: '24px 16px 24px 32px',
+                        padding: '16px 16px 16px 32px',
                         cursor: 'pointer', color: 'var(--tgd-text)',
                         transition: 'background 0.15s',
                       }}
@@ -249,7 +251,7 @@ export function InventoryBalancePage() {
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
                       </div>
-                    </button>
+                    </div>
 
                     {/* Expanded CDR lines */}
                     {isExpanded && (

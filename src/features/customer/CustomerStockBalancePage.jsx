@@ -182,14 +182,16 @@ export function CustomerStockBalancePage() {
               const isExpanded = expandedKeys.has(pg.productKey);
               return (
                 <div key={pg.productKey}>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => toggleKey(pg.productKey)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleKey(pg.productKey); } }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                       textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
                       border: 'none', borderBottom: '1px solid var(--tgd-border)',
-                      padding: '24px 16px', cursor: 'pointer', color: 'var(--tgd-text)',
+                      padding: '16px 16px', cursor: 'pointer', color: 'var(--tgd-text)',
                       transition: 'background 0.15s',
                     }}
                   >
@@ -214,7 +216,7 @@ export function CustomerStockBalancePage() {
                       </div>
                       <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
                     </div>
-                  </button>
+                  </div>
 
                   {isExpanded && (
                     <div style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
