@@ -121,13 +121,19 @@ function sumField(lines, field) {
 // stay chronological within a lot regardless of sort mode, that lot's first
 // appearance carries its true brought-forward balance; later rows for the
 // same lot reflect an already-partially-moved balance, so they're skipped.
+// Key mirrors movementBalanceKey in movementLedgerExcelUtils.js (lot_no when
+// present, else the product identifier) — keying on lotNo alone would treat
+// every lot-less row ("-") as one single lot and drop all but the first
+// product's opening balance.
 function sumOpeningBalanceByLot(lines, field) {
-  const seenLots = new Set();
+  const seenKeys = new Set();
   let sum = 0;
   for (const line of lines) {
-    const lotKey = line.lotNo ?? '-';
-    if (seenLots.has(lotKey)) continue;
-    seenLots.add(lotKey);
+    const key = (line.lotNo && line.lotNo !== '-')
+      ? `lot:${line.lotNo}`
+      : `product:${line.descCode ?? line.customerProduct ?? ''}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     sum += Number(line[field]) || 0;
   }
   return sum;
