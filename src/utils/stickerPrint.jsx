@@ -95,15 +95,17 @@ export function printSticker({
   .d-label { font-weight: 700; font-size: 8px; color: #555; -webkit-text-stroke: 0.1px #555; }
   .d-value { font-weight: 900; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
   /* Tracking code is the whole reason for this label: the single biggest,
-     boldest element, spanning the full landscape width on one line — the
-     code is always a fixed 11 characters (2-letter prefix + YYMMDD + 3-digit
-     sequence, see tgd_generate_deposit_line_tracking_code), so a single
-     large size can be sized to always fit without wrapping. Kept close to
-     the previously-tuned 50px — pushing it much higher risks the code
-     overflowing the label's 101.6mm width. */
-  .code-block { flex-shrink: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 3mm; border-top: 2px solid #000; padding-top: 0.7mm; margin-top: auto; }
+     boldest element. Label and value used to share one row (space-between),
+     which left the value only the width left over after the label — not
+     enough for an 11-character code (2-letter prefix + YYMMDD + 3-digit
+     sequence, see tgd_generate_deposit_line_tracking_code) at a size big
+     enough to read, so it was clipping past the label's right edge on
+     print. Stacking the label above the value instead gives the value the
+     label's share of the width too, which is what makes the larger size
+     below actually fit on one line instead of clipping. */
+  .code-block { flex-shrink: 0; display: flex; flex-direction: column; gap: 0.3mm; border-top: 2px solid #000; padding-top: 0.7mm; margin-top: auto; }
   .code-label { font-size: 12px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
-  .code-value { font-size: 52px; font-weight: 900; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 0.8px #000; }
+  .code-value { font-size: 54px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 1.1px #000; }
 </style>
 </head>
 <body>

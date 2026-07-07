@@ -223,7 +223,7 @@ export function CustomerWithdrawalRequestPrintDocument({
                 <div style={{ fontWeight: 600 }}>{fmt(line.lot_no)}</div>
                 {line.location ? <div style={{ fontSize: 9, color: '#555' }}>{line.location}</div> : null}
               </td>
-              <td style={TD}>
+              <td style={TD_SAFE}>
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
