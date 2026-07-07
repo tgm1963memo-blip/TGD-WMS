@@ -22,7 +22,7 @@ function fmtDate(v) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
 }
 
-const NCOLS = 13;
+const NCOLS = 14;
 const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
 const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
 // Reference numbers must stay fully readable, so wrap onto a second line
@@ -170,7 +170,7 @@ export function CustomerWithdrawalRequestPrintDocument({
         <colgroup>
           <col style={{ width: '3%' }} />
           <col style={{ width: '9%' }} />
-          <col style={{ width: '15%' }} />
+          <col style={{ width: '11%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '8%' }} />
           <col style={{ width: '7%' }} />
@@ -180,7 +180,8 @@ export function CustomerWithdrawalRequestPrintDocument({
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '10%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '8%' }} />
         </colgroup>
 
         <thead>
@@ -203,6 +204,7 @@ export function CustomerWithdrawalRequestPrintDocument({
             <th rowSpan={2} style={TH}>EXP DATE</th>
             <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}>T.WEIGHT<br />KG.</th>
             <th colSpan={4} style={{ ...TH, background: '#e8eaf6' }}>BALANCE TOTAL</th>
+            <th rowSpan={2} style={TH}>คงเหลือ<br />ในล็อต</th>
             <th rowSpan={2} style={TH}>REMARK</th>
           </tr>
           <tr>
@@ -234,6 +236,12 @@ export function CustomerWithdrawalRequestPrintDocument({
               <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
+              <td style={{ ...TD, textAlign: 'center' }}>
+                <div style={{ fontWeight: 600 }}>{line.lot_remaining_boxes != null ? line.lot_remaining_boxes : '-'}</div>
+                {line.lot_remaining_weight != null ? (
+                  <div style={{ fontSize: 9, color: '#555' }}>{fmtNum(line.lot_remaining_weight)} kg.</div>
+                ) : null}
+              </td>
               <td style={TD}>
                 {(line.note || line.admin_note) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -252,21 +260,23 @@ export function CustomerWithdrawalRequestPrintDocument({
 
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={6} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
+            <td colSpan={7} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={TD} />
+            <td style={TD} />
           </tr>
           <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
-            <td colSpan={6} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={7} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
+            <td style={TD} />
             <td style={TD} />
           </tr>
         </tfoot>

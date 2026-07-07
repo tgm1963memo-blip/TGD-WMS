@@ -88,11 +88,80 @@ export async function getCustomerWithdrawalRequest(requestId) {
 export async function listCustomerWithdrawalRequestLines(requestId) {
   if (!supabase) return missingSupabaseClientResult();
 
-  return supabase
+  const result = await supabase
     .from('tgd_customer_withdrawal_request_lines')
     .select(WITHDRAWAL_LINE_SELECT)
     .eq('withdrawal_request_id', requestId)
     .order('line_no', { ascending: true });
+
+  if (result.error || !result.data?.length) return result;
+
+  return { ...result, data: await attachRemainingLotBalance(result.data) };
+}
+
+// For each line's source deposit batch (the specific lot it was picked
+// from, via source_customer_deposit_request_line_id), computes how many
+// boxes/kg remain in that batch: its total received quantity minus
+// everything ever picked from it across COMPLETED withdrawals — so the
+// printed pick/delivery document can show staff what's left in that lot.
+// Lines with no direct source link (older data, or matched by lot fallback
+// only) get null — there's no single deposit line to measure against.
+async function attachRemainingLotBalance(lines) {
+  const depositLineIds = [...new Set(
+    lines.map((l) => l.source_customer_deposit_request_line_id).filter(Boolean)
+  )];
+
+  if (!supabase || depositLineIds.length === 0) {
+    return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null }));
+  }
+
+  const [depositLinesResult, withdrawnLinesResult] = await Promise.all([
+    supabase
+      .from('tgd_customer_deposit_request_lines')
+      .select('id, actual_boxes, actual_weight, expected_boxes, expected_weight')
+      .in('id', depositLineIds),
+    supabase
+      .from('tgd_customer_withdrawal_request_lines')
+      .select('source_customer_deposit_request_line_id, picked_boxes, picked_weight, withdrawal_request_id')
+      .in('source_customer_deposit_request_line_id', depositLineIds),
+  ]);
+
+  const withdrawnLines = withdrawnLinesResult.data ?? [];
+  const withdrawalRequestIds = [...new Set(withdrawnLines.map((r) => r.withdrawal_request_id).filter(Boolean))];
+
+  const { data: withdrawalRequests } = withdrawalRequestIds.length
+    ? await supabase.from('tgd_customer_withdrawal_requests').select('id, status').in('id', withdrawalRequestIds)
+    : { data: [] };
+  const statusByRequestId = new Map((withdrawalRequests ?? []).map((r) => [r.id, r.status]));
+
+  const depositLineMap = new Map((depositLinesResult.data ?? []).map((d) => [d.id, d]));
+
+  const withdrawnByDepositLine = new Map();
+  for (const row of withdrawnLines) {
+    if (statusByRequestId.get(row.withdrawal_request_id) !== 'COMPLETED') continue;
+    const key = row.source_customer_deposit_request_line_id;
+    const cur = withdrawnByDepositLine.get(key) ?? { boxes: 0, weight: 0 };
+    cur.boxes += Number(row.picked_boxes ?? 0);
+    cur.weight += Number(row.picked_weight ?? 0);
+    withdrawnByDepositLine.set(key, cur);
+  }
+
+  return lines.map((line) => {
+    const depositLine = line.source_customer_deposit_request_line_id
+      ? depositLineMap.get(line.source_customer_deposit_request_line_id)
+      : null;
+    if (!depositLine) {
+      return { ...line, lot_remaining_boxes: null, lot_remaining_weight: null };
+    }
+    const totalBoxes = Number(depositLine.actual_boxes ?? depositLine.expected_boxes ?? 0);
+    const totalWeight = Number(depositLine.actual_weight ?? depositLine.expected_weight ?? 0);
+    const withdrawn = withdrawnByDepositLine.get(line.source_customer_deposit_request_line_id) ?? { boxes: 0, weight: 0 };
+    return {
+      ...line,
+      lot_remaining_boxes: Math.max(0, totalBoxes - withdrawn.boxes),
+      lot_remaining_weight: Math.max(0, totalWeight - withdrawn.weight),
+    };
+  });
 }
 
 export async function listWithdrawalLineSummariesForDocs(docIds) {
