@@ -13,6 +13,16 @@ export function formatStickerDate(iso) {
   return d && m && y ? `${d}/${m}/${y}` : s;
 }
 
+// Splits the tracking code into two roughly-equal halves so it can print
+// across two lines instead of one — halving the characters per line lets
+// each line run much larger than a single 11-character line ever could
+// within the label's fixed width.
+function splitTrackingCode(code) {
+  if (!code) return ['-', ''];
+  const mid = Math.ceil(code.length / 2);
+  return [code.slice(0, mid), code.slice(mid)];
+}
+
 export function printSticker({
   depositDate, productName, quantityLabel, locationCode, trackingCode,
 }) {
@@ -27,6 +37,8 @@ export function printSticker({
   const qrSvg = renderToStaticMarkup(
     <QRCode value={trackingCode || ''} size={72} style={{ width: '100%', height: 'auto' }} />
   );
+
+  const [codeLine1, codeLine2] = splitTrackingCode(trackingCode);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -86,29 +98,36 @@ export function printSticker({
      every text element on the label, not just the tracking code, after a
      real print test came back with the smaller detail fields too thin/faint
      to read even though the CSS already said font-weight:700. */
-  .date-field { font-size: 13px; font-weight: 700; line-height: 1.2; -webkit-text-stroke: 0.2px #000; }
-  .qr-box svg { width: 13mm; height: 13mm; display: block; }
+  .date-field { font-size: 12px; font-weight: 700; line-height: 1.15; -webkit-text-stroke: 0.2px #000; }
+  .qr-box svg { width: 11mm; height: 11mm; display: block; }
   /* Only 3 fields left (product name spans both columns; Location and
      quantity share a row) — most of the label's height now goes to the
-     tracking code band below instead of being split across 9 detail rows. */
+     tracking code band below instead of being split across 9 detail rows.
+     Kept as compact as still-legible: every mm trimmed here is a mm the
+     two-line tracking code below gets to be bigger. */
   .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex-shrink: 0; }
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.15; padding-bottom: 0.3mm; }
+  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.05; padding-bottom: 0.15mm; }
   .d-field--wide { grid-column: 1 / -1; }
-  .d-label { font-weight: 700; font-size: 9px; color: #555; -webkit-text-stroke: 0.1px #555; }
-  .d-value { font-weight: 900; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
+  .d-label { font-weight: 700; font-size: 8px; color: #555; -webkit-text-stroke: 0.1px #555; }
+  .d-value { font-weight: 900; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
   /* Tracking code is the whole reason for this label: the single biggest,
-     boldest element, filling nearly the whole width on one line. Label and
-     value are stacked (not sharing a row) so the value gets the full
-     width — sharing a row with the label previously left it clipping past
-     the label's edge. 56px is the largest verified-safe size for an
-     11-character code (2-letter prefix + YYMMDD + 3-digit sequence, see
-     tgd_generate_deposit_line_tracking_code) at this label's fixed
-     101.6mm width — measured against the real font stack with margin to
-     spare; do not raise this without re-measuring, since a "would still
-     look right" bump has already clipped once (see WHY above). */
-  .code-block { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.5mm; border-top: 3px solid #000; padding-top: 1.2mm; margin-top: 0.6mm; }
-  .code-label { font-size: 14px; font-weight: 700; color: #333; -webkit-text-stroke: 0.2px #333; }
-  .code-value { font-size: 56px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; -webkit-text-stroke: 1.2px #000; }
+     boldest element, split across two lines (see splitTrackingCode) so
+     each line only has ~6 of the 11 characters (2-letter prefix + YYMMDD
+     + 3-digit sequence, see tgd_generate_deposit_line_tracking_code) to
+     fit. On this label's landscape aspect ratio (101.6mm wide but only
+     76.2mm tall), two stacked lines hit the label's HEIGHT limit long
+     before either line's width does — a first attempt sized purely by
+     checking width (fits at up to ~98px) overlapped the details section
+     above it once actually measured against the fixed height available.
+     66px keeps a real safety margin (~5.6px) below the tightest size that
+     still fit (70px, ~1.5px margin) in that same height-based measurement,
+     after trimming the QR/detail fields above and this block's own
+     padding as far as still legible — do not raise this without
+     re-measuring both lines' actual bounding box against the label's
+     bottom edge, not just their width. */
+  .code-block { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.3mm; border-top: 2px solid #000; padding-top: 0.6mm; margin-top: 0.3mm; }
+  .code-label { font-size: 9px; font-weight: 700; color: #333; -webkit-text-stroke: 0.15px #333; }
+  .code-value { font-size: 66px; font-weight: 900; letter-spacing: -1px; line-height: 1.02; white-space: nowrap; -webkit-text-stroke: 1.3px #000; }
 </style>
 </head>
 <body>
@@ -125,7 +144,7 @@ export function printSticker({
     </div>
     <div class="code-block">
       <div class="code-label">Tracking Code</div>
-      <div class="code-value">${trackingCode || '-'}</div>
+      <div class="code-value"><div>${codeLine1}</div><div>${codeLine2}</div></div>
     </div>
   </div>
 </div>
