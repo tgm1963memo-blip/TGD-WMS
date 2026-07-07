@@ -65,16 +65,22 @@ const COL_WIDTHS = [
 const NCOLS = COL_WIDTHS.length;
 
 // Row-per-printed-page budgets for the 8pt A4-landscape table, measured
-// empirically (Playwright print-to-PDF against representative row content)
-// and given a safety margin for longer real-world text than the sample
-// data used to measure. Four different budgets because each page shape
-// reserves different fixed overhead: the first page carries the
-// customer/period header block, the last page carries the TOTAL row +
-// signature block, and a report that fits on one page needs both at once.
-const SINGLE_PAGE_CAPACITY = 14;
-const FIRST_PAGE_CAPACITY = 24;
+// empirically (Playwright print-to-PDF, swept exhaustively across hundreds
+// of row counts) against worst-case-realistic row content: every row
+// CLOSED (the badge adds a line), long unbroken lot numbers that wrap
+// across several lines, and long product names/remarks. Four different
+// budgets because each page shape reserves different fixed overhead: the
+// first page carries the customer/period header block, the last page
+// carries the TOTAL row + signature block, and a report that fits on one
+// page needs both at once — that combined overhead is why
+// SINGLE_PAGE_CAPACITY is well below FIRST/LAST individually. Getting any
+// of these wrong doesn't just waste space — it silently pushes a page's
+// SUB TOTAL row onto a *different* physical page than its rows, so err
+// conservative here rather than trying to fit more rows per page.
+const SINGLE_PAGE_CAPACITY = 10;
+const FIRST_PAGE_CAPACITY = 18;
 const MIDDLE_PAGE_CAPACITY = 30;
-const LAST_PAGE_CAPACITY = 18;
+const LAST_PAGE_CAPACITY = 12;
 
 // Splits lines into per-printed-page chunks so a running SUB TOTAL can be
 // rendered as the last row of every page, not just the final one. Forces
@@ -91,8 +97,18 @@ function paginateLines(lines) {
   let isFirst = true;
 
   while (remaining.length > 0) {
-    const isFinalChunk = !isFirst && remaining.length <= LAST_PAGE_CAPACITY;
-    const cap = isFinalChunk ? remaining.length : (isFirst ? FIRST_PAGE_CAPACITY : MIDDLE_PAGE_CAPACITY);
+    const capForNonFinalChunk = isFirst ? FIRST_PAGE_CAPACITY : MIDDLE_PAGE_CAPACITY;
+    // If a normal (non-final-sized) chunk here would consume every
+    // remaining row, this chunk IS the final one — it'll carry TOTAL +
+    // signatures too, which only leaves LAST_PAGE_CAPACITY of headroom,
+    // smaller than capForNonFinalChunk. Sizing it as if it were a regular
+    // page let it overflow onto a hidden extra physical page with the
+    // SUB TOTAL/TOTAL rows alone and no visible rows above them — from
+    // the reader's perspective, a page with no subtotal at all. Capping
+    // it here instead means the true leftover becomes a genuine,
+    // separately-sized final page.
+    const wouldBeFinalChunk = remaining.length <= capForNonFinalChunk;
+    const cap = wouldBeFinalChunk ? LAST_PAGE_CAPACITY : capForNonFinalChunk;
     const take = Math.min(cap, remaining.length);
     pages.push({ lines: remaining.slice(0, take), isFirst, isLast: false });
     remaining = remaining.slice(take);
@@ -113,30 +129,6 @@ function paginateLines(lines) {
 
 function sumField(lines, field) {
   return lines.reduce((s, l) => s + (Number(l[field]) || 0), 0);
-}
-
-// balanceForwardVolume/Weight is a running per-lot balance carried on every
-// row for that lot, not a per-row amount — a plain sum would count the same
-// lot's opening balance once per movement it had in the period. Since rows
-// stay chronological within a lot regardless of sort mode, that lot's first
-// appearance carries its true brought-forward balance; later rows for the
-// same lot reflect an already-partially-moved balance, so they're skipped.
-// Key mirrors movementBalanceKey in movementLedgerExcelUtils.js (lot_no when
-// present, else the product identifier) — keying on lotNo alone would treat
-// every lot-less row ("-") as one single lot and drop all but the first
-// product's opening balance.
-function sumOpeningBalanceByLot(lines, field) {
-  const seenKeys = new Set();
-  let sum = 0;
-  for (const line of lines) {
-    const key = (line.lotNo && line.lotNo !== '-')
-      ? `lot:${line.lotNo}`
-      : `product:${line.descCode ?? line.customerProduct ?? ''}`;
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-    sum += Number(line[field]) || 0;
-  }
-  return sum;
 }
 
 export function InventoryMovementReportTemplate({
@@ -181,8 +173,8 @@ export function InventoryMovementReportTemplate({
         const pageReceivedWt  = sumField(page.lines, 'receivedWeight');
         const pageDeliveryVol = sumField(page.lines, 'deliveryVolume');
         const pageDeliveryWt  = sumField(page.lines, 'deliveryWeight');
-        const pageBalanceForwardVol = sumOpeningBalanceByLot(page.lines, 'balanceForwardVolume');
-        const pageBalanceForwardWt  = sumOpeningBalanceByLot(page.lines, 'balanceForwardWeight');
+        const pageBalanceForwardVol = sumField(page.lines, 'balanceForwardVolume');
+        const pageBalanceForwardWt  = sumField(page.lines, 'balanceForwardWeight');
 
         return (
           <div
