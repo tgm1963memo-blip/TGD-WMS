@@ -12,6 +12,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
+import { aggregateFinalBalances } from '../../utils/movementLedgerExcelUtils.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -19,7 +20,36 @@ import { useAuth } from '../auth/AuthContext.jsx';
 
 const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
 
-const initialState = { rows: [], summary: null, loading: false, error: null };
+const initialState = { rows: [], priorRows: [], summary: null, loading: false, error: null };
+
+function dayBefore(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Merges the three movement sources into one sorted row list — shared by
+// the main (on-screen) period and the prior-period fetch used to compute
+// each lot's ยกมา (brought-forward) opening balance.
+function mergeMovementRows(result, depositResult, withdrawalResult) {
+  const outboundRows = (result.data ?? []).filter((r) => {
+    const movType = String(r.movement_type_raw || '').toUpperCase();
+    return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
+  });
+
+  return [
+    ...(depositResult.data ?? []),
+    ...(withdrawalResult.data ?? []),
+    ...outboundRows,
+  ].sort((a, b) => {
+    const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
+    const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
+    if (aTime !== bTime) return aTime - bTime;
+    const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+    const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
+    return aOut - bOut;
+  });
+}
 
 export function CustomerMovementLedgerPage() {
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
@@ -61,34 +91,29 @@ export function CustomerMovementLedgerPage() {
       dateTo: dateTo || undefined,
     };
 
+    // Prior-period fetch (everything strictly before Date From) computes each
+    // lot's ยกมา opening balance — skipped when there's no Date From, since
+    // the main query already covers all history then.
+    const priorFilters = dateFrom
+      ? { customerId: customerId || undefined, dateFrom: undefined, dateTo: dayBefore(dateFrom) }
+      : null;
+
     Promise.all([
       getMovementLedgerRows(filters),
       getConfirmedDepositReceiptRows(filters),
       getConfirmedWithdrawalRows(filters),
-    ]).then(([result, depositResult, withdrawalResult]) => {
+      priorFilters ? getMovementLedgerRows(priorFilters) : Promise.resolve({ data: [] }),
+      priorFilters ? getConfirmedDepositReceiptRows(priorFilters) : Promise.resolve({ data: [] }),
+      priorFilters ? getConfirmedWithdrawalRows(priorFilters) : Promise.resolve({ data: [] }),
+    ]).then(([result, depositResult, withdrawalResult, priorResult, priorDepositResult, priorWithdrawalResult]) => {
       if (!isMounted) return;
 
-      const outboundRows = (result.data ?? []).filter((r) => {
-        const movType = String(r.movement_type_raw || '').toUpperCase();
-        return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
-      });
-
-      const rows = [
-        ...(depositResult.data ?? []),
-        ...(withdrawalResult.data ?? []),
-        ...outboundRows,
-      ].sort((a, b) => {
-        const aTime = new Date(a.movement_date ?? a.created_at ?? 0).getTime();
-        const bTime = new Date(b.movement_date ?? b.created_at ?? 0).getTime();
-        if (aTime !== bTime) return aTime - bTime;
-        // Same date: inbound (RECEIVE_CONFIRM) before outbound (DISPATCH)
-        const aOut = (a.movement_type === 'DISPATCH' || a.movement_type_canonical === 'DISPATCH') ? 1 : 0;
-        const bOut = (b.movement_type === 'DISPATCH' || b.movement_type_canonical === 'DISPATCH') ? 1 : 0;
-        return aOut - bOut;
-      });
+      const rows = mergeMovementRows(result, depositResult, withdrawalResult);
+      const priorRows = mergeMovementRows(priorResult, priorDepositResult, priorWithdrawalResult);
 
       setState({
         rows,
+        priorRows,
         summary: summarizeMovements(rows),
         loading: false,
         error: result.error ?? null,
@@ -114,8 +139,12 @@ export function CustomerMovementLedgerPage() {
   const filteredRows = productFilter
     ? state.rows.filter((r) => (r.product_id ?? r.customer_product_code) === productFilter)
     : state.rows;
+  const filteredPriorRows = productFilter
+    ? state.priorRows.filter((r) => (r.product_id ?? r.customer_product_code) === productFilter)
+    : state.priorRows;
 
   const filteredSummary = summarizeMovements(filteredRows);
+  const openingBalances = aggregateFinalBalances(filteredPriorRows);
   const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
 
   return (
@@ -225,6 +254,7 @@ export function CustomerMovementLedgerPage() {
                       date_to: dateTo,
                     },
                     summary: filteredSummary,
+                    openingBalances,
                   })}
                   language={reportLanguage}
                 />
