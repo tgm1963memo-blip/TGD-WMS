@@ -244,9 +244,10 @@ function applyUnifiedFilters(rows = [], filters = {}) {
 async function readStockMovements(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
+  const selectStr = filters.lotNo ? STOCK_MOVEMENT_SELECT.replace('tgd_lots(lot_number)', 'tgd_lots!inner(lot_number)') : STOCK_MOVEMENT_SELECT;
   let query = supabase
     .from('tgd_stock_movements')
-    .select(STOCK_MOVEMENT_SELECT)
+    .select(selectStr)
     .order('created_at', { ascending: false });
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
@@ -257,6 +258,7 @@ async function readStockMovements(filters = {}) {
       query = query.eq('product_id', filters.productId);
     }
   }
+  if (filters.lotNo) query = query.ilike('tgd_lots.lot_number', `%${filters.lotNo.trim()}%`);
   if (filters.sourceDocumentId) query = query.eq('source_document_id', filters.sourceDocumentId);
   if (filters.sourceModule) query = query.eq('source_module', filters.sourceModule);
   if (filters.movementType) query = query.eq('movement_type', filters.movementType);
@@ -269,9 +271,10 @@ async function readStockMovements(filters = {}) {
 async function readInventoryMovements(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
+  const selectStr = filters.lotNo ? INVENTORY_MOVEMENT_SELECT.replace('tgd_lots(lot_number)', 'tgd_lots!inner(lot_number)') : INVENTORY_MOVEMENT_SELECT;
   let query = supabase
     .from('tgd_inventory_movements')
-    .select(INVENTORY_MOVEMENT_SELECT)
+    .select(selectStr)
     .order('created_at', { ascending: false });
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
@@ -282,6 +285,7 @@ async function readInventoryMovements(filters = {}) {
       query = query.eq('product_id', filters.productId);
     }
   }
+  if (filters.lotNo) query = query.ilike('tgd_lots.lot_number', `%${filters.lotNo.trim()}%`);
   if (filters.movementType) query = query.eq('movement_type', filters.movementType);
   if (filters.referenceType) query = query.eq('reference_type', filters.referenceType);
   if (filters.referenceNo) query = query.eq('reference_no', filters.referenceNo);

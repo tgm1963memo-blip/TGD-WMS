@@ -158,6 +158,8 @@ export function MovementLedgerReportPage() {
       locationId: (Array.isArray(committedFilters.locationId) || !committedFilters.locationId) ? undefined : committedFilters.locationId,
       warehouseId: committedFilters.warehouseId || undefined,
       referenceType: committedFilters.referenceType || undefined,
+      trackingCode: committedFilters.trackingCode || undefined,
+      lotNo: committedFilters.lotNo || undefined,
     };
 
     const enrich = (rowsToEnrich) => {

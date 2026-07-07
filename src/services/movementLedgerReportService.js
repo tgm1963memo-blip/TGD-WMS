@@ -106,7 +106,8 @@ export async function getMovementTypeBreakdown(filters = {}) {
 export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const lineRelation = filters.productId ? 'tgd_customer_deposit_request_lines!inner' : 'tgd_customer_deposit_request_lines';
+  const hasLineFilter = filters.productId || filters.trackingCode || filters.lotNo;
+  const lineRelation = hasLineFilter ? 'tgd_customer_deposit_request_lines!inner' : 'tgd_customer_deposit_request_lines';
   let query = supabase
     .from('tgd_customer_deposit_requests')
     .select(`
@@ -125,6 +126,12 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     } else {
       query = query.eq('tgd_customer_deposit_request_lines.product_id', filters.productId);
     }
+  }
+  if (filters.trackingCode) {
+    query = query.ilike('tgd_customer_deposit_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
+  }
+  if (filters.lotNo) {
+    query = query.ilike('tgd_customer_deposit_request_lines.lot_no', `%${filters.lotNo.trim()}%`);
   }
   // Not filtered by date here — the row's actual reporting date is
   // last_action_at (falling back to expected_arrival_date) below, which can
@@ -256,7 +263,8 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
 export async function getConfirmedWithdrawalRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const lineRelation = filters.productId ? 'tgd_customer_withdrawal_request_lines!inner' : 'tgd_customer_withdrawal_request_lines';
+  const hasLineFilter = filters.productId || filters.trackingCode || filters.lotNo;
+  const lineRelation = hasLineFilter ? 'tgd_customer_withdrawal_request_lines!inner' : 'tgd_customer_withdrawal_request_lines';
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
     .select(`
@@ -277,6 +285,12 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     } else {
       query = query.eq('tgd_customer_withdrawal_request_lines.product_id', filters.productId);
     }
+  }
+  if (filters.trackingCode) {
+    query = query.ilike('tgd_customer_withdrawal_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
+  }
+  if (filters.lotNo) {
+    query = query.ilike('tgd_customer_withdrawal_request_lines.lot_no', `%${filters.lotNo.trim()}%`);
   }
   // Not filtered by date here — a line's actual reporting date is
   // picked_at (falling back to the request's last_action_at) below, which
