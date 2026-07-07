@@ -13,6 +13,8 @@ const initialFilters = {
   locationId: '',
   referenceType: '',
   temperatureType: [],
+  trackingCode: '',
+  lotNo: '',
 };
 
 const temperatureOptions = [
@@ -29,6 +31,8 @@ export function ReportFilterPanel({
   showMovementType = true,
   multiProduct = false,
   multiLocation = false,
+  showTrackingCode = false,
+  showLotNo = false,
 }) {
   const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || '') });
 
@@ -147,6 +151,12 @@ export function ReportFilterPanel({
         </div>
         <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>
         <div className="form-group"><label className="form-label">Reference Type<input className="form-control" name="referenceType" value={filters.referenceType} onChange={updateField} /></label></div>
+        {showTrackingCode && (
+          <div className="form-group"><label className="form-label">รหัสติดตาม<input className="form-control" name="trackingCode" value={filters.trackingCode || ''} onChange={updateField} placeholder="Tracking Code" /></label></div>
+        )}
+        {showLotNo && (
+          <div className="form-group"><label className="form-label">Lot สินค้า<input className="form-control" name="lotNo" value={filters.lotNo || ''} onChange={updateField} placeholder="Lot No" /></label></div>
+        )}
       </div>
       <div className="filter-toolbar-actions">
         <button type="button" className="btn btn-outline" onClick={resetFilters}>Reset</button>
