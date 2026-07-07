@@ -158,7 +158,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     if (filters.dateTo && receiptDate && receiptDate > filters.dateTo) continue;
 
     const confirmedLines = (req.tgd_customer_deposit_request_lines ?? [])
-      .filter((l) => l.actual_boxes != null && Number(l.actual_boxes) > 0);
+      .filter((l) => (l.actual_boxes != null && Number(l.actual_boxes) > 0) || (l.actual_weight != null && Number(l.actual_weight) > 0));
 
     for (const line of confirmedLines) {
       rows.push({
@@ -172,8 +172,8 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         product_id: line.product_id ?? null,
         lot_id: null,
         lot_no: line.lot_no ?? null,
-        qty: Number(line.actual_boxes),
-        quantity: Number(line.actual_boxes),
+        qty: Number(line.actual_boxes ?? 0),
+        quantity: Number(line.actual_boxes ?? 0),
         weight: Number(line.actual_weight ?? 0),
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
@@ -217,7 +217,6 @@ async function getInboundTemperatureIndex(customerIds) {
 
   for (const req of data) {
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
-      if (!line.temperature_type) continue;
       const bucket = index.get(req.customer_id) ?? [];
       bucket.push({ ...line, deposit_request_id: line.deposit_request_id ?? req.id });
       index.set(req.customer_id, bucket);
@@ -258,12 +257,43 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
   return null;
 }
 
+function resolveWithdrawalProductId(line, customerId, inboundIndex) {
+  if (line.product_id) return line.product_id;
+
+  const candidates = inboundIndex.get(customerId) ?? [];
+  if (candidates.length === 0) return null;
+
+  if (line.source_customer_deposit_request_id) {
+    const lotHint = line.source_lot_no ?? line.lot_no ?? null;
+    const direct = candidates.find((dl) =>
+      dl.deposit_request_id === line.source_customer_deposit_request_id &&
+      (lotHint == null || dl.lot_no === lotHint));
+    if (direct && direct.product_id) return direct.product_id;
+  }
+
+  // B: no direct link — match by lot_no; product code is optional (blank = any)
+  const lotNo = line.lot_no ?? '';
+  const code = (line.customer_product_code ?? '').trim();
+  const byLot = candidates.find((dl) =>
+    (dl.lot_no ?? '') === lotNo &&
+    (code === '' || dl.customer_product_code === line.customer_product_code));
+  if (byLot && byLot.product_id) return byLot.product_id;
+
+  // C: last resort — same product code regardless of lot
+  if (code !== '') {
+    const byCode = candidates.find((dl) => dl.customer_product_code === line.customer_product_code);
+    if (byCode && byCode.product_id) return byCode.product_id;
+  }
+
+  return null;
+}
+
 // Returns COMPLETED customer withdrawal lines as outbound movement rows.
 // These are not in tgd_stock_movements, so they must be fetched separately.
 export async function getConfirmedWithdrawalRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const hasLineFilter = filters.productId || filters.trackingCode || filters.lotNo;
+  const hasLineFilter = filters.trackingCode || filters.lotNo;
   const lineRelation = hasLineFilter ? 'tgd_customer_withdrawal_request_lines!inner' : 'tgd_customer_withdrawal_request_lines';
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
@@ -279,13 +309,8 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     .eq('status', 'COMPLETED');
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.productId) {
-    if (Array.isArray(filters.productId)) {
-      query = query.in('tgd_customer_withdrawal_request_lines.product_id', filters.productId);
-    } else {
-      query = query.eq('tgd_customer_withdrawal_request_lines.product_id', filters.productId);
-    }
-  }
+  // Note: We filter productId in JS below because some legacy withdrawal lines might have null product_id
+  // and need to be resolved via the inbound index first.
   if (filters.trackingCode) {
     query = query.ilike('tgd_customer_withdrawal_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
   }
@@ -309,8 +334,11 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   const rows = [];
   for (const req of (data ?? [])) {
     const lines = (req.tgd_customer_withdrawal_request_lines ?? [])
-      .filter((l) => (l.picked_boxes ?? l.requested_boxes) != null &&
-                     Number(l.picked_boxes ?? l.requested_boxes) > 0);
+      .filter((l) => {
+        const boxes = Number(l.picked_boxes ?? l.requested_boxes ?? 0);
+        const weight = Number(l.picked_weight ?? l.requested_weight ?? 0);
+        return boxes > 0 || weight > 0;
+      });
 
     for (const line of lines) {
       const movementDate = (line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null;
@@ -320,6 +348,15 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
       // Use picked_weight if recorded; fall back to requested_weight so reports are never 0
       const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
+      
+      const resolvedProductId = resolveWithdrawalProductId(line, req.customer_id, inboundIndex);
+
+      if (filters.productId) {
+        const pFilter = Array.isArray(filters.productId) ? filters.productId : [filters.productId];
+        if (pFilter.length > 0 && !pFilter.includes(resolvedProductId)) {
+          continue;
+        }
+      }
 
       rows.push({
         id: `withdrawal-${line.id}`,
@@ -329,7 +366,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         movement_type_canonical: 'DISPATCH',
         movement_date: line.picked_at ?? req.last_action_at,
         customer_id: req.customer_id,
-        product_id: line.product_id ?? null,
+        product_id: resolvedProductId,
         lot_id: null,
         lot_no: line.lot_no ?? null,
         qty: boxes,

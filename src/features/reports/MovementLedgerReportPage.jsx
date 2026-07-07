@@ -49,10 +49,19 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
     getConfirmedWithdrawalRows(serviceFilters),
   ]);
 
-  // Keep outbound/neutral movements; exclude draft and inbound (deposit lines cover all inbound)
+  // Keep outbound/neutral movements; exclude draft. 
+  // Exclude movements generated from deposits/withdrawals because depositRows/withdrawalRows cover them.
   let outboundRows = (result.data ?? []).filter((r) => {
     const movType = String(r.movement_type_raw || '').toUpperCase();
-    return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
+    if (movType.includes('DRAFT')) return false;
+    if (r.source_module === 'CUSTOMER_DEPOSIT') return false;
+    
+    // Fallback for legacy records that might not have source_module populated:
+    // If it's an inbound movement but has no source_module, we assume it's a legacy deposit
+    // and skip it to prevent double-counting.
+    if (!r.source_module && INBOUND_SKIP.has(movType)) return false;
+
+    return true;
   });
 
   let depositRows = depositResult.data ?? [];
@@ -82,6 +91,23 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
         r.from_location_id === filterCriteria.locationId);
     }
   }
+
+  // Deduplicate withdrawals
+  // outboundRows contains DISPATCH from tgd_stock_movements (basic fields)
+  // withdrawalRows contains CUSTOMER_WITHDRAWAL from tgd_customer_withdrawal_requests (rich fields, e.g. tracking_code)
+  // Due to DB query limits (1000 rows max) on requests, older withdrawals might be missing in withdrawalRows
+  // but present in outboundRows. We use withdrawalRows to enrich, and fallback to outboundRows.
+  const withdrawalDocNumbers = new Set(withdrawalRows.map((r) => String(r.source_document_no)));
+  outboundRows = outboundRows.filter((r) => {
+    const isWithdrawal = r.movement_type_raw === 'CUSTOMER_WITHDRAWAL' || (r.movement_type_raw === 'DISPATCH' && String(r.source_document_no).startsWith('WD-'));
+    if (isWithdrawal) {
+      if (withdrawalDocNumbers.has(String(r.source_document_no))) {
+        // We have a richer version in withdrawalRows (all lines for this WD were fetched), so drop this basic one from outboundRows
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Merge and sort by movement_date ascending; same date: inbound before outbound
   const rows = [...depositRows, ...withdrawalRows, ...outboundRows].sort((a, b) => {
@@ -154,7 +180,7 @@ export function MovementLedgerReportPage() {
       dateFrom: committedFilters.dateFrom || undefined,
       dateTo: committedFilters.dateTo || undefined,
       customerId: committedFilters.customerId || undefined,
-      productId: committedFilters.productId || undefined,
+      productId: (Array.isArray(committedFilters.productId) && committedFilters.productId.length === 0) ? undefined : committedFilters.productId || undefined,
       locationId: (Array.isArray(committedFilters.locationId) || !committedFilters.locationId) ? undefined : committedFilters.locationId,
       warehouseId: committedFilters.warehouseId || undefined,
       referenceType: committedFilters.referenceType || undefined,
