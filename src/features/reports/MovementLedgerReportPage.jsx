@@ -65,6 +65,7 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
       : rowSet.filter((r) => r.product_id === filterCriteria.productId);
     outboundRows = applyProd(outboundRows);
     depositRows = applyProd(depositRows);
+    withdrawalRows = applyProd(withdrawalRows);
   }
 
   // Apply location filter
@@ -201,6 +202,20 @@ export function MovementLedgerReportPage() {
         priorRows = priorRows.filter(filterFn);
       }
 
+      if (committedFilters.trackingCode && committedFilters.trackingCode.trim()) {
+        const query = committedFilters.trackingCode.trim().toLowerCase();
+        const filterFn = (r) => (r.tracking_code || '').toLowerCase().includes(query);
+        rows = rows.filter(filterFn);
+        priorRows = priorRows.filter(filterFn);
+      }
+
+      if (committedFilters.lotNo && committedFilters.lotNo.trim()) {
+        const query = committedFilters.lotNo.trim().toLowerCase();
+        const filterFn = (r) => (r.lot_no || '').toLowerCase().includes(query);
+        rows = rows.filter(filterFn);
+        priorRows = priorRows.filter(filterFn);
+      }
+
       setState({
         rows,
         summary: summarizeMovements(rows),
@@ -233,6 +248,8 @@ export function MovementLedgerReportPage() {
         showMovementType={false}
         multiProduct={true}
         multiLocation={true}
+        showTrackingCode={true}
+        showLotNo={true}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (
