@@ -19,13 +19,15 @@ function fmtNum(v, decimals = 3) {
 
 function fmtQty(v) {
   const n = Number(v);
-  return Number.isFinite(n) && n !== 0 ? String(n) : '-';
+  return Number.isFinite(n) && n !== 0 ? n.toLocaleString('en') : '-';
 }
 
 function fmtBalance(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '-';
-  return n === 0 ? '0' : (n > 0 ? `+${n}` : String(n));
+  if (n === 0) return '0';
+  const s = Math.abs(n).toLocaleString('en');
+  return n > 0 ? `+${s}` : `-${s}`;
 }
 
 function fmtBalanceWt(v, decimals = 3) {
@@ -311,9 +313,9 @@ export function InventoryMovementReportTemplate({
                   </td>
                   <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(cumBalanceForwardVol)}</td>
                   <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(cumBalanceForwardWt)}</td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{cumReceivedVol || '-'}</td>
+                  <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{fmtQty(cumReceivedVol)}</td>
                   <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(cumReceivedWt)}</td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{cumDeliveryVol || '-'}</td>
+                  <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{fmtQty(cumDeliveryVol)}</td>
                   <td style={{ ...CELL, textAlign: 'right',  background: '#fce4ec', fontSize: 8 }}>{fmtNum(cumDeliveryWt)}</td>
                   <td style={{ ...CELL, background: '#fff9e6' }} colSpan={2} />
                   <td colSpan={2} style={CELL} />
@@ -324,9 +326,9 @@ export function InventoryMovementReportTemplate({
                       <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>TOTAL</td>
                       <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(data?.totalBalanceForwardVolume)}</td>
                       <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(data?.totalBalanceForwardWeight)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{data?.totalReceived ?? fmtQty(subTotalReceivedVol)}</td>
+                      <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{fmtQty(data?.totalReceived ?? subTotalReceivedVol)}</td>
                       <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(data?.totalReceivedWeight ?? subTotalReceivedWt)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{data?.totalDelivery ?? fmtQty(subTotalDeliveryVol)}</td>
+                      <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{fmtQty(data?.totalDelivery ?? subTotalDeliveryVol)}</td>
                       <td style={{ ...CELL, textAlign: 'right',  background: '#fce4ec', fontSize: 8 }}>{fmtNum(data?.totalDeliveryWeight ?? subTotalDeliveryWt)}</td>
                       <td style={{ ...CELL, textAlign: 'center', background: '#fff9e6', fontSize: 8 }}>{fmtQty(data?.totalBalanceVolume)}</td>
                       <td style={{ ...CELL, textAlign: 'right',  background: '#fff9e6', fontSize: 8 }}>{fmtNum(data?.totalBalanceWeight)}</td>
