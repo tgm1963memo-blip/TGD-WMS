@@ -154,6 +154,7 @@ export function MovementLedgerReportPage() {
       dateFrom: committedFilters.dateFrom || undefined,
       dateTo: committedFilters.dateTo || undefined,
       customerId: committedFilters.customerId || undefined,
+      productId: committedFilters.productId || undefined,
       locationId: (Array.isArray(committedFilters.locationId) || !committedFilters.locationId) ? undefined : committedFilters.locationId,
       warehouseId: committedFilters.warehouseId || undefined,
       referenceType: committedFilters.referenceType || undefined,

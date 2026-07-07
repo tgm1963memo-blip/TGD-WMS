@@ -106,11 +106,12 @@ export async function getMovementTypeBreakdown(filters = {}) {
 export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
+  const lineRelation = filters.productId ? 'tgd_customer_deposit_request_lines!inner' : 'tgd_customer_deposit_request_lines';
   let query = supabase
     .from('tgd_customer_deposit_requests')
     .select(`
       id, request_no, customer_id, status, expected_arrival_date, last_action_at,
-      tgd_customer_deposit_request_lines(
+      ${lineRelation}(
         id, line_no, product_id, customer_product_code, product_name, lot_no,
         actual_boxes, actual_weight, location_id, temperature_type, tracking_code
       )
@@ -118,6 +119,13 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+  if (filters.productId) {
+    if (Array.isArray(filters.productId)) {
+      query = query.in('tgd_customer_deposit_request_lines.product_id', filters.productId);
+    } else {
+      query = query.eq('tgd_customer_deposit_request_lines.product_id', filters.productId);
+    }
+  }
   // Not filtered by date here — the row's actual reporting date is
   // last_action_at (falling back to expected_arrival_date) below, which can
   // differ from expected_arrival_date by days when a customer's scheduled
@@ -248,11 +256,12 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
 export async function getConfirmedWithdrawalRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
+  const lineRelation = filters.productId ? 'tgd_customer_withdrawal_request_lines!inner' : 'tgd_customer_withdrawal_request_lines';
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
     .select(`
       id, withdrawal_no, customer_id, status, last_action_at,
-      tgd_customer_withdrawal_request_lines(
+      ${lineRelation}(
         id, line_no, customer_product_code, product_name, lot_no, product_id,
         source_customer_deposit_request_id, source_lot_no,
         requested_boxes, requested_weight,
@@ -262,6 +271,13 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     .eq('status', 'COMPLETED');
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+  if (filters.productId) {
+    if (Array.isArray(filters.productId)) {
+      query = query.in('tgd_customer_withdrawal_request_lines.product_id', filters.productId);
+    } else {
+      query = query.eq('tgd_customer_withdrawal_request_lines.product_id', filters.productId);
+    }
+  }
   // Not filtered by date here — a line's actual reporting date is
   // picked_at (falling back to the request's last_action_at) below, which
   // can differ from the request-level last_action_at when lines within
