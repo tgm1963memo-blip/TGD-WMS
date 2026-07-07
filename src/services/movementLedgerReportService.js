@@ -103,30 +103,47 @@ export async function getMovementTypeBreakdown(filters = {}) {
   return { data: groupByMovementType(data ?? []), error: null };
 }
 
+// Deposit and withdrawal request lines almost never carry a product_id — the
+// customer portal identifies products by customer_product_code /
+// internal_product_code instead. Resolve the master product via those codes
+// (matched against tgd_products.sku) so product filtering/grouping works.
+async function getProductSkuMap() {
+  const map = new Map();
+  if (!supabase) return map;
+
+  const { data, error } = await supabase.from('tgd_products').select('id, sku');
+  if (error || !data) return map;
+
+  for (const p of data) {
+    if (p.sku) map.set(p.sku, p.id);
+  }
+  return map;
+}
+
+function resolveLineProductId(line, skuMap) {
+  if (line.product_id) return line.product_id;
+  return skuMap.get(line.internal_product_code) ?? skuMap.get(line.customer_product_code) ?? null;
+}
+
 export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const hasLineFilter = filters.productId || filters.trackingCode || filters.lotNo;
+  const hasLineFilter = filters.trackingCode || filters.lotNo;
   const lineRelation = hasLineFilter ? 'tgd_customer_deposit_request_lines!inner' : 'tgd_customer_deposit_request_lines';
   let query = supabase
     .from('tgd_customer_deposit_requests')
     .select(`
       id, request_no, customer_id, status, expected_arrival_date, last_action_at,
       ${lineRelation}(
-        id, line_no, product_id, customer_product_code, product_name, lot_no,
+        id, line_no, product_id, customer_product_code, internal_product_code, product_name, lot_no,
         actual_boxes, actual_weight, location_id, temperature_type, tracking_code
       )
     `)
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.productId) {
-    if (Array.isArray(filters.productId)) {
-      query = query.in('tgd_customer_deposit_request_lines.product_id', filters.productId);
-    } else {
-      query = query.eq('tgd_customer_deposit_request_lines.product_id', filters.productId);
-    }
-  }
+  // Note: product filtering happens in JS below (after resolving product_id
+  // via sku match) because these lines essentially never have product_id set.
   if (filters.trackingCode) {
     query = query.ilike('tgd_customer_deposit_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
   }
@@ -146,6 +163,8 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   const { data, error } = await query;
   if (error) return { data: [], error };
 
+  const skuMap = await getProductSkuMap();
+
   const rows = [];
   for (const req of (data ?? [])) {
     // Use actual confirmation date (last_action_at) so the row sorts chronologically
@@ -161,6 +180,15 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
       .filter((l) => (l.actual_boxes != null && Number(l.actual_boxes) > 0) || (l.actual_weight != null && Number(l.actual_weight) > 0));
 
     for (const line of confirmedLines) {
+      const resolvedProductId = resolveLineProductId(line, skuMap);
+
+      if (filters.productId) {
+        const pFilter = Array.isArray(filters.productId) ? filters.productId : [filters.productId];
+        if (pFilter.length > 0 && !pFilter.includes(resolvedProductId)) {
+          continue;
+        }
+      }
+
       rows.push({
         id: `deposit-${line.id}`,
         ledger_source: 'stock_ledger',
@@ -169,7 +197,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         movement_type_canonical: 'RECEIVE_CONFIRM',
         movement_date: receiptDate,
         customer_id: req.customer_id,
-        product_id: line.product_id ?? null,
+        product_id: resolvedProductId,
         lot_id: null,
         lot_no: line.lot_no ?? null,
         qty: Number(line.actual_boxes ?? 0),
@@ -257,8 +285,16 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
   return null;
 }
 
-function resolveWithdrawalProductId(line, customerId, inboundIndex) {
+function resolveWithdrawalProductId(line, customerId, inboundIndex, skuMap) {
   if (line.product_id) return line.product_id;
+
+  // Withdrawal lines almost never have product_id set — match the sku
+  // recorded on the line (internal or customer code) against the product
+  // master first, since that's reliable even when there's no confirmed
+  // deposit line to cross-reference (deposit lines don't have product_id
+  // either, so the candidate-matching fallback below rarely succeeds).
+  const bySku = skuMap.get(line.internal_product_code) ?? skuMap.get(line.customer_product_code);
+  if (bySku) return bySku;
 
   const candidates = inboundIndex.get(customerId) ?? [];
   if (candidates.length === 0) return null;
@@ -300,7 +336,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
     .select(`
       id, withdrawal_no, customer_id, status, last_action_at,
       ${lineRelation}(
-        id, line_no, customer_product_code, product_name, lot_no, product_id,
+        id, line_no, customer_product_code, internal_product_code, product_name, lot_no, product_id,
         source_customer_deposit_request_id, source_lot_no,
         requested_boxes, requested_weight,
         picked_boxes, picked_weight, picked_at, picked_by_email, tracking_code
@@ -329,7 +365,10 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const inboundIndex = await getInboundTemperatureIndex(customerIds);
+  const [inboundIndex, skuMap] = await Promise.all([
+    getInboundTemperatureIndex(customerIds),
+    getProductSkuMap(),
+  ]);
 
   const rows = [];
   for (const req of (data ?? [])) {
@@ -349,7 +388,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       // Use picked_weight if recorded; fall back to requested_weight so reports are never 0
       const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
       
-      const resolvedProductId = resolveWithdrawalProductId(line, req.customer_id, inboundIndex);
+      const resolvedProductId = resolveWithdrawalProductId(line, req.customer_id, inboundIndex, skuMap);
 
       if (filters.productId) {
         const pFilter = Array.isArray(filters.productId) ? filters.productId : [filters.productId];
