@@ -168,14 +168,15 @@ export function InventoryMovementReportTemplate({
       {pages.map((page, pageIdx) => {
         const rowStartIndex = rowsSoFar;
         rowsSoFar += page.lines.length;
-        const cumulativeCount = rowsSoFar;
-        const cumulativeLines = lines.slice(0, cumulativeCount);
-        const cumReceivedVol = sumField(cumulativeLines, 'receivedVolume');
-        const cumReceivedWt  = sumField(cumulativeLines, 'receivedWeight');
-        const cumDeliveryVol = sumField(cumulativeLines, 'deliveryVolume');
-        const cumDeliveryWt  = sumField(cumulativeLines, 'deliveryWeight');
-        const cumBalanceForwardVol = sumOpeningBalanceByLot(cumulativeLines, 'balanceForwardVolume');
-        const cumBalanceForwardWt  = sumOpeningBalanceByLot(cumulativeLines, 'balanceForwardWeight');
+        // Each page's SUB TOTAL sums only that page's own rows — not a
+        // running total carried forward from earlier pages. The grand
+        // TOTAL row (true last page only) is the one cumulative figure.
+        const pageReceivedVol = sumField(page.lines, 'receivedVolume');
+        const pageReceivedWt  = sumField(page.lines, 'receivedWeight');
+        const pageDeliveryVol = sumField(page.lines, 'deliveryVolume');
+        const pageDeliveryWt  = sumField(page.lines, 'deliveryWeight');
+        const pageBalanceForwardVol = sumOpeningBalanceByLot(page.lines, 'balanceForwardVolume');
+        const pageBalanceForwardWt  = sumOpeningBalanceByLot(page.lines, 'balanceForwardWeight');
 
         return (
           <div
@@ -304,22 +305,24 @@ export function InventoryMovementReportTemplate({
                 })}
               </tbody>
 
-              {/* ── TFOOT: running SUB TOTAL on every page; grand TOTAL +
-                  signatures only on the true last page ── */}
+              {/* ── TFOOT: per-page SUB TOTAL on every page that has rows;
+                  grand TOTAL + signatures only on the true last page ── */}
               <tfoot>
-                <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-                  <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>
-                    SUB TOTAL ({cumulativeCount})
-                  </td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(cumBalanceForwardVol)}</td>
-                  <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(cumBalanceForwardWt)}</td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{fmtQty(cumReceivedVol)}</td>
-                  <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(cumReceivedWt)}</td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{fmtQty(cumDeliveryVol)}</td>
-                  <td style={{ ...CELL, textAlign: 'right',  background: '#fce4ec', fontSize: 8 }}>{fmtNum(cumDeliveryWt)}</td>
-                  <td style={{ ...CELL, background: '#fff9e6' }} colSpan={2} />
-                  <td colSpan={2} style={CELL} />
-                </tr>
+                {page.lines.length > 0 && (
+                  <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
+                    <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>
+                      SUB TOTAL ({page.lines.length})
+                    </td>
+                    <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(pageBalanceForwardVol)}</td>
+                    <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(pageBalanceForwardWt)}</td>
+                    <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{fmtQty(pageReceivedVol)}</td>
+                    <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(pageReceivedWt)}</td>
+                    <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{fmtQty(pageDeliveryVol)}</td>
+                    <td style={{ ...CELL, textAlign: 'right',  background: '#fce4ec', fontSize: 8 }}>{fmtNum(pageDeliveryWt)}</td>
+                    <td style={{ ...CELL, background: '#fff9e6' }} colSpan={2} />
+                    <td colSpan={2} style={CELL} />
+                  </tr>
+                )}
                 {page.isLast && (
                   <>
                     <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
