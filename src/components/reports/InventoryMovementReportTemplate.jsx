@@ -113,6 +113,24 @@ function sumField(lines, field) {
   return lines.reduce((s, l) => s + (Number(l[field]) || 0), 0);
 }
 
+// balanceForwardVolume/Weight is a running per-lot balance carried on every
+// row for that lot, not a per-row amount — a plain sum would count the same
+// lot's opening balance once per movement it had in the period. Since rows
+// stay chronological within a lot regardless of sort mode, that lot's first
+// appearance carries its true brought-forward balance; later rows for the
+// same lot reflect an already-partially-moved balance, so they're skipped.
+function sumOpeningBalanceByLot(lines, field) {
+  const seenLots = new Set();
+  let sum = 0;
+  for (const line of lines) {
+    const lotKey = line.lotNo ?? '-';
+    if (seenLots.has(lotKey)) continue;
+    seenLots.add(lotKey);
+    sum += Number(line[field]) || 0;
+  }
+  return sum;
+}
+
 export function InventoryMovementReportTemplate({
   data,
   language = 'th',
@@ -154,6 +172,8 @@ export function InventoryMovementReportTemplate({
         const cumReceivedWt  = sumField(cumulativeLines, 'receivedWeight');
         const cumDeliveryVol = sumField(cumulativeLines, 'deliveryVolume');
         const cumDeliveryWt  = sumField(cumulativeLines, 'deliveryWeight');
+        const cumBalanceForwardVol = sumOpeningBalanceByLot(cumulativeLines, 'balanceForwardVolume');
+        const cumBalanceForwardWt  = sumOpeningBalanceByLot(cumulativeLines, 'balanceForwardWeight');
 
         return (
           <div
@@ -289,8 +309,8 @@ export function InventoryMovementReportTemplate({
                   <td colSpan={8} style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>
                     SUB TOTAL ({cumulativeCount})
                   </td>
-                  <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>-</td>
-                  <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>-</td>
+                  <td style={{ ...CELL, textAlign: 'center', background: '#e8eaf6', fontSize: 8 }}>{fmtQty(cumBalanceForwardVol)}</td>
+                  <td style={{ ...CELL, textAlign: 'right',  background: '#e8eaf6', fontSize: 8 }}>{fmtNum(cumBalanceForwardWt)}</td>
                   <td style={{ ...CELL, textAlign: 'center', background: '#e8f5e9', fontSize: 8 }}>{cumReceivedVol || '-'}</td>
                   <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(cumReceivedWt)}</td>
                   <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{cumDeliveryVol || '-'}</td>
