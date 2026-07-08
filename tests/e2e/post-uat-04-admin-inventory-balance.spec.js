@@ -178,8 +178,10 @@ test.describe('Post-UAT: Admin Inventory Balance Page', () => {
     await expandAllBtn.click();
     await page.waitForTimeout(500);
 
-    // After expand, we should see detail table
-    const hasTable = await page.locator('table').isVisible({ timeout: 5000 }).catch(() => false);
+    // After expand, we should see detail table(s) — .first() because expand-all
+    // now renders one table per expanded product, and a bare multi-match
+    // locator throws (swallowed by the catch below into a false negative).
+    const hasTable = await page.locator('table').first().isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasTable).toBe(true);
     await screenshot(page, '09-expanded.png');
 
