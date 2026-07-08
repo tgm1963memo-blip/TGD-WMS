@@ -44,14 +44,10 @@ const summaryColumns = [
     render: (row) => <StatusBadge value={row.movement_type} />,
   },
   {
-    key: 'lot_no',
-    header: 'ล็อต',
-    render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
-  },
-  {
-    key: 'temperature_type',
-    header: 'อุณหภูมิ',
-    render: (row) => <span className="table-meta-text">{row.temperature_type || '-'}</span>,
+    key: 'tracking_code',
+    header: 'รหัสติดตาม',
+    render: (row) => <span className="table-meta-text">{row.tracking_code || '-'}</span>,
+    title: (row) => row.tracking_code,
   },
   {
     key: 'product_id',
@@ -73,14 +69,22 @@ const summaryColumns = [
     },
   },
   {
-    key: 'customer_id',
-    header: 'ลูกค้า',
-    render: (row) => <span className="compact-cell-text">{formatCompactText(row.customer_name ?? row.customer_id, 48)}</span>,
-    title: (row) => row.customer_name ?? row.customer_id,
+    key: 'lot_no',
+    header: 'lot',
+    render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
+  },
+  {
+    key: 'mfg_date',
+    header: 'วันผลิต',
+    render: (row) => (
+      <span className="table-meta-text">
+        {row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-'}
+      </span>
+    ),
   },
   {
     key: 'inbound_qty',
-    header: 'รับเข้า (กล่อง)',
+    header: 'รับเข้า(กล่อง)',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
@@ -89,7 +93,7 @@ const summaryColumns = [
   },
   {
     key: 'inbound_weight',
-    header: 'รับเข้า (KG)',
+    header: 'รับเข้า(น้ำหนัก)',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>{fmtWt(row.weight)}</span>;
@@ -97,7 +101,7 @@ const summaryColumns = [
   },
   {
     key: 'outbound_qty',
-    header: 'จ่ายออก (กล่อง)',
+    header: 'จ่ายออก(กล่อง)',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
@@ -106,21 +110,29 @@ const summaryColumns = [
   },
   {
     key: 'outbound_weight',
-    header: 'จ่ายออก (KG)',
+    header: 'จ่ายออก(น้ำหนัก)',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{fmtWt(row.weight)}</span>;
     },
   },
   {
-    key: 'reference_no',
-    header: 'อ้างอิง',
+    key: 'balance_qty',
+    header: 'คงเหลือ(กล่อง)',
     render: (row) => (
-      <span className="compact-cell-text">
-        {formatCompactText(row.source_document_no ?? row.reference_no ?? row.reference_id, 24)}
+      <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
+        {row.balanceQty ?? '-'}
       </span>
     ),
-    title: (row) => row.source_document_no ?? row.reference_no ?? row.reference_id,
+  },
+  {
+    key: 'balance_weight',
+    header: 'คงเหลือ(น้ำหนัก)',
+    render: (row) => (
+      <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
+        {row.balanceWeight !== undefined ? fmtWt(row.balanceWeight) : '-'}
+      </span>
+    ),
   },
 ];
 
@@ -130,23 +142,27 @@ function renderMovementDetail(row) {
     <>
       <DetailField label="วันที่เคลื่อนไหว" value={formatDocumentDate(row.movement_date ?? row.created_at)} />
       <DetailField label="ประเภท" value={row.movement_type} />
+      <DetailField label="รหัสติดตาม" value={row.tracking_code} />
       <DetailField label="สินค้า" value={row.product_name ?? row.product_id} />
       <DetailField label="ลูกค้า" value={row.customer_name ?? row.customer_id} />
       <DetailField label="ล็อต" value={row.lot_no} />
+      <DetailField label="วันผลิต" value={row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : null} />
       <DetailField label="อุณหภูมิ" value={row.temperature_type} />
       <DetailField label="ตำแหน่งต้นทาง" value={row.from_location_id} />
       <DetailField label="ตำแหน่งปลายทาง" value={row.to_location_id} />
       {inbound ? (
         <>
           <DetailField label="รับเข้า (กล่อง)" value={row.qty ?? row.quantity} />
-          <DetailField label="รับเข้า (KG)" value={fmtWt(row.weight)} />
+          <DetailField label="รับเข้า (น้ำหนัก)" value={fmtWt(row.weight)} />
         </>
       ) : (
         <>
           <DetailField label="จ่ายออก (กล่อง)" value={row.qty ?? row.quantity} />
-          <DetailField label="จ่ายออก (KG)" value={fmtWt(row.weight)} />
+          <DetailField label="จ่ายออก (น้ำหนัก)" value={fmtWt(row.weight)} />
         </>
       )}
+      <DetailField label="คงเหลือ (กล่อง)" value={row.balanceQty} />
+      <DetailField label="คงเหลือ (น้ำหนัก)" value={row.balanceWeight !== undefined ? fmtWt(row.balanceWeight) : undefined} />
       <DetailField label="หน่วย" value={row.uom} />
       <DetailField label="ประเภทอ้างอิง" value={row.reference_type} />
       <DetailField label="เลขที่อ้างอิง" value={row.reference_no} />

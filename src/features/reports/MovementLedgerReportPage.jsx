@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
-import { MovementLedgerTable } from '../../components/reports/MovementLedgerTable.jsx';
+import { MovementLedgerTable, isInbound } from '../../components/reports/MovementLedgerTable.jsx';
 import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.jsx';
 import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
@@ -16,7 +16,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot } from '../../utils/movementLedgerExcelUtils.js';
+import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot, movementBalanceKey } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -264,7 +264,44 @@ export function MovementLedgerReportPage() {
   }, [committedFilters]);
 
   const t = (key) => getTranslation(key, language);
-  const displayRows = sortMode === 'productLot' ? sortRowsByProductThenLot(state.rows) : state.rows;
+  const displayRows = useMemo(() => {
+    const ordered = sortMode === 'productLot' ? sortRowsByProductThenLot(state.rows) : state.rows;
+    const running = new Map();
+    let currentKey = null;
+    let balance = { qty: 0, weight: 0 };
+
+    return ordered.map((row) => {
+      const key = movementBalanceKey(row);
+      if (sortMode === 'productLot') {
+        if (key !== currentKey) {
+          currentKey = key;
+          balance = openingBalances.get(key) ?? { qty: 0, weight: 0 };
+        }
+      } else {
+        balance = running.get(key) ?? openingBalances.get(key) ?? { qty: 0, weight: 0 };
+      }
+
+      const inbound = isInbound(row);
+      const qty = Number(row.qty ?? row.quantity ?? 0);
+      const weight = Number(row.weight ?? 0);
+      const nextBalance = {
+        qty: balance.qty + (inbound ? qty : -qty),
+        weight: balance.weight + (inbound ? weight : -weight),
+      };
+
+      if (sortMode === 'productLot') {
+        balance = nextBalance;
+      } else {
+        running.set(key, nextBalance);
+      }
+
+      return {
+        ...row,
+        balanceQty: nextBalance.qty,
+        balanceWeight: nextBalance.weight,
+      };
+    });
+  }, [state.rows, sortMode, openingBalances]);
 
   return (
     <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>

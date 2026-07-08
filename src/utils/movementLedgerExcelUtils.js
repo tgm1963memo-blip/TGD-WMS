@@ -3,9 +3,9 @@ import { formatDocumentDate } from './documentDisplayUtils.js';
 import { isInbound, fmtWt } from '../components/reports/MovementLedgerTable.jsx';
 
 const HEADERS = [
-  'วันที่', 'ประเภท', 'ล็อต', 'รหัสติดตาม', 'สินค้า', 'ลูกค้า',
-  'รับเข้า (กล่อง)', 'รับเข้า (KG)', 'จ่ายออก (กล่อง)', 'จ่ายออก (KG)',
-  'ยอดคงเหลือ (กล่อง)', 'ยอดคงเหลือ (KG)', 'อ้างอิง',
+  'วันที่', 'ประเภท', 'รหัสติดตาม', 'สินค้า', 'lot', 'วันผลิต',
+  'รับเข้า(กล่อง)', 'รับเข้า(น้ำหนัก)', 'จ่ายออก(กล่อง)', 'จ่ายออก(น้ำหนัก)',
+  'คงเหลือ(กล่อง)', 'คงเหลือ(น้ำหนัก)'
 ];
 
 // Group strictly by customer + lot rather than customer + product + lot: a
@@ -85,17 +85,16 @@ function openingBalanceExcelRow(meta, opening) {
   return {
     'วันที่': '',
     'ประเภท': 'ยกมา',
-    'ล็อต': meta.lot_no || '-',
     'รหัสติดตาม': meta.tracking_code || '-',
     'สินค้า': productDisplay(meta),
-    'ลูกค้า': meta.customer_name ?? meta.customer_id ?? '',
-    'รับเข้า (กล่อง)': '',
-    'รับเข้า (KG)': '',
-    'จ่ายออก (กล่อง)': '',
-    'จ่ายออก (KG)': '',
-    'ยอดคงเหลือ (กล่อง)': opening.qty,
-    'ยอดคงเหลือ (KG)': Number(opening.weight.toFixed(3)),
-    'อ้างอิง': '',
+    'lot': meta.lot_no || '-',
+    'วันผลิต': meta.mfg_date ? formatDocumentDate(meta.mfg_date, { dateOnly: true }) : '-',
+    'รับเข้า(กล่อง)': '',
+    'รับเข้า(น้ำหนัก)': '',
+    'จ่ายออก(กล่อง)': '',
+    'จ่ายออก(น้ำหนัก)': '',
+    'คงเหลือ(กล่อง)': opening.qty,
+    'คงเหลือ(น้ำหนัก)': Number(opening.weight.toFixed(3)),
   };
 }
 
@@ -109,17 +108,16 @@ function movementExcelRow(row, balance) {
   return {
     'วันที่': formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false }),
     'ประเภท': row.movement_type ?? '',
-    'ล็อต': row.lot_no || '-',
     'รหัสติดตาม': row.tracking_code || '-',
     'สินค้า': productDisplay(row),
-    'ลูกค้า': row.customer_name ?? row.customer_id ?? '',
-    'รับเข้า (กล่อง)': inbound ? qty : '',
-    'รับเข้า (KG)': inbound ? fmtWt(row.weight) : '',
-    'จ่ายออก (กล่อง)': inbound ? '' : qty,
-    'จ่ายออก (KG)': inbound ? '' : fmtWt(row.weight),
-    'ยอดคงเหลือ (กล่อง)': balance.qty,
-    'ยอดคงเหลือ (KG)': Number(balance.weight.toFixed(3)),
-    'อ้างอิง': row.source_document_no ?? row.reference_no ?? row.reference_id ?? '',
+    'lot': row.lot_no || '-',
+    'วันผลิต': row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-',
+    'รับเข้า(กล่อง)': inbound ? qty : '',
+    'รับเข้า(น้ำหนัก)': inbound ? fmtWt(row.weight) : '',
+    'จ่ายออก(กล่อง)': inbound ? '' : qty,
+    'จ่ายออก(น้ำหนัก)': inbound ? '' : fmtWt(row.weight),
+    'คงเหลือ(กล่อง)': balance.qty,
+    'คงเหลือ(น้ำหนัก)': Number(balance.weight.toFixed(3)),
   };
 }
 
@@ -166,17 +164,16 @@ function totalsExcelRow(totals) {
   return {
     'วันที่': '',
     'ประเภท': 'รวมทั้งหมด',
-    'ล็อต': '',
     'รหัสติดตาม': '',
     'สินค้า': '',
-    'ลูกค้า': '',
-    'รับเข้า (กล่อง)': totals.receivedQty,
-    'รับเข้า (KG)': Number(totals.receivedWeight.toFixed(3)),
-    'จ่ายออก (กล่อง)': totals.deliveredQty,
-    'จ่ายออก (KG)': Number(totals.deliveredWeight.toFixed(3)),
-    'ยอดคงเหลือ (กล่อง)': totals.balanceQty,
-    'ยอดคงเหลือ (KG)': Number(totals.balanceWeight.toFixed(3)),
-    'อ้างอิง': '',
+    'lot': '',
+    'วันผลิต': '',
+    'รับเข้า(กล่อง)': totals.receivedQty,
+    'รับเข้า(น้ำหนัก)': Number(totals.receivedWeight.toFixed(3)),
+    'จ่ายออก(กล่อง)': totals.deliveredQty,
+    'จ่ายออก(น้ำหนัก)': Number(totals.deliveredWeight.toFixed(3)),
+    'คงเหลือ(กล่อง)': totals.balanceQty,
+    'คงเหลือ(น้ำหนัก)': Number(totals.balanceWeight.toFixed(3)),
   };
 }
 
