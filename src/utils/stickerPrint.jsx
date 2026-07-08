@@ -26,11 +26,6 @@ function splitTrackingCode(code) {
 export function printSticker({
   depositDate, productName, quantityLabel, locationCode, trackingCode,
 }) {
-  const field = (label, value, opts = {}) => `
-    <div class="d-field${opts.wide ? ' d-field--wide' : ''}">
-      <span class="d-label">${label}</span>
-      <span class="d-value">${value ?? '-'}</span>
-    </div>`;
 
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
@@ -78,8 +73,8 @@ export function printSticker({
   .sticker-page { width: 101.6mm; height: 76.2mm; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
-    border: 3px solid #000; border-radius: 4mm; padding: 1.2mm 2.5mm;
-    display: flex; flex-direction: column; gap: 0.6mm; overflow: hidden;
+    border: 3px solid #000; border-radius: 4mm; padding: 1.5mm;
+    background-color: white; overflow: hidden; display: flex; flex-direction: column;
   }
   @media print {
     .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
@@ -89,63 +84,59 @@ export function printSticker({
       width: 101.6mm; height: 76.2mm;
     }
   }
-  .top-row { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
-  /* font-weight alone isn't reliably bold once the browser/printer substitutes
-     a fallback Latin font (the Thai-first font stack above may not carry a
-     true black weight for Latin/numerals/dates) — a text stroke guarantees a
-     visibly heavier, legible stroke on an actual thermal-label print
-     regardless of which font actually gets used to render it. Applied to
-     every text element on the label, not just the tracking code, after a
-     real print test came back with the smaller detail fields too thin/faint
-     to read even though the CSS already said font-weight:700. */
-  .date-field { font-size: 12px; font-weight: 700; line-height: 1.15; -webkit-text-stroke: 0.2px #000; }
-  .qr-box svg { width: 11mm; height: 11mm; display: block; }
-  /* Only 3 fields left (product name spans both columns; Location and
-     quantity share a row) — most of the label's height now goes to the
-     tracking code band below instead of being split across 9 detail rows.
-     Kept as compact as still-legible: every mm trimmed here is a mm the
-     two-line tracking code below gets to be bigger. */
-  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; flex-shrink: 0; }
-  .d-field { display: flex; flex-direction: column; border-bottom: 1px dotted #999; line-height: 1.05; padding-bottom: 0.15mm; }
-  .d-field--wide { grid-column: 1 / -1; }
-  .d-label { font-weight: 700; font-size: 8px; color: #555; -webkit-text-stroke: 0.1px #555; }
-  .d-value { font-weight: 900; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-text-stroke: 0.3px #000; }
-  /* Tracking code is the whole reason for this label: the single biggest,
-     boldest element, split across two lines (see splitTrackingCode) so
-     each line only has ~6 of the 11 characters (2-letter prefix + YYMMDD
-     + 3-digit sequence, see tgd_generate_deposit_line_tracking_code) to
-     fit. On this label's landscape aspect ratio (101.6mm wide but only
-     76.2mm tall), two stacked lines hit the label's HEIGHT limit long
-     before either line's width does — a first attempt sized purely by
-     checking width (fits at up to ~98px) overlapped the details section
-     above it once actually measured against the fixed height available.
-     66px keeps a real safety margin (~5.6px) below the tightest size that
-     still fit (70px, ~1.5px margin) in that same height-based measurement,
-     after trimming the QR/detail fields above and this block's own
-     padding as far as still legible — do not raise this without
-     re-measuring both lines' actual bounding box against the label's
-     bottom edge, not just their width. */
-  .code-block { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.3mm; border-top: 2px solid #000; padding-top: 0.6mm; margin-top: 0.3mm; }
-  .code-label { font-size: 9px; font-weight: 700; color: #333; -webkit-text-stroke: 0.15px #333; }
-  .code-value { font-size: 66px; font-weight: 900; letter-spacing: -1px; line-height: 1.02; white-space: nowrap; -webkit-text-stroke: 1.3px #000; }
+
+  /* Table Grid Layout (Minimized White Space) */
+  table.layout { width: 100%; height: 100%; border-collapse: collapse; }
+  table.layout td { border: 2px solid #000; padding: 1mm 2mm; overflow: hidden; }
+  .qr-cell { width: 22mm; padding: 1.5mm !important; text-align: center; vertical-align: middle; }
+  .qr-cell svg { width: 100%; height: auto; display: block; margin: 0 auto; }
+  
+  .product-cell { vertical-align: top; padding-bottom: 2mm !important; }
+  .product-flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
+  .product-name { font-size: 20px; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px; -webkit-text-stroke: 0.3px #000; }
+  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; -webkit-text-stroke: 0.1px #000; }
+  
+  .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; -webkit-text-stroke: 0.2px #000; }
+  .info-label { font-size: 9px; color: #333; -webkit-text-stroke: 0.1px #333; display: block; margin-bottom: 1px; }
+  
+  .track-row { height: 100%; text-align: center; vertical-align: middle; padding: 0 !important; }
+  .track-wrapper { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
+  /* Tracking code is maximized to fill the remaining area */
+  .track-code { font-size: 96px; font-weight: 900; line-height: 0.82; letter-spacing: -3px; -webkit-text-stroke: 1.5px #000; margin: 0; padding: 0; }
 </style>
 </head>
 <body>
 <div class="sticker-page">
   <div class="sticker">
-    <div class="top-row">
-      <div class="date-field">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
-      <div class="qr-box">${qrSvg}</div>
-    </div>
-    <div class="details">
-      ${field('ชื่อสินค้า', productName, { wide: true })}
-      ${field('Location', locationCode || '-')}
-      ${field('จำนวน', quantityLabel)}
-    </div>
-    <div class="code-block">
-      <div class="code-label">Tracking Code</div>
-      <div class="code-value"><div>${codeLine1}</div><div>${codeLine2}</div></div>
-    </div>
+    <table class="layout">
+      <tr>
+        <td class="product-cell" colspan="2">
+          <div class="product-flex">
+            <div class="product-name">${productName || '-'}</div>
+            <div class="date-block">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
+          </div>
+        </td>
+        <td class="qr-cell" rowspan="2">${qrSvg}</td>
+      </tr>
+      <tr class="info-row">
+        <td>
+          <span class="info-label">Location</span>
+          ${locationCode || '-'}
+        </td>
+        <td>
+          <span class="info-label">จำนวน</span>
+          ${quantityLabel || '-'}
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" class="track-row">
+          <div class="track-wrapper">
+            <div class="track-code">${codeLine1}</div>
+            <div class="track-code">${codeLine2}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
 </div>
 </body>
