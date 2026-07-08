@@ -78,13 +78,39 @@ export function getMatchedDepositLine(line, depositLines = []) {
   return getIdentifierMatchedDepositLines(line, depositLines)[0] ?? null;
 }
 
-/** Remaining deposit balance for a withdrawal line, and whether the requested quantity exceeds it. */
-export function getWithdrawalBalanceInfo(line, depositLines = []) {
+/**
+ * Remaining deposit balance for a withdrawal line, and whether the requested
+ * quantity exceeds it.
+ *
+ * `siblingLines` (all other lines in the same draft/request, including the
+ * one being checked) is used to also subtract whatever quantity those other
+ * lines already claim against the same underlying deposit line(s) — without
+ * this, two lines that each individually stay within the total balance but
+ * jointly exceed it would both pass unflagged. This is exactly the shape of
+ * a real incident: two lines in one withdrawal request both drawing from
+ * the same 100-box tracking code (there they each independently over-asked
+ * for 200, which the single-line check already caught, but a pair of
+ * requests each under the total — e.g. 60 + 60 against 100 — would not have
+ * been).
+ */
+export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines = []) {
   const balanceLines = getIdentifierMatchedDepositLines(line, depositLines);
+  const balanceLineIds = new Set(balanceLines.map((dl) => dl.id));
   const maxBoxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
   const maxWtBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
-  const exceedsBoxBalance = maxBoxBalance > 0 && line?.requested_boxes !== '' && Number(line?.requested_boxes) > maxBoxBalance;
-  const exceedsWtBalance = maxWtBalance > 0 && line?.requested_weight !== '' && Number(line?.requested_weight) > maxWtBalance;
+
+  const otherClaimants = (siblingLines ?? []).filter((other) =>
+    other !== line
+    && other?.key !== line?.key
+    && getIdentifierMatchedDepositLines(other, depositLines).some((dl) => balanceLineIds.has(dl.id)),
+  );
+  const othersClaimedBoxes = otherClaimants.reduce((sum, other) => sum + (Number(other.requested_boxes) || 0), 0);
+  const othersClaimedWeight = otherClaimants.reduce((sum, other) => sum + (Number(other.requested_weight) || 0), 0);
+
+  const availableBoxBalance = maxBoxBalance - othersClaimedBoxes;
+  const availableWtBalance = maxWtBalance - othersClaimedWeight;
+  const exceedsBoxBalance = maxBoxBalance > 0 && line?.requested_boxes !== '' && Number(line?.requested_boxes) > availableBoxBalance;
+  const exceedsWtBalance = maxWtBalance > 0 && line?.requested_weight !== '' && Number(line?.requested_weight) > availableWtBalance;
   return { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance };
 }
 

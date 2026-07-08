@@ -322,7 +322,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           }
         }
 
-        const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLines);
+        const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLines, activeLines);
         if (exceedsBoxBalance) {
           setSubmitError(`รายการที่ ${i + 1}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (มี ${maxBoxBalance} กล่อง)`);
           return;
@@ -456,7 +456,7 @@ export function CustomerWithdrawalRequestCreatePage() {
   // of only failing with an error banner after the customer clicks it.
   const allDepositLinesForBalanceCheck = Object.values(depositLinesMap).flat();
   const hasBalanceExceeded = lines.some((line) => {
-    const { exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLinesForBalanceCheck);
+    const { exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLinesForBalanceCheck, lines);
     return exceedsBoxBalance || exceedsWtBalance;
   });
 

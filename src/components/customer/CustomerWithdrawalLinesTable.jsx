@@ -293,7 +293,7 @@ export function CustomerWithdrawalLinesTable({
 
             const matchedDL = getMatchedDepositLine(line, sourceDepositLines);
             const weightPerBox = matchedDL?.weight_per_box ? Number(matchedDL.weight_per_box) : null;
-            const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, sourceDepositLines);
+            const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, sourceDepositLines, lines);
 
             const qtyMode = line.withdrawal_qty_mode || WITHDRAWAL_QTY_MODES.WEIGHT;
             const boxesDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.WEIGHT;
