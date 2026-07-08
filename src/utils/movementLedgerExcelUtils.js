@@ -3,7 +3,7 @@ import { formatDocumentDate } from './documentDisplayUtils.js';
 import { isInbound, fmtWt } from '../components/reports/MovementLedgerTable.jsx';
 
 const HEADERS = [
-  'วันที่', 'ประเภท', 'ล็อต', 'สินค้า', 'ลูกค้า',
+  'วันที่', 'ประเภท', 'ล็อต', 'รหัสติดตาม', 'สินค้า', 'ลูกค้า',
   'รับเข้า (กล่อง)', 'รับเข้า (KG)', 'จ่ายออก (กล่อง)', 'จ่ายออก (KG)',
   'ยอดคงเหลือ (กล่อง)', 'ยอดคงเหลือ (KG)', 'อ้างอิง',
 ];
@@ -86,6 +86,7 @@ function openingBalanceExcelRow(meta, opening) {
     'วันที่': '',
     'ประเภท': 'ยกมา',
     'ล็อต': meta.lot_no || '-',
+    'รหัสติดตาม': meta.tracking_code || '-',
     'สินค้า': productDisplay(meta),
     'ลูกค้า': meta.customer_name ?? meta.customer_id ?? '',
     'รับเข้า (กล่อง)': '',
@@ -109,6 +110,7 @@ function movementExcelRow(row, balance) {
     'วันที่': formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false }),
     'ประเภท': row.movement_type ?? '',
     'ล็อต': row.lot_no || '-',
+    'รหัสติดตาม': row.tracking_code || '-',
     'สินค้า': productDisplay(row),
     'ลูกค้า': row.customer_name ?? row.customer_id ?? '',
     'รับเข้า (กล่อง)': inbound ? qty : '',
@@ -165,6 +167,7 @@ function totalsExcelRow(totals) {
     'วันที่': '',
     'ประเภท': 'รวมทั้งหมด',
     'ล็อต': '',
+    'รหัสติดตาม': '',
     'สินค้า': '',
     'ลูกค้า': '',
     'รับเข้า (กล่อง)': totals.receivedQty,

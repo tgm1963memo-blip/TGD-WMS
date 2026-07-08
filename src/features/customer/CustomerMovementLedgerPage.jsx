@@ -12,7 +12,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { aggregateFinalBalances } from '../../utils/movementLedgerExcelUtils.js';
+import { aggregateFinalBalances, downloadMovementLedgerExcel } from '../../utils/movementLedgerExcelUtils.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -58,6 +58,8 @@ export function CustomerMovementLedgerPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [productFilter, setProductFilter] = useState('');
+  const [lotFilter, setLotFilter] = useState('');
+  const [trackingCodeFilter, setTrackingCodeFilter] = useState('');
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
@@ -123,7 +125,9 @@ export function CustomerMovementLedgerPage() {
     return () => { isMounted = false; };
   }, [searched, customerId, profileLoading, dateFrom, dateTo]);
 
-  // Product options derived from loaded rows
+  // Product/LOT/tracking-code options derived from loaded rows — lets the
+  // customer pick from what actually exists in their own history instead of
+  // having to know/type an exact LOT or tracking code.
   const productOptions = searched && state.rows.length > 0
     ? [...new Map(
         state.rows
@@ -135,13 +139,23 @@ export function CustomerMovementLedgerPage() {
       ).values()].sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
     : [];
 
-  // Apply client-side product filter
-  const filteredRows = productFilter
-    ? state.rows.filter((r) => (r.product_id ?? r.customer_product_code) === productFilter)
-    : state.rows;
-  const filteredPriorRows = productFilter
-    ? state.priorRows.filter((r) => (r.product_id ?? r.customer_product_code) === productFilter)
-    : state.priorRows;
+  const lotOptions = searched && state.rows.length > 0
+    ? [...new Set(state.rows.map((r) => r.lot_no).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    : [];
+
+  const trackingCodeOptions = searched && state.rows.length > 0
+    ? [...new Set(state.rows.map((r) => r.tracking_code).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    : [];
+
+  // Apply client-side product/LOT/tracking-code filters
+  function matchesFilters(r) {
+    if (productFilter && (r.product_id ?? r.customer_product_code) !== productFilter) return false;
+    if (lotFilter && r.lot_no !== lotFilter) return false;
+    if (trackingCodeFilter && r.tracking_code !== trackingCodeFilter) return false;
+    return true;
+  }
+  const filteredRows = state.rows.filter(matchesFilters);
+  const filteredPriorRows = state.priorRows.filter(matchesFilters);
 
   const filteredSummary = summarizeMovements(filteredRows);
   const openingBalances = aggregateFinalBalances(filteredPriorRows);
@@ -195,14 +209,49 @@ export function CustomerMovementLedgerPage() {
               </select>
             </div>
           )}
+          {lotOptions.length > 0 && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Lot</label>
+              <select
+                className="form-input"
+                data-testid="customer-movement-ledger-lot-select"
+                value={lotFilter}
+                onChange={(e) => setLotFilter(e.target.value)}
+              >
+                <option value="">ทุก Lot</option>
+                {lotOptions.map((lot) => (
+                  <option key={lot} value={lot}>{lot}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {trackingCodeOptions.length > 0 && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>รหัสติดตาม (Tracking No.)</label>
+              <select
+                className="form-input"
+                data-testid="customer-movement-ledger-tracking-code-select"
+                value={trackingCodeFilter}
+                onChange={(e) => setTrackingCodeFilter(e.target.value)}
+              >
+                <option value="">ทุกรหัสติดตาม</option>
+                {trackingCodeOptions.map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button className="btn btn-primary" type="submit" disabled={!customerId || profileLoading}>
             ดูรายงาน
           </button>
-          {(dateFrom || dateTo || productFilter) && (
+          {(dateFrom || dateTo || productFilter || lotFilter || trackingCodeFilter) && (
             <button
               className="btn btn-secondary"
               type="button"
-              onClick={() => { setDateFrom(''); setDateTo(''); setProductFilter(''); setSearched(false); }}
+              onClick={() => {
+                setDateFrom(''); setDateTo(''); setProductFilter('');
+                setLotFilter(''); setTrackingCodeFilter(''); setSearched(false);
+              }}
             >
               ล้างตัวกรอง
             </button>
@@ -240,6 +289,17 @@ export function CustomerMovementLedgerPage() {
               title="Entry-Delivery Inventory Report"
               disabled={false}
               orientation="landscape"
+              extraActions={(
+                <button
+                  type="button"
+                  className="btn"
+                  data-testid="customer-movement-ledger-export-excel"
+                  onClick={() => downloadMovementLedgerExcel(filteredRows, openingBalances, 'productLot', 'customer-movement-ledger')}
+                  disabled={filteredRows.length === 0}
+                >
+                  Export Excel
+                </button>
+              )}
               renderReport={(reportLanguage) => (
                 <InventoryMovementReportTemplate
                   branding={branding}
