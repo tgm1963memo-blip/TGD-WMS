@@ -31,10 +31,30 @@ function dayBefore(dateStr) {
 // Merges the three movement sources into one sorted row list — shared by
 // the main (on-screen) period and the prior-period fetch used to compute
 // each lot's ยกมา (brought-forward) opening balance.
+//
+// withdrawalResult already carries the richer, request-line-based rows for
+// every COMPLETED withdrawal (see getConfirmedWithdrawalRows); the generic
+// stock_movements source (result) can also contain a DISPATCH row for that
+// same withdrawal (source_document_no starting "WD-", or movement_type_raw
+// "CUSTOMER_WITHDRAWAL"). Without dropping that duplicate, the same
+// physical withdrawal would be summed twice — once from each source — into
+// both the on-screen totals and the Excel export's running balance. Mirrors
+// the dedup already applied in MovementLedgerReportPage.jsx's
+// fetchMergedRows for the same three sources.
 function mergeMovementRows(result, depositResult, withdrawalResult) {
+  const withdrawalDocNumbers = new Set(
+    (withdrawalResult.data ?? []).map((r) => String(r.source_document_no)),
+  );
+
   const outboundRows = (result.data ?? []).filter((r) => {
     const movType = String(r.movement_type_raw || '').toUpperCase();
-    return !movType.includes('DRAFT') && !INBOUND_SKIP.has(movType);
+    if (movType.includes('DRAFT') || INBOUND_SKIP.has(movType)) return false;
+
+    const isWithdrawal = r.movement_type_raw === 'CUSTOMER_WITHDRAWAL'
+      || (r.movement_type_raw === 'DISPATCH' && String(r.source_document_no).startsWith('WD-'));
+    if (isWithdrawal && withdrawalDocNumbers.has(String(r.source_document_no))) return false;
+
+    return true;
   });
 
   return [

@@ -5,6 +5,7 @@ import {
   toNullableNumber,
   toNullableText,
 } from './customerPortalServiceUtils.js';
+import { getCustomerStockBalance } from './customerDepositRequestService.js';
 
 const WITHDRAWAL_HEADER_SELECT = [
   'id',
@@ -105,32 +106,50 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
   return { ...result, data: await attachRemainingLotBalance(result.data, requestRow?.customer_id ?? null) };
 }
 
-// For each line's source deposit batch, computes how many boxes/kg remain
-// in that batch (its total received quantity minus everything ever picked
-// from it across COMPLETED withdrawals) and resolves its storage location
-// code — so the printed pick/delivery document can show staff what's left
-// in that lot and where it's stored. Resolves the batch via the line's
-// direct source_customer_deposit_request_line_id link when present, else
-// falls back to matching by lot_no + customer_product_code against this
-// customer's own confirmed deposits — mirroring the same A/B match
-// tgd_get_customer_stock_balance uses. Lines that still can't be resolved
-// (no lot_no at all) get null for both.
+// For each line's source deposit batch, resolves how many boxes/kg remain
+// in that batch and its storage location code — so the printed pick/
+// delivery document can show staff what's left in that lot and where it's
+// stored.
+//
+// The remaining quantity itself is read straight from
+// tgd_get_customer_stock_balance (same RPC — and same fixed FIFO/tracking-
+// code allocation, see migration 112 — that powers the admin "ยอดคงเหลือ"
+// screen), rather than re-deriving it here from raw withdrawal rows. An
+// earlier version of this function re-summed withdrawals itself, keyed
+// strictly by each withdrawal line's own source_customer_deposit_request_
+// line_id — but most existing withdrawal lines never have that column
+// populated (see migration 112's investigation), so it silently summed to
+// zero and always reported the batch's full original quantity as
+// "remaining" even after it had been mostly withdrawn. Reusing the RPC
+// avoids maintaining two separate (and now provably inconsistent)
+// implementations of the same balance calculation.
+//
+// Batch resolution still happens locally, in priority order: direct
+// source_customer_deposit_request_line_id link, else the line's tracking
+// code (unique per deposit line), else lot_no + customer_product_code —
+// the last of which is inherently ambiguous when a LOT spans multiple
+// deposit lines, so it just picks one sibling to represent for display;
+// the *quantity* shown for it is still that specific sibling's correct,
+// FIFO-allocated balance from the RPC, not a re-derived approximation.
 async function attachRemainingLotBalance(lines, customerId) {
   if (!supabase || !customerId) {
     return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null }));
   }
 
-  const { data: depositRequests } = await supabase
-    .from('tgd_customer_deposit_requests')
-    .select(`
-      id,
-      tgd_customer_deposit_request_lines(
-        id, lot_no, customer_product_code, actual_boxes, actual_weight,
-        expected_boxes, expected_weight, location_id, tgd_locations(location_code)
-      )
-    `)
-    .eq('customer_id', customerId)
-    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
+  const [{ data: depositRequests }, { data: balances }] = await Promise.all([
+    supabase
+      .from('tgd_customer_deposit_requests')
+      .select(`
+        id,
+        tgd_customer_deposit_request_lines(
+          id, lot_no, tracking_code, customer_product_code, actual_boxes, actual_weight,
+          expected_boxes, expected_weight, location_id, tgd_locations(location_code)
+        )
+      `)
+      .eq('customer_id', customerId)
+      .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']),
+    getCustomerStockBalance(customerId),
+  ]);
 
   const depositLineList = (depositRequests ?? []).flatMap((r) => r.tgd_customer_deposit_request_lines ?? []);
   if (depositLineList.length === 0) {
@@ -138,11 +157,19 @@ async function attachRemainingLotBalance(lines, customerId) {
   }
 
   const depositLineById = new Map(depositLineList.map((d) => [d.id, d]));
+  // Balance rows only cover lines with a positive remaining balance (the
+  // RPC filters out zero-balance lines), so a resolved line missing here
+  // means it's fully withdrawn — correctly reported as 0, not null.
+  const balanceByLineId = new Map((balances ?? []).map((b) => [b.id, b]));
 
   function resolveDepositLine(line) {
     if (line.source_customer_deposit_request_line_id) {
       const direct = depositLineById.get(line.source_customer_deposit_request_line_id);
       if (direct) return direct;
+    }
+    if (line.tracking_code) {
+      const byTracking = depositLineList.find((d) => d.tracking_code === line.tracking_code);
+      if (byTracking) return byTracking;
     }
     const lotNo = line.lot_no ?? line.source_lot_no ?? null;
     if (!lotNo) return null;
@@ -152,45 +179,17 @@ async function attachRemainingLotBalance(lines, customerId) {
     ) ?? null;
   }
 
-  const resolvedByLineId = new Map(lines.map((line) => [line.id, resolveDepositLine(line)]));
-  const usedDepositLineIds = [...new Set([...resolvedByLineId.values()].map((d) => d?.id).filter(Boolean))];
-
-  const { data: withdrawnLines } = usedDepositLineIds.length
-    ? await supabase
-        .from('tgd_customer_withdrawal_request_lines')
-        .select('source_customer_deposit_request_line_id, picked_boxes, picked_weight, withdrawal_request_id')
-        .in('source_customer_deposit_request_line_id', usedDepositLineIds)
-    : { data: [] };
-
-  const withdrawalRequestIds = [...new Set((withdrawnLines ?? []).map((r) => r.withdrawal_request_id).filter(Boolean))];
-  const { data: withdrawalRequests } = withdrawalRequestIds.length
-    ? await supabase.from('tgd_customer_withdrawal_requests').select('id, status').in('id', withdrawalRequestIds)
-    : { data: [] };
-  const statusByRequestId = new Map((withdrawalRequests ?? []).map((r) => [r.id, r.status]));
-
-  const withdrawnByDepositLine = new Map();
-  for (const row of (withdrawnLines ?? [])) {
-    if (statusByRequestId.get(row.withdrawal_request_id) !== 'COMPLETED') continue;
-    const key = row.source_customer_deposit_request_line_id;
-    const cur = withdrawnByDepositLine.get(key) ?? { boxes: 0, weight: 0 };
-    cur.boxes += Number(row.picked_boxes ?? 0);
-    cur.weight += Number(row.picked_weight ?? 0);
-    withdrawnByDepositLine.set(key, cur);
-  }
-
   return lines.map((line) => {
-    const depositLine = resolvedByLineId.get(line.id);
+    const depositLine = resolveDepositLine(line);
     if (!depositLine) {
       return { ...line, lot_remaining_boxes: null, lot_remaining_weight: null };
     }
-    const totalBoxes = Number(depositLine.actual_boxes ?? depositLine.expected_boxes ?? 0);
-    const totalWeight = Number(depositLine.actual_weight ?? depositLine.expected_weight ?? 0);
-    const withdrawn = withdrawnByDepositLine.get(depositLine.id) ?? { boxes: 0, weight: 0 };
+    const balance = balanceByLineId.get(depositLine.id);
     return {
       ...line,
       location: depositLine.tgd_locations?.location_code ?? line.location ?? null,
-      lot_remaining_boxes: Math.max(0, totalBoxes - withdrawn.boxes),
-      lot_remaining_weight: Math.max(0, totalWeight - withdrawn.weight),
+      lot_remaining_boxes: Number(balance?.actual_boxes ?? 0),
+      lot_remaining_weight: Number(balance?.actual_weight ?? 0),
     };
   });
 }
