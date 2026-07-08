@@ -49,13 +49,19 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
     getConfirmedWithdrawalRows(serviceFilters),
   ]);
 
-  // Keep outbound/neutral movements; exclude draft. 
+  // Keep outbound/neutral movements; exclude draft.
   // Exclude movements generated from deposits/withdrawals because depositRows/withdrawalRows cover them.
   let outboundRows = (result.data ?? []).filter((r) => {
     const movType = String(r.movement_type_raw || '').toUpperCase();
     if (movType.includes('DRAFT')) return false;
-    if (r.source_module === 'CUSTOMER_DEPOSIT') return false;
-    
+    // tgd_stock_movements actually stores 'CUSTOMER_DEPOSIT_REQUEST' (confirmed via direct
+    // query), not the bare 'CUSTOMER_DEPOSIT' this used to check for — that exact-match
+    // never fired, so every deposit confirmation was double counted here: once from this
+    // generic stock_movements row (blank lot_no, raw movement-id reference) and once from
+    // the richer, lot_no-bearing row depositRows already supplies for the same event.
+    // startsWith so any other 'CUSTOMER_DEPOSIT*' source_module variant is caught too.
+    if (String(r.source_module || '').startsWith('CUSTOMER_DEPOSIT')) return false;
+
     // Fallback for legacy records that might not have source_module populated:
     // If it's an inbound movement but has no source_module, we assume it's a legacy deposit
     // and skip it to prevent double-counting.
