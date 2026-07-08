@@ -49,6 +49,7 @@ export function InventoryBalancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedTemperature, setSelectedTemperature] = useState('');
   const [searchText, setSearchText] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [detailId, setDetailId] = useState(null);
@@ -78,6 +79,7 @@ export function InventoryBalancePage() {
   // Filter (customer filter is client-side now that all data is loaded at once)
   const filtered = lines.filter((l) => {
     if (selectedCustomerId && l.request?.customer_id !== selectedCustomerId) return false;
+    if (selectedTemperature && l.temperature_type !== selectedTemperature) return false;
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return (
@@ -148,6 +150,19 @@ export function InventoryBalancePage() {
             ))}
           </select>
         </label>
+        <label className="form-field" style={{ margin: 0, flex: '0 0 160px' }}>
+          <span>อุณหภูมิ</span>
+          <select
+            className="form-control"
+            value={selectedTemperature}
+            onChange={(e) => setSelectedTemperature(e.target.value)}
+          >
+            <option value="">-- ทุกอุณหภูมิ --</option>
+            <option value="FROZEN">FROZEN</option>
+            <option value="CHILLED">CHILLED</option>
+            <option value="AMBIENT">AMBIENT</option>
+          </select>
+        </label>
         <label className="form-field" style={{ margin: 0, flex: '1 1 220px' }}>
           <span>ค้นหา</span>
           <input
@@ -158,9 +173,9 @@ export function InventoryBalancePage() {
             onChange={(e) => setSearchText(e.target.value)}
           />
         </label>
-        {(selectedCustomerId || searchText) && (
+        {(selectedCustomerId || searchText || selectedTemperature) && (
           <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-end' }}
-            onClick={() => { setSelectedCustomerId(''); setSearchText(''); }}>
+            onClick={() => { setSelectedCustomerId(''); setSearchText(''); setSelectedTemperature(''); }}>
             ล้างตัวกรอง
           </button>
         )}
