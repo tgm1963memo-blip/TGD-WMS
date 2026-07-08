@@ -553,6 +553,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.lot_no ?? '-'}</td>
                         <td style={{ textAlign: 'right' }}>
+                          <div style={{ marginBottom: 2 }}>
+                            <span
+                              className={`status-badge ${line.picked_boxes != null ? 'status-badge--confirmed' : 'status-badge--uat'}`}
+                              style={{ fontSize: 10 }}
+                            >
+                              {line.picked_boxes != null ? 'จัดแล้ว' : 'รอดำเนินการ'}
+                            </span>
+                          </div>
                           {line.picked_boxes != null ? (
                             <>
                               <span style={{ fontWeight: 700, color: Number(line.picked_boxes) !== Number(line.requested_boxes) ? 'var(--tgd-warning)' : 'var(--tgd-success)' }}>
