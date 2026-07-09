@@ -655,7 +655,8 @@ export function CustomerAdminWithdrawalReviewPage() {
                           </div>
                         </td>
                         <td>
-                          {canWrite && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status) ? (
+                          {(canWrite && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status))
+                            || (userRole === 'admin' && !['CANCELLED', 'REJECTED'].includes(selected?.status)) ? (
                             <button
                               className="btn btn-secondary btn-sm"
                               type="button"
