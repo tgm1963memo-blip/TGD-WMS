@@ -5,6 +5,29 @@ import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { getAllCustomerStockBalances } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
+import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+
+const BALANCE_EXPORT_HEADERS = [
+  'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
+  'LOT', 'รหัสติดตาม', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
+];
+
+function balanceExportRow(line, customerLabel) {
+  return {
+    'ลูกค้า': customerLabel,
+    'รหัสสินค้า': line.customer_product_code ?? '-',
+    'ชื่อสินค้า': line.product_name ?? '-',
+    'อุณหภูมิ': line.temperature_type ?? '-',
+    'เลขที่ใบฝาก': line.request?.request_no ?? '-',
+    'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
+    'LOT': line.lot_no ?? '-',
+    'รหัสติดตาม': line.tracking_code ?? '-',
+    'คงเหลือ (กล่อง)': line.actual_boxes ?? line.expected_boxes ?? 0,
+    'คงเหลือ (กก.)': line.actual_weight ?? line.expected_weight ?? 0,
+    'หมายเหตุลูกค้า': line.note ?? '-',
+    'หมายเหตุ ADMIN': line.actual_note ?? '-',
+  };
+}
 
 function TempBadge({ type }) {
   const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
@@ -128,6 +151,16 @@ export function InventoryBalancePage() {
   const grandTotalWeight = customerGroups.reduce((s, g) => s + g.totalWeight, 0);
   const uniqueProducts = new Set(filtered.map((l) => l.customer_product_code ?? l.product_name)).size;
 
+  function handleExportExcel() {
+    const rows = filtered.map((line) => {
+      const customer = customers.find((c) => c.id === line.request?.customer_id);
+      const customerLabel = customer?.customer_name ?? customer?.customer_code ?? line.request?.customer_id ?? '-';
+      return balanceExportRow(line, customerLabel);
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadExcelRows(rows, BALANCE_EXPORT_HEADERS, `stock-balance-${stamp}.xlsx`, 'Stock Balance');
+  }
+
   return (
     <section className={getPageShellClassName()}>
       <PageHeader
@@ -184,6 +217,14 @@ export function InventoryBalancePage() {
           onClick={() => setExpandedKeys(expandedKeys.size > 0 ? new Set() : new Set(customerGroups.flatMap((g) => g.products.map((p) => p.productKey))))}
         >
           {expandedKeys.size > 0 ? '▲ ย่อทั้งหมด' : '▼ ขยายทั้งหมด'}
+        </button>
+        <button
+          type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-end' }}
+          onClick={handleExportExcel}
+          disabled={filtered.length === 0}
+          data-testid="inventory-balance-export-excel"
+        >
+          Export Excel
         </button>
       </div>
 
