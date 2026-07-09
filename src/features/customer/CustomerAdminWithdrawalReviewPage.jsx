@@ -16,6 +16,7 @@ import {
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
   updateWithdrawalLineAdminNote,
+  updateWithdrawalLineTrackingCode,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -47,6 +48,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [recounting, setRecounting] = useState(false);
   const [lineAdminNotes, setLineAdminNotes] = useState({});
   const [savingAdminNote, setSavingAdminNote] = useState({});
+  const [lineTrackingCodes, setLineTrackingCodes] = useState({});
+  const [savingTrackingCode, setSavingTrackingCode] = useState({});
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -113,8 +116,13 @@ export function CustomerAdminWithdrawalReviewPage() {
       const loadedLines = result.data ?? [];
       setLines(loadedLines);
       const initNotes = {};
-      loadedLines.forEach((l) => { initNotes[l.id] = l.admin_note ?? ''; });
+      const initTrackingCodes = {};
+      loadedLines.forEach((l) => {
+        initNotes[l.id] = l.admin_note ?? '';
+        initTrackingCodes[l.id] = l.tracking_code ?? '';
+      });
       setLineAdminNotes(initNotes);
+      setLineTrackingCodes(initTrackingCodes);
     });
 
     return () => { active = false; };
@@ -522,6 +530,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                     header={selected}
                     language={language}
                     lines={lines}
+                    isStaff={true}
                   />
                 )}
                 title={selected.withdrawal_no}
@@ -538,6 +547,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>#</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
+                      <th>รหัสติดตาม</th>
                       <th>{t('lot')}</th>
                       <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
                       <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
@@ -551,6 +561,34 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td>{line.line_no}</td>
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
+                        <td style={{ minWidth: 140 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                              placeholder="รหัสติดตาม..."
+                              value={lineTrackingCodes[line.id] ?? line.tracking_code ?? ''}
+                              onChange={(e) => setLineTrackingCodes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={!canWrite || savingTrackingCode[line.id]}
+                              style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                              onClick={async () => {
+                                setSavingTrackingCode((prev) => ({ ...prev, [line.id]: true }));
+                                const r = await updateWithdrawalLineTrackingCode(line.id, lineTrackingCodes[line.id] ?? '');
+                                setSavingTrackingCode((prev) => ({ ...prev, [line.id]: false }));
+                                if (!r.error) {
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, tracking_code: lineTrackingCodes[line.id] } : l));
+                                }
+                              }}
+                            >
+                              {savingTrackingCode[line.id] ? '…' : '💾'}
+                            </button>
+                          </div>
+                        </td>
                         <td>{line.lot_no ?? '-'}</td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ marginBottom: 2 }}>

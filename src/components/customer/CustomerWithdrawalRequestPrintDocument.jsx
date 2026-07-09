@@ -36,12 +36,28 @@ const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-all' };
 const META_KEY = { fontWeight: 600, fontSize: 10, paddingBottom: 2, whiteSpace: 'nowrap' };
 const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
-export function CustomerWithdrawalRequestPrintDocument({
+export function CustomerWithdrawalRequestPrintDocument(props) {
+  if (!props.header) return null;
+  if (!props.isStaff) {
+    return <CustomerWithdrawalRequestPrintDocumentPage {...props} />;
+  }
+  return (
+    <>
+      <CustomerWithdrawalRequestPrintDocumentPage {...props} copyType="customer" />
+      <div style={{ pageBreakBefore: 'always', height: 0 }} />
+      <CustomerWithdrawalRequestPrintDocumentPage {...props} copyType="staff" />
+    </>
+  );
+}
+
+function CustomerWithdrawalRequestPrintDocumentPage({
   header,
   lines = [],
   language = 'th',
   branding,
   hideCustomerName = false,
+  isStaff = false,
+  copyType,
 }) {
   if (!header) return null;
 
@@ -117,7 +133,14 @@ export function CustomerWithdrawalRequestPrintDocument({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_withdrawal_print_title')}</div>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>
+                  {t('customer_withdrawal_print_title')}
+                  {isStaff && copyType && (
+                    <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 8 }}>
+                      {copyType === 'customer' ? '(สำหรับลูกค้า)' : '(สำหรับพนักงาน)'}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: '#333' }}>
                   {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.withdrawal_no ?? header.request_no}</strong>
                   {docDate && docDate !== '-' && (

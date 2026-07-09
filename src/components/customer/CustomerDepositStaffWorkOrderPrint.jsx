@@ -24,11 +24,23 @@ function fmtDT(iso) {
 const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingBottom: 2 };
 const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2 };
 
-export function CustomerDepositStaffWorkOrderPrint({
+export function CustomerDepositStaffWorkOrderPrint(props) {
+  if (!props.header) return null;
+  return (
+    <>
+      <CustomerDepositStaffWorkOrderPrintPage {...props} copyType="customer" />
+      <div style={{ pageBreakBefore: 'always', height: 0 }} />
+      <CustomerDepositStaffWorkOrderPrintPage {...props} copyType="staff" />
+    </>
+  );
+}
+
+function CustomerDepositStaffWorkOrderPrintPage({
   header,
   lines = [],
   language = 'th',
   branding,
+  copyType,
 }) {
   if (!header) return null;
 
@@ -71,7 +83,12 @@ export function CustomerDepositStaffWorkOrderPrint({
             {/* Right: document title + no + date + scan QR */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_staff_work_order_title')}</div>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>
+                  {t('customer_deposit_staff_work_order_title')}
+                  <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 8 }}>
+                    {copyType === 'customer' ? '(สำหรับลูกค้า)' : '(สำหรับพนักงาน)'}
+                  </span>
+                </div>
                 <div style={{ fontSize: 11, color: '#333' }}>
                   {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
                   {header.expected_arrival_date && (
