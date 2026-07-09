@@ -8,6 +8,7 @@ export function MultiSelectDropdown({
   name
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -20,7 +21,12 @@ export function MultiSelectDropdown({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const handleToggle = () => setIsOpen(!isOpen);
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setSearchQuery('');
+    }
+  };
 
   const handleCheckboxChange = (optionValue, checked) => {
     let newValue = [...(value || [])];
@@ -42,6 +48,10 @@ export function MultiSelectDropdown({
     }
     return `เลือก ${value.length} รายการ`;
   };
+
+  const filteredOptions = options.filter(opt =>
+    (opt.label || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="multi-select-dropdown" ref={containerRef} style={{ position: 'relative' }}>
@@ -77,16 +87,29 @@ export function MultiSelectDropdown({
           border: '1px solid var(--tgd-border)',
           borderRadius: '4px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          maxHeight: '250px',
+          maxHeight: '280px',
           overflowY: 'auto',
           zIndex: 100,
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {options.length === 0 ? (
+          {options.length > 5 && (
+            <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 2 }}>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="ค้นหา..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: '100%', padding: '4px 8px', fontSize: '13px', minHeight: '30px' }}
+              />
+            </div>
+          )}
+          {filteredOptions.length === 0 ? (
             <div style={{ padding: '8px 12px', color: '#666', fontSize: '13px' }}>ไม่มีข้อมูล</div>
           ) : (
-            options.map((opt) => {
+            filteredOptions.map((opt) => {
               const isChecked = (value || []).includes(String(opt.value));
               return (
                 <label
