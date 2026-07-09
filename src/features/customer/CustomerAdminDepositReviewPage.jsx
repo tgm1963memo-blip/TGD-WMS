@@ -133,7 +133,7 @@ export function CustomerAdminDepositReviewPage() {
 
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canRequestRecount = canWrite && selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'].includes(selected.status);
-  const allLinesHaveActualQty = lines.length > 0 && lines.every((l) => l.actual_boxes != null || l.actual_weight != null);
+  const allLinesHaveActualQty = lines.length > 0 && lines.every((l) => l.actual_boxes != null && l.actual_weight != null);
   const canConfirmReceiving = canWrite && selected &&
     ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(selected.status) &&
     allLinesHaveActualQty;
