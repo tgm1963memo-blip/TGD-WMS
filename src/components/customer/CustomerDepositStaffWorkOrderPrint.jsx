@@ -148,8 +148,8 @@ export function CustomerDepositStaffWorkOrderPrint({
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
-          <col style={{ width: '9%' }} />
           <col style={{ width: '11%' }} />
+          <col style={{ width: '9%' }} />
           <col style={{ width: hasActual ? '15%' : '14%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '7%' }} />
@@ -173,8 +173,8 @@ export function CustomerDepositStaffWorkOrderPrint({
           </tr>
           <tr>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>#</th>
-            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>รหัสติดตาม</th>
+            <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOT NO</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CODE</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>การจัดเก็บ</th>
@@ -206,8 +206,8 @@ export function CustomerDepositStaffWorkOrderPrint({
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
                 <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{idx + 1}</td>
-                <td style={TD_NOWRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
                 <td style={{ ...TD_NOWRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmt(line.tracking_code)}</td>
+                <td style={TD_NOWRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
                 <td style={TD}>{fmt(line.product_name)}</td>
                 <td style={TD_NOWRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
                 <td style={TD_NOWRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
