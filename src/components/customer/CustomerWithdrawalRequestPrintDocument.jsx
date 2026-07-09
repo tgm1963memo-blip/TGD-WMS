@@ -22,14 +22,19 @@ function fmtDate(v) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
 }
 
-const NCOLS = 15;
-const TH = { border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' };
-const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
+const NCOLS = 14;
+const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0', fontSize: 9, fontWeight: 700, textAlign: 'center', overflowWrap: 'break-word', wordBreak: 'break-word' };
+// verticalAlign: 'top' — table cells default to middle-aligned, so a short
+// single-line cell (e.g. LOT NO) in the same row as a long wrapped cell
+// (e.g. CUSTOMER PRODUCT spanning 2-3 lines) got vertically centered and
+// visually collided with the taller neighboring cell's text. Top-aligning
+// every cell keeps each row's first line flush with the row's top border.
+const TD = { border: '1px solid #ccc', padding: '4px 2px', fontSize: 9, verticalAlign: 'top' };
 // Reference numbers must stay fully readable, so wrap onto a second line
 // instead of clipping — hidden overflow would silently drop characters.
-const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
-const META_KEY = { fontWeight: 600, fontSize: 11, paddingBottom: 2, whiteSpace: 'nowrap' };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
+const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-all' };
+const META_KEY = { fontWeight: 600, fontSize: 10, paddingBottom: 2, whiteSpace: 'nowrap' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerWithdrawalRequestPrintDocument({
   header,
@@ -42,8 +47,36 @@ export function CustomerWithdrawalRequestPrintDocument({
 
   const t = (key) => getTranslation(key, language);
 
+  const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
+  const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
+  const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
+  const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
+
   const totalWeightKg = lines.reduce((s, l) => s + (Number(l.requested_weight) || 0), 0);
   const totalBoxes    = lines.reduce((s, l) => s + (Number(l.requested_boxes) || 0), 0);
+
+  // lot_remaining_boxes/weight (from tgd_get_customer_stock_balance) only
+  // reflects withdrawals whose request status is already 'COMPLETED' — so
+  // for any withdrawal still in progress, this document's own line hasn't
+  // been subtracted from that figure yet. Printed for staff who need to
+  // know what will be left in the batch *after* fulfilling this document,
+  // so net out this line's own claim (picked, if already picked, else the
+  // requested amount) unless the RPC has already accounted for it.
+  const isBalanceAlreadyNetted = header.status === 'COMPLETED';
+  function remainingAfterThisWithdrawal(line) {
+    if (isBalanceAlreadyNetted) {
+      return { boxes: line.lot_remaining_boxes, weight: line.lot_remaining_weight };
+    }
+    if (line.lot_remaining_boxes == null && line.lot_remaining_weight == null) {
+      return { boxes: null, weight: null };
+    }
+    const claimedBoxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
+    const claimedWeight = Number(line.picked_weight ?? line.requested_weight ?? 0);
+    return {
+      boxes: line.lot_remaining_boxes != null ? Math.max(0, line.lot_remaining_boxes - claimedBoxes) : null,
+      weight: line.lot_remaining_weight != null ? Math.max(0, line.lot_remaining_weight - claimedWeight) : null,
+    };
+  }
 
   const docDate = header.requested_dispatch_date
     ? header.requested_dispatch_date
@@ -119,7 +152,7 @@ export function CustomerWithdrawalRequestPrintDocument({
               {!hideCustomerName ? (
                 <>
                   <td style={META_KEY}>CUSTOMER NAME</td>
-                  <td style={META_VAL}>{fmt(header.customer_name)}</td>
+                  <td style={META_VAL}>{fmt(customerName)}</td>
                 </>
               ) : (
                 <td colSpan={2} style={{ border: 'none' }}></td>
@@ -129,13 +162,13 @@ export function CustomerWithdrawalRequestPrintDocument({
             </tr>
             <tr>
               <td style={META_KEY}>ADDRESS</td>
-              <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
+              <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(customerAddress)}</td>
             </tr>
             <tr>
               <td style={META_KEY}>TEL</td>
-              <td style={META_VAL}>{fmt(header.contact_phone)}</td>
+              <td style={META_VAL}>{fmt(contactPhone)}</td>
               <td style={META_KEY}>FAX</td>
-              <td style={META_VAL}>{fmt(header.contact_fax)}</td>
+              <td style={META_VAL}>{fmt(contactFax)}</td>
             </tr>
             <tr>
               <td style={META_KEY}>DELIVERY TO</td>
@@ -169,15 +202,14 @@ export function CustomerWithdrawalRequestPrintDocument({
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
-          <col style={{ width: '6%' }} />
-          <col style={{ width: '6%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '9%' }} />
+          <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
+          <col style={{ width: '10%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '6%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
-          <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '6%' }} />
@@ -192,25 +224,24 @@ export function CustomerWithdrawalRequestPrintDocument({
           <tr>
             <td colSpan={NCOLS} className="operational-report-running-header">
               เลขที่เอกสาร {header.withdrawal_no ?? header.request_no}
-              {!hideCustomerName && <>&nbsp;•&nbsp; ลูกค้า {fmt(header.customer_name)}</>}
+              {!hideCustomerName && <>&nbsp;•&nbsp; ลูกค้า {fmt(customerName)}</>}
             </td>
           </tr>
           <tr>
             <th rowSpan={2} style={TH}>#</th>
-            <th rowSpan={2} style={TH}>LOT NO</th>
-            <th rowSpan={2} style={TH}>LOCATION</th>
-            <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={TH}>TRACKING NO</th>
+            <th rowSpan={2} style={TH}>LOT NO</th>
             <th rowSpan={2} style={TH}>ITEM CODE</th>
+            <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
+            <th rowSpan={2} style={TH}>LOCATION</th>
             <th rowSpan={2} style={TH}>MFG DATE</th>
             <th rowSpan={2} style={TH}>EXP DATE</th>
             <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}>T.WEIGHT<br />KG.</th>
-            <th colSpan={4} style={{ ...TH, background: '#e8eaf6' }}>BALANCE TOTAL</th>
+            <th colSpan={3} style={{ ...TH, background: '#e8eaf6' }}>BALANCE TOTAL</th>
             <th rowSpan={2} style={TH}>คงเหลือ<br />ในล็อต</th>
             <th rowSpan={2} style={TH}>REMARK</th>
           </tr>
           <tr>
-            <th style={{ ...TH, background: '#e8eaf6' }}>Palet</th>
             <th style={{ ...TH, background: '#e8eaf6' }}>Box</th>
             <th style={{ ...TH, background: '#e8eaf6' }}>Pack</th>
             <th style={{ ...TH, background: '#e8eaf6' }}>Pcs</th>
@@ -218,28 +249,29 @@ export function CustomerWithdrawalRequestPrintDocument({
         </thead>
 
         <tbody>
-          {lines.length ? lines.map((line, idx) => (
+          {lines.length ? lines.map((line, idx) => {
+            const remaining = remainingAfterThisWithdrawal(line);
+            return (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
+              <td style={TD_SAFE}>{fmt(line.tracking_code)}</td>
               <td style={{ ...TD_SAFE, fontWeight: 600 }}>{fmt(line.lot_no)}</td>
-              <td style={TD_SAFE}>{fmt(line.location)}</td>
+              <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
               <td style={TD_SAFE}>
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
-              <td style={TD_SAFE}>{fmt(line.tracking_code)}</td>
-              <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
+              <td style={TD_SAFE}>{fmt(line.location)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
               <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(line.requested_weight)}</td>
-              <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>
-                <div style={{ fontWeight: 600 }}>{line.lot_remaining_boxes != null ? line.lot_remaining_boxes : '-'}</div>
-                {line.lot_remaining_weight != null ? (
-                  <div style={{ fontSize: 9, color: '#555' }}>{fmtNum(line.lot_remaining_weight)} kg.</div>
+                <div style={{ fontWeight: 600 }}>{remaining.boxes != null ? remaining.boxes : '-'}</div>
+                {remaining.weight != null ? (
+                  <div style={{ fontSize: 9, color: '#555' }}>{fmtNum(remaining.weight)} kg.</div>
                 ) : null}
               </td>
               <td style={TD}>
@@ -251,7 +283,8 @@ export function CustomerWithdrawalRequestPrintDocument({
                 ) : '-'}
               </td>
             </tr>
-          )) : (
+            );
+          }) : (
             <tr>
               <td colSpan={NCOLS} style={{ ...TD, textAlign: 'center', color: '#888' }}>ไม่มีรายการ</td>
             </tr>
@@ -262,7 +295,6 @@ export function CustomerWithdrawalRequestPrintDocument({
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
             <td colSpan={8} style={{ ...TD, textAlign: 'right' }}>SUB TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
-            <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
@@ -272,7 +304,6 @@ export function CustomerWithdrawalRequestPrintDocument({
           <tr style={{ fontWeight: 700, background: '#ebebeb' }}>
             <td colSpan={8} style={{ ...TD, textAlign: 'right' }}>TOTAL</td>
             <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(totalWeightKg)}</td>
-            <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalBoxes || '-'}</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
             <td style={{ ...TD, textAlign: 'center' }}>0</td>
