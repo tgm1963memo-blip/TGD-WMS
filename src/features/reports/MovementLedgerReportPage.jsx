@@ -73,6 +73,15 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
   let depositRows = depositResult.data ?? [];
   let withdrawalRows = withdrawalResult.data ?? [];
 
+  // Apply movement type filter
+  if (filterCriteria.movementType && filterCriteria.movementType.length > 0) {
+    const types = Array.isArray(filterCriteria.movementType) ? filterCriteria.movementType : [filterCriteria.movementType];
+    const matchType = (r) => types.includes(r.movement_type_canonical) || types.includes(r.movement_type_raw) || types.includes(r.movement_type);
+    outboundRows = outboundRows.filter(matchType);
+    depositRows = depositRows.filter(matchType);
+    withdrawalRows = withdrawalRows.filter(matchType);
+  }
+
   // Apply product filter
   if (filterCriteria.productId && filterCriteria.productId.length > 0) {
     const applyProd = (rowSet) => Array.isArray(filterCriteria.productId)
@@ -317,7 +326,7 @@ export function MovementLedgerReportPage() {
         customerOptions={customerOptions}
         productOptions={productOptions}
         locationOptions={locationOptions}
-        showMovementType={false}
+        showMovementType={true}
         multiProduct={true}
         multiLocation={true}
         showTrackingCode={true}

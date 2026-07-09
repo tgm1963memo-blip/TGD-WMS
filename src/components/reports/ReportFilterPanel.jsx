@@ -5,7 +5,7 @@ import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 const initialFilters = {
   dateFrom: '',
   dateTo: '',
-  movementType: '',
+  movementType: [],
   productId: '',
   productIds: [],
   customerId: '',
@@ -22,6 +22,15 @@ const temperatureOptions = [
   { value: '-', label: 'ไม่มีระบุ (-)' },
 ];
 
+const MOVEMENT_TYPE_OPTIONS = [
+  { value: 'OPENING_BALANCE', label: 'ยอดยกมา (Opening Balance)' },
+  { value: 'RECEIVE_CONFIRM', label: 'ใบฝาก / รับเข้า (Receive / Inbound)' },
+  { value: 'DISPATCH', label: 'ใบเบิก / จ่ายออก (Dispatch / Outbound)' },
+  { value: 'ADJUST_IN', label: 'ปรับปรุงเข้า (Adjust In)' },
+  { value: 'ADJUST_OUT', label: 'ปรับปรุงออก (Adjust Out)' },
+  { value: 'TRANSFER', label: 'โอนย้าย (Transfer)' },
+];
+
 export function ReportFilterPanel({
   value = initialFilters,
   onChange,
@@ -34,7 +43,7 @@ export function ReportFilterPanel({
   showTrackingCode = false,
   showLotNo = false,
 }) {
-  const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || '') });
+  const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || ''), movementType: Array.isArray(value.movementType) ? value.movementType : (value.movementType ? [value.movementType] : []) });
 
   useEffect(() => {
     setFilters((prev) => ({ ...prev, productId: multiProduct ? [] : '', locationId: multiLocation ? [] : '' }));
@@ -65,7 +74,18 @@ export function ReportFilterPanel({
         <div className="form-group"><label className="form-label">Date From<input className="form-control" name="dateFrom" type="date" value={filters.dateFrom} onChange={updateField} /></label></div>
         <div className="form-group"><label className="form-label">Date To<input className="form-control" name="dateTo" type="date" value={filters.dateTo} onChange={updateField} /></label></div>
         {showMovementType && (
-          <div className="form-group"><label className="form-label">Movement Type<input className="form-control" name="movementType" value={filters.movementType} onChange={updateField} /></label></div>
+          <div className="form-group">
+            <label className="form-label">
+              ประเภทเอกสาร
+              <MultiSelectDropdown
+                name="movementType"
+                options={MOVEMENT_TYPE_OPTIONS}
+                value={filters.movementType}
+                onChange={(val) => setFilters((prev) => ({ ...prev, movementType: val }))}
+                placeholder="— ทั้งหมด —"
+              />
+            </label>
+          </div>
         )}
         <div className="form-group">
           <label className="form-label">
