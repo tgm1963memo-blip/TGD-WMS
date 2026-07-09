@@ -11,7 +11,7 @@ const WITHDRAWAL_HEADER_SELECT = [
   'id',
   'withdrawal_no',
   'customer_id',
-  'customer:tgd_customers(customer_code, customer_name, name)',
+  'customer:tgd_customers(customer_code, customer_name, name, address, phone)',
   'status',
   'requested_dispatch_date',
   'delivery_type',
@@ -342,6 +342,18 @@ export async function updateWithdrawalLineAdminNote(lineId, adminNote) {
     p_line_id: lineId,
     p_admin_note: toNullableText(adminNote),
   });
+
+  return { data, error };
+}
+
+export async function updateWithdrawalLineTrackingCode(lineId, trackingCode) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase
+    .from('tgd_customer_withdrawal_request_lines')
+    .update({ tracking_code: toNullableText(trackingCode) })
+    .eq('id', lineId)
+    .select();
 
   return { data, error };
 }
