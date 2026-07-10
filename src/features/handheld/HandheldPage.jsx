@@ -178,27 +178,61 @@ function TopBar({ title, subtitle, onBack, badge }) {
 }
 
 // ── Qty input row ─────────────────────────────────────────────
-function QtyRow({ boxes, setBoxes, weight, setWeight }) {
+// weightPerBox/weightLocked/onToggleWeightLock are optional: when a
+// per-lot weight/box is known and locked, typing boxes auto-computes
+// weight and the weight field becomes read-only, with a small toggle to
+// unlock it for the rare box that genuinely weighs something else.
+function QtyRow({ boxes, setBoxes, weight, setWeight, weightPerBox = null, weightLocked = false, onToggleWeightLock }) {
+  const autoCalc = Boolean(weightPerBox) && weightLocked;
+
+  function inputStyle(val) {
+    return {
+      width: '100%', boxSizing: 'border-box',
+      background: val ? C.greenLight : C.inputBg,
+      border: `2px solid ${val ? C.green : C.border}`,
+      borderRadius: 16, padding: '16px 12px',
+      color: val ? C.green : C.text,
+      fontSize: 26, fontWeight: 800, textAlign: 'center', outline: 'none',
+      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    };
+  }
+
   return (
     <div style={{ display: 'flex', gap: 16, padding: '0 0 16px', flexShrink: 0 }}>
-      {[['กล่อง', boxes, setBoxes], ['น้ำหนัก (กก.)', weight, setWeight]].map(([label, val, setVal]) => (
-        <label key={label} style={{ flex: 1 }}>
-          <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</div>
-          <input
-            type="number" min={0} value={val}
-            onChange={(e) => setVal(e.target.value)}
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: val ? C.greenLight : C.inputBg,
-              border: `2px solid ${val ? C.green : C.border}`,
-              borderRadius: 16, padding: '16px 12px',
-              color: val ? C.green : C.text,
-              fontSize: 26, fontWeight: 800, textAlign: 'center', outline: 'none',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          />
-        </label>
-      ))}
+      <label style={{ flex: 1 }}>
+        <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>กล่อง</div>
+        <input
+          type="number" min={0} value={boxes}
+          onChange={(e) => {
+            const val = e.target.value;
+            setBoxes(val);
+            if (autoCalc) {
+              setWeight(val !== '' ? (Number(val) * weightPerBox).toFixed(2) : '');
+            }
+          }}
+          style={inputStyle(boxes)}
+        />
+      </label>
+      <label style={{ flex: 1 }}>
+        <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <span>น้ำหนัก (กก.)</span>
+          {weightPerBox ? (
+            <button
+              type="button"
+              onClick={onToggleWeightLock}
+              style={{ background: 'none', border: 'none', color: C.pickAccent, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0, whiteSpace: 'nowrap' }}
+            >
+              {weightLocked ? 'แก้ไขน้ำหนักเอง' : 'คำนวณอัตโนมัติ'}
+            </button>
+          ) : null}
+        </div>
+        <input
+          type="number" min={0} value={weight}
+          disabled={autoCalc}
+          onChange={(e) => setWeight(e.target.value)}
+          style={inputStyle(weight)}
+        />
+      </label>
     </div>
   );
 }
@@ -1193,6 +1227,7 @@ function PickingWorkflow({ onBack, t }) {
   const [autoConfirmedItem, setAutoConfirmedItem] = useState(null);
   const [boxes, setBoxes] = useState('');
   const [weight, setWeight] = useState('');
+  const [weightAutoLocked, setWeightAutoLocked] = useState(true);
   const [confirmed, setConfirmed] = useState([]);
   const [sortType, setSortType] = useState('pending');
   const [saving, setSaving] = useState(false);
@@ -1347,6 +1382,7 @@ function PickingWorkflow({ onBack, t }) {
     setMatchedLine(match);
     setBoxes(match.requested_boxes?.toString() ?? '');
     setWeight(match.requested_weight?.toString() ?? '');
+    setWeightAutoLocked(true);
     setEditWarned(false);
   }
 
@@ -1665,7 +1701,12 @@ function PickingWorkflow({ onBack, t }) {
               </div>
             )}
 
-            <QtyRow boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight} />
+            <QtyRow
+              boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight}
+              weightPerBox={matchedLine.resolved_weight_per_box}
+              weightLocked={weightAutoLocked}
+              onToggleWeightLock={() => setWeightAutoLocked((prev) => !prev)}
+            />
 
             <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
               style={{

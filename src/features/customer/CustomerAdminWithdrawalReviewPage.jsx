@@ -45,6 +45,7 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [recountQty, setRecountQty] = useState('');
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountWeight, setRecountWeight] = useState('');
+  const [recountWeightLocked, setRecountWeightLocked] = useState(true);
   const [recounting, setRecounting] = useState(false);
   const [lineAdminNotes, setLineAdminNotes] = useState({});
   const [savingAdminNote, setSavingAdminNote] = useState({});
@@ -665,6 +666,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 setRecountBoxes((line.picked_boxes ?? line.requested_boxes ?? '').toString());
                                 setRecountWeight((line.picked_weight ?? line.requested_weight ?? '').toString());
                                 setRecountQty((line.picked_qty ?? line.requested_qty ?? '').toString());
+                                setRecountWeightLocked(true);
                                 setError('');
                               }}
                             >
@@ -818,16 +820,35 @@ export function CustomerAdminWithdrawalReviewPage() {
                   min={0}
                   step={1}
                   value={recountBoxes}
-                  onChange={(e) => setRecountBoxes(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRecountBoxes(val);
+                    if (recountLine?.resolved_weight_per_box && recountWeightLocked) {
+                      setRecountWeight(val !== '' ? (Number(val) * recountLine.resolved_weight_per_box).toFixed(2) : '');
+                    }
+                  }}
                 />
               </label>
               <label className="form-field">
-                <span>น้ำหนักที่หยิบจริง (กก.)</span>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <span>น้ำหนักที่หยิบจริง (กก.)</span>
+                  {recountLine?.resolved_weight_per_box ? (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm"
+                      style={{ fontSize: 11, padding: 0 }}
+                      onClick={() => setRecountWeightLocked((prev) => !prev)}
+                    >
+                      {recountWeightLocked ? 'แก้ไขน้ำหนักเอง' : 'คำนวณอัตโนมัติ'}
+                    </button>
+                  ) : null}
+                </span>
                 <input
                   className="form-control"
                   type="number"
                   min={0}
                   step={0.001}
+                  disabled={Boolean(recountLine?.resolved_weight_per_box) && recountWeightLocked}
                   value={recountWeight}
                   onChange={(e) => setRecountWeight(e.target.value)}
                 />

@@ -133,7 +133,7 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
 // FIFO-allocated balance from the RPC, not a re-derived approximation.
 async function attachRemainingLotBalance(lines, customerId) {
   if (!supabase || !customerId) {
-    return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null }));
+    return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null, resolved_weight_per_box: null }));
   }
 
   const [{ data: depositRequests }, { data: balances }] = await Promise.all([
@@ -143,7 +143,7 @@ async function attachRemainingLotBalance(lines, customerId) {
         id,
         tgd_customer_deposit_request_lines(
           id, lot_no, tracking_code, customer_product_code, actual_boxes, actual_weight,
-          expected_boxes, expected_weight, location_id, tgd_locations(location_code)
+          expected_boxes, expected_weight, weight_per_box, location_id, tgd_locations(location_code)
         )
       `)
       .eq('customer_id', customerId)
@@ -153,7 +153,7 @@ async function attachRemainingLotBalance(lines, customerId) {
 
   const depositLineList = (depositRequests ?? []).flatMap((r) => r.tgd_customer_deposit_request_lines ?? []);
   if (depositLineList.length === 0) {
-    return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null }));
+    return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null, resolved_weight_per_box: null }));
   }
 
   const depositLineById = new Map(depositLineList.map((d) => [d.id, d]));
@@ -182,7 +182,7 @@ async function attachRemainingLotBalance(lines, customerId) {
   return lines.map((line) => {
     const depositLine = resolveDepositLine(line);
     if (!depositLine) {
-      return { ...line, lot_remaining_boxes: null, lot_remaining_weight: null };
+      return { ...line, lot_remaining_boxes: null, lot_remaining_weight: null, resolved_weight_per_box: null };
     }
     const balance = balanceByLineId.get(depositLine.id);
     return {
@@ -190,6 +190,7 @@ async function attachRemainingLotBalance(lines, customerId) {
       location: depositLine.tgd_locations?.location_code ?? line.location ?? null,
       lot_remaining_boxes: Number(balance?.actual_boxes ?? 0),
       lot_remaining_weight: Number(balance?.actual_weight ?? 0),
+      resolved_weight_per_box: depositLine.weight_per_box != null ? Number(depositLine.weight_per_box) : null,
     };
   });
 }
