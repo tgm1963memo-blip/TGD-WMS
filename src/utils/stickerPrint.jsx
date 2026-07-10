@@ -56,7 +56,7 @@ export function printSticker({
      should have none. */
   @page { margin: 0; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  body { font-family: Tahoma, 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
   /* On screen (this preview popup): show the sticker as a plain landscape
      rectangle, unrotated, so what you see here is what the layout actually
      looks like — easy to check before printing.
@@ -73,7 +73,7 @@ export function printSticker({
   .sticker-page { width: 101.6mm; height: 76.2mm; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
-    border: 3px solid #000; border-radius: 4mm; padding: 1.5mm;
+    border: 3px solid #000; border-radius: 4mm; padding: 1mm;
     background-color: white; overflow: hidden; display: flex; flex-direction: column;
   }
   @media print {
@@ -87,11 +87,11 @@ export function printSticker({
 
   /* Table Grid Layout (Minimized White Space) */
   table.layout { width: 100%; height: 100%; border-collapse: collapse; }
-  table.layout td { border: 2px solid #000; padding: 1mm 2mm; overflow: hidden; }
-  .qr-cell { width: 22mm; padding: 1.5mm !important; text-align: center; vertical-align: middle; }
+  table.layout td { border: 2px solid #000; padding: 0.8mm 1.5mm; overflow: hidden; }
+  .qr-cell { width: 22mm; padding: 1mm !important; text-align: center; vertical-align: middle; }
   .qr-cell svg { width: 100%; height: auto; display: block; margin: 0 auto; }
-  
-  .product-cell { vertical-align: top; padding-bottom: 2mm !important; }
+
+  .product-cell { vertical-align: top; padding-bottom: 1mm !important; }
   .product-flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
   .product-name { font-size: 20px; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px; -webkit-text-stroke: 0.3px #000; }
   .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; -webkit-text-stroke: 0.1px #000; }
@@ -102,7 +102,7 @@ export function printSticker({
   .track-row { height: 100%; text-align: center; vertical-align: middle; padding: 0 !important; }
   .track-wrapper { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
   /* Tracking code is maximized to fill the remaining area */
-  .track-code { font-size: 96px; font-weight: 900; line-height: 0.82; letter-spacing: -3px; -webkit-text-stroke: 1.5px #000; margin: 0; padding: 0; }
+  .track-code { font-family: 'Tahoma', sans-serif; font-size: 94px; font-weight: 900; line-height: 0.85; letter-spacing: -3px; -webkit-text-stroke: 2px #000; margin: 0; padding: 0; white-space: nowrap; }
 </style>
 </head>
 <body>
