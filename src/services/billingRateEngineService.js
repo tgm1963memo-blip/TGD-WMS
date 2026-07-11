@@ -16,12 +16,24 @@ function missingSupabaseClientResult() {
 // keyed on tgd_customer_products.id (the catalog row), which we CAN
 // resolve reliably via customer_product_code — same approach used
 // throughout the withdrawal/deposit line matching code in this app.
-function buildCustomerProductIdMap(catalogRows = []) {
-  const map = new Map();
+//
+// Also maps each code to the master catalog's CURRENT temperature_type —
+// deposit lines snapshot temperature_type at deposit time (copied from the
+// catalog then, see CustomerDepositLinesTable.jsx's selectCatalogProduct),
+// which can drift from the master if the catalog entry is corrected later
+// or the line predates a catalog fix. A storage rate scoped to a
+// temperature tier must key off the master's classification, not a
+// possibly-stale per-line snapshot, so an item master correction is
+// reflected in billing immediately.
+function buildCatalogMaps(catalogRows = []) {
+  const productIdByCode = new Map();
+  const temperatureTypeByCode = new Map();
   for (const row of catalogRows) {
-    if (row.customer_product_code) map.set(row.customer_product_code, row.id);
+    if (!row.customer_product_code) continue;
+    productIdByCode.set(row.customer_product_code, row.id);
+    if (row.temperature_type) temperatureTypeByCode.set(row.customer_product_code, row.temperature_type);
   }
-  return map;
+  return { productIdByCode, temperatureTypeByCode };
 }
 
 // Finds, for each deposit line, the date it became fully depleted (if it
@@ -110,7 +122,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   if (ratesResult.error) return { data: null, error: ratesResult.error };
   if (catalogResult.error) return { data: null, error: catalogResult.error };
 
-  const codeToProductId = buildCustomerProductIdMap(catalogResult.data ?? []);
+  const { productIdByCode, temperatureTypeByCode } = buildCatalogMaps(catalogResult.data ?? []);
 
   const rawDepositLines = [];
   const depositRequestIds = [];
@@ -138,8 +150,10 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const depositLines = rawDepositLines.map((line) => ({
     id: line.id,
     customer_id: line.customer_id,
-    customer_product_id: codeToProductId.get(line.customer_product_code) ?? null,
-    temperature_type: line.temperature_type ?? null,
+    customer_product_id: productIdByCode.get(line.customer_product_code) ?? null,
+    // Master catalog's current classification wins; the line's own
+    // snapshot only covers products no longer present in the catalog.
+    temperature_type: temperatureTypeByCode.get(line.customer_product_code) ?? line.temperature_type ?? null,
     received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
     receipt_date: line.receipt_date,
     exit_date: exitDates.get(line.id) ?? null,
