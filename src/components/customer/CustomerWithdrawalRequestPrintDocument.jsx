@@ -297,7 +297,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                   <div style={{ fontSize: 9, color: '#555' }}>{fmtNum(remaining.weight)} kg.</div>
                 ) : null}
               </td>
-              <td style={TD}>
+              <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {(line.note || line.admin_note) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {line.note ? <span>{line.note}</span> : null}

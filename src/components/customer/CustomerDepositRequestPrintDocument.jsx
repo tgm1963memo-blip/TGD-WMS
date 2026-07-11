@@ -222,7 +222,7 @@ export function CustomerDepositRequestPrintDocument({
                   {line.actual_weight ?? '-'}
                 </td>
               )}
-              <td style={TD}>{line.note ?? line.actual_note ?? '-'}</td>
+              <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{line.note ?? line.actual_note ?? '-'}</td>
             </tr>
           )) : (
             <tr>
