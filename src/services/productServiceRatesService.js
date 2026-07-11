@@ -27,6 +27,7 @@ export const TEMPERATURE_TYPES = [
   { value: '',        label: '— ทุกอุณหภูมิ —' },
   { value: 'FROZEN',  label: 'แช่แข็ง (FROZEN)' },
   { value: 'CHILLED', label: 'แช่เย็น (CHILLED)' },
+  { value: 'AMBIENT', label: 'อุณหภูมิห้อง (AMBIENT)' },
 ];
 
 export async function listProductServiceRates(customerProductId) {
@@ -45,6 +46,18 @@ export async function listProductServiceRatesByCustomer(customerId) {
     .select('id, customer_product_id, service_type, rate, unit_basis, currency, note, is_active, tgd_customer_products!inner(id, customer_product_code, product_name, customer_id)')
     .eq('tgd_customer_products.customer_id', customerId)
     .order('service_type');
+}
+
+export async function listDistinctServiceTypes() {
+  if (!supabase) return missing();
+  // Using PostgREST to fetch distinct service_types.
+  // There's no distinct keyword, so we fetch them all and reduce in JS.
+  const { data, error } = await supabase
+    .from('tgd_customer_product_service_rates')
+    .select('service_type');
+  if (error) return { data: null, error };
+  const distinct = [...new Set((data || []).map((row) => row.service_type))].filter(Boolean);
+  return { data: distinct, error: null };
 }
 
 function shapeProductServiceRateRow(row = {}) {

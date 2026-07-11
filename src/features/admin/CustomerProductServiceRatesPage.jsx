@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
@@ -12,6 +12,7 @@ import {
   listCustomerProductsForRateImport,
   upsertProductServiceRate,
   bulkUpsertProductServiceRates,
+  listDistinctServiceTypes,
 } from '../../services/productServiceRatesService.js';
 import {
   buildStorageRateLookupMap,
@@ -66,6 +67,7 @@ export function CustomerProductServiceRatesPage() {
   const [productId, setProductId] = useState('');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
+  const [distinctServiceTypes, setDistinctServiceTypes] = useState([]);
 
   const [rates, setRates] = useState([]);
   const [ratesLoading, setRatesLoading] = useState(false);
@@ -85,6 +87,7 @@ export function CustomerProductServiceRatesPage() {
 
   useEffect(() => {
     getCustomers().then((r) => setCustomers(r.data ?? []));
+    listDistinctServiceTypes().then((r) => setDistinctServiceTypes(r.data ?? []));
   }, []);
 
   useEffect(() => {
@@ -260,6 +263,13 @@ export function CustomerProductServiceRatesPage() {
 
   const selectedProduct = products.find((p) => p.id === productId);
 
+  // Combine default service types with dynamically discovered ones
+  const allServiceTypes = useMemo(() => {
+    const defaultVals = SERVICE_TYPES.map(s => s.value);
+    const custom = distinctServiceTypes.filter(s => !defaultVals.includes(s));
+    return [...SERVICE_TYPES, ...custom.map(c => ({ value: c, label: c, labelEn: 'Custom' }))];
+  }, [distinctServiceTypes]);
+
   return (
     <section className={getPageShellClassName()}>
       <PageHeader
@@ -307,7 +317,7 @@ export function CustomerProductServiceRatesPage() {
             style={{ marginTop: 4, display: 'block', width: '100%' }}
           >
             <option value="">ทุกประเภท</option>
-            {SERVICE_TYPES.map((s) => (
+            {allServiceTypes.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
@@ -339,6 +349,7 @@ export function CustomerProductServiceRatesPage() {
           <span style={{ fontSize: 12, color: '#2d9348' }}>
             {selectedProduct.uom ? `หน่วย: ${selectedProduct.uom}` : ''}
             {selectedProduct.pack_weight_kg ? `  น้ำหนัก: ${selectedProduct.pack_weight_kg} กก./หน่วย` : ''}
+            {selectedProduct.temperature_type ? `  อุณหภูมิ: ${TEMPERATURE_TYPES.find(t => t.value === selectedProduct.temperature_type)?.label || selectedProduct.temperature_type}` : ''}
           </span>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', marginLeft: 8 }}>
@@ -520,16 +531,21 @@ export function CustomerProductServiceRatesPage() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
                   ประเภทค่าบริการ *
                 </label>
-                <select
+                <input
+                  list="service-types-list"
                   className="form-control"
                   value={form.serviceType}
                   onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))}
                   disabled={!!form.rateId}
-                >
-                  {SERVICE_TYPES.map((s) => (
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}
+                  placeholder="เลือกหรือพิมพ์ประเภทค่าบริการใหม่"
+                  required
+                />
+                <datalist id="service-types-list">
+                  {allServiceTypes.map((s) => (
                     <option key={s.value} value={s.value}>{s.label} ({s.labelEn})</option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
