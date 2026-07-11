@@ -156,7 +156,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
             <td style={META_KEY}>RECEIVE FROM</td>
             <td style={META_VAL}>{fmt(header.receive_from)}</td>
             <td style={META_KEY}>REMARK</td>
-            <td style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.note)}</td>
+            <td style={{ ...META_VAL, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{fmt(header.note)}</td>
           </tr>
         </tbody>
       </table>
@@ -243,7 +243,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 <td style={TD_NOWRAP}>{fmtDate(line.mfg_date)}</td>
                 <td style={TD_NOWRAP}>{fmtDate(line.exp_date)}</td>
                 <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{fmt(line.argent_type)}</td>
-                {!hasActual && <td style={{ ...TD, overflowWrap: 'break-word' }}>{fmt(line.actual_note ?? line.note)}</td>}
+                {!hasActual && <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{fmt(line.actual_note ?? line.note)}</td>}
               </tr>
             );
           })}

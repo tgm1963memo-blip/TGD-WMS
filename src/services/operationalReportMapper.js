@@ -181,8 +181,15 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const totalBalanceForwardWt = Object.keys(lotBalances).reduce(
     (sum, key) => sum + (openingBalances.get(key)?.weight ?? 0), 0);
 
-  const totalBalanceVol = totalBalanceForwardVol + subtotalReceivedVol - subtotalDeliveryVol;
-  const totalBalanceWt = totalBalanceForwardWt + subtotalReceivedWt - subtotalDeliveryWt;
+  // Grand total is the sum of each lot's own final balance (lotBalances,
+  // already floored at 0 per lot above) — NOT forward + received - delivered
+  // recomputed flat. That flat formula ignores the per-lot floor entirely,
+  // so a lot whose recorded withdrawals exceeded what it received (clamped
+  // to 0 in lotBalances, same as the stock balance page's RPC) still
+  // subtracted its true negative amount from this total, understating it
+  // relative to every other total in this report and to the balance page.
+  const totalBalanceVol = Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
+  const totalBalanceWt = Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
 
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',

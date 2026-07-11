@@ -184,8 +184,6 @@ function totalsExcelRow(totals) {
 // opening plus this period's net movement), not once per row, since a lot's
 // balance appears on every one of its rows as a running total.
 function computeGrandTotals(rows, openingBalances) {
-  const netMovementByKey = aggregateFinalBalances(rows);
-
   let receivedQty = 0;
   let receivedWeight = 0;
   let deliveredQty = 0;
@@ -202,12 +200,35 @@ function computeGrandTotals(rows, openingBalances) {
     }
   });
 
+  // Final balance per lot must be replayed chronologically from its own
+  // opening balance, flooring at 0 at every step (addMovement does this) —
+  // NOT "opening + net movement computed independently of opening", which
+  // ignores the floor entirely and understates the total whenever a lot's
+  // recorded withdrawals exceed what it received (same clamp-at-0 rule the
+  // stock balance page's RPC applies).
+  const dateSorted = [...rows].sort((a, b) =>
+    new Date(a.movement_date ?? a.created_at ?? 0).getTime() - new Date(b.movement_date ?? b.created_at ?? 0).getTime());
+
+  const finalBalanceByKey = new Map();
+  dateSorted.forEach((row) => {
+    const key = movementBalanceKey(row);
+    const seed = finalBalanceByKey.get(key) ?? openingBalances.get(key) ?? zeroBalance();
+    finalBalanceByKey.set(key, addMovement(seed, row));
+  });
+
   let balanceQty = 0;
   let balanceWeight = 0;
-  netMovementByKey.forEach((net, key) => {
-    const opening = openingBalances.get(key) ?? zeroBalance();
-    balanceQty += opening.qty + net.qty;
-    balanceWeight += opening.weight + net.weight;
+  finalBalanceByKey.forEach((balance) => {
+    balanceQty += balance.qty;
+    balanceWeight += balance.weight;
+  });
+  // A lot with an opening balance but no movement rows in this period still
+  // carries its (already-floored) balance forward into the grand total.
+  openingBalances.forEach((opening, key) => {
+    if (!finalBalanceByKey.has(key)) {
+      balanceQty += opening.qty;
+      balanceWeight += opening.weight;
+    }
   });
 
   return { receivedQty, receivedWeight, deliveredQty, deliveredWeight, balanceQty, balanceWeight };
