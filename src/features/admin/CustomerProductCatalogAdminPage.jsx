@@ -4,7 +4,6 @@ import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
-import { getCurrentUserProfile } from '../../services/userProfileService.js';
 import {
   deactivateCustomerProduct,
   listCustomerProducts,
@@ -15,9 +14,9 @@ import {
   exportCustomerProductsExcel,
   parseCustomerProductImportFile,
 } from '../../utils/customerProductExcelUtils.js';
-import { canWriteCustomerCatalog } from '../../security/userManagementPermissions.js';
+import { hasRoleFunctionAccess, hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
-import { useAuth } from '../auth/AuthContext.jsx';
 
 const EMPTY_FORM = {
   productId: '',
@@ -275,7 +274,9 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
 }
 
 export function CustomerProductCatalogAdminPage() {
-  const { session } = useAuth();
+  const { role: userRole } = useUserRole();
+  const canView = hasRoleFunctionAccess(userRole, 'customer_product_catalog_admin');
+  const canWrite = hasRoleFunctionWriteAccess(userRole, 'customer_product_catalog_admin');
   const t = useTranslation();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -287,7 +288,6 @@ export function CustomerProductCatalogAdminPage() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [canWrite, setCanWrite] = useState(false);
   const [formError, setFormError] = useState('');
 
   const customerMap = useMemo(
@@ -312,9 +312,8 @@ export function CustomerProductCatalogAdminPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getCurrentUserProfile(session?.user?.id), getCustomers()]).then(([profileResult, customerResult]) => {
+    getCustomers().then((customerResult) => {
       if (!active) return;
-      setCanWrite(canWriteCustomerCatalog(profileResult.data?.role ?? ''));
       setCustomers(customerResult.data ?? []);
     });
     loadProducts();
@@ -459,7 +458,7 @@ export function CustomerProductCatalogAdminPage() {
     );
   });
 
-  if (!loading && !canWrite) {
+  if (!loading && !canView) {
     return (
       <section className="page-shell" data-testid="customer-product-catalog-admin-page">
         <PageHeader title={t('catalog_admin_title')} description={t('catalog_admin_description')} />
