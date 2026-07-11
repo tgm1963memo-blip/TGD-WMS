@@ -183,7 +183,7 @@ function totalsExcelRow(totals) {
 // remaining balance is summed once per distinct lot (its final balance —
 // opening plus this period's net movement), not once per row, since a lot's
 // balance appears on every one of its rows as a running total.
-function computeGrandTotals(rows, openingBalances) {
+function computeGrandTotals(rows, openingBalances, authoritativeTotals = null) {
   let receivedQty = 0;
   let receivedWeight = 0;
   let deliveredQty = 0;
@@ -231,23 +231,31 @@ function computeGrandTotals(rows, openingBalances) {
     }
   });
 
+  // authoritativeTotals (same source as the stock balance page's RPC —
+  // see getAuthoritativeBalanceTotals) overrides the locally-replayed sum
+  // when supplied, so the exported grand total matches that page exactly.
+  if (authoritativeTotals) {
+    balanceQty = authoritativeTotals.totalBoxes;
+    balanceWeight = authoritativeTotals.totalWeight;
+  }
+
   return { receivedQty, receivedWeight, deliveredQty, deliveredWeight, balanceQty, balanceWeight };
 }
 
-export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map(), sortMode = 'productLot') {
+export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map(), sortMode = 'productLot', authoritativeTotals = null) {
   const excelRows = sortMode === 'date'
     ? buildDateOrderedExcelRows(rows, openingBalances)
     : buildGroupedExcelRows(rows, openingBalances);
 
   if (rows.length > 0) {
-    excelRows.push(totalsExcelRow(computeGrandTotals(rows, openingBalances)));
+    excelRows.push(totalsExcelRow(computeGrandTotals(rows, openingBalances, authoritativeTotals)));
   }
 
   return excelRows;
 }
 
-export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger') {
-  const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode);
+export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger', authoritativeTotals = null) {
+  const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode, authoritativeTotals);
   const stamp = new Date().toISOString().slice(0, 10);
   downloadExcelRows(excelRows, HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger');
 }

@@ -9,6 +9,7 @@ import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
   getConfirmedWithdrawalRows,
+  getAuthoritativeBalanceTotals,
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
@@ -83,6 +84,11 @@ export function CustomerMovementLedgerPage() {
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
+  // Authoritative "remaining" total — same source as the stock balance
+  // page's RPC (see getAuthoritativeBalanceTotals) — only valid as a
+  // stand-in for this report's total when it isn't narrowed to a
+  // product/lot/tracking-code subset and its date range reaches today.
+  const [authoritativeTotals, setAuthoritativeTotals] = useState(null);
 
   const branding = getDocumentBrandingConfig();
   const printedBy = session?.user?.email ?? null;
@@ -120,6 +126,11 @@ export function CustomerMovementLedgerPage() {
       ? { customerId: customerId || undefined, dateFrom: undefined, dateTo: dayBefore(dateFrom) }
       : null;
 
+    const canUseAuthoritative = !dateTo || dateTo >= new Date().toISOString().slice(0, 10);
+    const authoritativeFetch = canUseAuthoritative
+      ? getAuthoritativeBalanceTotals(customerId)
+      : Promise.resolve({ data: null, error: null });
+
     Promise.all([
       getMovementLedgerRows(filters),
       getConfirmedDepositReceiptRows(filters),
@@ -127,12 +138,14 @@ export function CustomerMovementLedgerPage() {
       priorFilters ? getMovementLedgerRows(priorFilters) : Promise.resolve({ data: [] }),
       priorFilters ? getConfirmedDepositReceiptRows(priorFilters) : Promise.resolve({ data: [] }),
       priorFilters ? getConfirmedWithdrawalRows(priorFilters) : Promise.resolve({ data: [] }),
-    ]).then(([result, depositResult, withdrawalResult, priorResult, priorDepositResult, priorWithdrawalResult]) => {
+      authoritativeFetch,
+    ]).then(([result, depositResult, withdrawalResult, priorResult, priorDepositResult, priorWithdrawalResult, authoritative]) => {
       if (!isMounted) return;
 
       const rows = mergeMovementRows(result, depositResult, withdrawalResult);
       const priorRows = mergeMovementRows(priorResult, priorDepositResult, priorWithdrawalResult);
 
+      setAuthoritativeTotals(authoritative.error ? null : authoritative.data);
       setState({
         rows,
         priorRows,
@@ -180,6 +193,10 @@ export function CustomerMovementLedgerPage() {
   const filteredSummary = summarizeMovements(filteredRows);
   const openingBalances = aggregateFinalBalances(filteredPriorRows);
   const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
+  // A product/LOT/tracking-code filter narrows filteredRows to a subset
+  // the (unfiltered, per-customer) authoritative total wouldn't match.
+  const hasNarrowingFilter = Boolean(productFilter || lotFilter || trackingCodeFilter);
+  const effectiveAuthoritativeTotals = hasNarrowingFilter ? null : authoritativeTotals;
 
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-movement-ledger-page">
@@ -314,7 +331,7 @@ export function CustomerMovementLedgerPage() {
                   type="button"
                   className="btn"
                   data-testid="customer-movement-ledger-export-excel"
-                  onClick={() => downloadMovementLedgerExcel(filteredRows, openingBalances, 'productLot', 'customer-movement-ledger')}
+                  onClick={() => downloadMovementLedgerExcel(filteredRows, openingBalances, 'productLot', 'customer-movement-ledger', effectiveAuthoritativeTotals)}
                   disabled={filteredRows.length === 0}
                 >
                   Export Excel
@@ -335,6 +352,7 @@ export function CustomerMovementLedgerPage() {
                     },
                     summary: filteredSummary,
                     openingBalances,
+                    authoritativeTotals: effectiveAuthoritativeTotals,
                   })}
                   language={reportLanguage}
                 />

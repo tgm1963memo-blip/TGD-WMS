@@ -13,6 +13,7 @@ import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
   getConfirmedWithdrawalRows,
+  getAuthoritativeBalanceTotals,
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
@@ -36,6 +37,35 @@ function dayBefore(dateStr) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+
+// The authoritative total is an all-time snapshot (same as the stock
+// balance page's RPC — it has no date parameter at all), and only scoped
+// by customer in getAuthoritativeBalanceTotals. It's only a valid stand-in
+// for "this report's remaining total" when:
+//  - the report's date range extends to today or has no upper bound (a
+//    report frozen at some point in the past has a genuinely different,
+//    smaller "remaining" than the current all-time balance), and
+//  - no product/lot/tracking-code/location filter narrows the rows to a
+//    subset the all-time-per-customer total wouldn't match.
+function canUseAuthoritativeTotals(committedFilters) {
+  if (!committedFilters) return false;
+  if (committedFilters.dateTo) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (committedFilters.dateTo < today) return false;
+  }
+  const hasProductFilter = Array.isArray(committedFilters.productId)
+    ? committedFilters.productId.length > 0
+    : Boolean(committedFilters.productId);
+  const hasLocationFilter = Array.isArray(committedFilters.locationId)
+    ? committedFilters.locationId.length > 0
+    : Boolean(committedFilters.locationId);
+  if (hasProductFilter || hasLocationFilter) return false;
+  if (committedFilters.warehouseId || committedFilters.referenceType) return false;
+  if (committedFilters.trackingCode && committedFilters.trackingCode.trim()) return false;
+  if (committedFilters.lotNo && committedFilters.lotNo.trim()) return false;
+  if (committedFilters.temperatureType && (Array.isArray(committedFilters.temperatureType) ? committedFilters.temperatureType.length > 0 : true)) return false;
+  return true;
 }
 
 // Fetches and merges the three movement sources for a given date range,
@@ -145,6 +175,11 @@ export function MovementLedgerReportPage() {
   const [committedFilters, setCommittedFilters] = useState(null);
   const [state, setState] = useState(initialState);
   const [openingBalances, setOpeningBalances] = useState(new Map());
+  // Authoritative "remaining" total — sourced from the same algorithm as
+  // the stock balance page's RPC (see getAuthoritativeBalanceTotals), not
+  // re-derived from date-filtered movement rows, so the report's grand
+  // TOTAL always agrees with that page exactly.
+  const [authoritativeTotals, setAuthoritativeTotals] = useState(null);
   // Controls row order for the on-screen table, the PDF report, and the
   // Excel export all at once: plain chronological order, or grouped by
   // product then lot (a stock-card view showing each lot's full history
@@ -225,11 +260,18 @@ export function MovementLedgerReportPage() {
         )
       : Promise.resolve({ rows: [], error: null });
 
+    const authoritativeFetch = canUseAuthoritativeTotals(committedFilters)
+      ? getAuthoritativeBalanceTotals(committedFilters.customerId || null)
+      : Promise.resolve({ data: null, error: null });
+
     Promise.all([
       fetchMergedRows(serviceFilters, committedFilters),
       priorFetch,
-    ]).then(([main, prior]) => {
+      authoritativeFetch,
+    ]).then(([main, prior, authoritative]) => {
       if (!isMounted) return;
+
+      setAuthoritativeTotals(authoritative.error ? null : authoritative.data);
 
       let rows = enrich(main.rows);
       let priorRows = enrich(prior.rows);
@@ -372,7 +414,7 @@ export function MovementLedgerReportPage() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances, sortMode)}
+                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances, sortMode, 'movement-ledger', authoritativeTotals)}
                 disabled={state.rows.length === 0}
               >
                 Export Excel
@@ -396,6 +438,7 @@ export function MovementLedgerReportPage() {
                     summary: state.summary,
                     openingBalances,
                     sortMode,
+                    authoritativeTotals,
                   })}
                   language={reportLanguage}
                   customerDetails={selectedCustomer}

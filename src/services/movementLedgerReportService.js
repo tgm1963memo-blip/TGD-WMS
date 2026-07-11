@@ -1,11 +1,96 @@
 import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
 import { supabase } from './supabaseClient.js';
+import { computeDepositLineBalances } from '../utils/stockBalanceCalc.js';
 
 function missingSupabaseClientResult() {
   return {
     data: null,
     error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
   };
+}
+
+// The stock balance page's "remaining" figure (tgd_get_customer_stock_balance)
+// is an all-time snapshot — total ever received minus total ever withdrawn,
+// with no date scoping at all. For the movement ledger report's grand TOTAL
+// to agree with it exactly, the total has to be computed the same way: the
+// same per-deposit-line exact/tracking-code match plus FIFO lot-pool
+// distribution (see stockBalanceCalc.js), not re-derived from date-filtered
+// movement rows grouped by lot_no, which is a different (and looser)
+// approximation. customerId is optional — omit it for the all-customers
+// admin report.
+export async function getAuthoritativeBalanceTotals(customerId = null) {
+  if (!supabase) return { data: { totalBoxes: 0, totalWeight: 0 }, error: null };
+
+  let depositQuery = supabase
+    .from('tgd_customer_deposit_requests')
+    .select(`
+      customer_id,
+      tgd_customer_deposit_request_lines(
+        id, line_no, lot_no, customer_product_code, tracking_code,
+        actual_boxes, actual_weight, expected_boxes, expected_weight
+      )
+    `)
+    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED']);
+  if (customerId) depositQuery = depositQuery.eq('customer_id', customerId);
+
+  let withdrawalQuery = supabase
+    .from('tgd_customer_withdrawal_requests')
+    .select(`
+      customer_id,
+      tgd_customer_withdrawal_request_lines(
+        source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
+        customer_product_code, picked_boxes, picked_weight
+      )
+    `)
+    .eq('status', 'COMPLETED');
+  if (customerId) withdrawalQuery = withdrawalQuery.eq('customer_id', customerId);
+
+  const [depositResult, withdrawalResult] = await Promise.all([depositQuery, withdrawalQuery]);
+  if (depositResult.error) return { data: null, error: depositResult.error };
+  if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
+
+  const depositLines = [];
+  for (const req of (depositResult.data ?? [])) {
+    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
+      depositLines.push({
+        id: line.id,
+        customer_id: req.customer_id,
+        lot_no: line.lot_no ?? '',
+        customer_product_code: line.customer_product_code ?? '',
+        line_no: line.line_no ?? 0,
+        tracking_code: line.tracking_code ?? null,
+        received_boxes: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+        received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
+      });
+    }
+  }
+
+  const withdrawalLines = [];
+  for (const req of (withdrawalResult.data ?? [])) {
+    for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
+      withdrawalLines.push({
+        customer_id: req.customer_id,
+        source_customer_deposit_request_line_id: line.source_customer_deposit_request_line_id ?? null,
+        tracking_code: line.tracking_code ?? null,
+        lot_no: line.lot_no ?? '',
+        source_lot_no: line.source_lot_no ?? null,
+        customer_product_code: line.customer_product_code ?? '',
+        picked_boxes: Number(line.picked_boxes ?? 0),
+        picked_weight: Number(line.picked_weight ?? 0),
+      });
+    }
+  }
+
+  const balances = computeDepositLineBalances(depositLines, withdrawalLines);
+
+  let totalBoxes = 0;
+  let totalWeight = 0;
+  for (const balance of balances.values()) {
+    totalBoxes += balance.boxes;
+    totalWeight += balance.weight;
+  }
+
+  return { data: { totalBoxes, totalWeight }, error: null };
 }
 
 function movementDirection(row) {

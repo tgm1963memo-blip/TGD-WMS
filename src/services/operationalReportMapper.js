@@ -77,7 +77,7 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
   };
 }
 
-export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null, openingBalances = new Map(), sortMode = 'date' }) {
+export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}, summary = null, openingBalances = new Map(), sortMode = 'date', authoritativeTotals = null }) {
   // Classify each row as inbound or outbound
   const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
   const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
@@ -188,8 +188,16 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   // to 0 in lotBalances, same as the stock balance page's RPC) still
   // subtracted its true negative amount from this total, understating it
   // relative to every other total in this report and to the balance page.
-  const totalBalanceVol = Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
-  const totalBalanceWt = Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
+  //
+  // authoritativeTotals (from getAuthoritativeBalanceTotals, which ports the
+  // stock balance RPC's exact per-line/FIFO-pool algorithm) overrides this
+  // when supplied, so the report's grand total matches the balance page
+  // exactly rather than approximating it via lot_no-grouped movement rows —
+  // the two group withdrawn quantity differently whenever a LOT spans
+  // multiple deposit lines (tracking codes), which lot_no-only grouping
+  // can't fully replicate.
+  const totalBalanceVol = authoritativeTotals?.totalBoxes ?? Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
+  const totalBalanceWt = authoritativeTotals?.totalWeight ?? Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
 
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',
