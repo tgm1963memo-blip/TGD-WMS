@@ -167,11 +167,9 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
 
   const rows = [];
   for (const req of (data ?? [])) {
-    // Use actual confirmation date (last_action_at) so the row sorts chronologically
-    // after the deposit was truly received, not by the customer's planned arrival date.
-    const receiptDate = req.last_action_at
-      ? req.last_action_at.split('T')[0]
-      : req.expected_arrival_date ?? null;
+    // Use expected_arrival_date (the document date) as the movement date,
+    // falling back to last_action_at if not available.
+    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? req.last_action_at.split('T')[0] : null);
 
     if (filters.dateFrom && receiptDate && receiptDate < filters.dateFrom) continue;
     if (filters.dateTo && receiptDate && receiptDate > filters.dateTo) continue;
@@ -334,7 +332,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
     .select(`
-      id, withdrawal_no, customer_id, status, last_action_at,
+      id, withdrawal_no, customer_id, status, last_action_at, requested_dispatch_date,
       ${lineRelation}(
         id, line_no, customer_product_code, internal_product_code, product_name, lot_no, product_id,
         source_customer_deposit_request_id, source_lot_no,
@@ -372,22 +370,25 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
 
   const rows = [];
   for (const req of (data ?? [])) {
+    // Only actually-picked lines count as a real outbound movement — a
+    // COMPLETED withdrawal can still have a line whose picked_boxes/
+    // picked_weight were never recorded (nothing was ever actually pulled
+    // and weighed for it). Falling back to requested_boxes/requested_weight
+    // here counted goods as shipped that were never actually confirmed
+    // picked, which is exactly what made this report's remaining weight
+    // disagree with the stock balance page (that RPC only ever sums
+    // picked_weight, never requested_weight).
     const lines = (req.tgd_customer_withdrawal_request_lines ?? [])
-      .filter((l) => {
-        const boxes = Number(l.picked_boxes ?? l.requested_boxes ?? 0);
-        const weight = Number(l.picked_weight ?? l.requested_weight ?? 0);
-        return boxes > 0 || weight > 0;
-      });
+      .filter((l) => Number(l.picked_boxes ?? 0) > 0 || Number(l.picked_weight ?? 0) > 0);
 
     for (const line of lines) {
-      const movementDate = (line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null;
+      const movementDate = req.requested_dispatch_date ?? ((line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null);
       if (filters.dateFrom && movementDate && movementDate < filters.dateFrom) continue;
       if (filters.dateTo && movementDate && movementDate > filters.dateTo) continue;
 
-      const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
-      // Use picked_weight if recorded; fall back to requested_weight so reports are never 0
-      const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
-      
+      const boxes = Number(line.picked_boxes ?? 0);
+      const weight = Number(line.picked_weight ?? 0);
+
       const resolvedProductId = resolveWithdrawalProductId(line, req.customer_id, inboundIndex, skuMap);
 
       if (filters.productId) {
@@ -403,7 +404,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         movement_type: 'DISPATCH',
         movement_type_raw: 'CUSTOMER_WITHDRAWAL',
         movement_type_canonical: 'DISPATCH',
-        movement_date: line.picked_at ?? req.last_action_at,
+        movement_date: req.requested_dispatch_date ?? line.picked_at ?? req.last_action_at,
         customer_id: req.customer_id,
         product_id: resolvedProductId,
         lot_id: null,

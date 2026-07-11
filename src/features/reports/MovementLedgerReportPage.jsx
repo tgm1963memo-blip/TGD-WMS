@@ -293,9 +293,12 @@ export function MovementLedgerReportPage() {
       const inbound = isInbound(row);
       const qty = Number(row.qty ?? row.quantity ?? 0);
       const weight = Number(row.weight ?? 0);
+      // Floored at 0 to match tgd_get_customer_stock_balance (the stock
+      // balance page's RPC), which never reports a negative remaining
+      // balance either.
       const nextBalance = {
-        qty: balance.qty + (inbound ? qty : -qty),
-        weight: balance.weight + (inbound ? weight : -weight),
+        qty: Math.max(0, balance.qty + (inbound ? qty : -qty)),
+        weight: Math.max(0, balance.weight + (inbound ? weight : -weight)),
       };
 
       if (sortMode === 'productLot') {

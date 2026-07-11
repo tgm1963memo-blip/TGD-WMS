@@ -156,8 +156,14 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     line.balanceForwardVolume = lotBalances[key].vol;
     line.balanceForwardWeight = lotBalances[key].weight;
 
-    lotBalances[key].vol += line.receivedVolume - line.deliveryVolume;
-    lotBalances[key].weight += line.receivedWeight - line.deliveryWeight;
+    // Floored at 0 to match tgd_get_customer_stock_balance (the same RPC
+    // behind the stock balance page), which never reports a negative
+    // remaining balance either — without this floor, a lot whose recorded
+    // withdrawals exceed what it actually received would drift the running
+    // total negative here while the balance page clamped it at 0, so the
+    // two screens' "remaining" figures could never agree for that lot.
+    lotBalances[key].vol = Math.max(0, lotBalances[key].vol + line.receivedVolume - line.deliveryVolume);
+    lotBalances[key].weight = Math.max(0, lotBalances[key].weight + line.receivedWeight - line.deliveryWeight);
 
     line.balanceVolume = lotBalances[key].vol;
     line.balanceWeight = lotBalances[key].weight;
