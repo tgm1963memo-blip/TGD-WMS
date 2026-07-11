@@ -11,6 +11,7 @@ import {
   listAllProductServiceRates,
   listCustomerProductsForRateImport,
   upsertProductServiceRate,
+  deleteProductServiceRate,
   bulkUpsertProductServiceRates,
   listDistinctServiceTypes,
 } from '../../services/productServiceRatesService.js';
@@ -83,6 +84,7 @@ export function CustomerProductServiceRatesPage() {
   const [form, setForm] = useState(null);
   const [formProducts, setFormProducts] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -234,6 +236,27 @@ export function CustomerProductServiceRatesPage() {
     }
     setSuccess('บันทึกอัตราค่าบริการเรียบร้อยแล้ว');
     setForm(null);
+    await loadRates();
+  }
+
+  async function handleDelete(row) {
+    const label = row.is_all_items
+      ? `ทุกรายการ (${row.service_type})`
+      : `${row.product_name ?? row.customer_product_code ?? ''} (${row.service_type})`;
+    if (!window.confirm(`ยืนยันลบอัตราค่าบริการ "${label}" ?`)) return;
+
+    setDeletingId(row.id);
+    setError('');
+    setSuccess('');
+    const { data, error: deleteError } = await deleteProductServiceRate(row.id);
+    setDeletingId(null);
+    if (deleteError) {
+      setError(deleteError.message ?? 'ลบอัตราค่าบริการไม่สำเร็จ');
+      return;
+    }
+    setSuccess(data?.deleted
+      ? 'ลบอัตราค่าบริการเรียบร้อยแล้ว'
+      : 'มีการใช้งานอ้างอิงอัตรานี้อยู่ จึงปิดการใช้งานแทนการลบ');
     await loadRates();
   }
 
@@ -482,9 +505,18 @@ export function CustomerProductServiceRatesPage() {
                       {row.is_active ? 'ใช้งาน' : 'ปิด'}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 14px' }}>
+                  <td style={{ padding: '10px 14px', display: 'flex', gap: 6 }}>
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => openEdit(row)}>
                       แก้ไข
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ color: '#dc2626', borderColor: '#fecaca' }}
+                      disabled={deletingId === row.id}
+                      onClick={() => handleDelete(row)}
+                    >
+                      {deletingId === row.id ? 'กำลังลบ...' : 'ลบ'}
                     </button>
                   </td>
                 </tr>

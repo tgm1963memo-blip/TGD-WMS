@@ -166,6 +166,12 @@ export async function bulkUpsertProductServiceRates(rows = []) {
   };
 }
 
+export async function deleteProductServiceRate(rateId) {
+  if (!supabase) return missing();
+  const { data, error } = await supabase.rpc('tgd_delete_product_service_rate', { p_rate_id: rateId });
+  return { data, error };
+}
+
 export async function upsertProductServiceRate(payload = {}) {
   if (!supabase) return missing();
   const { data, error } = await supabase.rpc('tgd_upsert_product_service_rate', {
