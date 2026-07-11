@@ -19,6 +19,8 @@ import {
   parseStorageRateImportFile,
 } from '../../utils/storageRateExcelUtils.js';
 
+const ALL_ITEMS_VALUE = '__ALL_ITEMS__';
+
 const EMPTY_FORM = {
   rateId: '',
   customerId: '',
@@ -176,15 +178,23 @@ export function CustomerProductServiceRatesPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.productId) {
-      setError('กรุณาเลือกสินค้า');
-      return;
+    const isAllItems = form.productId === ALL_ITEMS_VALUE;
+    if (!form.rateId) {
+      if (!form.customerId) {
+        setError('กรุณาเลือกลูกค้า');
+        return;
+      }
+      if (!form.productId) {
+        setError('กรุณาเลือกสินค้า');
+        return;
+      }
     }
     setSaving(true);
     setError('');
     const result = await upsertProductServiceRate({
       rateId:            form.rateId || null,
-      customerProductId: form.productId,
+      customerProductId: isAllItems ? null : (form.productId || null),
+      customerId:        isAllItems ? form.customerId : null,
       serviceType:       form.serviceType,
       rate:              parseFloat(form.rate),
       unitBasis:         form.unitBasis,
@@ -407,8 +417,14 @@ export function CustomerProductServiceRatesPage() {
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_code ?? ''}</div>
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 13 }}>
-                    <div style={{ fontWeight: 600 }}>{row.product_name ?? '-'}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_product_code ?? ''}</div>
+                    {row.is_all_items ? (
+                      <span style={{ fontWeight: 600, color: '#7c3aed' }}>— ทุกรายการ (All Items) —</span>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600 }}>{row.product_name ?? '-'}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_product_code ?? ''}</div>
+                      </>
+                    )}
                   </td>
                   <td style={{ padding: '10px 14px' }}><ServiceBadge type={row.service_type} /></td>
                   <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
@@ -476,6 +492,7 @@ export function CustomerProductServiceRatesPage() {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     >
                       <option value="">— เลือกสินค้า —</option>
+                      <option value={ALL_ITEMS_VALUE}>— ทุกรายการ (All Items) —</option>
                       {formProducts.map((p) => (
                         <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
                       ))}

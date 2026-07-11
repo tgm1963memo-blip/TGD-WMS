@@ -41,11 +41,15 @@ export async function listProductServiceRatesByCustomer(customerId) {
 }
 
 function shapeProductServiceRateRow(row = {}) {
-  const product = row.tgd_customer_products ?? {};
-  const customer = product.tgd_customers ?? {};
+  // A rate is either scoped to one product (tgd_customer_products embed
+  // present) or to a whole customer's "all items" (customer_product_id is
+  // null, tgd_customers embedded directly instead) — never both.
+  const product = row.tgd_customer_products ?? null;
+  const customer = product?.tgd_customers ?? row.tgd_customers ?? {};
   return {
     id: row.id,
     customer_product_id: row.customer_product_id,
+    is_all_items: row.customer_product_id == null,
     service_type: row.service_type,
     rate: row.rate,
     unit_basis: row.unit_basis,
@@ -53,11 +57,11 @@ function shapeProductServiceRateRow(row = {}) {
     note: row.note,
     is_active: row.is_active,
     created_at: row.created_at,
-    customer_id: customer.id ?? product.customer_id ?? null,
+    customer_id: customer.id ?? row.customer_id ?? product?.customer_id ?? null,
     customer_code: customer.customer_code ?? null,
     customer_name: customer.customer_name ?? null,
-    customer_product_code: product.customer_product_code ?? null,
-    product_name: product.product_name ?? null,
+    customer_product_code: product?.customer_product_code ?? null,
+    product_name: product?.product_name ?? null,
   };
 }
 
@@ -65,21 +69,27 @@ function shapeProductServiceRateRow(row = {}) {
 // Storage Rate page's table view — the earlier listProductServiceRates
 // functions only ever scope to one product or one customer, so there was no
 // way to see/filter every rate in the system at once.
+//
+// customerId filtering happens in JS after the fetch (not as a query
+// filter) because a rate's customer can come from either the embedded
+// product relation or the rate's own customer_id column (for all-items
+// rates) — PostgREST can't OR a filter across two different relations in
+// one request.
 export async function listAllProductServiceRates(filters = {}) {
   if (!supabase) return missing();
 
   let query = supabase
     .from('tgd_customer_product_service_rates')
     .select(`
-      id, customer_product_id, service_type, rate, unit_basis, currency, note, is_active, created_at,
-      tgd_customer_products!inner(
+      id, customer_product_id, customer_id, service_type, rate, unit_basis, currency, note, is_active, created_at,
+      tgd_customer_products(
         id, customer_product_code, product_name, customer_id,
-        tgd_customers!inner(id, customer_code, customer_name)
-      )
+        tgd_customers(id, customer_code, customer_name)
+      ),
+      tgd_customers(id, customer_code, customer_name)
     `)
     .order('service_type');
 
-  if (filters.customerId) query = query.eq('tgd_customer_products.customer_id', filters.customerId);
   if (filters.customerProductId) query = query.eq('customer_product_id', filters.customerProductId);
   if (filters.serviceType) query = query.eq('service_type', filters.serviceType);
   if (filters.isActive != null) query = query.eq('is_active', filters.isActive);
@@ -87,7 +97,13 @@ export async function listAllProductServiceRates(filters = {}) {
   const result = await query;
   if (result.error) return { data: null, error: result.error };
 
-  return { data: (result.data ?? []).map(shapeProductServiceRateRow), error: null };
+  let rows = result.data ?? [];
+  if (filters.customerId) {
+    rows = rows.filter((row) =>
+      (row.tgd_customer_products?.customer_id ?? row.customer_id) === filters.customerId);
+  }
+
+  return { data: rows.map(shapeProductServiceRateRow), error: null };
 }
 
 // Customer + product lookup used to resolve "customer_code" +
@@ -137,6 +153,7 @@ export async function upsertProductServiceRate(payload = {}) {
     p_currency:            payload.currency ?? 'THB',
     p_note:                payload.note ?? null,
     p_is_active:           payload.isActive ?? true,
+    p_customer_id:         payload.customerId ?? null,
   });
   return { data, error };
 }
