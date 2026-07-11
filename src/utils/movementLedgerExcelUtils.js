@@ -234,9 +234,19 @@ function computeGrandTotals(rows, openingBalances, authoritativeTotals = null) {
   // authoritativeTotals (same source as the stock balance page's RPC —
   // see getAuthoritativeBalanceTotals) overrides the locally-replayed sum
   // when supplied, so the exported grand total matches that page exactly.
+  //
+  // received/delivered get overridden too, not just the balance — they must
+  // come from the same all-time, floor-aware computation the balance did,
+  // or receivedQty - deliveredQty (this period's raw sums only) won't equal
+  // balanceQty (all-time). Defining delivered as received - balance
+  // guarantees the three figures reconcile exactly.
   if (authoritativeTotals) {
+    receivedQty = authoritativeTotals.totalReceivedBoxes ?? receivedQty;
+    receivedWeight = authoritativeTotals.totalReceivedWeight ?? receivedWeight;
     balanceQty = authoritativeTotals.totalBoxes;
     balanceWeight = authoritativeTotals.totalWeight;
+    deliveredQty = authoritativeTotals.totalDeliveredBoxes ?? (receivedQty - balanceQty);
+    deliveredWeight = authoritativeTotals.totalDeliveredWeight ?? (receivedWeight - balanceWeight);
   }
 
   return { receivedQty, receivedWeight, deliveredQty, deliveredWeight, balanceQty, balanceWeight };

@@ -199,6 +199,19 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const totalBalanceVol = authoritativeTotals?.totalBoxes ?? Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
   const totalBalanceWt = authoritativeTotals?.totalWeight ?? Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
 
+  // When authoritativeTotals is available, the grand-total row's received
+  // and delivered figures must come from that same all-time, floor-aware
+  // computation too — not from subtotalReceived/subtotalDelivery, which are
+  // plain sums over just this report's date-filtered rows. Mixing a
+  // date-scoped received/delivered with an all-time balance is exactly what
+  // made รับเข้า - จ่ายออก disagree with คงเหลือ on the printed total: the two
+  // pairs were answering different questions (this period's movements vs.
+  // the true all-time remaining stock).
+  const totalReceivedVol = authoritativeTotals?.totalReceivedBoxes ?? (summary?.totalInboundQty ?? subtotalReceivedVol);
+  const totalReceivedWt = authoritativeTotals?.totalReceivedWeight ?? subtotalReceivedWt;
+  const totalDeliveryVol = authoritativeTotals?.totalDeliveredBoxes ?? (summary?.totalOutboundQty ?? subtotalDeliveryVol);
+  const totalDeliveryWt = authoritativeTotals?.totalDeliveredWeight ?? subtotalDeliveryWt;
+
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',
     address: filters.customer_address ?? '-',
@@ -210,10 +223,10 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     subtotalReceived: subtotalReceivedVol,
     subtotalDelivery: subtotalDeliveryVol,
     subtotalWeight: subtotalReceivedWt + subtotalDeliveryWt,
-    totalReceived: summary?.totalInboundQty ?? subtotalReceivedVol,
-    totalReceivedWeight: subtotalReceivedWt,
-    totalDelivery: summary?.totalOutboundQty ?? subtotalDeliveryVol,
-    totalDeliveryWeight: subtotalDeliveryWt,
+    totalReceived: totalReceivedVol,
+    totalReceivedWeight: totalReceivedWt,
+    totalDelivery: totalDeliveryVol,
+    totalDeliveryWeight: totalDeliveryWt,
     totalBalanceVolume: totalBalanceVol,
     totalBalanceWeight: totalBalanceWt,
     totalBalanceForwardVolume: totalBalanceForwardVol,

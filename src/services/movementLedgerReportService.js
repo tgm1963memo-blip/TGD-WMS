@@ -90,7 +90,35 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
     totalWeight += balance.weight;
   }
 
-  return { data: { totalBoxes, totalWeight }, error: null };
+  // Total ever received, over the same deposit lines the balance above was
+  // computed from. Defining "delivered" as receivedX - totalX (below) rather
+  // than as an independent sum of picked_boxes/picked_weight guarantees
+  // received - delivered == balance by construction, for any combination of
+  // exact/pool-matched withdrawals — including the edge case where a lot's
+  // recorded withdrawals exceed what it actually received (the balance
+  // floors at 0 for that lot, so the "delivered" side must likewise cap at
+  // what was received, not count the data-entry excess as a real delivery).
+  let totalReceivedBoxes = 0;
+  let totalReceivedWeight = 0;
+  for (const dl of depositLines) {
+    totalReceivedBoxes += dl.received_boxes;
+    totalReceivedWeight += dl.received_weight;
+  }
+
+  const totalDeliveredBoxes = totalReceivedBoxes - totalBoxes;
+  const totalDeliveredWeight = totalReceivedWeight - totalWeight;
+
+  return {
+    data: {
+      totalBoxes,
+      totalWeight,
+      totalReceivedBoxes,
+      totalReceivedWeight,
+      totalDeliveredBoxes,
+      totalDeliveredWeight,
+    },
+    error: null,
+  };
 }
 
 function movementDirection(row) {
