@@ -22,6 +22,15 @@ import {
 } from '../../utils/storageRateExcelUtils.js';
 
 const ALL_ITEMS_VALUE = '__ALL_ITEMS__';
+const CATEGORY_PREFIX = '__CATEGORY__:';
+
+function isAllItemsScope(productIdValue) {
+  return productIdValue === ALL_ITEMS_VALUE || productIdValue.startsWith(CATEGORY_PREFIX);
+}
+
+function categoryTemperatureOf(productIdValue) {
+  return productIdValue.startsWith(CATEGORY_PREFIX) ? productIdValue.slice(CATEGORY_PREFIX.length) : '';
+}
 
 const EMPTY_FORM = {
   rateId: '',
@@ -33,7 +42,6 @@ const EMPTY_FORM = {
   currency: 'THB',
   note: '',
   periodDays: '',
-  temperatureType: '',
   maxQuantity: '',
 };
 
@@ -161,17 +169,20 @@ export function CustomerProductServiceRatesPage() {
   }
 
   function openEdit(row) {
+    const productId = row.customer_product_id
+      ?? (row.is_all_items
+        ? (row.temperature_type ? `${CATEGORY_PREFIX}${row.temperature_type}` : ALL_ITEMS_VALUE)
+        : '');
     setForm({
       rateId:      row.id,
       customerId:  row.customer_id ?? '',
-      productId:   row.customer_product_id ?? (row.is_all_items ? ALL_ITEMS_VALUE : ''),
+      productId,
       serviceType: row.service_type,
       rate:        String(row.rate ?? ''),
       unitBasis:   row.unit_basis,
       currency:    row.currency ?? 'THB',
       note:        row.note ?? '',
       periodDays:  row.period_days != null ? String(row.period_days) : '',
-      temperatureType: row.temperature_type ?? '',
       maxQuantity: row.max_quantity != null ? String(row.max_quantity) : '',
     });
     setFormProducts([]);
@@ -188,7 +199,8 @@ export function CustomerProductServiceRatesPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const isAllItems = form.productId === ALL_ITEMS_VALUE;
+    const isAllItems = isAllItemsScope(form.productId);
+    const categoryTemperature = categoryTemperatureOf(form.productId);
     if (!form.rateId) {
       if (!form.customerId) {
         setError('กรุณาเลือกลูกค้า');
@@ -212,7 +224,7 @@ export function CustomerProductServiceRatesPage() {
       note:              form.note,
       isActive:          true,
       periodDays:        form.periodDays,
-      temperatureType:   isAllItems ? form.temperatureType : null,
+      temperatureType:   isAllItems ? (categoryTemperature || null) : null,
       maxQuantity:       form.maxQuantity,
     });
     setSaving(false);
@@ -439,7 +451,11 @@ export function CustomerProductServiceRatesPage() {
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 13 }}>
                     {row.is_all_items ? (
-                      <span style={{ fontWeight: 600, color: '#7c3aed' }}>— ทุกรายการ (All Items) —</span>
+                      <span style={{ fontWeight: 600, color: '#7c3aed' }}>
+                        {row.temperature_type
+                          ? `— ทุกรายการ: ${TEMPERATURE_TYPES.find((t) => t.value === row.temperature_type)?.label ?? row.temperature_type} —`
+                          : '— ทุกรายการ (ทุกอุณหภูมิ) —'}
+                      </span>
                     ) : (
                       <>
                         <div style={{ fontWeight: 600 }}>{row.product_name ?? '-'}</div>
@@ -454,7 +470,6 @@ export function CustomerProductServiceRatesPage() {
                   <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>
                     {ub?.label ?? row.unit_basis}
                     {row.period_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ทุก {row.period_days} วัน</div> : null}
-                    {row.temperature_type ? <div style={{ fontSize: 11, color: '#64748b' }}>{row.temperature_type}</div> : null}
                     {row.max_quantity ? <div style={{ fontSize: 11, color: '#94a3b8' }}>สูงสุด {row.max_quantity}</div> : null}
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>{row.note ?? '-'}</td>
@@ -518,11 +533,17 @@ export function CustomerProductServiceRatesPage() {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     >
                       <option value="">— เลือกสินค้า —</option>
-                      <option value={ALL_ITEMS_VALUE}>— ทุกรายการ (All Items) —</option>
+                      <option value={ALL_ITEMS_VALUE}>— ทุกรายการ (ทุกอุณหภูมิ) —</option>
+                      {TEMPERATURE_TYPES.filter((t) => t.value).map((t) => (
+                        <option key={t.value} value={`${CATEGORY_PREFIX}${t.value}`}>
+                          — ทุกรายการ: {t.label} —
+                        </option>
+                      ))}
                       {formProducts.map((p) => (
                         <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
                       ))}
                     </select>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>เลือกประเภท (แช่แข็ง/แช่เย็น) เพื่อกำหนดอัตราให้ทุกสินค้าในประเภทนั้นของลูกค้านี้ โดยไม่ต้องเลือกทีละรายการ</span>
                   </label>
                 </div>
               )}
@@ -607,23 +628,6 @@ export function CustomerProductServiceRatesPage() {
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>เช่น 12 = เสียบปลั๊กไม่เกิน 12 ชม./ครั้ง</span>
                 </label>
               </div>
-
-              {form.productId === ALL_ITEMS_VALUE && (
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 14 }}>
-                  ใช้เฉพาะอุณหภูมิ
-                  <select
-                    className="form-control"
-                    value={form.temperatureType}
-                    onChange={(e) => setForm((f) => ({ ...f, temperatureType: e.target.value }))}
-                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                  >
-                    {TEMPERATURE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>สำหรับกำหนดอัตราค่าฝากแยกตามอุณหภูมิ (เช่น FROZEN vs CHILLED) ในลูกค้าเดียวกัน</span>
-                </label>
-              )}
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 14 }}>
                 หมายเหตุ
