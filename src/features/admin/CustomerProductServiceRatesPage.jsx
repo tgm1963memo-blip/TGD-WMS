@@ -7,6 +7,7 @@ import { listCustomerProducts, upsertCustomerProduct } from '../../services/cust
 import {
   SERVICE_TYPES,
   UNIT_BASIS,
+  TEMPERATURE_TYPES,
   listAllProductServiceRates,
   listCustomerProductsForRateImport,
   upsertProductServiceRate,
@@ -30,6 +31,9 @@ const EMPTY_FORM = {
   unitBasis: 'PER_KG',
   currency: 'THB',
   note: '',
+  periodDays: '',
+  temperatureType: '',
+  maxQuantity: '',
 };
 
 const SERVICE_COLORS = {
@@ -157,12 +161,15 @@ export function CustomerProductServiceRatesPage() {
     setForm({
       rateId:      row.id,
       customerId:  row.customer_id ?? '',
-      productId:   row.customer_product_id,
+      productId:   row.customer_product_id ?? (row.is_all_items ? ALL_ITEMS_VALUE : ''),
       serviceType: row.service_type,
       rate:        String(row.rate ?? ''),
       unitBasis:   row.unit_basis,
       currency:    row.currency ?? 'THB',
       note:        row.note ?? '',
+      periodDays:  row.period_days != null ? String(row.period_days) : '',
+      temperatureType: row.temperature_type ?? '',
+      maxQuantity: row.max_quantity != null ? String(row.max_quantity) : '',
     });
     setFormProducts([]);
     setError('');
@@ -201,6 +208,9 @@ export function CustomerProductServiceRatesPage() {
       currency:          form.currency || 'THB',
       note:              form.note,
       isActive:          true,
+      periodDays:        form.periodDays,
+      temperatureType:   isAllItems ? form.temperatureType : null,
+      maxQuantity:       form.maxQuantity,
     });
     setSaving(false);
     if (result.error) {
@@ -430,7 +440,12 @@ export function CustomerProductServiceRatesPage() {
                   <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
                     {Number(row.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {row.currency}
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>{ub?.label ?? row.unit_basis}</td>
+                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>
+                    {ub?.label ?? row.unit_basis}
+                    {row.period_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ทุก {row.period_days} วัน</div> : null}
+                    {row.temperature_type ? <div style={{ fontSize: 11, color: '#64748b' }}>{row.temperature_type}</div> : null}
+                    {row.max_quantity ? <div style={{ fontSize: 11, color: '#94a3b8' }}>สูงสุด {row.max_quantity}</div> : null}
+                  </td>
                   <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>{row.note ?? '-'}</td>
                   <td style={{ padding: '10px 14px' }}>
                     <span style={{
@@ -545,6 +560,54 @@ export function CustomerProductServiceRatesPage() {
                   </select>
                 </label>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  รอบคิดค่าบริการ (วัน)
+                  <input
+                    className="form-control"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="เว้นว่าง = คิดครั้งเดียว"
+                    value={form.periodDays}
+                    onChange={(e) => setForm((f) => ({ ...f, periodDays: e.target.value }))}
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>เช่น 15 = คิดค่าฝากซ้ำทุก 15 วัน</span>
+                </label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  จำนวนสูงสุดต่อครั้ง
+                  <input
+                    className="form-control"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="เว้นว่าง = ไม่จำกัด"
+                    value={form.maxQuantity}
+                    onChange={(e) => setForm((f) => ({ ...f, maxQuantity: e.target.value }))}
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>เช่น 12 = เสียบปลั๊กไม่เกิน 12 ชม./ครั้ง</span>
+                </label>
+              </div>
+
+              {form.productId === ALL_ITEMS_VALUE && (
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 14 }}>
+                  ใช้เฉพาะอุณหภูมิ
+                  <select
+                    className="form-control"
+                    value={form.temperatureType}
+                    onChange={(e) => setForm((f) => ({ ...f, temperatureType: e.target.value }))}
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                  >
+                    {TEMPERATURE_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>สำหรับกำหนดอัตราค่าฝากแยกตามอุณหภูมิ (เช่น FROZEN vs CHILLED) ในลูกค้าเดียวกัน</span>
+                </label>
+              )}
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 14 }}>
                 หมายเหตุ

@@ -112,6 +112,9 @@ export function shapeBillingInvoiceDraftLine(row = {}) {
     billing_status: row.billing_status ?? null,
     rate: row.rate == null ? null : toNumber(row.rate),
     amount: row.amount == null ? null : toNumber(row.amount),
+    service_rate_id: row.service_rate_id ?? null,
+    period_days: row.period_days == null ? null : toNumber(row.period_days),
+    storage_days: row.storage_days == null ? null : toNumber(row.storage_days),
     line_note: row.line_note ?? null,
     duplicate_guard_active: row.duplicate_guard_active !== false,
     created_at: row.created_at ?? null,
@@ -146,6 +149,75 @@ export function buildInvoiceDraftLineFromMovement(movement = {}, invoiceDraftId 
     amount,
     line_note: movement.line_note ?? null,
     duplicate_guard_active: true,
+  };
+}
+
+// Storage/auxiliary lines (see billingRateEngineService.js) have no single
+// source movement — a storage charge spans a whole billing period, and an
+// auxiliary service (container plug-in, overnight fee) attaches to a
+// deposit request, not a movement — so source_movement_id stays null for
+// these (see the 20260712090000 migration making that column nullable).
+export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = {}) {
+  const rate = storageLine.rate ?? {};
+  return {
+    invoice_draft_id: null,
+    source_movement_id: null,
+    source_document_no: null,
+    source_document_type: 'STORAGE',
+    customer_id: storageLine.customerId,
+    product_id: null,
+    product_code: depositLine.customer_product_code ?? null,
+    product_name: depositLine.customer_product_code ?? null,
+    lot_no: depositLine.lot_no ?? null,
+    pallet_no: null,
+    movement_type: 'STORAGE',
+    movement_date: null,
+    qty: 0,
+    uom: 'กก.',
+    net_weight: storageLine.weight,
+    gross_weight: storageLine.weight,
+    chargeable_weight: storageLine.weight,
+    billing_status: 'READY',
+    rate: rate.rate != null ? toNumber(rate.rate) : null,
+    amount: storageLine.amount,
+    service_rate_id: rate.id ?? null,
+    period_days: rate.period_days ?? null,
+    storage_days: storageLine.days ?? null,
+    line_note: rate.period_days
+      ? `ค่าฝาก ${storageLine.periods} งวด (${storageLine.days} วัน / งวดละ ${rate.period_days} วัน)`
+      : 'ค่าฝาก (ครั้งเดียว)',
+    duplicate_guard_active: false,
+  };
+}
+
+export function buildInvoiceDraftLineFromAuxiliaryLine(auxLine) {
+  const rate = auxLine.rate ?? {};
+  return {
+    invoice_draft_id: null,
+    source_movement_id: null,
+    source_document_no: null,
+    source_document_type: 'SERVICE',
+    customer_id: auxLine.customerId,
+    product_id: null,
+    product_code: null,
+    product_name: rate.note ?? rate.service_type ?? 'ค่าบริการเสริม',
+    lot_no: null,
+    pallet_no: null,
+    movement_type: 'SERVICE',
+    movement_date: null,
+    qty: auxLine.quantity,
+    uom: rate.unit_basis === 'PER_HOUR' ? 'ชม.' : rate.unit_basis === 'FLAT' ? 'ครั้ง' : rate.unit_basis,
+    net_weight: null,
+    gross_weight: null,
+    chargeable_weight: null,
+    billing_status: 'READY',
+    rate: rate.rate != null ? toNumber(rate.rate) : null,
+    amount: auxLine.amount,
+    service_rate_id: rate.id ?? null,
+    period_days: null,
+    storage_days: null,
+    line_note: auxLine.note ?? null,
+    duplicate_guard_active: false,
   };
 }
 

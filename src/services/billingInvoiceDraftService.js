@@ -11,6 +11,9 @@ import {
   INVOICE_DRAFT_TABLE,
   buildBillingInvoiceDraftNo,
   buildInvoiceDraftCreatePayload,
+  buildInvoiceDraftLineFromStorageLine,
+  buildInvoiceDraftLineFromAuxiliaryLine,
+  calculateInvoiceDraftTotals,
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   canDeleteBillingInvoiceDraft,
@@ -18,6 +21,8 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
+import { getBillingPeriodPreview } from './billingRateEngineService.js';
+import { getCustomers } from './masterDataService.js';
 import {
   evaluateInvoiceDraftBplusExportReadiness,
   normalizeCustomerForBplusReadiness,
@@ -245,6 +250,108 @@ export async function createBillingInvoiceDraftFromMovements({
     ...line,
     invoice_draft_id: draftId,
   }));
+
+  const linesInsert = await supabase
+    .from(INVOICE_DRAFT_LINE_TABLE)
+    .insert(lineRows)
+    .select('*');
+
+  if (linesInsert.error) {
+    return { data: null, error: normalizeServiceError(linesInsert.error) };
+  }
+
+  return {
+    data: {
+      draft: shapeBillingInvoiceDraftHeader(headerInsert.data),
+      lines: (linesInsert.data ?? []).map(shapeBillingInvoiceDraftLine),
+    },
+    error: null,
+  };
+}
+
+// Generates a draft's storage + auxiliary-service lines from the rate
+// engine (see billingRateEngineService.js) for one customer over one
+// billing period, instead of the manual "pick movement rows" flow above —
+// storage charges span the whole period rather than a single movement, so
+// they don't fit that flow. Returns a preview (no rate resolved / nothing
+// to bill is reported via zero lines) so the caller can show it before
+// committing, and a separate confirm step actually inserts it.
+export async function previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd }) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
+    return { data: null, error: validationError('customerId, billingPeriodStart, and billingPeriodEnd are required.') };
+  }
+
+  const previewResult = await getBillingPeriodPreview({
+    customerId,
+    periodStart: billingPeriodStart,
+    periodEnd: billingPeriodEnd,
+  });
+  if (previewResult.error) return { data: null, error: previewResult.error };
+
+  const { storageLines, auxLines, depositLines } = previewResult.data;
+  const depositLineById = new Map(depositLines.map((dl) => [dl.id, dl]));
+
+  const lines = [
+    ...storageLines.map((sl) => buildInvoiceDraftLineFromStorageLine(sl, depositLineById.get(sl.depositLineId) ?? {})),
+    ...auxLines.map((al) => buildInvoiceDraftLineFromAuxiliaryLine(al)),
+  ];
+
+  const totals = calculateInvoiceDraftTotals(lines);
+
+  return { data: { lines, totals }, error: null };
+}
+
+export async function createBillingInvoiceDraftForPeriod({
+  customerId,
+  billingPeriodStart,
+  billingPeriodEnd,
+  note = null,
+  internalReference = null,
+  createdBy = null,
+} = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
+    return { data: null, error: validationError('customerId, billingPeriodStart, and billingPeriodEnd are required.') };
+  }
+
+  const preview = await previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd });
+  if (preview.error) return { data: null, error: preview.error };
+
+  if (preview.data.lines.length === 0) {
+    return { data: null, error: validationError('No storage or service charges found for this customer/period.') };
+  }
+
+  const customersResult = await getCustomers();
+  const customerName = (customersResult.data ?? []).find((c) => c.id === customerId)?.customer_name ?? null;
+
+  const draftNo = await resolveDraftNo();
+  const header = {
+    draft_no: draftNo,
+    customer_id: customerId,
+    customer_name: customerName,
+    billing_period_start: billingPeriodStart,
+    billing_period_end: billingPeriodEnd,
+    status: INVOICE_DRAFT_STATUS.DRAFT,
+    ...preview.data.totals,
+    currency: 'THB',
+    note,
+    internal_reference: internalReference,
+    created_by: createdBy,
+  };
+
+  const headerInsert = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .insert(header)
+    .select('*')
+    .single();
+
+  if (headerInsert.error) {
+    return { data: null, error: normalizeServiceError(headerInsert.error) };
+  }
+
+  const draftId = headerInsert.data.id;
+  const lineRows = preview.data.lines.map((line) => ({ ...line, invoice_draft_id: draftId }));
 
   const linesInsert = await supabase
     .from(INVOICE_DRAFT_LINE_TABLE)

@@ -19,8 +19,11 @@ import {
   upsertCustomerDepositRequestLine,
   updateCustomerDepositRequestDraft,
   deleteCustomerDepositRequestLine,
+  listCustomerDepositRequestServices,
+  upsertCustomerDepositRequestService,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import {
   downloadCustomerDepositLineTemplate,
   exportCustomerDepositLinesExcel,
@@ -72,6 +75,11 @@ export function CustomerDepositRequestCreatePage() {
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  // Auxiliary per-request services (container reefer plug-in, overnight flat
+  // fee, Slow Freeze prep, etc.) not tied to any single product's weight —
+  // see tgd_customer_deposit_request_services / billingRateCalc.js.
+  const [auxServiceOptions, setAuxServiceOptions] = useState([]);
+  const [selectedAuxServices, setSelectedAuxServices] = useState({}); // rateId -> { checked, quantity }
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -236,6 +244,37 @@ export function CustomerDepositRequestCreatePage() {
       || '';
     if (name) setHeader((h) => (h.contact_name ? h : { ...h, contact_name: name }));
   }, [profile, isEditMode, copyFromId]);
+
+  // Auxiliary services offered to this customer — any configured rate whose
+  // unit isn't weight-based (FLAT/PER_HOUR), since PER_KG rates are already
+  // billed automatically from received weight, not selected manually here.
+  useEffect(() => {
+    if (!effectiveCustomerId) {
+      setAuxServiceOptions([]);
+      return undefined;
+    }
+    let active = true;
+    listAllProductServiceRates({ customerId: effectiveCustomerId, isActive: true }).then((result) => {
+      if (!active) return;
+      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR');
+      setAuxServiceOptions(options);
+    });
+    return () => { active = false; };
+  }, [effectiveCustomerId]);
+
+  useEffect(() => {
+    if (!editId) return undefined;
+    let active = true;
+    listCustomerDepositRequestServices(editId).then((result) => {
+      if (!active || result.error) return;
+      const selections = {};
+      for (const row of (result.data ?? [])) {
+        selections[row.service_rate_id] = { checked: true, quantity: row.quantity, id: row.id };
+      }
+      setSelectedAuxServices(selections);
+    });
+    return () => { active = false; };
+  }, [editId]);
 
   useEffect(() => {
     let active = true;
@@ -436,6 +475,20 @@ export function CustomerDepositRequestCreatePage() {
       }
     }
 
+    for (const [rateId, selection] of Object.entries(selectedAuxServices)) {
+      if (!selection?.checked) continue;
+      const serviceResult = await upsertCustomerDepositRequestService(requestId, {
+        id: selection.id ?? null,
+        serviceRateId: rateId,
+        quantity: selection.quantity ?? 1,
+      });
+      if (serviceResult.error) {
+        setSubmitting(false);
+        setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
+        return;
+      }
+    }
+
     if (!shouldSubmit) {
       setSubmitting(false);
       navigate(`/customer/deposit-request/${requestId}`);
@@ -549,6 +602,48 @@ export function CustomerDepositRequestCreatePage() {
             onRemoveLine={removeLine}
           />
         </div>
+
+        {auxServiceOptions.length > 0 && (
+          <div className="form-section" style={{ marginBottom: 16 }}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>บริการเสริม (ไม่ผูกกับน้ำหนักสินค้า)</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {auxServiceOptions.map((opt) => {
+                const sel = selectedAuxServices[opt.id] ?? { checked: false, quantity: 1 };
+                return (
+                  <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: sel.checked ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={sel.checked}
+                      onChange={(e) => setSelectedAuxServices((prev) => ({
+                        ...prev,
+                        [opt.id]: { ...sel, checked: e.target.checked, quantity: sel.quantity ?? 1 },
+                      }))}
+                    />
+                    <span style={{ flex: 1, fontSize: 13 }}>
+                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}
+                      {opt.max_quantity ? ` (สูงสุด ${opt.max_quantity}${opt.unit_basis === 'PER_HOUR' ? ' ชม.' : ''})` : ''}
+                    </span>
+                    {opt.unit_basis === 'PER_HOUR' && sel.checked && (
+                      <input
+                        type="number"
+                        min="0"
+                        max={opt.max_quantity || undefined}
+                        step="0.5"
+                        placeholder="ชม."
+                        value={sel.quantity ?? 1}
+                        onChange={(e) => setSelectedAuxServices((prev) => ({
+                          ...prev,
+                          [opt.id]: { ...sel, quantity: e.target.value },
+                        }))}
+                        style={{ width: 80, padding: '4px 8px', fontSize: 12 }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="form-grid">
           <label className="form-field">

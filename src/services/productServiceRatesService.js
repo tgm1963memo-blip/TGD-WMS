@@ -19,7 +19,14 @@ export const UNIT_BASIS = [
   { value: 'PER_PALLET', label: 'ต่อพาเลท (฿/พาเลท)' },
   { value: 'PER_TRIP',   label: 'ต่อเที่ยว (฿/เที่ยว)' },
   { value: 'PER_DAY',    label: 'ต่อวัน (฿/วัน)' },
+  { value: 'PER_HOUR',   label: 'ต่อชั่วโมง (฿/ชม.)' },
   { value: 'FLAT',       label: 'อัตราคงที่ (Flat)' },
+];
+
+export const TEMPERATURE_TYPES = [
+  { value: '',        label: '— ทุกอุณหภูมิ —' },
+  { value: 'FROZEN',  label: 'แช่แข็ง (FROZEN)' },
+  { value: 'CHILLED', label: 'แช่เย็น (CHILLED)' },
 ];
 
 export async function listProductServiceRates(customerProductId) {
@@ -53,6 +60,9 @@ function shapeProductServiceRateRow(row = {}) {
     service_type: row.service_type,
     rate: row.rate,
     unit_basis: row.unit_basis,
+    period_days: row.period_days ?? null,
+    temperature_type: row.temperature_type ?? null,
+    max_quantity: row.max_quantity ?? null,
     currency: row.currency,
     note: row.note,
     is_active: row.is_active,
@@ -81,7 +91,8 @@ export async function listAllProductServiceRates(filters = {}) {
   let query = supabase
     .from('tgd_customer_product_service_rates')
     .select(`
-      id, customer_product_id, customer_id, service_type, rate, unit_basis, currency, note, is_active, created_at,
+      id, customer_product_id, customer_id, service_type, rate, unit_basis,
+      period_days, temperature_type, max_quantity, currency, note, is_active, created_at,
       tgd_customer_products(
         id, customer_product_code, product_name, customer_id,
         tgd_customers(id, customer_code, customer_name)
@@ -154,6 +165,9 @@ export async function upsertProductServiceRate(payload = {}) {
     p_note:                payload.note ?? null,
     p_is_active:           payload.isActive ?? true,
     p_customer_id:         payload.customerId ?? null,
+    p_period_days:         payload.periodDays != null && payload.periodDays !== '' ? Number(payload.periodDays) : null,
+    p_temperature_type:    payload.temperatureType || null,
+    p_max_quantity:        payload.maxQuantity != null && payload.maxQuantity !== '' ? Number(payload.maxQuantity) : null,
   });
   return { data, error };
 }

@@ -266,6 +266,35 @@ export async function upsertCustomerDepositRequestLine(requestId, line = {}) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Auxiliary per-request services (container reefer plug-in, overnight flat
+// fee, etc.) — selected at deposit time but billed separately from the
+// automatic weight-based storage engine (see billingRateCalc.js).
+export async function listCustomerDepositRequestServices(requestId) {
+  if (!supabase) return missingSupabaseClientResult();
+  return supabase
+    .from('tgd_customer_deposit_request_services')
+    .select('id, deposit_request_id, service_rate_id, quantity, note')
+    .eq('deposit_request_id', requestId);
+}
+
+export async function upsertCustomerDepositRequestService(requestId, { id = null, serviceRateId, quantity = 1, note = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_upsert_customer_deposit_request_service', {
+    p_deposit_request_id: requestId,
+    p_service_rate_id: serviceRateId,
+    p_quantity: toNullableNumber(quantity) ?? 1,
+    p_note: toNullableText(note),
+    p_id: id,
+  });
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+export async function deleteCustomerDepositRequestService(id) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_delete_customer_deposit_request_service', { p_id: id });
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function deleteCustomerDepositRequestLine(requestId, lineId) {
   if (!supabase) return missingSupabaseClientResult();
 
