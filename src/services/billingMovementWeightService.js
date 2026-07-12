@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient.js';
 import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
 
 import { applyBillingMovementWeightFilters } from '../utils/billingMovementWeightReportUtils.js';
+import { resolveMovementWeights } from '../utils/billingWeightUtils.js';
 
 
 
@@ -100,6 +101,49 @@ export function shapeBillingMovementWeightRow(row = {}) {
 
 }
 
+// Rows sourced from the customer deposit/withdrawal request tables (via
+// getConfirmedDepositReceiptRows / getConfirmedWithdrawalRows /
+// getStorageOpeningBalanceRows — see movementLedgerReportService.js) only
+// ever carry a plain `weight` field and no billing classification at all,
+// unlike tgd_billing_movement_weight_v / tgd_unified_movements_v rows,
+// which already have net_weight/gross_weight/chargeable_weight and
+// is_billable/billing_status computed as real columns. shapeBillingMovementWeightRow
+// alone left those fields at 0/false/null for this source, which both hid
+// the weight in the report table and made every row fail the "is this
+// selectable for an invoice draft" check (getMovementDraftSelectionState).
+//
+// This report merges rows from BOTH sources in one list, so the fallback
+// below only applies when a field is genuinely absent (`== null`) — an
+// already-classified tgd_unified_movements_v row (e.g. an ADJUST_IN/
+// ADJUST_OUT movement resolveBillingEligibility deliberately excludes)
+// must keep its real is_billable:false, not get silently overridden to
+// true. resolveMovementWeights itself already prefers an explicit
+// gross_weight/net_weight/chargeable_weight/billing_status when present
+// (falling back to `weight` and a from-scratch computation only when
+// they're missing), so it's safe to apply unconditionally to both sources.
+export function enrichClientMergedBillingMovementWeightRow(row = {}) {
+
+  const shaped = shapeBillingMovementWeightRow(row);
+  const weights = resolveMovementWeights(row);
+  const rawType = String(row.movement_type_raw ?? row.movement_type ?? '').toUpperCase();
+  const isStorageOpening = rawType === 'STORAGE_OPENING_BALANCE';
+  const isOutbound = rawType.includes('WITHDRAWAL') || rawType.includes('DISPATCH');
+
+  return {
+    ...shaped,
+    net_weight: weights.net_weight,
+    gross_weight: weights.gross_weight,
+    chargeable_weight: weights.chargeable_weight,
+    weight_per_unit: weights.weight_per_unit,
+    pallet_weight: weights.pallet_weight,
+    is_billable: row.is_billable != null ? Boolean(row.is_billable) : true,
+    billing_exclusion_reason: row.billing_exclusion_reason ?? null,
+    billing_service_type: row.billing_service_type
+      ?? (isStorageOpening ? 'STORAGE' : (isOutbound ? 'OUTBOUND_HANDLING' : 'INBOUND_HANDLING')),
+    billing_status: weights.billing_status,
+  };
+
+}
 
 
 async function readFromBillingDatabaseView(filters = {}) {

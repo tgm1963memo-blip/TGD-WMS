@@ -121,6 +121,149 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
   };
 }
 
+// Deposit lines received before a billing period's start date never show up
+// as a row in a date-filtered report (their one RECEIVE_CONFIRM event
+// happened before the window), yet whatever they still have in storage as
+// of the period start is exactly what STORAGE billing needs to charge for
+// that period — the same "ยอดยกมา" concept as the movement ledger report's
+// opening balance, but here it becomes an actual billable row rather than a
+// display-only forwarding figure. Reuses computeDepositLineBalances (the
+// same exact/pool-matching algorithm behind the stock balance page) on a
+// subset of deposit/withdrawal lines filtered to "happened before asOfDate"
+// — that alone computes "the balance as of asOfDate" with no separate math.
+export async function getStorageOpeningBalanceRows(customerId, asOfDate) {
+  if (!supabase || !customerId || !asOfDate) return { data: [], error: null };
+
+  const depositQuery = supabase
+    .from('tgd_customer_deposit_requests')
+    .select(`
+      id, request_no, customer_id, expected_arrival_date, last_action_at,
+      tgd_customer_deposit_request_lines(
+        id, line_no, lot_no, customer_product_code, internal_product_code, product_id,
+        tracking_code, product_name, temperature_type,
+        actual_boxes, actual_weight, expected_boxes, expected_weight
+      )
+    `)
+    .eq('customer_id', customerId)
+    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED']);
+
+  const withdrawalQuery = supabase
+    .from('tgd_customer_withdrawal_requests')
+    .select(`
+      id, customer_id, last_action_at, requested_dispatch_date,
+      tgd_customer_withdrawal_request_lines(
+        source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
+        customer_product_code, picked_boxes, picked_weight, picked_at
+      )
+    `)
+    .eq('customer_id', customerId)
+    .eq('status', 'COMPLETED');
+
+  const [depositResult, withdrawalResult] = await Promise.all([depositQuery, withdrawalQuery]);
+  if (depositResult.error) return { data: [], error: depositResult.error };
+  if (withdrawalResult.error) return { data: [], error: withdrawalResult.error };
+
+  const allDepositLines = [];
+  const lineMeta = new Map();
+  for (const req of (depositResult.data ?? [])) {
+    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? req.last_action_at.split('T')[0] : null);
+    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
+      allDepositLines.push({
+        id: line.id,
+        customer_id: req.customer_id,
+        lot_no: line.lot_no ?? '',
+        customer_product_code: line.customer_product_code ?? '',
+        line_no: line.line_no ?? 0,
+        tracking_code: line.tracking_code ?? null,
+        received_boxes: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+        received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
+        receipt_date: receiptDate,
+      });
+      lineMeta.set(line.id, {
+        request_no: req.request_no,
+        product_name: line.product_name ?? line.customer_product_code ?? null,
+        temperature_type: line.temperature_type ?? null,
+        product_id: line.product_id ?? null,
+        internal_product_code: line.internal_product_code ?? null,
+      });
+    }
+  }
+
+  const beforePeriodLines = allDepositLines.filter((dl) => dl.receipt_date && dl.receipt_date < asOfDate);
+  if (beforePeriodLines.length === 0) return { data: [], error: null };
+
+  // Same product resolution as getConfirmedDepositReceiptRows — these lines
+  // almost never have product_id set directly, so it's matched via sku
+  // against the product master, keeping the Product filter usable on
+  // opening-balance rows the same way it already works on regular ones.
+  const skuMap = await getProductSkuMap();
+
+  const allWithdrawalLines = [];
+  for (const req of (withdrawalResult.data ?? [])) {
+    for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
+      const boxes = Number(line.picked_boxes ?? 0);
+      const weight = Number(line.picked_weight ?? 0);
+      if (boxes <= 0 && weight <= 0) continue;
+      const pickedDate = (line.picked_at ?? req.requested_dispatch_date ?? req.last_action_at ?? '').split('T')[0] || null;
+      allWithdrawalLines.push({
+        customer_id: req.customer_id,
+        source_customer_deposit_request_line_id: line.source_customer_deposit_request_line_id ?? null,
+        tracking_code: line.tracking_code ?? null,
+        lot_no: line.lot_no ?? '',
+        source_lot_no: line.source_lot_no ?? null,
+        customer_product_code: line.customer_product_code ?? '',
+        picked_boxes: boxes,
+        picked_weight: weight,
+        picked_date: pickedDate,
+      });
+    }
+  }
+
+  // Only withdrawals that happened strictly before the period start count
+  // toward the opening balance — anything picked on/after asOfDate belongs
+  // to the period itself, not to what was already "brought forward".
+  const priorWithdrawalLines = allWithdrawalLines.filter((wl) => !wl.picked_date || wl.picked_date < asOfDate);
+
+  const balances = computeDepositLineBalances(beforePeriodLines, priorWithdrawalLines);
+
+  const rows = [];
+  for (const dl of beforePeriodLines) {
+    const balance = balances.get(dl.id) ?? { boxes: 0, weight: 0 };
+    if (balance.boxes <= 0 && balance.weight <= 0) continue;
+    const meta = lineMeta.get(dl.id) ?? {};
+    rows.push({
+      id: `opening-${dl.id}-asof-${asOfDate}`,
+      ledger_source: 'stock_ledger',
+      movement_type: 'STORAGE_OPENING_BALANCE',
+      movement_type_raw: 'STORAGE_OPENING_BALANCE',
+      movement_type_canonical: 'STORAGE_OPENING_BALANCE',
+      movement_date: asOfDate,
+      customer_id: dl.customer_id,
+      product_id: meta.product_id ?? skuMap.get(meta.internal_product_code) ?? skuMap.get(dl.customer_product_code) ?? null,
+      lot_no: dl.lot_no,
+      qty: balance.boxes,
+      quantity: balance.boxes,
+      weight: balance.weight,
+      uom: 'กล่อง',
+      product_name: meta.product_name ?? null,
+      customer_product_code: dl.customer_product_code,
+      temperature_type: meta.temperature_type ?? null,
+      tracking_code: dl.tracking_code,
+      // Grouped by each line's own original deposit request (not a shared
+      // literal) — BillingMovementWeightTable.jsx's groupRowsByDocument
+      // keys purely on source_document_no, so every opening-balance line
+      // sharing one string would collapse 200+ unrelated lots into a
+      // single checkbox/document row instead of one row per original
+      // deposit request, same as regular deposit rows already do.
+      source_document_no: meta.request_no ? `${meta.request_no} (ยอดยกมา)` : `ยอดยกมา-${dl.id}`,
+      source_document_type: 'STORAGE_OPENING_BALANCE',
+      remark: meta.request_no ? `ยอดคงเหลือยกมาจาก ${meta.request_no}` : 'ยอดคงเหลือยกมาก่อนช่วงบิลลิ่งที่เลือก',
+    });
+  }
+
+  return { data: rows, error: null };
+}
+
 function movementDirection(row) {
   if (row.to_warehouse_id && !row.from_warehouse_id) return 'IN';
   if (row.from_warehouse_id && !row.to_warehouse_id) return 'OUT';

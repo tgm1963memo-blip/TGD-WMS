@@ -2,7 +2,13 @@ import { supabase } from './supabaseClient.js';
 import {
   getBillingMovementWeightRows,
   shapeBillingMovementWeightRow,
+  enrichClientMergedBillingMovementWeightRow,
 } from './billingMovementWeightService.js';
+import {
+  getConfirmedDepositReceiptRows,
+  getConfirmedWithdrawalRows,
+  getStorageOpeningBalanceRows,
+} from './movementLedgerReportService.js';
 import {
   APPROVABLE_INVOICE_DRAFT_STATUSES,
   CANCELLABLE_INVOICE_DRAFT_STATUSES,
@@ -66,20 +72,91 @@ async function resolveDraftNo() {
   return buildBillingInvoiceDraftNo(Date.now() % 10000);
 }
 
+const OPENING_BALANCE_ID_PATTERN = /^opening-(.+)-asof-(\d{4}-\d{2}-\d{2})$/;
+
+// Resolves opening-<depositLineId>-asof-<date> synthetic ids (see
+// getStorageOpeningBalanceRows) back into real rows. These ids don't
+// correspond to a persisted movement record — they encode a deposit line
+// id and an as-of date, so the balance is deterministically recomputed
+// from those two facts here rather than trusted from whatever the client
+// last displayed, guaranteeing what actually gets billed matches the
+// current deposit/withdrawal data at creation time.
+async function resolveOpeningBalanceIds(ids = []) {
+  const parsed = ids
+    .map((id) => {
+      const match = OPENING_BALANCE_ID_PATTERN.exec(id);
+      return match ? { id, lineId: match[1], asOfDate: match[2] } : null;
+    })
+    .filter(Boolean);
+  if (parsed.length === 0) return new Map();
+
+  const lineIds = [...new Set(parsed.map((p) => p.lineId))];
+  const { data: lines, error } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, deposit_request_id, tgd_customer_deposit_requests(customer_id)')
+    .in('id', lineIds);
+  if (error || !lines) return new Map();
+
+  const customerByLineId = new Map(
+    lines.map((line) => [line.id, line.tgd_customer_deposit_requests?.customer_id]),
+  );
+
+  const groups = new Map();
+  for (const p of parsed) {
+    const customerId = customerByLineId.get(p.lineId);
+    if (!customerId) continue;
+    const key = `${customerId}|${p.asOfDate}`;
+    if (!groups.has(key)) groups.set(key, { customerId, asOfDate: p.asOfDate });
+  }
+
+  const resultMap = new Map();
+  await Promise.all([...groups.values()].map(async ({ customerId, asOfDate }) => {
+    const { data: rows } = await getStorageOpeningBalanceRows(customerId, asOfDate);
+    for (const row of (rows ?? [])) {
+      resultMap.set(String(row.id), enrichClientMergedBillingMovementWeightRow(row));
+    }
+  }));
+
+  return resultMap;
+}
+
 async function fetchMovementsByIds(movementIds = []) {
   const normalizedIds = [...new Set((movementIds ?? []).map((id) => String(id)).filter(Boolean))];
   if (normalizedIds.length === 0) {
     return { data: [], error: null };
   }
 
-  const result = await getBillingMovementWeightRows({ billableOnly: false });
-  if (result.error) {
-    return { data: null, error: result.error };
-  }
+  const openingIds = normalizedIds.filter((id) => OPENING_BALANCE_ID_PATTERN.test(id));
 
-  const rowsById = new Map(
-    (result.data ?? []).map((row) => [String(row.movement_id), shapeBillingMovementWeightRow(row)]),
-  );
+  // The report page merges rows from three sources (see
+  // BillingMovementWeightReportPage.jsx): the legacy billing movement
+  // weight view/unified movements table, the customer deposit/withdrawal
+  // request tables, and computed storage opening-balance rows. Draft
+  // creation has to be able to re-resolve an id from whichever of those
+  // the user actually selected, or a row that's fully visible and
+  // selectable on screen would fail here with "not found in billing
+  // source" the moment Create Draft is clicked.
+  const [viewResult, depositResult, withdrawalResult, openingRowsById] = await Promise.all([
+    getBillingMovementWeightRows({ billableOnly: false }),
+    getConfirmedDepositReceiptRows({}),
+    getConfirmedWithdrawalRows({}),
+    resolveOpeningBalanceIds(openingIds),
+  ]);
+
+  if (viewResult.error) return { data: null, error: viewResult.error };
+  if (depositResult.error) return { data: null, error: depositResult.error };
+  if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
+
+  const rowsById = new Map();
+  for (const row of (viewResult.data ?? [])) {
+    rowsById.set(String(row.movement_id), shapeBillingMovementWeightRow(row));
+  }
+  for (const row of [...(depositResult.data ?? []), ...(withdrawalResult.data ?? [])]) {
+    rowsById.set(String(row.id), enrichClientMergedBillingMovementWeightRow(row));
+  }
+  for (const [id, row] of openingRowsById) {
+    rowsById.set(id, row);
+  }
 
   const missingIds = normalizedIds.filter((id) => !rowsById.has(id));
   if (missingIds.length > 0) {

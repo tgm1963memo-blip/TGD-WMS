@@ -9,11 +9,12 @@ import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js'
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
-import { shapeBillingMovementWeightRow } from '../../services/billingMovementWeightService.js';
+import { enrichClientMergedBillingMovementWeightRow } from '../../services/billingMovementWeightService.js';
 import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
   getConfirmedWithdrawalRows,
+  getStorageOpeningBalanceRows,
 } from '../../services/movementLedgerReportService.js';
 import {
   createBillingInvoiceDraftFromMovements,
@@ -80,14 +81,25 @@ export function BillingMovementWeightReportPage() {
 
     const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
 
+    // Storage billing needs weight-basis for lots deposited before the
+    // selected period's start too (the "ยอดยกมา" opening balance) — but
+    // computing that requires a full deposit/withdrawal history for one
+    // customer, so it's only fetched when both a customer and a Date From
+    // are selected (mirrors canUseAuthoritativeTotals-style gating used
+    // elsewhere for this same reason).
+    const openingBalanceFetch = committedFilters.customerId && committedFilters.dateFrom
+      ? getStorageOpeningBalanceRows(committedFilters.customerId, committedFilters.dateFrom)
+      : Promise.resolve({ data: [], error: null });
+
     Promise.all([
       getMovementLedgerRows(committedFilters),
       getConfirmedDepositReceiptRows(committedFilters),
       getConfirmedWithdrawalRows(committedFilters),
-    ]).then(async ([movResult, depositResult, withdrawalResult]) => {
+      openingBalanceFetch,
+    ]).then(async ([movResult, depositResult, withdrawalResult, openingResult]) => {
       if (!isMounted) return;
 
-      const err = movResult.error ?? depositResult.error ?? withdrawalResult.error;
+      const err = movResult.error ?? depositResult.error ?? withdrawalResult.error ?? openingResult.error;
       if (err) {
         setState({ rows: [], loading: false, error: err, source: null });
         return;
@@ -108,11 +120,12 @@ export function BillingMovementWeightReportPage() {
       const allRaw = [
         ...(depositResult.data ?? []),
         ...(withdrawalResult.data ?? []),
+        ...(openingResult.data ?? []),
         ...outboundRows,
       ].sort((a, b) => new Date(a.movement_date ?? 0) - new Date(b.movement_date ?? 0));
 
       const shaped = allRaw.map((row) => ({
-        ...shapeBillingMovementWeightRow(row),
+        ...enrichClientMergedBillingMovementWeightRow(row),
         customer_name: customerMap[row.customer_id] ?? row.customer_name ?? null,
         product_name: productMap[row.product_id] ?? row.product_name ?? null,
         temperature_type: row.temperature_type ?? productTemperatureMap[row.product_id] ?? null,
