@@ -11,17 +11,29 @@ function isoToDisplay(iso) {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+// Thai users very commonly type the Buddhist Era year they use in everyday
+// life (e.g. 2569) into a "ปี" field, expecting the system to understand —
+// this silently stored dates 543 years in the future (see e.g. deposit
+// request CDR-20260704-0002, which recorded 2569-07-01 for an arrival date
+// clearly meant to be 2026-07-01). No real Gregorian date entered into this
+// WMS will ever be past year 2100, so any year beyond that threshold is
+// unambiguously a Buddhist Era year that needs the standard -543 offset
+// back to Gregorian, not a literal far-future date.
+const BUDDHIST_ERA_OFFSET = 543;
+const GREGORIAN_YEAR_CEILING = 2100;
+
 function displayToIso(display) {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(display);
   if (!m) return null;
   const [, dd, mm, yyyy] = m;
   const day = Number(dd);
   const month = Number(mm);
-  const year = Number(yyyy);
+  let year = Number(yyyy);
   if (month < 1 || month > 12) return null;
+  if (year > GREGORIAN_YEAR_CEILING) year -= BUDDHIST_ERA_OFFSET;
   const daysInMonth = new Date(year, month, 0).getDate();
   if (day < 1 || day > daysInMonth) return null;
-  return `${yyyy}-${mm}-${dd}`;
+  return `${String(year).padStart(4, '0')}-${mm}-${dd}`;
 }
 
 function maskDigits(raw) {
