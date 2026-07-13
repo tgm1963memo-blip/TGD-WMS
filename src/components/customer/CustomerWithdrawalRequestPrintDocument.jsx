@@ -1,6 +1,7 @@
 import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
+import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtNum(v, decimals = 3) {
@@ -109,8 +110,9 @@ function CustomerWithdrawalRequestPrintDocumentPage({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-withdrawal-print-document"
-      style={{ padding: 0, minHeight: '178mm' }}
+      style={{ padding: 0, minHeight: '178mm', position: 'relative' }}
     >
+      <CancelledDocumentWatermark status={header.status} />
       {/* ── Compact page header ── */}
       {(() => {
         const norm = normalizeDocumentBrandingConfig(branding ?? getDefaultDocumentBranding());
@@ -138,6 +140,11 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                   {isStaff && copyType && (
                     <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 8 }}>
                       {copyType === 'customer' ? '(สำหรับลูกค้า)' : '(สำหรับพนักงาน)'}
+                    </span>
+                  )}
+                  {header.status === 'CANCELLED' && (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#dc2626', marginLeft: 8 }}>
+                      [ยกเลิกแล้ว]
                     </span>
                   )}
                 </div>

@@ -2,6 +2,7 @@ import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtDate(v) {
@@ -81,8 +82,9 @@ export function CustomerDepositRequestPrintDocument({
     <article
       className="operational-report-print-document customer-request-print-document"
       data-testid="customer-deposit-print-document"
-      style={{ padding: 0, minHeight: '178mm' }}
+      style={{ padding: 0, minHeight: '178mm', position: 'relative' }}
     >
+      <CancelledDocumentWatermark status={header.status} />
       {/* ── Compact page header ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -100,7 +102,14 @@ export function CustomerDepositRequestPrintDocument({
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 800 }}>{t('customer_deposit_print_title')}</div>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>
+            {t('customer_deposit_print_title')}
+            {header.status === 'CANCELLED' && (
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#dc2626', marginLeft: 8 }}>
+                [ยกเลิกแล้ว]
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 11, color: '#333' }}>
             {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
             {header.created_at && (
