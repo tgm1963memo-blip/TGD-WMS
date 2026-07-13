@@ -6,8 +6,8 @@ import { matchPath } from 'react-router-dom';
  * Route Permission Catalog — aligned with navigation menu and active UI routes only.
  */
 export const ROUTE_PERMISSION_CATALOG = [
-  { route_path: '/dashboard', route_name: 'DashboardPage', permission_area: 'reports', minimum_role: 'admin', access_level: 'read', notes: '' },
-  { route_path: '/dashboard/inventory', route_name: 'InventoryDashboardPage', permission_area: 'reports', minimum_role: 'admin', access_level: 'read', notes: '' },
+  { route_path: '/dashboard', route_name: 'DashboardPage', permission_area: 'reports', minimum_role: 'accounting', access_level: 'read', notes: 'Opened to accounting/warehouse_admin/warehouse_manager — read-only operations summary, no admin-only content' },
+  { route_path: '/dashboard/inventory', route_name: 'InventoryDashboardPage', permission_area: 'reports', minimum_role: 'accounting', access_level: 'read', notes: '' },
   { route_path: '/master/customers', route_name: 'CustomersPage', permission_area: 'master_data', minimum_role: 'warehouse_manager', access_level: 'read', notes: '' },
   { route_path: '/operations/receiving', route_name: 'ReceivingPage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'Customer deposit driven inbound only' },
   { route_path: '/operations/receiving/:id', route_name: 'ReceivingDetailPage', permission_area: 'receiving', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },

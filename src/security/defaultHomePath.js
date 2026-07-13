@@ -7,7 +7,7 @@ const DEFAULT_HOME_BY_ROLE = Object.freeze({
   warehouse_manager: '/operations/receiving',
   warehouse_admin: '/operations/receiving',
   warehouse_staff: '/handheld',
-  accounting: '/reports',
+  accounting: '/dashboard',
   viewer: '/reports',
   customer_admin: '/customer',
   customer_user: '/customer',
