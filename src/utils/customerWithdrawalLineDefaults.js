@@ -82,28 +82,41 @@ export function getMatchedDepositLine(line, depositLines = []) {
  * Remaining deposit balance for a withdrawal line, and whether the requested
  * quantity exceeds it.
  *
+ * Scoped to the single deposit line getMatchedDepositLine() resolves — the
+ * exact same one CustomerWithdrawalRequestCreatePage.jsx stamps the
+ * withdrawal line's tracking_code/source_customer_deposit_request_line_id
+ * from on submit — not pooled across every deposit line sharing the same
+ * lot_no. A lot can legitimately span several tracking codes/pallets (a
+ * normal situation — see migration 20260708100019's lot-fanout handling),
+ * and validating against their combined total here while the withdrawal
+ * only ever gets tagged with the one matched code let a request pass with
+ * a quantity the pool could cover but that single physical tracking code
+ * never held — e.g. requesting 400 boxes against a lot pooling 1,000
+ * boxes across three tracking codes, then printing a pick instruction for
+ * "400 boxes from tracking code X" when X itself only ever received 100.
+ * Withdrawing across multiple tracking codes now requires one line per
+ * code (already supported via TRACKING_CODE identifier selection), each
+ * validated against its own real balance.
+ *
  * `siblingLines` (all other lines in the same draft/request, including the
  * one being checked) is used to also subtract whatever quantity those other
- * lines already claim against the same underlying deposit line(s) — without
- * this, two lines that each individually stay within the total balance but
- * jointly exceed it would both pass unflagged. This is exactly the shape of
- * a real incident: two lines in one withdrawal request both drawing from
- * the same 100-box tracking code (there they each independently over-asked
- * for 200, which the single-line check already caught, but a pair of
- * requests each under the total — e.g. 60 + 60 against 100 — would not have
- * been).
+ * lines already claim against the same underlying deposit line — without
+ * this, two lines that each individually stay within the balance but
+ * jointly exceed it would both pass unflagged (e.g. 60 + 60 against a
+ * single 100-box tracking code).
  */
 export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines = []) {
-  const balanceLines = getIdentifierMatchedDepositLines(line, depositLines);
-  const balanceLineIds = new Set(balanceLines.map((dl) => dl.id));
-  const maxBoxBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_boxes) || Number(dl.expected_boxes) || 0), 0);
-  const maxWtBalance = balanceLines.reduce((sum, dl) => sum + (Number(dl.actual_weight) || Number(dl.expected_weight) || 0), 0);
+  const matchedLine = getMatchedDepositLine(line, depositLines);
+  const maxBoxBalance = matchedLine ? (Number(matchedLine.actual_boxes) || Number(matchedLine.expected_boxes) || 0) : 0;
+  const maxWtBalance = matchedLine ? (Number(matchedLine.actual_weight) || Number(matchedLine.expected_weight) || 0) : 0;
 
-  const otherClaimants = (siblingLines ?? []).filter((other) =>
-    other !== line
-    && other?.key !== line?.key
-    && getIdentifierMatchedDepositLines(other, depositLines).some((dl) => balanceLineIds.has(dl.id)),
-  );
+  const otherClaimants = matchedLine
+    ? (siblingLines ?? []).filter((other) =>
+        other !== line
+        && other?.key !== line?.key
+        && getMatchedDepositLine(other, depositLines)?.id === matchedLine.id,
+      )
+    : [];
   const othersClaimedBoxes = otherClaimants.reduce((sum, other) => sum + (Number(other.requested_boxes) || 0), 0);
   const othersClaimedWeight = otherClaimants.reduce((sum, other) => sum + (Number(other.requested_weight) || 0), 0);
 
