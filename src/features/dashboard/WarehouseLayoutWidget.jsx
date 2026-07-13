@@ -29,16 +29,38 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500'
   );
 }
 
+// Parses {room}-{side}-{row}-{level}-{bay} — bay ("ตอน") optional so
+// locations still on the pre-bay 4-segment format parse too (defaulting
+// to bay 1), matching every other location-code parser in the codebase.
+function parseLocationCode(code) {
+  const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
+  return m ? { side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
+}
+
 function SectionGrid({ section, onLocClick }) {
   const [hovered, setHovered] = useState(null);
+  // Cell = one (side, row, level) shelf position. A cell holds exactly one
+  // location unless the room was configured with more than 1 "ตอน" (bay),
+  // in which case it holds several — expandedCellKey tracks which
+  // multi-bay cell the user clicked to reveal its bay list, since there
+  // isn't room to draw every bay as its own dot on the map.
+  const [expandedCellKey, setExpandedCellKey] = useState(null);
   const { rows, cols, locations, gridInfo } = section;
   const total = rows * cols;
 
-  const locMap = useMemo(() => {
+  // Keyed by "{side}-{row}-{level}", not the full location_code — a cell
+  // can hold more than one bay, and the code's bay segment isn't known
+  // ahead of time while walking the row/level grid below.
+  const cellMap = useMemo(() => {
     const map = {};
     for (const loc of locations || []) {
-      if (loc?.location_code) map[loc.location_code] = loc;
+      const parsed = parseLocationCode(loc?.location_code);
+      if (!parsed) continue;
+      const key = `${parsed.side}-${parsed.row}-${parsed.level}`;
+      if (!map[key]) map[key] = [];
+      map[key].push({ ...loc, bay: parsed.bay });
     }
+    for (const bays of Object.values(map)) bays.sort((a, b) => a.bay - b.bay);
     return map;
   }, [locations]);
 
@@ -46,33 +68,74 @@ function SectionGrid({ section, onLocClick }) {
   if (gridInfo?.sidesConfig) {
     const leftConfig = gridInfo.sidesConfig.L || { rows: 0, levels: 0 };
     const rightConfig = gridInfo.sidesConfig.R || { rows: 0, levels: 0 };
-    const zoneCode = section.code;
 
     const renderDot = (side, r, c) => {
-      const rowStr = String(r).padStart(2, '0');
-      const lvStr = String(c).padStart(2, '0');
-      const code = `${zoneCode}-${side}-${rowStr}-${lvStr}`;
-      const loc = locMap[code];
-      const isOccupied = loc?.isOccupied ?? false;
+      const cellKey = `${side}-${r}-${c}`;
+      const bays = cellMap[cellKey] ?? [];
+      const codeLabel = bays.length === 1 ? bays[0].location_code : `${section.code}-${side}-${String(r).padStart(2, '0')}-${String(c).padStart(2, '0')}`;
+      const occupiedCount = bays.filter((b) => b.isOccupied).length;
+      const isOccupied = occupiedCount > 0;
+      const isMultiBay = bays.length > 1;
+      const isExpanded = expandedCellKey === cellKey;
+
+      function handleClick() {
+        if (isMultiBay) {
+          setExpandedCellKey(isExpanded ? null : cellKey);
+          return;
+        }
+        if (isOccupied && bays[0]) onLocClick?.(bays[0].id, bays[0].location_code);
+      }
 
       return (
-        <div
-          key={code}
-          onMouseEnter={() => setHovered({ code, row: r, col: c, isOccupied })}
-          onMouseLeave={() => setHovered(null)}
-          onClick={() => isOccupied && loc && onLocClick?.(loc.id, code)}
-          title={code}
-          style={{
-            width: 14, height: 14,
-            borderRadius: '50%',
-            background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
-            boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-            cursor: isOccupied ? 'pointer' : 'default',
-            transition: 'transform 0.2s, opacity 0.2s',
-            transform: hovered?.code === code ? 'scale(1.5)' : 'scale(1)',
-            opacity: hovered && hovered.code !== code ? 0.6 : 1,
-          }}
-        />
+        <div key={cellKey} style={{ position: 'relative' }}>
+          <div
+            onMouseEnter={() => setHovered({ code: codeLabel, row: r, col: c, isOccupied, bayCount: bays.length, occupiedCount })}
+            onMouseLeave={() => setHovered(null)}
+            onClick={handleClick}
+            title={isMultiBay ? `${codeLabel} · ${bays.length} ตอน` : codeLabel}
+            style={{
+              width: 14, height: 14,
+              borderRadius: isMultiBay ? 4 : '50%',
+              background: bays.length === 0 ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
+              boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
+              border: isMultiBay ? '2px solid #6366f1' : 'none',
+              cursor: (isOccupied || isMultiBay) ? 'pointer' : 'default',
+              transition: 'transform 0.2s, opacity 0.2s',
+              transform: hovered?.code === codeLabel ? 'scale(1.5)' : 'scale(1)',
+              opacity: hovered && hovered.code !== codeLabel ? 0.6 : 1,
+            }}
+          />
+          {isExpanded && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute', top: '120%', left: '50%', transform: 'translateX(-50%)',
+                zIndex: 20, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: 8, minWidth: 150,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6, whiteSpace: 'nowrap' }}>
+                {section.code}-{side}-{String(r).padStart(2, '0')}-{String(c).padStart(2, '0')} · {bays.length} ตอน
+              </div>
+              {bays.map((b) => (
+                <div
+                  key={b.id}
+                  onClick={() => { if (b.isOccupied) onLocClick?.(b.id, b.location_code); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 6,
+                    cursor: b.isOccupied ? 'pointer' : 'default', fontSize: 12, whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: b.isOccupied ? '#f59e0b' : '#10b981' }} />
+                  <span style={{ color: '#334155' }}>ตอน {b.bay}</span>
+                  <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: 11 }}>{b.isOccupied ? 'มีสินค้า' : 'ว่าง'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       );
     };
 
@@ -121,7 +184,9 @@ function SectionGrid({ section, onLocClick }) {
             <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 2 }}>{section.name}</div>
             <div>{hovered.code}</div>
             <div style={{ marginTop: 4, fontWeight: 400, fontSize: 12 }}>
-              {hovered.isOccupied ? '🟠 มีสินค้า' : '⬜ ว่าง'}
+              {hovered.bayCount > 1
+                ? `📦 ${hovered.occupiedCount}/${hovered.bayCount} ตอนมีสินค้า · คลิกเพื่อดูรายละเอียด`
+                : (hovered.isOccupied ? '🟠 มีสินค้า' : '⬜ ว่าง')}
             </div>
           </div>
         )}
