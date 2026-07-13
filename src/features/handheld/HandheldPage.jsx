@@ -413,6 +413,7 @@ function ReceivingWorkflow({ onBack, t }) {
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
   const [locLevel, setLocLevel] = useState('');
+  const [locBay, setLocBay] = useState('');
   const [confirmed, setConfirmed] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -436,10 +437,13 @@ function ReceivingWorkflow({ onBack, t }) {
   const [extraSaving, setExtraSaving] = useState(false);
   const [extraError, setExtraError] = useState('');
 
-  // Parse location code into hierarchy parts: zone, side, row, level
+  // Parse location code into hierarchy parts: zone, side, row, level, bay
+  // ("ตอน"). Bay is optional in the regex so locations still on the
+  // pre-bay 4-segment format (shouldn't exist after the retrofit migration,
+  // but kept defensive) still parse as bay 1.
   function parseLocCode(code) {
-    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
-    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4] } : null;
+    const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4], bay: m[5] ?? '01' } : null;
   }
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })), [locations]);
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
@@ -464,17 +468,25 @@ function ReceivingWorkflow({ onBack, t }) {
     return [...new Set(parsedLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow).map((l) => l.parsed.level))].sort();
   }, [parsedLocs, locZone, locSide, locRow]);
 
-  // Auto-resolve selectedLocation from the 4-part hierarchy selection
+  const availableBays = useMemo(() => {
+    if (!locZone || !locSide || !locRow || !locLevel) return [];
+    return [...new Set(parsedLocs.filter((l) =>
+      l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow && l.parsed.level === locLevel
+    ).map((l) => l.parsed.bay))].sort();
+  }, [parsedLocs, locZone, locSide, locRow, locLevel]);
+
+  // Auto-resolve selectedLocation from the 5-part hierarchy selection
   useEffect(() => {
-    if (!useHierarchy || !locZone || !locSide || !locRow || !locLevel) {
+    if (!useHierarchy || !locZone || !locSide || !locRow || !locLevel || !locBay) {
       if (useHierarchy) setSelectedLocation(null);
       return;
     }
     const match = parsedLocs.find((l) =>
-      l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow && l.parsed.level === locLevel
+      l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow
+      && l.parsed.level === locLevel && l.parsed.bay === locBay
     );
     setSelectedLocation(match ?? null);
-  }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
+  }, [locZone, locSide, locRow, locLevel, locBay, parsedLocs, useHierarchy]);
 
   useEffect(() => {
     setLocationOccupied(null);
@@ -619,7 +631,7 @@ function ReceivingWorkflow({ onBack, t }) {
     setStickerItem(confirmedItem);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
     setSelectedLocation(null); setMismatchWarned(false); setLocationOccupied(null); setLocationOccupiedWarned(false);
-    setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
+    setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay('');
     setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
   }
 
@@ -788,7 +800,7 @@ function ReceivingWorkflow({ onBack, t }) {
       <TopBar
         title={selectedDoc.request_no}
         subtitle={`✅ ${doneCount}/${lines.length} รายการ`}
-        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
         badge={
           <div style={{
             background: 'rgba(255,255,255,0.2)', borderRadius: 20,
@@ -1000,7 +1012,7 @@ function ReceivingWorkflow({ onBack, t }) {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
-                      <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                      <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
                         style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
                         {availableZones.map((z) => <option key={z} value={z}>{z}</option>)}
@@ -1008,7 +1020,7 @@ function ReceivingWorkflow({ onBack, t }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ฝั่ง</div>
-                      <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }}
+                      <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); setLocBay(''); }}
                         disabled={!locZone}
                         style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
@@ -1017,7 +1029,7 @@ function ReceivingWorkflow({ onBack, t }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>แถว</div>
-                      <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }}
+                      <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); setLocBay(''); }}
                         disabled={!locSide}
                         style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
@@ -1026,11 +1038,20 @@ function ReceivingWorkflow({ onBack, t }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ชั้น</div>
-                      <select value={locLevel} onChange={(e) => setLocLevel(e.target.value)}
+                      <select value={locLevel} onChange={(e) => { setLocLevel(e.target.value); setLocBay(''); }}
                         disabled={!locRow}
                         style={{ width: '100%', boxSizing: 'border-box', background: locRow ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locRow ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
                         {availableLevels.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ตอน</div>
+                      <select value={locBay} onChange={(e) => setLocBay(e.target.value)}
+                        disabled={!locLevel}
+                        style={{ width: '100%', boxSizing: 'border-box', background: locLevel ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locLevel ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                        <option value="">— เลือก —</option>
+                        {availableBays.map((b) => <option key={b} value={b}>{b}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1803,13 +1824,14 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
   const [locLevel, setLocLevel] = useState('');
+  const [locBay, setLocBay] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [updated, setUpdated] = useState([]);
 
   function parseLocCode(code) {
-    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
-    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4] } : null;
+    const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: m[3], level: m[4], bay: m[5] ?? '01' } : null;
   }
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })), [locations]);
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
@@ -1818,15 +1840,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const availableSides = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone).map((l) => l.parsed.side))].sort(), [parsedLocs, locZone]);
   const availableRows = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort(), [parsedLocs, locZone, locSide]);
   const availableLevels = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone && l.parsed?.side === locSide && l.parsed?.row === locRow).map((l) => l.parsed.level))].sort(), [parsedLocs, locZone, locSide, locRow]);
+  const availableBays = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.zone === locZone && l.parsed?.side === locSide && l.parsed?.row === locRow && l.parsed?.level === locLevel).map((l) => l.parsed.bay))].sort(), [parsedLocs, locZone, locSide, locRow, locLevel]);
 
   useEffect(() => {
-    if (locZone && locSide && locRow && locLevel && useHierarchy) {
-      const match = parsedLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow && l.parsed.level === locLevel);
+    if (locZone && locSide && locRow && locLevel && locBay && useHierarchy) {
+      const match = parsedLocs.find((l) =>
+        l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === locRow
+        && l.parsed.level === locLevel && l.parsed.bay === locBay
+      );
       setSelectedLocation(match ?? null);
     } else if (useHierarchy) {
       setSelectedLocation(null);
     }
-  }, [locZone, locSide, locRow, locLevel, parsedLocs, useHierarchy]);
+  }, [locZone, locSide, locRow, locLevel, locBay, parsedLocs, useHierarchy]);
 
   useEffect(() => {
     listCustomerDepositRequests({ statusIn: ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'] }).then((r) => {
@@ -1904,7 +1930,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
     triggerSuccessFeedback();
     setLines((prev) => prev.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation?.id ?? null } : l));
     setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
-    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel('');
+    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay('');
   }
 
   const pendingCount = lines.filter((l) => !l.location_id).length;
@@ -2020,7 +2046,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
               const hasloc = !!l.location_id;
               return (
                 <div key={l.id}
-                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
                   style={{
                     background: hasloc ? C.greenLight : C.surface,
                     border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
@@ -2094,7 +2120,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
-                    <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+                    <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
                       style={{ width: '100%', boxSizing: 'border-box', background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
                       {availableZones.map((z) => <option key={z} value={z}>{z}</option>)}
@@ -2102,7 +2128,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ฝั่ง</div>
-                    <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }}
+                    <select value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); setLocBay(''); }}
                       disabled={!locZone}
                       style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
@@ -2111,7 +2137,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>แถว</div>
-                    <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }}
+                    <select value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); setLocBay(''); }}
                       disabled={!locSide}
                       style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
@@ -2120,11 +2146,20 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ชั้น</div>
-                    <select value={locLevel} onChange={(e) => setLocLevel(e.target.value)}
+                    <select value={locLevel} onChange={(e) => { setLocLevel(e.target.value); setLocBay(''); }}
                       disabled={!locRow}
                       style={{ width: '100%', boxSizing: 'border-box', background: locRow ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locRow ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
                       {availableLevels.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ตอน</div>
+                    <select value={locBay} onChange={(e) => setLocBay(e.target.value)}
+                      disabled={!locLevel}
+                      style={{ width: '100%', boxSizing: 'border-box', background: locLevel ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locLevel ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                      <option value="">— เลือก —</option>
+                      {availableBays.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
                 </div>

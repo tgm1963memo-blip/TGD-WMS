@@ -16,9 +16,11 @@ const EMPTY_FORM = {
   sideLeft: true,
   leftRows: 5,
   leftLevels: 5,
+  leftBays: 1,
   sideRight: true,
   rightRows: 5,
   rightLevels: 5,
+  rightBays: 1,
 };
 
 const TEMP_OPTIONS = [
@@ -45,17 +47,17 @@ function describeGrid(gridInfo) {
   if (gridInfo.type === 'new') {
     const parts = [];
     if (gridInfo.sidesConfig?.L && gridInfo.sidesConfig.L.rows > 0) {
-      parts.push(`L: ${gridInfo.sidesConfig.L.rows}×${gridInfo.sidesConfig.L.levels}`);
+      parts.push(`L: ${gridInfo.sidesConfig.L.rows}×${gridInfo.sidesConfig.L.levels}×${gridInfo.sidesConfig.L.bays || 1}`);
     }
     if (gridInfo.sidesConfig?.R && gridInfo.sidesConfig.R.rows > 0) {
-      parts.push(`R: ${gridInfo.sidesConfig.R.rows}×${gridInfo.sidesConfig.R.levels}`);
+      parts.push(`R: ${gridInfo.sidesConfig.R.rows}×${gridInfo.sidesConfig.R.levels}×${gridInfo.sidesConfig.R.bays || 1}`);
     }
     if (parts.length > 0) return parts.join(' · ');
-    
+
     const sideStr = gridInfo.numSides === 2
       ? 'ซ้าย + ขวา'
       : (gridInfo.sides?.[0] === 'L' ? 'ฝั่งซ้าย' : 'ฝั่งขวา');
-    return `${gridInfo.numRows} แถว · ${sideStr} · ${gridInfo.numLevels} ชั้น`;
+    return `${gridInfo.numRows} แถว · ${sideStr} · ${gridInfo.numLevels} ชั้น · ${gridInfo.numBays || 1} ตอน`;
   }
   if (gridInfo.type === 'old') return `${gridInfo.rows} แถว × ${gridInfo.cols} ช่อง`;
   return '';
@@ -67,9 +69,11 @@ function initEditForm(section) {
     leftActive: (sc.L?.rows ?? 0) > 0,
     leftRows: sc.L?.rows || 5,
     leftLevels: sc.L?.levels || 5,
+    leftBays: sc.L?.bays || 1,
     rightActive: (sc.R?.rows ?? 0) > 0,
     rightRows: sc.R?.rows || 5,
     rightLevels: sc.R?.levels || 5,
+    rightBays: sc.R?.bays || 1,
   };
 }
 
@@ -119,13 +123,15 @@ function SectionCard({ section, onDelete, onEdit }) {
     setEditSuccess('');
     const lRows = Math.max(1, Math.min(50, +editForm.leftRows || 1));
     const lLevels = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
+    const lBays = Math.max(1, Math.min(20, +editForm.leftBays || 1));
     const rRows = Math.max(1, Math.min(50, +editForm.rightRows || 1));
     const rLevels = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
+    const rBays = Math.max(1, Math.min(20, +editForm.rightBays || 1));
     const result = await onEdit(section.id, {
       zoneCode: section.code,
       zoneName: section.name,
-      leftConfig: { active: editForm.leftActive, rows: lRows, levels: lLevels },
-      rightConfig: { active: editForm.rightActive, rows: rRows, levels: rLevels },
+      leftConfig: { active: editForm.leftActive, rows: lRows, levels: lLevels, bays: lBays },
+      rightConfig: { active: editForm.rightActive, rows: rRows, levels: rLevels, bays: rBays },
     });
     setEditSaving(false);
     if (result?.error) {
@@ -139,9 +145,11 @@ function SectionCard({ section, onDelete, onEdit }) {
 
   const efLR = Math.max(1, Math.min(50, +editForm.leftRows || 1));
   const efLL = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
+  const efLB = Math.max(1, Math.min(20, +editForm.leftBays || 1));
   const efRR = Math.max(1, Math.min(50, +editForm.rightRows || 1));
   const efRL = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
-  const editTotal = (editForm.leftActive ? efLR * efLL : 0) + (editForm.rightActive ? efRR * efRL : 0);
+  const efRB = Math.max(1, Math.min(20, +editForm.rightBays || 1));
+  const editTotal = (editForm.leftActive ? efLR * efLL * efLB : 0) + (editForm.rightActive ? efRR * efRL * efRB : 0);
 
   return (
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
@@ -242,7 +250,7 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งซ้าย (L)
               </label>
               {editForm.leftActive && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                     จำนวนแถว
                     <input
@@ -265,6 +273,17 @@ function SectionCard({ section, onDelete, onEdit }) {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
                   </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนตอน
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={20}
+                      value={editForm.leftBays}
+                      onChange={(e) => setEf('leftBays', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
                 </div>
               )}
             </div>
@@ -280,7 +299,7 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งขวา (R)
               </label>
               {editForm.rightActive && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                     จำนวนแถว
                     <input
@@ -303,6 +322,17 @@ function SectionCard({ section, onDelete, onEdit }) {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
                   </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนตอน
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={20}
+                      value={editForm.rightBays}
+                      onChange={(e) => setEf('rightBays', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
                 </div>
               )}
             </div>
@@ -310,9 +340,9 @@ function SectionCard({ section, onDelete, onEdit }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 13, color: '#64748b' }}>
               รวม <strong style={{ color: '#1e293b' }}>{editTotal}</strong> location
-              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}×{efLL}</span>}
+              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}×{efLL}×{efLB}</span>}
               {editForm.leftActive && editForm.rightActive && <span style={{ color: '#94a3b8' }}> / </span>}
-              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}×{efRL}</span>}
+              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}×{efRL}×{efRB}</span>}
             </div>
             <button
               type="button"
@@ -349,10 +379,12 @@ function AddSectionForm({ onAdd }) {
 
   const leftRows = Math.max(1, Math.min(50, +form.leftRows || 1));
   const leftLevels = Math.max(1, Math.min(20, +form.leftLevels || 1));
+  const leftBays = Math.max(1, Math.min(20, +form.leftBays || 1));
   const rightRows = Math.max(1, Math.min(50, +form.rightRows || 1));
   const rightLevels = Math.max(1, Math.min(20, +form.rightLevels || 1));
+  const rightBays = Math.max(1, Math.min(20, +form.rightBays || 1));
 
-  const total = (form.sideLeft ? leftRows * leftLevels : 0) + (form.sideRight ? rightRows * rightLevels : 0);
+  const total = (form.sideLeft ? leftRows * leftLevels * leftBays : 0) + (form.sideRight ? rightRows * rightLevels * rightBays : 0);
   const totalSides = (form.sideLeft ? 1 : 0) + (form.sideRight ? 1 : 0);
 
   async function handleSubmit(e) {
@@ -368,8 +400,8 @@ function AddSectionForm({ onAdd }) {
     setSaving(true);
     setError('');
     
-    const leftConfig = { active: form.sideLeft, rows: leftRows, levels: leftLevels };
-    const rightConfig = { active: form.sideRight, rows: rightRows, levels: rightLevels };
+    const leftConfig = { active: form.sideLeft, rows: leftRows, levels: leftLevels, bays: leftBays };
+    const rightConfig = { active: form.sideRight, rows: rightRows, levels: rightLevels, bays: rightBays };
     
     const result = await onAdd({
       zoneCode: form.zoneCode.trim().toUpperCase(),
@@ -471,7 +503,7 @@ function AddSectionForm({ onAdd }) {
             ฝั่งซ้าย (L)
           </label>
           {form.sideLeft && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 จำนวนแถว
                 <input
@@ -494,6 +526,17 @@ function AddSectionForm({ onAdd }) {
                   style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                 />
               </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนตอน
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={20}
+                  value={form.leftBays}
+                  onChange={(e) => set('leftBays', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
             </div>
           )}
         </div>
@@ -510,7 +553,7 @@ function AddSectionForm({ onAdd }) {
             ฝั่งขวา (R)
           </label>
           {form.sideRight && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 จำนวนแถว
                 <input
@@ -533,6 +576,17 @@ function AddSectionForm({ onAdd }) {
                   style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                 />
               </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนตอน
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={20}
+                  value={form.rightBays}
+                  onChange={(e) => set('rightBays', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
             </div>
           )}
         </div>
@@ -547,7 +601,7 @@ function AddSectionForm({ onAdd }) {
         <span style={{ fontWeight: 700, color: '#2d9348' }}>ตัวอย่างรหัส Location:</span>
         {form.zoneCode.trim() && totalSides > 0 ? (
           <span style={{ fontFamily: 'monospace', color: '#1e293b', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
-            {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01-01
+            {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01-01-01
           </span>
         ) : (
           <span style={{ color: '#94a3b8' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
@@ -557,9 +611,9 @@ function AddSectionForm({ onAdd }) {
           {totalSides > 0 && total > 0 && (
             <span style={{ color: '#94a3b8', marginLeft: 6 }}>
               (
-                {form.sideLeft ? `L: ${leftRows}×${leftLevels}` : ''}
+                {form.sideLeft ? `L: ${leftRows}×${leftLevels}×${leftBays}` : ''}
                 {form.sideLeft && form.sideRight ? ' / ' : ''}
-                {form.sideRight ? `R: ${rightRows}×${rightLevels}` : ''}
+                {form.sideRight ? `R: ${rightRows}×${rightLevels}×${rightBays}` : ''}
               )
             </span>
           )}
@@ -621,7 +675,7 @@ export function WarehouseLocationSetupPage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="ตั้งค่า Location คลังสินค้า"
-        description="กำหนดห้อง ฝั่ง แถว และชั้น — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว}-{ชั้น} เช่น H1-L-01-03"
+        description="กำหนดห้อง ฝั่ง แถว ชั้น และตอน — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว}-{ชั้น}-{ตอน} เช่น H1-L-01-03-01"
       />
 
       {/* Summary stats */}

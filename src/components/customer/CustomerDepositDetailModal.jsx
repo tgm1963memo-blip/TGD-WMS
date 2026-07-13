@@ -57,6 +57,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
   const [locLevel, setLocLevel] = useState('');
+  const [locBay, setLocBay] = useState('');
   const [customerData, setCustomerData] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
@@ -106,10 +107,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     getActiveLocations().then(({ data }) => setAllLocations(data ?? []));
   }, []);
 
-  // Parse location code into hierarchy parts
+  // Parse location code into hierarchy parts (bay/"ตอน" optional so
+  // pre-retrofit 4-segment codes still parse, defaulting to bay 1)
   function parseLocCode(code) {
-    const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
-    return m ? { zone: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4] } : null;
+    const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
+    return m ? { zone: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
   }
 
   const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })).filter((l) => l.parsed);
@@ -117,8 +119,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const locSideOptions = locZone ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone).map((l) => l.parsed.side))].sort() : [];
   const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
   const locLevelOptions = (locZone && locSide && locRow) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow).map((l) => l.parsed.level))].sort((a, b) => a - b) : [];
-  const selectedLocObj = (locZone && locSide && locRow && locLevel)
-    ? (parsedAllLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel) ?? null)
+  const locBayOptions = (locZone && locSide && locRow && locLevel)
+    ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel).map((l) => l.parsed.bay))].sort((a, b) => a - b)
+    : [];
+  const selectedLocObj = (locZone && locSide && locRow && locLevel && locBay)
+    ? (parsedAllLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel && l.parsed.bay === +locBay) ?? null)
     : null;
 
   const branding = getDocumentBrandingConfig();
@@ -481,6 +486,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 setLocSide(p?.side ?? '');
                                 setLocRow(p?.row ? String(p.row) : '');
                                 setLocLevel(p?.level ? String(p.level) : '');
+                                setLocBay(p?.bay ? String(p.bay) : '');
                               }}
                             >
                               📍
@@ -715,7 +721,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       {/* Location update modal — only for RECEIVED_CONFIRMED lines */}
       <Modal
         isOpen={!!locationLine}
-        onClose={() => { setLocationLine(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); }}
+        onClose={() => { setLocationLine(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
         title="อัปเดต Location"
         size="sm"
         footer={(
@@ -743,30 +749,37 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <div className="form-grid" style={{ gap: 10 }}>
                 <label className="form-field">
                   <span>ห้อง / โซน</span>
-                  <select className="form-control" value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); }}>
+                  <select className="form-control" value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}>
                     <option value="">-- เลือกห้อง --</option>
                     {locZoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
                   <span>ฝั่ง</span>
-                  <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); }} disabled={!locZone}>
+                  <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); setLocBay(''); }} disabled={!locZone}>
                     <option value="">-- เลือกฝั่ง --</option>
                     {locSideOptions.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
                   <span>แถว</span>
-                  <select className="form-control" value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); }} disabled={!locSide}>
+                  <select className="form-control" value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); setLocBay(''); }} disabled={!locSide}>
                     <option value="">-- เลือกแถว --</option>
                     {locRowOptions.map((r) => <option key={r} value={String(r)}>แถว {r}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
                   <span>ชั้น</span>
-                  <select className="form-control" value={locLevel} onChange={(e) => setLocLevel(e.target.value)} disabled={!locRow}>
+                  <select className="form-control" value={locLevel} onChange={(e) => { setLocLevel(e.target.value); setLocBay(''); }} disabled={!locRow}>
                     <option value="">-- เลือกชั้น --</option>
                     {locLevelOptions.map((lv) => <option key={lv} value={String(lv)}>ชั้น {lv}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>ตอน</span>
+                  <select className="form-control" value={locBay} onChange={(e) => setLocBay(e.target.value)} disabled={!locLevel}>
+                    <option value="">-- เลือกตอน --</option>
+                    {locBayOptions.map((b) => <option key={b} value={String(b)}>ตอน {b}</option>)}
                   </select>
                 </label>
                 {selectedLocObj && (

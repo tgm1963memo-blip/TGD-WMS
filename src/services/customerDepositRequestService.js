@@ -55,6 +55,7 @@ const DEPOSIT_LINE_SELECT = [
   'actual_weight',
   'actual_note',
   'location_id',
+  'location:tgd_locations(location_code)',
   'created_at',
 ].join(', ');
 

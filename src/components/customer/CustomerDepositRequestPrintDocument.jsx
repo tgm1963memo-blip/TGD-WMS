@@ -49,8 +49,9 @@ export function CustomerDepositRequestPrintDocument({
 
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const hasLot    = lines.some((l) => l.lot_no || l.mfg_date || l.exp_date);
+  const hasLocation = lines.some((l) => l.location?.location_code);
 
-  const colCount = 6 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + 1;
+  const colCount = 6 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0) + (hasLocation ? 1 : 0) + 1;
 
   const totalDeclaredBoxes  = lines.reduce((s, l) => s + (Number(l.expected_boxes) || 0), 0);
   const totalDeclaredWeight = lines.reduce((s, l) => s + (Number(l.expected_weight) || 0), 0);
@@ -200,6 +201,7 @@ export function CustomerDepositRequestPrintDocument({
             <th style={{ ...TH, width: '7%', textAlign: 'right' }}>กก.ฝาก</th>
             <th style={{ ...TH, width: '6%', textAlign: 'center' }}>กล่อง</th>
             <th style={{ ...TH, width: '8%' }}>การจัดเก็บ</th>
+            {hasLocation && <th style={{ ...TH, width: '8%' }}>LOCATION</th>}
             {hasLot && <th style={{ ...TH, width: '7%' }}>LOT</th>}
             {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันผลิต</th>}
             {hasLot && <th style={{ ...TH, width: '10%', textAlign: 'center' }}>วันหมดอายุ</th>}
@@ -218,6 +220,7 @@ export function CustomerDepositRequestPrintDocument({
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
               <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.expected_boxes ?? '-'}</td>
               <td style={TD_SAFE}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
+              {hasLocation && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{line.location?.location_code || '-'}</td>}
               {hasLot && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
               {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>}
@@ -247,6 +250,7 @@ export function CustomerDepositRequestPrintDocument({
             <td style={{ ...TD, textAlign: 'right' }}>{totalDeclaredWeight ? totalDeclaredWeight.toLocaleString() : '-'}</td>
             <td style={{ ...TD, textAlign: 'center' }}>{totalDeclaredBoxes ? totalDeclaredBoxes.toLocaleString() : '-'}</td>
             <td style={TD} />
+            {hasLocation && <td style={TD} />}
             {hasLot && <td colSpan={3} style={TD} />}
             {hasActual && (
               <td style={{ ...TD, textAlign: 'center' }}>{totalActualBoxes ? totalActualBoxes.toLocaleString() : '-'}</td>

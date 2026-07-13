@@ -53,6 +53,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
   const totalActualWeight = lines.reduce((s, l) => s + (Number(l.actual_weight) || 0), 0);
 
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
+  const hasLocation = lines.some((l) => l.location?.location_code);
 
   return (
     <article
@@ -177,6 +178,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
           <col style={{ width: hasActual ? '15%' : '14%' }} />
           <col style={{ width: '9%' }} />
           <col style={{ width: '7%' }} />
+          {hasLocation && <col style={{ width: '7%' }} />}
           <col style={{ width: '6%' }} />
           <col style={{ width: '7%' }} />
           {hasActual && <col style={{ width: '6%' }} />}
@@ -191,7 +193,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
               behavior), so a continuation page shows which document this is
               without re-printing the full customer/address/temp block above. */}
           <tr>
-            <td colSpan={hasActual ? 13 : 12} className="operational-report-running-header">
+            <td colSpan={(hasActual ? 13 : 12) + (hasLocation ? 1 : 0)} className="operational-report-running-header">
               เลขที่เอกสาร {header.request_no} &nbsp;•&nbsp; ลูกค้า {fmt(header.customer_name)}
             </td>
           </tr>
@@ -202,6 +204,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CUSTOMER PRODUCT</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>CODE</th>
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>การจัดเก็บ</th>
+            {hasLocation && <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>LOCATION</th>}
             <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่ลูกค้าแจ้ง</th>
             {hasActual && <th colSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#e8f5e9', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>จำนวนที่รับจริง</th>}
             <th rowSpan={2} style={{ border: '1px solid #ccc', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700 }}>วันผลิต</th>
@@ -235,6 +238,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 <td style={TD}>{fmt(line.product_name)}</td>
                 <td style={TD_NOWRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
                 <td style={TD_NOWRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
+                {hasLocation && <td style={{ ...TD_NOWRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
                 <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
                 <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
                 {hasActual && (
@@ -257,7 +261,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
         </tbody>
         <tfoot>
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
-            <td colSpan={6} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
+            <td colSpan={hasLocation ? 7 : 6} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredWeight || null)}</td>
             {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualBoxes || null)}</td>}

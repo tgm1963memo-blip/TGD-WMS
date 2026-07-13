@@ -20,10 +20,13 @@ export async function ensureDefaultWarehouse() {
     .single();
 }
 
-// New format: {RoomCode}-{L|R}-{Row:02d}-{Level:02d}  e.g. H1-L-01-03
+// New format: {RoomCode}-{L|R}-{Row:02d}-{Level:02d}-{Bay:02d}  e.g. H1-L-01-03-01
+// Bay ("ตอน") is optional in the regex so pre-existing 4-segment codes (rooms
+// created before this dimension existed) still parse — they're treated as
+// bay 1, matching how they were retrofitted in the database.
 function parseNewCode(code) {
-  const m = /^(.+)-([LR])-(\d+)-(\d+)$/i.exec(code ?? '');
-  return m ? { room: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4] } : null;
+  const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
+  return m ? { room: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
 }
 
 // Legacy format: PREFIX-RxxCxx  e.g. S001-R01C01
@@ -47,12 +50,14 @@ function analyzeLocations(locations) {
     const numRows = Math.max(...newParsed.map((p) => p.row));
     const sides = [...new Set(newParsed.map((p) => p.side))].sort();
     const numLevels = Math.max(...newParsed.map((p) => p.level));
-    
-    const sidesConfig = { L: { rows: 0, levels: 0 }, R: { rows: 0, levels: 0 } };
+    const numBays = Math.max(...newParsed.map((p) => p.bay));
+
+    const sidesConfig = { L: { rows: 0, levels: 0, bays: 0 }, R: { rows: 0, levels: 0, bays: 0 } };
     newParsed.forEach(p => {
       if (sidesConfig[p.side]) {
         sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
         sidesConfig[p.side].levels = Math.max(sidesConfig[p.side].levels, p.level);
+        sidesConfig[p.side].bays = Math.max(sidesConfig[p.side].bays, p.bay);
       }
     });
 
@@ -62,9 +67,10 @@ function analyzeLocations(locations) {
       numSides: sides.length,
       sides,
       numLevels,
+      numBays,
       sidesConfig,
       rows: numRows * sides.length,
-      cols: numLevels,
+      cols: numLevels * numBays,
     };
   }
 
@@ -214,7 +220,7 @@ export async function getActiveLocations() {
 }
 
 // sides: array of 'L' | 'R' | both
-// Location code format: {roomCode}-{side}-{row:02d}-{level:02d}  e.g. H1-L-01-03
+// Location code format: {roomCode}-{side}-{row:02d}-{level:02d}-{bay:02d}  e.g. H1-L-01-03-01
 export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig }) {
   if (!supabase) return missing();
 
@@ -257,18 +263,22 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
 
   const addSideLocations = (side, config) => {
     if (!config?.active) return;
+    const bayCount = Math.max(1, Number(config.bays) || 1);
     for (let r = 1; r <= config.rows; r++) {
       for (let lv = 1; lv <= config.levels; lv++) {
-        const rowStr = String(r).padStart(2, '0');
-        const lvStr = String(lv).padStart(2, '0');
-        inserts.push({
-          room_id: room.id,
-          zone_id: zone.id,
-          name: `${zoneCode}-${side}-${rowStr}-${lvStr}`,
-          location_code: `${zoneCode}-${side}-${rowStr}-${lvStr}`,
-          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv}`,
-          location_type: 'SHELF',
-        });
+        for (let b = 1; b <= bayCount; b++) {
+          const rowStr = String(r).padStart(2, '0');
+          const lvStr = String(lv).padStart(2, '0');
+          const bayStr = String(b).padStart(2, '0');
+          inserts.push({
+            room_id: room.id,
+            zone_id: zone.id,
+            name: `${zoneCode}-${side}-${rowStr}-${lvStr}-${bayStr}`,
+            location_code: `${zoneCode}-${side}-${rowStr}-${lvStr}-${bayStr}`,
+            location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv} ตอน${b}`,
+            location_type: 'SHELF',
+          });
+        }
       }
     }
   };
@@ -314,19 +324,22 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
 
   const addSide = (side, config) => {
     if (!config?.active) return;
+    const bayCount = Math.max(1, Number(config.bays) || 1);
     for (let r = 1; r <= config.rows; r++) {
       for (let lv = 1; lv <= config.levels; lv++) {
-        const code = `${zoneCode}-${side}-${String(r).padStart(2, '0')}-${String(lv).padStart(2, '0')}`;
-        desiredCodes.add(code);
-        if (!existingCodes.has(code)) {
-          toInsertRows.push({
-            room_id: roomId,
-            zone_id: zoneId,
-            name: code,
-            location_code: code,
-            location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv}`,
-            location_type: 'SHELF',
-          });
+        for (let b = 1; b <= bayCount; b++) {
+          const code = `${zoneCode}-${side}-${String(r).padStart(2, '0')}-${String(lv).padStart(2, '0')}-${String(b).padStart(2, '0')}`;
+          desiredCodes.add(code);
+          if (!existingCodes.has(code)) {
+            toInsertRows.push({
+              room_id: roomId,
+              zone_id: zoneId,
+              name: code,
+              location_code: code,
+              location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv} ตอน${b}`,
+              location_type: 'SHELF',
+            });
+          }
         }
       }
     }
