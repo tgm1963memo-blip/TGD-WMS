@@ -31,13 +31,26 @@ export function isCatalogDepositLineSelected(line) {
   return hasCatalogId || hasProductCode;
 }
 
+function isDepositLineComplete(line) {
+  // weight_per_box is optional: when the customer doesn't know the per-unit
+  // weight, total weight and box count are captured independently instead.
+  const totalWeight = Number(line.expected_weight);
+  const boxes = Number(line.expected_boxes);
+  return totalWeight > 0 && boxes > 0;
+}
+
 export function getFilledDepositLines(lines) {
-  return (lines ?? []).filter((line) => {
-    if (!isCatalogDepositLineSelected(line)) return false;
-    // weight_per_box is optional: when the customer doesn't know the per-unit
-    // weight, total weight and box count are captured independently instead.
-    const totalWeight = Number(line.expected_weight);
-    const boxes = Number(line.expected_boxes);
-    return totalWeight > 0 && boxes > 0;
-  });
+  return (lines ?? []).filter((line) => isCatalogDepositLineSelected(line) && isDepositLineComplete(line));
+}
+
+/**
+ * Rows where a product was selected but the required quantity fields
+ * (box count / total weight) are still missing. These used to be silently
+ * dropped by getFilledDepositLines with no feedback — callers should block
+ * submission and surface these row numbers instead.
+ */
+export function getIncompleteDepositLines(lines) {
+  return (lines ?? [])
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => isCatalogDepositLineSelected(line) && !isDepositLineComplete(line));
 }

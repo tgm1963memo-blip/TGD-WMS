@@ -135,15 +135,29 @@ export function isCatalogWithdrawalLineSelected(line) {
   return Boolean(line?.catalog_product_id && line.catalog_product_id !== '__manual__');
 }
 
+function withdrawalLineHasProduct(line) {
+  return isCatalogWithdrawalLineSelected(line) || Boolean(String(line?.product_name ?? '').trim());
+}
+
+function withdrawalLineHasQty(line) {
+  const mode = line.withdrawal_qty_mode ?? WITHDRAWAL_QTY_MODES.WEIGHT;
+  return mode === WITHDRAWAL_QTY_MODES.BOXES
+    ? String(line.requested_boxes ?? '').trim() !== ''
+    : String(line.requested_weight ?? '').trim() !== '';
+}
+
 export function getFilledWithdrawalLines(lines) {
-  return (lines ?? []).filter(
-    (line) => {
-      const hasProduct = isCatalogWithdrawalLineSelected(line) || Boolean(String(line?.product_name ?? '').trim());
-      const mode = line.withdrawal_qty_mode ?? WITHDRAWAL_QTY_MODES.WEIGHT;
-      const hasQty = mode === WITHDRAWAL_QTY_MODES.BOXES
-        ? String(line.requested_boxes ?? '').trim() !== ''
-        : String(line.requested_weight ?? '').trim() !== '';
-      return hasProduct && hasQty;
-    },
-  );
+  return (lines ?? []).filter((line) => withdrawalLineHasProduct(line) && withdrawalLineHasQty(line));
+}
+
+/**
+ * Rows where a product was selected but the requested quantity for the
+ * chosen mode (boxes/weight) is still missing. These used to be silently
+ * dropped by getFilledWithdrawalLines with no feedback — callers should
+ * block submission and surface these row numbers instead.
+ */
+export function getIncompleteWithdrawalLines(lines) {
+  return (lines ?? [])
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => withdrawalLineHasProduct(line) && !withdrawalLineHasQty(line));
 }

@@ -35,6 +35,7 @@ import {
   createInitialDepositLines,
   DEPOSIT_LINE_DEFAULT_COUNT,
   getFilledDepositLines,
+  getIncompleteDepositLines,
 } from '../../utils/customerDepositLineDefaults.js';
 import {
   mapDepositHeaderForCopy,
@@ -381,6 +382,13 @@ export function CustomerDepositRequestCreatePage() {
 
     if (isRequestProxy && !proxyCustomerId) {
       setSubmitError(t('customer_request_proxy_customer_required'));
+      return;
+    }
+
+    const incompleteLines = getIncompleteDepositLines(lines);
+    if (incompleteLines.length) {
+      const rowNumbers = incompleteLines.map(({ index }) => index + 1).join(', ');
+      setSubmitError(`กรุณากรอกจำนวนกล่องและน้ำหนักรวมให้ครบในแถวที่ ${rowNumbers} หรือเอาสินค้าในแถวนั้นออก ก่อนบันทึก`);
       return;
     }
 

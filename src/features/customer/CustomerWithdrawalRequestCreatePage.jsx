@@ -28,6 +28,7 @@ import {
   createEmptyWithdrawalLine,
   createInitialWithdrawalLines,
   getFilledWithdrawalLines,
+  getIncompleteWithdrawalLines,
   getMatchedDepositLine,
   getWithdrawalBalanceInfo,
   WITHDRAWAL_LINE_DEFAULT_COUNT,
@@ -292,6 +293,13 @@ export function CustomerWithdrawalRequestCreatePage() {
 
       if (isEditMode && editStatus && editStatus !== 'WITHDRAWAL_DRAFT') {
         setSubmitError('คำขอนี้ไม่อยู่ในสถานะร่าง ไม่สามารถแก้ไขหรือส่งได้ (สถานะ: ' + editStatus + ')');
+        return;
+      }
+
+      const incompleteLines = getIncompleteWithdrawalLines(lines);
+      if (incompleteLines.length) {
+        const rowNumbers = incompleteLines.map(({ index }) => index + 1).join(', ');
+        setSubmitError(`กรุณากรอกจำนวนที่ต้องการเบิกให้ครบในแถวที่ ${rowNumbers} หรือเอาสินค้าในแถวนั้นออก ก่อนบันทึก`);
         return;
       }
 
