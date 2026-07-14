@@ -56,7 +56,19 @@ export function printSticker({
      should have none. */
   @page { margin: 0; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Tahoma, 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  /* Thai-capable fonts MUST lead this list. A prior change ("style: use
+     Tahoma font on sticker") reordered this to Tahoma-first for a cleaner
+     look on the developer's screen, but real thermal-label print drivers
+     (confirmed on the warehouse's Honeywell PM42) don't shape/rasterize Thai
+     combining vowel/tone marks correctly through Tahoma — printed labels
+     came out with tone marks and vowels visibly displaced from their base
+     consonant, reading as garbled/wrong characters even though on-screen
+     preview looked fine. Leelawadee UI / TH Sarabun New / Sarabun are the
+     fonts Windows actually ships with correct Thai shaping tables; keep them
+     first and use Tahoma only as a plain-Latin/digit fallback at the end.
+     Do not reorder this for cosmetic reasons without re-testing an actual
+     print on the physical label printer, not just the screen preview. */
+  body { font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
   /* On screen (this preview popup): show the sticker as a plain landscape
      rectangle, unrotated, so what you see here is what the layout actually
      looks like — easy to check before printing.
@@ -93,12 +105,17 @@ export function printSticker({
 
   .product-cell { vertical-align: top; padding-bottom: 1mm !important; }
   .product-flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
-  .product-name { font-size: 20px; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px; -webkit-text-stroke: 0.3px #000; }
-  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; -webkit-text-stroke: 0.1px #000; }
-  
-  .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; -webkit-text-stroke: 0.2px #000; }
-  .info-label { font-size: 9px; color: #333; -webkit-text-stroke: 0.1px #333; display: block; margin-bottom: 1px; }
-  
+  /* No -webkit-text-stroke and no negative letter-spacing here: both distort
+     Thai combining vowel/tone marks on real print rasterizers (see the font
+     comment on body {} above) — font-weight 700 alone (a real weight most
+     Thai-capable fonts ship, unlike a faux/synthetic 900) gives plenty of
+     boldness without that risk. */
+  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; }
+
+  .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; }
+  .info-label { font-size: 9px; color: #333; display: block; margin-bottom: 1px; }
+
   .track-row { height: 100%; text-align: center; vertical-align: middle; padding: 0 !important; }
   .track-wrapper { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
   /* Tracking code is maximized to fill the remaining area */
