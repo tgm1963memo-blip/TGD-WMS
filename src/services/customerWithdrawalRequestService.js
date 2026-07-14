@@ -173,10 +173,38 @@ async function attachRemainingLotBalance(lines, customerId) {
     }
     const lotNo = line.lot_no ?? line.source_lot_no ?? null;
     if (!lotNo) return null;
-    return depositLineList.find((d) =>
+    const lotMatches = depositLineList.filter((d) =>
       (d.lot_no ?? '') === lotNo &&
       (!line.customer_product_code || d.customer_product_code === line.customer_product_code)
-    ) ?? null;
+    );
+    if (lotMatches.length <= 1) return lotMatches[0] ?? null;
+
+    // A LOT can span more than one deposit line — several receiving
+    // batches/tracking codes, each with its own real weight_per_box (a lot
+    // spanning e.g. a 5kg/box batch and a 9.8kg/box batch is a real,
+    // observed case — see the balance-lock migration's incident notes).
+    // Blindly taking the first lot-mate here previously meant a withdrawal
+    // line resolved by LOT alone (no tracking_code recorded on it, e.g. an
+    // older pre-migration row) could get an unrelated batch's
+    // weight_per_box, so the "average weight" shown/used for it wouldn't
+    // match the tracking code it actually came from. Prefer whichever
+    // lot-mate can actually cover this line's own requested/picked
+    // quantity, tie-broken by the smallest sufficient remaining balance —
+    // the same disambiguation getMatchedDepositLine uses client-side for
+    // the same reason.
+    const wantBoxes = Number(line.picked_boxes ?? line.requested_boxes) || 0;
+    const wantWeight = Number(line.picked_weight ?? line.requested_weight) || 0;
+    const fits = lotMatches.filter((d) => {
+      const boxBal = Number(d.actual_boxes ?? d.expected_boxes ?? 0);
+      const wtBal = Number(d.actual_weight ?? d.expected_weight ?? 0);
+      return (wantBoxes <= 0 || boxBal >= wantBoxes) && (wantWeight <= 0 || wtBal >= wantWeight);
+    });
+    const candidates = fits.length ? fits : lotMatches;
+    return candidates.reduce((best, d) => {
+      const bestBal = Number(best.actual_boxes ?? best.expected_boxes ?? 0);
+      const dBal = Number(d.actual_boxes ?? d.expected_boxes ?? 0);
+      return dBal < bestBal ? d : best;
+    });
   }
 
   return lines.map((line) => {
