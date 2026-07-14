@@ -372,6 +372,15 @@ export function CustomerDepositRequestCreatePage() {
     }
   }
 
+  // activeLines (the filtered, filled-only subset) doesn't share indices with
+  // the table's own # column once any row is skipped — resolve the row
+  // number a user actually sees on screen by the line's stable key instead of
+  // reusing a loop index into a filtered array.
+  function displayRowNo(line) {
+    const idx = lines.findIndex((l) => l.key === line.key);
+    return idx === -1 ? '?' : idx + 1;
+  }
+
   async function saveFormData(shouldSubmit) {
     setSubmitError('');
 
@@ -469,7 +478,8 @@ export function CustomerDepositRequestCreatePage() {
 
       if (lineResult.error) {
         setSubmitting(false);
-        setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+        const rawMessage = lineResult.error.message ?? t('customer_portal_load_error');
+        setSubmitError(`รายการที่ ${displayRowNo(line)}: ${rawMessage}`);
         return;
       }
 

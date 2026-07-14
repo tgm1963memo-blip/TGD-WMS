@@ -105,10 +105,23 @@ export function getMatchedDepositLine(line, depositLines = []) {
  * jointly exceed it would both pass unflagged (e.g. 60 + 60 against a
  * single 100-box tracking code).
  */
+// `actual_*` is the netted remaining balance (see getDepositInventoryLines) —
+// 0 is a valid, meaningful value here ("nothing left"), not "unknown". Only
+// fall back to expected_* when actual_* itself is missing (null/undefined),
+// never on it being falsy-zero — `Number(0) || Number(expected)` would
+// silently substitute the pre-withdrawal total and hide a fully-depleted
+// balance, letting an over-request through with no client-side warning.
+function resolveBalance(actual, expected) {
+  const a = actual != null ? Number(actual) : null;
+  if (a != null && Number.isFinite(a)) return a;
+  const e = expected != null ? Number(expected) : null;
+  return e != null && Number.isFinite(e) ? e : 0;
+}
+
 export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines = []) {
   const matchedLine = getMatchedDepositLine(line, depositLines);
-  const maxBoxBalance = matchedLine ? (Number(matchedLine.actual_boxes) || Number(matchedLine.expected_boxes) || 0) : 0;
-  const maxWtBalance = matchedLine ? (Number(matchedLine.actual_weight) || Number(matchedLine.expected_weight) || 0) : 0;
+  const maxBoxBalance = matchedLine ? resolveBalance(matchedLine.actual_boxes, matchedLine.expected_boxes) : 0;
+  const maxWtBalance = matchedLine ? resolveBalance(matchedLine.actual_weight, matchedLine.expected_weight) : 0;
 
   const otherClaimants = matchedLine
     ? (siblingLines ?? []).filter((other) =>
@@ -122,8 +135,12 @@ export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines =
 
   const availableBoxBalance = maxBoxBalance - othersClaimedBoxes;
   const availableWtBalance = maxWtBalance - othersClaimedWeight;
-  const exceedsBoxBalance = maxBoxBalance > 0 && line?.requested_boxes !== '' && Number(line?.requested_boxes) > availableBoxBalance;
-  const exceedsWtBalance = maxWtBalance > 0 && line?.requested_weight !== '' && Number(line?.requested_weight) > availableWtBalance;
+  // matchedLine check (not maxBoxBalance > 0): a genuinely-zero remaining
+  // balance must still be flagged when boxes/weight are requested against
+  // it — only skip the check when there's no deposit line to compare
+  // against at all.
+  const exceedsBoxBalance = Boolean(matchedLine) && line?.requested_boxes !== '' && Number(line?.requested_boxes) > availableBoxBalance;
+  const exceedsWtBalance = Boolean(matchedLine) && line?.requested_weight !== '' && Number(line?.requested_weight) > availableWtBalance;
   return { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance };
 }
 

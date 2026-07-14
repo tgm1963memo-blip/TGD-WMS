@@ -275,6 +275,15 @@ export function CustomerWithdrawalRequestCreatePage() {
     return rawLot === '__null_lot__' ? '' : (rawLot || null);
   }
 
+  // activeLines (the filtered, product+qty-only subset) doesn't share indices
+  // with the table's own # column once any row is skipped — resolve the row
+  // number a user actually sees on screen by the line's stable key instead of
+  // reusing a loop index into a filtered array.
+  function displayRowNo(line) {
+    const idx = lines.findIndex((l) => l.key === line.key);
+    return idx === -1 ? '?' : idx + 1;
+  }
+
   async function saveFormData(shouldSubmit) {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -315,7 +324,7 @@ export function CustomerWithdrawalRequestCreatePage() {
         const line = activeLines[i];
         const lot = normalizeLotNo(line.lot_no);
         if (!lot && !line.source_deposit_request_id) {
-          setSubmitError(`รายการที่ ${i + 1}: ถ้าไม่สามารถระบุ LOT ที่ชัดเจนได้ กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: ถ้าไม่สามารถระบุ LOT ที่ชัดเจนได้ กรุณาเลือกแหล่งที่มา (ใบฝาก)`);
           return;
         }
 
@@ -325,18 +334,18 @@ export function CustomerWithdrawalRequestCreatePage() {
           const boxesFilled = String(line.requested_boxes ?? '').trim() !== '';
           const weightFilled = String(line.requested_weight ?? '').trim() !== '';
           if (!boxesFilled || !weightFilled) {
-            setSubmitError(`รายการที่ ${i + 1}: ไม่ทราบน้ำหนักต่อกล่อง กรุณาระบุทั้งจำนวนกล่องและน้ำหนัก`);
+            setSubmitError(`รายการที่ ${displayRowNo(line)}: ไม่ทราบน้ำหนักต่อกล่อง กรุณาระบุทั้งจำนวนกล่องและน้ำหนัก`);
             return;
           }
         }
 
         const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLines, activeLines);
         if (exceedsBoxBalance) {
-          setSubmitError(`รายการที่ ${i + 1}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (มี ${maxBoxBalance} กล่อง)`);
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (มี ${maxBoxBalance} กล่อง)`);
           return;
         }
         if (exceedsWtBalance) {
-          setSubmitError(`รายการที่ ${i + 1}: น้ำหนักที่เบิกเกินยอดคงเหลือ (มี ${maxWtBalance.toFixed(2)} กก.)`);
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: น้ำหนักที่เบิกเกินยอดคงเหลือ (มี ${maxWtBalance.toFixed(2)} กก.)`);
           return;
         }
       }
@@ -418,7 +427,8 @@ export function CustomerWithdrawalRequestCreatePage() {
         });
 
         if (lineResult.error) {
-          setSubmitError(lineResult.error.message ?? t('customer_portal_load_error'));
+          const rawMessage = lineResult.error.message ?? t('customer_portal_load_error');
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: ${rawMessage}`);
           return;
         }
 
