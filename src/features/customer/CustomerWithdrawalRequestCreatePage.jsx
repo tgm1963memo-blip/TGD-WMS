@@ -215,7 +215,7 @@ export function CustomerWithdrawalRequestCreatePage() {
       return undefined;
     }
 
-    getDepositInventoryLines({ customerId: effectiveCustomerId }).then((result) => {
+    getDepositInventoryLines({ customerId: effectiveCustomerId, excludeWithdrawalRequestId: editId || undefined }).then((result) => {
       if (!active) return;
       const allLines = result.data ?? [];
 

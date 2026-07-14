@@ -108,24 +108,82 @@ export function DateInputDMY({
     }
   }
 
+  const nativeDateRef = useRef(null);
+
+  // Typing dd/mm/yyyy by hand is error-prone (e.g. a customer typing the
+  // Buddhist Era year they use day-to-day into a plain text field silently
+  // stored a date 543 years out — see the BUDDHIST_ERA_OFFSET note above).
+  // Offering the browser's native calendar picker as an alternative input
+  // path removes that whole class of mistake without giving up the
+  // dd/mm/yyyy text field power users are used to.
+  function openCalendar() {
+    const node = nativeDateRef.current;
+    if (!node || disabled) return;
+    if (typeof node.showPicker === 'function') {
+      try {
+        node.showPicker();
+        return;
+      } catch {
+        // Some browsers throw if not called from a direct user gesture on
+        // this exact element (rare) — fall back to focusing it instead.
+      }
+    }
+    node.focus();
+  }
+
   return (
-    <input
-      className={className}
-      data-testid={testId}
-      disabled={disabled}
-      id={id}
-      inputMode="numeric"
-      maxLength={10}
-      onBlur={handleBlur}
-      onChange={handleChange}
-      onFocus={handleFocus}
-      pattern="\d{2}/\d{2}/\d{4}"
-      placeholder={placeholder}
-      required={required}
-      style={style}
-      title={title ?? 'วัน/เดือน/ปี'}
-      type="text"
-      value={text}
-    />
+    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+      <input
+        className={className}
+        data-testid={testId}
+        disabled={disabled}
+        id={id}
+        inputMode="numeric"
+        maxLength={10}
+        onBlur={handleBlur}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        pattern="\d{2}/\d{2}/\d{4}"
+        placeholder={placeholder}
+        required={required}
+        style={{ ...style, width: '100%', boxSizing: 'border-box', paddingRight: 26 }}
+        title={title ?? 'วัน/เดือน/ปี'}
+        type="text"
+        value={text}
+      />
+      <button
+        aria-label="เลือกวันที่จากปฏิทิน"
+        disabled={disabled}
+        onClick={openCalendar}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'var(--tgd-muted-text, #64748b)',
+          cursor: disabled ? 'default' : 'pointer',
+          lineHeight: 0,
+          padding: 2,
+          position: 'absolute',
+          right: 4,
+          top: '50%',
+          transform: 'translateY(-50%)',
+        }}
+        tabIndex={-1}
+        title="เลือกวันที่จากปฏิทิน"
+        type="button"
+      >
+        📅
+      </button>
+      <input
+        aria-hidden="true"
+        disabled={disabled}
+        min={min}
+        onChange={handleChange}
+        ref={nativeDateRef}
+        style={{ height: 0, opacity: 0, pointerEvents: 'none', position: 'absolute', width: 0 }}
+        tabIndex={-1}
+        type="date"
+        value={value || ''}
+      />
+    </div>
   );
 }

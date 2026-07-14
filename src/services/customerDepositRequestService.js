@@ -157,11 +157,70 @@ export async function getDepositInventoryLines(filters = {}) {
 
   if (lErr) return { data: null, error: lErr };
 
+  // actual_boxes/actual_weight above are the RAW deposited totals, not what's
+  // left after prior withdrawals. The withdrawal-request create page uses
+  // this as its balance-check baseline (getWithdrawalBalanceInfo), so without
+  // netting out already-claimed quantities here it silently compares a new
+  // request against the full original deposit instead of the true remaining
+  // balance — the same balance the server-side lock in
+  // tgd_upsert_customer_withdrawal_request_line already enforces. Mirror that
+  // RPC's "claimed" computation (same deposit line id OR same tracking code,
+  // any non-CANCELLED withdrawal request) so the client warns before the
+  // server has to reject it.
+  const lineIds = (lines ?? []).map((l) => l.id);
+  const trackingCodes = [...new Set((lines ?? []).map((l) => l.tracking_code).filter(Boolean))];
+
+  let claimedQuery = supabase
+    .from('tgd_customer_withdrawal_request_lines')
+    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status)')
+    .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED');
+
+  if (filters.excludeWithdrawalRequestId) {
+    claimedQuery = claimedQuery.neq('withdrawal_request_id', filters.excludeWithdrawalRequestId);
+  }
+
+  const orParts = [];
+  if (lineIds.length) orParts.push(`source_customer_deposit_request_line_id.in.(${lineIds.join(',')})`);
+  if (trackingCodes.length) orParts.push(`tracking_code.in.(${trackingCodes.map((c) => `"${c}"`).join(',')})`);
+
+  const claimedByLineId = {};
+  const claimedByTrackingCode = {};
+  if (orParts.length) {
+    const { data: claimedLines, error: cErr } = await claimedQuery.or(orParts.join(','));
+    if (cErr) return { data: null, error: cErr };
+    for (const cl of claimedLines ?? []) {
+      if (cl.source_customer_deposit_request_line_id) {
+        const bucket = claimedByLineId[cl.source_customer_deposit_request_line_id] ?? { boxes: 0, weight: 0 };
+        bucket.boxes += Number(cl.requested_boxes) || 0;
+        bucket.weight += Number(cl.requested_weight) || 0;
+        claimedByLineId[cl.source_customer_deposit_request_line_id] = bucket;
+      }
+      if (cl.tracking_code) {
+        const bucket = claimedByTrackingCode[cl.tracking_code] ?? { boxes: 0, weight: 0 };
+        bucket.boxes += Number(cl.requested_boxes) || 0;
+        bucket.weight += Number(cl.requested_weight) || 0;
+        claimedByTrackingCode[cl.tracking_code] = bucket;
+      }
+    }
+  }
+
   const headerMap = Object.fromEntries(headers.map((h) => [h.id, h]));
-  const enriched = (lines ?? []).map((l) => ({
-    ...l,
-    request: headerMap[l.deposit_request_id] ?? null,
-  }));
+  const enriched = (lines ?? []).map((l) => {
+    // A line matched by id and by tracking_code could double-count the same
+    // withdrawal row if it satisfies both — dedupe isn't needed here since
+    // both buckets are summed from the SAME underlying rows independently
+    // per deposit line, and every withdrawal row is attributed to exactly
+    // one deposit line in practice, so take whichever bucket is non-empty.
+    const claimed = claimedByLineId[l.id] ?? claimedByTrackingCode[l.tracking_code] ?? { boxes: 0, weight: 0 };
+    const rawBoxes = Number(l.actual_boxes) || 0;
+    const rawWeight = Number(l.actual_weight) || 0;
+    return {
+      ...l,
+      request: headerMap[l.deposit_request_id] ?? null,
+      actual_boxes: Math.max(0, rawBoxes - claimed.boxes),
+      actual_weight: Math.max(0, rawWeight - claimed.weight),
+    };
+  });
 
   return { data: enriched, error: null };
 }
