@@ -66,7 +66,11 @@ export function mapOutboundDetailToDeliverySlipData(detail) {
       customerProduct: line.customer_product ?? line.product_name ?? line.product_id ?? '-',
       itemCode: line.product_code ?? line.product_id ?? '-',
       batchNo: line.batch_no ?? '-',
-      totalWeightKg: line.requested_weight ?? line.picked_weight ?? line.weight ?? '-',
+      // picked_weight is the confirmed/actual amount once recorded — it can
+      // differ from what was originally requested, so it must take
+      // priority (see the same fix applied to the customer withdrawal
+      // print document and balance-lock RPC this session).
+      totalWeightKg: line.picked_weight ?? line.requested_weight ?? line.weight ?? '-',
       balanceTotal: line.balance_total ?? line.available_qty ?? '-',
     })),
     totalWeightKg: sumWeight(lines),

@@ -69,8 +69,22 @@ function CustomerWithdrawalRequestPrintDocumentPage({
   const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
   const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
 
-  const totalWeightKg = lines.reduce((s, l) => s + (Number(l.requested_weight) || 0), 0);
-  const totalBoxes    = lines.reduce((s, l) => s + (Number(l.requested_boxes) || 0), 0);
+  // picked_boxes/picked_weight is the CONFIRMED quantity once recorded (via
+  // a recount, or the Handheld pick) — it can legitimately differ from what
+  // was originally requested (e.g. a real case this session: requested 64
+  // boxes, recount confirmed only 58, admin_note "ยอดจริงมี58ถุง"). The
+  // printed document must reflect that confirmed number, not the original
+  // request, once one exists — falls back to requested_* only when nothing
+  // has been picked/confirmed yet (still a draft/pending work order).
+  function confirmedQty(line) {
+    return {
+      boxes: Number(line.picked_boxes ?? line.requested_boxes ?? 0),
+      weight: Number(line.picked_weight ?? line.requested_weight ?? 0),
+    };
+  }
+
+  const totalWeightKg = lines.reduce((s, l) => s + confirmedQty(l).weight, 0);
+  const totalBoxes    = lines.reduce((s, l) => s + confirmedQty(l).boxes, 0);
 
   // lot_remaining_boxes/weight (from tgd_get_customer_stock_balance) only
   // reflects withdrawals whose request status is already 'COMPLETED' — so
@@ -87,11 +101,10 @@ function CustomerWithdrawalRequestPrintDocumentPage({
     if (line.lot_remaining_boxes == null && line.lot_remaining_weight == null) {
       return { boxes: null, weight: null };
     }
-    const claimedBoxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
-    const claimedWeight = Number(line.picked_weight ?? line.requested_weight ?? 0);
+    const claimed = confirmedQty(line);
     return {
-      boxes: line.lot_remaining_boxes != null ? Math.max(0, line.lot_remaining_boxes - claimedBoxes) : null,
-      weight: line.lot_remaining_weight != null ? Math.max(0, line.lot_remaining_weight - claimedWeight) : null,
+      boxes: line.lot_remaining_boxes != null ? Math.max(0, line.lot_remaining_boxes - claimed.boxes) : null,
+      weight: line.lot_remaining_weight != null ? Math.max(0, line.lot_remaining_weight - claimed.weight) : null,
     };
   }
 
@@ -281,6 +294,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
         <tbody>
           {lines.length ? lines.map((line, idx) => {
             const remaining = remainingAfterThisWithdrawal(line);
+            const qty = confirmedQty(line);
             return (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
@@ -294,8 +308,8 @@ function CustomerWithdrawalRequestPrintDocumentPage({
               <td style={TD_SAFE}>{fmt(line.location)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
-              <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(line.requested_weight)}</td>
-              <td style={{ ...TD, textAlign: 'center' }}>{line.requested_boxes ?? '-'}</td>
+              <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(qty.weight)}</td>
+              <td style={{ ...TD, textAlign: 'center' }}>{qty.boxes || '-'}</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>0</td>
               <td style={{ ...TD, textAlign: 'center' }}>

@@ -21,11 +21,22 @@ export function CustomerWithdrawalRequestLinesDisplay({
             <th>{t('customer_col_requested_qty')}</th>
             <th>{t('customer_col_requested_boxes')}</th>
             <th>{t('customer_col_requested_weight')}</th>
+            <th>{t('customer_col_confirmed_boxes')}</th>
+            <th>{t('customer_col_confirmed_weight')}</th>
             <th>{t('customer_col_picking_rule')}</th>
           </tr>
         </thead>
         <tbody>
-          {sortedData.length ? sortedData.map((line) => (
+          {sortedData.length ? sortedData.map((line) => {
+            // picked_boxes/weight is only set once a recount/pick has been
+            // recorded — it's the CONFIRMED quantity and can legitimately
+            // differ from what was originally requested (e.g. a recount
+            // finding fewer boxes than requested). Show '-' until then
+            // rather than silently repeating the requested figure, so it's
+            // clear whether a line has actually been confirmed yet.
+            const hasConfirmedBoxes = line.picked_boxes != null;
+            const hasConfirmedWeight = line.picked_weight != null;
+            return (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td>{line.line_no}</td>
               <td>{line.customer_product_code ?? '-'}</td>
@@ -33,10 +44,13 @@ export function CustomerWithdrawalRequestLinesDisplay({
               <td>{line.requested_qty ?? '-'}</td>
               <td>{line.requested_boxes ?? '-'}</td>
               <td>{formatRequestWeight(line.requested_weight)}</td>
+              <td>{hasConfirmedBoxes ? line.picked_boxes : '-'}</td>
+              <td>{hasConfirmedWeight ? formatRequestWeight(line.picked_weight) : '-'}</td>
               <td>{line.picking_rule ?? '-'}</td>
             </tr>
-          )) : (
-            <tr><td colSpan={7}>{t('customer_request_detail_lines_empty')}</td></tr>
+            );
+          }) : (
+            <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
           )}
         </tbody>
       </table>

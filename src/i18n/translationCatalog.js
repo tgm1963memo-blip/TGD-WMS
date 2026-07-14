@@ -719,6 +719,8 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_col_requested_boxes: { th: 'จำนวนลัง', en: 'Requested Boxes' },
   customer_col_requested_weight: { th: 'น้ำหนัก (กก.)', en: 'Requested Weight (kg)' },
   customer_col_picking_rule: { th: 'กฎการหยิบ', en: 'Picking Rule' },
+  customer_col_confirmed_boxes: { th: 'ยืนยันแล้ว (ลัง)', en: 'Confirmed Boxes' },
+  customer_col_confirmed_weight: { th: 'ยืนยันแล้ว (กก.)', en: 'Confirmed Weight (kg)' },
   customer_request_cancel_title: { th: 'ขอยกเลิกเอกสาร', en: 'Request cancellation' },
   customer_request_cancel_description: { th: 'ยกเลิกได้ตามเงื่อนไขที่ผู้ดูแลระบบกำหนด (เช่น แจ้งล่วงหน้ากี่วัน)', en: 'Cancellation is allowed under admin-configured rules (e.g. advance notice days).' },
   customer_request_cancel_comment: { th: 'เหตุผลการยกเลิก', en: 'Cancellation reason' },

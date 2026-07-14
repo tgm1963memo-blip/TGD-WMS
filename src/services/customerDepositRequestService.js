@@ -172,7 +172,7 @@ export async function getDepositInventoryLines(filters = {}) {
 
   let claimedQuery = supabase
     .from('tgd_customer_withdrawal_request_lines')
-    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status)')
+    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status)')
     .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED');
 
   if (filters.excludeWithdrawalRequestId) {
@@ -189,16 +189,25 @@ export async function getDepositInventoryLines(filters = {}) {
     const { data: claimedLines, error: cErr } = await claimedQuery.or(orParts.join(','));
     if (cErr) return { data: null, error: cErr };
     for (const cl of claimedLines ?? []) {
+      // picked_boxes/weight is the CONFIRMED amount once recorded (a
+      // recount/pick can find fewer than originally requested — e.g. a real
+      // case this session: requested 64, picked only 58). Claiming the
+      // stale requested figure after that overstates what's actually gone
+      // from the batch, which could wrongly block a later withdrawal for
+      // the difference that was never really taken. Fall back to requested
+      // only while still in progress (picked_* not yet recorded).
+      const claimedBoxes = Number(cl.picked_boxes ?? cl.requested_boxes) || 0;
+      const claimedWeight = Number(cl.picked_weight ?? cl.requested_weight) || 0;
       if (cl.source_customer_deposit_request_line_id) {
         const bucket = claimedByLineId[cl.source_customer_deposit_request_line_id] ?? { boxes: 0, weight: 0 };
-        bucket.boxes += Number(cl.requested_boxes) || 0;
-        bucket.weight += Number(cl.requested_weight) || 0;
+        bucket.boxes += claimedBoxes;
+        bucket.weight += claimedWeight;
         claimedByLineId[cl.source_customer_deposit_request_line_id] = bucket;
       }
       if (cl.tracking_code) {
         const bucket = claimedByTrackingCode[cl.tracking_code] ?? { boxes: 0, weight: 0 };
-        bucket.boxes += Number(cl.requested_boxes) || 0;
-        bucket.weight += Number(cl.requested_weight) || 0;
+        bucket.boxes += claimedBoxes;
+        bucket.weight += claimedWeight;
         claimedByTrackingCode[cl.tracking_code] = bucket;
       }
     }
