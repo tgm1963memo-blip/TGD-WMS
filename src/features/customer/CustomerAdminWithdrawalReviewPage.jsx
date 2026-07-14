@@ -108,6 +108,30 @@ export function CustomerAdminWithdrawalReviewPage() {
     return () => { active = false; };
   }, []);
 
+  // Re-fetches this request's lines fresh from the DB — including
+  // lot_remaining_boxes/weight and picked_boxes/weight, which the printed
+  // document relies on to show the balance *after* this withdrawal. Every
+  // action below that changes the request's status or a line's picked
+  // quantity only patched `rows`/`lines` locally with the new status, never
+  // refetching `lines` itself — so a request completed (or picked) without
+  // reloading the page kept showing the PRE-withdrawal remaining balance on
+  // print, since the print trusts lot_remaining_boxes as already-netted
+  // once status is COMPLETED, but that field was never refreshed to match.
+  async function refreshLines(id) {
+    if (!id) { setLines([]); return; }
+    const result = await listCustomerWithdrawalRequestLines(id);
+    const loadedLines = result.data ?? [];
+    setLines(loadedLines);
+    const initNotes = {};
+    const initTrackingCodes = {};
+    loadedLines.forEach((l) => {
+      initNotes[l.id] = l.admin_note ?? '';
+      initTrackingCodes[l.id] = l.tracking_code ?? '';
+    });
+    setLineAdminNotes(initNotes);
+    setLineTrackingCodes(initTrackingCodes);
+  }
+
   useEffect(() => {
     let active = true;
     if (!selectedId) { setLines([]); return undefined; }
@@ -181,11 +205,13 @@ export function CustomerAdminWithdrawalReviewPage() {
     if (pickResult.error) {
       setError(pickResult.error.message ?? 'Send to handheld failed');
       setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: acceptResult.data?.status ?? 'ADMIN_ACCEPTED' } : r)));
+      await refreshLines(selectedId);
       return;
     }
     const newStatus = pickResult.data?.status ?? 'WAREHOUSE_PICKING';
     setActionMsg(`${t('admin_work_order_opened')} — ${t('admin_sent_to_handheld')}`);
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    await refreshLines(selectedId);
   }
 
   async function handleSendToHandheld() {
@@ -203,6 +229,7 @@ export function CustomerAdminWithdrawalReviewPage() {
     const newStatus = result.data?.status ?? 'WAREHOUSE_PICKING';
     setActionMsg(t('admin_sent_to_handheld'));
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    await refreshLines(selectedId);
   }
 
   async function handleConfirmWithdrawal() {
@@ -220,6 +247,11 @@ export function CustomerAdminWithdrawalReviewPage() {
     const newStatus = result.data?.status ?? 'COMPLETED';
     setActionMsg(t('admin_withdrawal_confirmed'));
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    // Refetch before opening the notify/print flow — the printed document
+    // shows lines' lot_remaining_boxes/weight as already-netted once status
+    // is COMPLETED, so it must reflect this exact withdrawal's own effect,
+    // not whatever was cached from before this action ran (see refreshLines).
+    await refreshLines(selectedId);
     setNotifyNote('');
     setNotifyOpen(true);
   }
@@ -237,6 +269,7 @@ export function CustomerAdminWithdrawalReviewPage() {
     const newStatus = result.data?.status ?? 'REJECTED';
     setActionMsg(getWithdrawalStatusLabel(newStatus, t) || newStatus);
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    await refreshLines(selectedId);
     setRejectOpen(false);
     setRejectReason('');
   }
@@ -254,6 +287,7 @@ export function CustomerAdminWithdrawalReviewPage() {
     const newStatus = result.data?.status ?? 'CANCELLED';
     setActionMsg('ยกเลิกเอกสารแล้ว');
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+    await refreshLines(selectedId);
     setCancelOpen(false);
     setCancelComment('');
   }
@@ -275,6 +309,10 @@ export function CustomerAdminWithdrawalReviewPage() {
         ? { ...l, picked_boxes: boxes, picked_weight: weight }
         : l
     ));
+    // Also refresh lot_remaining_boxes/weight in the background — a recount
+    // changes what's actually been taken, which the printed document's
+    // remaining-balance figure depends on (see refreshLines).
+    refreshLines(selectedId);
     setActionMsg('บันทึกการตรวจนับเรียบร้อย');
     setRecountLine(null);
   }
