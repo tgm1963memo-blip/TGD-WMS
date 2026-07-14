@@ -73,9 +73,56 @@ export function getIdentifierMatchedDepositLines(line, depositLines = []) {
   return productMatched;
 }
 
-/** The single best-matching deposit line for the line's chosen identifier, used to resolve weight-per-box and the admin note. */
+function candidateBalance(dl, field) {
+  const actualField = field === 'boxes' ? dl.actual_boxes : dl.actual_weight;
+  const expectedField = field === 'boxes' ? dl.expected_boxes : dl.expected_weight;
+  const a = actualField != null ? Number(actualField) : null;
+  if (a != null && Number.isFinite(a)) return a;
+  const e = expectedField != null ? Number(expectedField) : null;
+  return e != null && Number.isFinite(e) ? e : 0;
+}
+
+/**
+ * The single best-matching deposit line for the line's chosen identifier,
+ * used to resolve weight-per-box, the admin note, and (via
+ * getWithdrawalBalanceInfo) the remaining-balance check.
+ *
+ * A LOT can legitimately span more than one deposit line (several receiving
+ * batches/tracking codes under one LOT — see the balance-lock migration's
+ * incident notes). When a LOT/date/note identifier matches more than one
+ * candidate, blindly taking the first one made two withdrawal rows that
+ * reference the same LOT but are actually meant for two DIFFERENT batches
+ * collide: sibling-claim netting in getWithdrawalBalanceInfo treated them as
+ * competing for a single candidate's balance even though each individually
+ * fit a different batch exactly (e.g. one row for 24 boxes matching one
+ * untouched batch, another for the 10 boxes remaining on a separate
+ * tracking code) — both got wrongly flagged as exceeding the balance.
+ *
+ * Prefer whichever candidate can actually cover this row's own requested
+ * quantity, tie-broken by the smallest sufficient remaining balance (least
+ * excess — naturally FEFO-friendly, and deterministic even before a
+ * quantity is typed). Falls back to the first candidate only when none of
+ * them can individually satisfy the request (matches the previous
+ * behavior, so an over-limit request still resolves to *some* line and
+ * gets flagged, just not spuriously split across unrelated siblings).
+ */
 export function getMatchedDepositLine(line, depositLines = []) {
-  return getIdentifierMatchedDepositLines(line, depositLines)[0] ?? null;
+  const candidates = getIdentifierMatchedDepositLines(line, depositLines);
+  if (candidates.length <= 1) return candidates[0] ?? null;
+
+  const requestedBoxes = Number(line?.requested_boxes) || 0;
+  const requestedWeight = Number(line?.requested_weight) || 0;
+
+  const fits = candidates.filter((dl) =>
+    (requestedBoxes <= 0 || candidateBalance(dl, 'boxes') >= requestedBoxes)
+    && (requestedWeight <= 0 || candidateBalance(dl, 'weight') >= requestedWeight),
+  );
+
+  if (!fits.length) return candidates[0];
+
+  return fits.reduce((best, dl) =>
+    (candidateBalance(dl, 'boxes') < candidateBalance(best, 'boxes') ? dl : best),
+  );
 }
 
 /**
