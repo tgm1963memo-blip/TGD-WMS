@@ -271,18 +271,18 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             </td>
           </tr>
           <tr>
-            <th rowSpan={2} style={TH}>#</th>
-            <th rowSpan={2} style={TH}>TRACKING NO</th>
-            <th rowSpan={2} style={TH}>LOT NO</th>
-            <th rowSpan={2} style={TH}>ITEM CODE</th>
-            <th rowSpan={2} style={TH}>CUSTOMER PRODUCT</th>
-            <th rowSpan={2} style={TH}>LOCATION</th>
-            <th rowSpan={2} style={TH}>MFG DATE</th>
-            <th rowSpan={2} style={TH}>EXP DATE</th>
-            <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}>T.WEIGHT<br />KG.</th>
-            <th colSpan={3} style={{ ...TH, background: '#e8eaf6' }}>BALANCE TOTAL</th>
-            <th rowSpan={2} style={TH}>คงเหลือ<br />ในล็อต</th>
-            <th rowSpan={2} style={TH}>REMARK</th>
+            <th rowSpan={2} style={TH}><div>#</div></th>
+            <th rowSpan={2} style={TH}><div>TRACKING NO</div></th>
+            <th rowSpan={2} style={TH}><div>LOT NO</div></th>
+            <th rowSpan={2} style={TH}><div>ITEM CODE</div></th>
+            <th rowSpan={2} style={TH}><div>CUSTOMER PRODUCT</div></th>
+            <th rowSpan={2} style={TH}><div>LOCATION</div></th>
+            <th rowSpan={2} style={TH}><div>MFG DATE</div></th>
+            <th rowSpan={2} style={TH}><div>EXP DATE</div></th>
+            <th rowSpan={2} style={{ ...TH, textAlign: 'right' }}><div>T.WEIGHT<br />KG.</div></th>
+            <th colSpan={3} style={{ ...TH, background: '#e8eaf6' }}><div>BALANCE TOTAL</div></th>
+            <th rowSpan={2} style={TH}><div>คงเหลือ<br />ในล็อต</div></th>
+            <th rowSpan={2} style={TH}><div>REMARK</div></th>
           </tr>
           <tr>
             <th style={{ ...TH, background: '#e8eaf6' }}>Box</th>
@@ -298,14 +298,14 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             return (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
-              <td style={TD_SAFE}>{fmt(line.tracking_code)}</td>
-              <td style={{ ...TD_SAFE, fontWeight: 600 }}>{fmt(line.lot_no)}</td>
-              <td style={TD_SAFE}>{fmt(line.customer_product_code ?? line.product_code)}</td>
+              <td style={TD_SAFE}><div>{fmt(line.tracking_code)}</div></td>
+              <td style={{ ...TD_SAFE, fontWeight: 600 }}><div>{fmt(line.lot_no)}</div></td>
+              <td style={TD_SAFE}><div>{fmt(line.customer_product_code ?? line.product_code)}</div></td>
               <td style={TD_SAFE}>
                 <div>{fmt(line.product_name)}</div>
                 {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
               </td>
-              <td style={TD_SAFE}>{fmt(line.location)}</td>
+              <td style={TD_SAFE}><div>{fmt(line.location)}</div></td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
               <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(qty.weight)}</td>
