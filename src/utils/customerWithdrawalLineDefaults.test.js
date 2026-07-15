@@ -134,3 +134,32 @@ describe('getMatchedDepositLine / getWithdrawalBalanceInfo (regression: one LOT 
     expect(info.exceedsBoxBalance).toBe(true);
   });
 });
+
+describe('getWithdrawalBalanceInfo (regression: float-drift falsely flags requesting exactly the displayed balance)', () => {
+  it('does not flag a weight equal to the displayed balance when subtraction lands on a binary-float remainder (100.6 - 62.5 = 38.099999999999994, not 38.1)', () => {
+    const depositLine = {
+      id: 'dl-float',
+      customer_product_code: 'RPC049',
+      product_name: 'เศษชายสามชั้น',
+      lot_no: '083',
+      tracking_code: 'XX260630135',
+      actual_boxes: 4,
+      actual_weight: 100.6 - 62.5,
+      expected_boxes: 4,
+      expected_weight: 100.6 - 62.5,
+    };
+    const line = {
+      key: 1,
+      customer_product_code: 'RPC049',
+      product_name: 'เศษชายสามชั้น',
+      identifier_type: 'TRACKING_CODE',
+      identifier_value: 'XX260630135',
+      requested_boxes: '4',
+      requested_weight: '38.10',
+    };
+
+    const info = getWithdrawalBalanceInfo(line, [depositLine], [line]);
+    expect(info.maxWtBalance.toFixed(2)).toBe('38.10');
+    expect(info.exceedsWtBalance).toBe(false);
+  });
+});

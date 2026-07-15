@@ -186,8 +186,13 @@ export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines =
   // balance must still be flagged when boxes/weight are requested against
   // it — only skip the check when there's no deposit line to compare
   // against at all.
+  // WEIGHT_EPSILON absorbs binary-float drift from the subtractions above
+  // (e.g. 100.6 - 62.5 === 38.099999999999994, not 38.1) — without it, a
+  // user typing the exact balance shown on screen (rounded to 2dp) gets
+  // falsely flagged as exceeding it.
+  const WEIGHT_EPSILON = 0.005;
   const exceedsBoxBalance = Boolean(matchedLine) && line?.requested_boxes !== '' && Number(line?.requested_boxes) > availableBoxBalance;
-  const exceedsWtBalance = Boolean(matchedLine) && line?.requested_weight !== '' && Number(line?.requested_weight) > availableWtBalance;
+  const exceedsWtBalance = Boolean(matchedLine) && line?.requested_weight !== '' && Number(line?.requested_weight) - availableWtBalance > WEIGHT_EPSILON;
   return { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance };
 }
 
