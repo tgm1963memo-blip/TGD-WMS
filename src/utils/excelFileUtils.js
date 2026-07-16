@@ -28,12 +28,15 @@ export async function readExcelFile(file) {
   if (!sheetName) return { headers: [], rows: [] };
 
   const sheet = workbook.Sheets[sheetName];
+
+  // Read the header row directly so it's available even when the sheet has
+  // zero data rows (sheet_to_json's default json output has no rows to pull
+  // Object.keys from in that case, which used to make a valid, header-only
+  // template file look like it was missing its required columns).
+  const [headerRow] = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 });
+  const headers = (headerRow ?? []).map((h) => String(h ?? '').trim());
+
   const json = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-
-  const headers = json.length
-    ? Object.keys(json[0])
-    : [];
-
   const rows = json.map((row, index) => ({
     ...row,
     __row: index + 2,

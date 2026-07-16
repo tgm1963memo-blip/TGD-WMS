@@ -10,6 +10,16 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Round each line's charge to 2dp at the point it's computed, rather than
+// leaving it at full float precision and rounding only for display — since
+// rate is numeric(14,4) and weight can carry several decimals, the invoice
+// total (sum of unrounded amounts) would otherwise differ from the sum of
+// the individually-rounded amounts printed for each line, by a satang or
+// two.
+function round2(value) {
+  return Math.round(value * 100) / 100;
+}
+
 function toDateOnly(value) {
   if (!value) return null;
   const s = String(value).split('T')[0];
@@ -27,12 +37,6 @@ function maxDateStr(a, b) {
   if (!a) return b;
   if (!b) return a;
   return a > b ? a : b;
-}
-
-function minDateStr(a, b) {
-  if (!a) return b;
-  if (!b) return a;
-  return a < b ? a : b;
 }
 
 // Picks the best-matching configured rate for a product/customer + service
@@ -56,11 +60,48 @@ export function resolveServiceRate(rates = [], { customerId, customerProductId, 
   return allItemsGeneric ?? null;
 }
 
+// Sums the weight actually on hand for each day in [start, end] (both
+// inclusive, YYYY-MM-DD): starts at receivedWeight and steps down by each
+// withdrawal event's weight as of its date (an event dated exactly `start`
+// is already reflected — i.e. withdrawals take effect the day they
+// happened, not the day after). Only exactly-matched withdrawal events
+// should be passed in (see computeExitDates-style matching upstream) —
+// weight this can't attribute to a specific line should NOT appear here, so
+// an unmatched withdrawal biases toward billing more rather than silently
+// under-billing.
+function sumWeightDays(receivedWeight, events, start, end) {
+  const totalDays = diffDaysInclusive(start, end);
+  if (totalDays <= 0) return 0;
+
+  const withdrawnBeforeStart = events
+    .filter((e) => e.date <= start)
+    .reduce((sum, e) => sum + e.weight, 0);
+  const weightAtStart = Math.max(0, receivedWeight - withdrawnBeforeStart);
+
+  let weightDays = weightAtStart * totalDays;
+  for (const e of events) {
+    if (e.date > start && e.date <= end) {
+      weightDays -= e.weight * diffDaysInclusive(e.date, end);
+    }
+  }
+  return Math.max(0, weightDays);
+}
+
 // depositLines: [{ id, customer_id, customer_product_id, temperature_type,
-//   received_weight, receipt_date (YYYY-MM-DD), exit_date (YYYY-MM-DD or
-//   null if still in storage as of "now") }]
+//   received_weight, receipt_date (YYYY-MM-DD),
+//   withdrawal_events: [{ weight, date (YYYY-MM-DD) }] }]
 // Returns one computed line per deposit line that has a resolvable STORAGE
 // rate and at least one billable day/occurrence within [periodStart, periodEnd].
+//
+// Storage is billed proportionally to weight-days actually on hand within
+// the window (amount = rate x weightDays/period_days), rather than the
+// line's full original weight times a whole-period count. This fixes two
+// compounding bugs the day/whole-period model had: (1) a line only billed
+// its full original weight or 0 ("exited"/not) with no reduction after a
+// PARTIAL withdrawal, even though less was actually in storage from that
+// day on; and (2) periods = ceil(days/period_days) double-billed any window
+// whose day count wasn't an exact multiple of period_days (e.g. a 31-day
+// calendar month against a 30-day rate billed 2 whole periods, not ~1.03).
 export function computeStorageInvoiceLines({ depositLines = [], rates = [], periodStart, periodEnd }) {
   const results = [];
 
@@ -74,34 +115,42 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
     if (!rate) continue;
 
     const receiptDate = toDateOnly(dl.receipt_date);
-    const exitDate = toDateOnly(dl.exit_date);
     if (!receiptDate || receiptDate > periodEnd) continue;
-    if (exitDate && exitDate < periodStart) continue;
+
+    const receivedWeight = toNumber(dl.received_weight);
 
     if (rate.period_days == null) {
       // Charged once, only in the period that contains the receipt date —
-      // this is a one-time deposit/handling-style fee, not a recurring one.
+      // this is a one-time deposit/handling-style fee, not a recurring
+      // storage charge, so it isn't affected by later withdrawals.
       if (receiptDate < periodStart || receiptDate > periodEnd) continue;
-      const amount = toNumber(dl.received_weight) * toNumber(rate.rate);
+      const amount = round2(receivedWeight * toNumber(rate.rate));
       results.push({
         depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
-        days: null, weight: toNumber(dl.received_weight), amount,
+        days: null, weight: receivedWeight, amount,
       });
       continue;
     }
 
-    const effectiveEnd = minDateStr(exitDate ?? periodEnd, periodEnd);
     const start = maxDateStr(receiptDate, periodStart);
-    const end = minDateStr(effectiveEnd, periodEnd);
-    if (!start || !end || end < start) continue;
+    const end = periodEnd;
+    if (!start || start > end) continue;
 
     const days = diffDaysInclusive(start, end);
     if (days <= 0) continue;
-    const periods = Math.ceil(days / rate.period_days);
-    const amount = toNumber(dl.received_weight) * toNumber(rate.rate) * periods;
+
+    const events = (dl.withdrawal_events ?? [])
+      .map((e) => ({ weight: toNumber(e.weight), date: toDateOnly(e.date) }))
+      .filter((e) => e.date && e.weight > 0);
+
+    const weightDays = sumWeightDays(receivedWeight, events, start, end);
+    if (weightDays <= 0) continue;
+
+    const amount = round2((weightDays / rate.period_days) * toNumber(rate.rate));
     results.push({
-      depositLineId: dl.id, customerId: dl.customer_id, rate, periods,
-      days, weight: toNumber(dl.received_weight), amount,
+      depositLineId: dl.id, customerId: dl.customer_id, rate,
+      periods: round2(days / rate.period_days),
+      days, weight: round2(weightDays / days), weightDays, amount,
     });
   }
 
@@ -119,7 +168,7 @@ export function computeAuxiliaryServiceLines({ selections = [] }) {
     const rate = sel.rate ?? {};
     const cap = rate.max_quantity != null ? Number(rate.max_quantity) : null;
     const quantity = cap != null ? Math.min(toNumber(sel.quantity, 1), cap) : toNumber(sel.quantity, 1);
-    const amount = quantity * toNumber(rate.rate);
+    const amount = round2(quantity * toNumber(rate.rate));
     return {
       depositRequestId: sel.depositRequestId,
       customerId: sel.customerId,

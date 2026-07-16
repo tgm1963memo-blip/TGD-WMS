@@ -26,6 +26,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
+import { printStickers } from '../../utils/stickerPrint.jsx';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -68,6 +69,7 @@ export function CustomerAdminDepositReviewPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [globalSearchText, setGlobalSearchText] = useState('');
+  const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
 
   const filteredRows = rows.filter((row) => {
     if (!globalSearchText) return true;
@@ -110,6 +112,7 @@ export function CustomerAdminDepositReviewPage() {
 
   useEffect(() => {
     let active = true;
+    setSelectedLineIds(new Set());
     if (!selectedId) { setLines([]); return undefined; }
 
     listCustomerDepositRequestLines(selectedId).then((result) => {
@@ -286,6 +289,42 @@ export function CustomerAdminDepositReviewPage() {
     setActionMsg('ส่งคำขอตรวจนับใหม่ไปยังหัวหน้า Admin แล้ว');
     setRecountRequestOpen(false);
     setRecountRequestComment('');
+  }
+
+  function toggleLineSelected(lineId) {
+    setSelectedLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId); else next.add(lineId);
+      return next;
+    });
+  }
+
+  function toggleSelectAllLines(candidateLines) {
+    setSelectedLineIds((prev) => {
+      const selectableIds = candidateLines.map((l) => l.id);
+      const allSelected = selectableIds.length > 0 && selectableIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(selectableIds);
+    });
+  }
+
+  function handlePrintSelectedStickers() {
+    const depositDate = selected?.last_action_at ?? selected?.expected_arrival_date ?? null;
+    const items = lines
+      .filter((l) => selectedLineIds.has(l.id))
+      .map((l) => {
+        const quantityParts = [];
+        if (l.actual_boxes != null) quantityParts.push(`${l.actual_boxes} กล่อง`);
+        if (l.actual_weight != null) quantityParts.push(`${Number(l.actual_weight).toLocaleString('th-TH')} กก.`);
+        return {
+          depositDate,
+          productName: l.product_name ?? l.customer_product_code ?? '-',
+          quantityLabel: quantityParts.join(' / ') || '-',
+          locationCode: l.location?.location_code ?? '-',
+          trackingCode: l.tracking_code ?? '',
+        };
+      });
+    if (!items.length) return;
+    printStickers(items);
   }
 
   if (loading) {
@@ -476,11 +515,30 @@ export function CustomerAdminDepositReviewPage() {
 
             {/* Lines table with actual qty column and recount button */}
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  type="button"
+                  disabled={selectedLineIds.size === 0}
+                  onClick={handlePrintSelectedStickers}
+                >
+                  🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                </button>
+              </div>
               <div className="responsive-table">
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th style={{ width: 32 }}>
+                        <input
+                          type="checkbox"
+                          checked={lines.filter((l) => l.tracking_code).length > 0
+                            && lines.filter((l) => l.tracking_code).every((l) => selectedLineIds.has(l.id))}
+                          onChange={() => toggleSelectAllLines(lines.filter((l) => l.tracking_code))}
+                          title="เลือกทั้งหมด (เฉพาะรายการที่มีรหัสติดตาม)"
+                        />
+                      </th>
                       <th>#</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
@@ -495,6 +553,15 @@ export function CustomerAdminDepositReviewPage() {
                   <tbody>
                     {lines.length ? lines.map((line) => (
                       <tr key={line.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedLineIds.has(line.id)}
+                            disabled={!line.tracking_code}
+                            title={!line.tracking_code ? 'ไม่มีรหัสติดตาม พิมพ์สติกเกอร์ไม่ได้' : undefined}
+                            onChange={() => toggleLineSelected(line.id)}
+                          />
+                        </td>
                         <td>{line.line_no}</td>
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
@@ -557,7 +624,7 @@ export function CustomerAdminDepositReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

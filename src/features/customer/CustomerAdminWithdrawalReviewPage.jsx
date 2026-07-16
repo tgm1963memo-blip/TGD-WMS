@@ -632,10 +632,10 @@ export function CustomerAdminWithdrawalReviewPage() {
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ marginBottom: 2 }}>
                             <span
-                              className={`status-badge ${line.picked_boxes != null ? 'status-badge--confirmed' : 'status-badge--uat'}`}
+                              className={`status-badge ${line.picked_at != null ? 'status-badge--confirmed' : 'status-badge--uat'}`}
                               style={{ fontSize: 10 }}
                             >
-                              {line.picked_boxes != null ? 'จัดแล้ว' : 'รอดำเนินการ'}
+                              {line.picked_at != null ? 'จัดแล้ว' : 'รอดำเนินการ'}
                             </span>
                           </div>
                           {line.picked_boxes != null ? (

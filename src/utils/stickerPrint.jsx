@@ -23,10 +23,14 @@ function splitTrackingCode(code) {
   return [code.slice(0, mid), code.slice(mid)];
 }
 
-export function printSticker({
+// Builds one <div class="sticker-page">...</div> block for a single item —
+// shared by printSticker (one popup, one label) and printStickers (one
+// popup, N labels back-to-back, each its own printed page via
+// page-break-after so a multi-box deposit line prints one sticker per box
+// in a single print job instead of N separate popups).
+function renderStickerPageHtml({
   depositDate, productName, quantityLabel, locationCode, trackingCode,
 }) {
-
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
   const qrSvg = renderToStaticMarkup(
@@ -35,7 +39,43 @@ export function printSticker({
 
   const [codeLine1, codeLine2] = splitTrackingCode(trackingCode);
 
-  const html = `<!DOCTYPE html>
+  return `<div class="sticker-page">
+  <div class="sticker">
+    <table class="layout">
+      <tr>
+        <td class="product-cell" colspan="2">
+          <div class="product-flex">
+            <div class="product-name">${productName || '-'}</div>
+            <div class="date-block">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
+          </div>
+        </td>
+        <td class="qr-cell" rowspan="2">${qrSvg}</td>
+      </tr>
+      <tr class="info-row">
+        <td>
+          <span class="info-label">Location</span>
+          ${locationCode || '-'}
+        </td>
+        <td>
+          <span class="info-label">จำนวน</span>
+          ${quantityLabel || '-'}
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" class="track-row">
+          <div class="track-wrapper">
+            <div class="track-code">${codeLine1}</div>
+            <div class="track-code">${codeLine2}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>`;
+}
+
+function stickerDocumentHtml(pagesHtml) {
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -69,9 +109,9 @@ export function printSticker({
      Do not reorder this for cosmetic reasons without re-testing an actual
      print on the physical label printer, not just the screen preview. */
   body { font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; font-size: 15px; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-  /* On screen (this preview popup): show the sticker as a plain landscape
-     rectangle, unrotated, so what you see here is what the layout actually
-     looks like — easy to check before printing.
+  /* On screen (this preview popup): show each sticker as a plain landscape
+     rectangle, unrotated, stacked with a gap — easy to check before
+     printing.
      When printing: the physical label roll is still 3in wide x 4in long
      (76.2mm x 101.6mm) — a previous attempt at this label declared the
      sticker itself 101.6mm wide (assuming a 4x3in roll) and it printed
@@ -81,15 +121,22 @@ export function printSticker({
      landscape content 90deg to fit inside it sideways — nothing in the
      print job is ever wider than the print head. Turn the printed label a
      quarter turn to read it; if it comes out rotated the wrong way on your
-     printer, flip the sign on "rotate(90deg)" below to -90deg. */
-  .sticker-page { width: 101.6mm; height: 76.2mm; }
+     printer, flip the sign on "rotate(90deg)" below to -90deg.
+     Each .sticker-page is also its own printed page (page-break-after),
+     so N items print as N sequential labels off the thermal roll instead
+     of being squeezed onto one. */
+  .sticker-page { width: 101.6mm; height: 76.2mm; margin-bottom: 6mm; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
     border: 3px solid #000; border-radius: 4mm; padding: 1mm;
     background-color: white; overflow: hidden; display: flex; flex-direction: column;
   }
   @media print {
-    .sticker-page { width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative; }
+    .sticker-page {
+      width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative;
+      margin: 0; page-break-after: always;
+    }
+    .sticker-page:last-child { page-break-after: auto; }
     .sticker {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%) rotate(90deg);
@@ -123,44 +170,33 @@ export function printSticker({
 </style>
 </head>
 <body>
-<div class="sticker-page">
-  <div class="sticker">
-    <table class="layout">
-      <tr>
-        <td class="product-cell" colspan="2">
-          <div class="product-flex">
-            <div class="product-name">${productName || '-'}</div>
-            <div class="date-block">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
-          </div>
-        </td>
-        <td class="qr-cell" rowspan="2">${qrSvg}</td>
-      </tr>
-      <tr class="info-row">
-        <td>
-          <span class="info-label">Location</span>
-          ${locationCode || '-'}
-        </td>
-        <td>
-          <span class="info-label">จำนวน</span>
-          ${quantityLabel || '-'}
-        </td>
-      </tr>
-      <tr>
-        <td colspan="3" class="track-row">
-          <div class="track-wrapper">
-            <div class="track-code">${codeLine1}</div>
-            <div class="track-code">${codeLine2}</div>
-          </div>
-        </td>
-      </tr>
-    </table>
-  </div>
-</div>
+${pagesHtml}
 </body>
 </html>`;
+}
+
+function openAndPrintHtml(html) {
   const win = window.open('', '_blank', 'width=520,height=380');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
   win.onload = () => { setTimeout(() => win.print(), 500); };
+}
+
+export function printSticker({
+  depositDate, productName, quantityLabel, locationCode, trackingCode,
+}) {
+  const html = stickerDocumentHtml(renderStickerPageHtml({
+    depositDate, productName, quantityLabel, locationCode, trackingCode,
+  }));
+  openAndPrintHtml(html);
+}
+
+// items: [{ depositDate, productName, quantityLabel, locationCode, trackingCode }]
+// Prints every item as its own page in ONE print job/popup, in the order
+// given — used for "print stickers for selected lines" bulk actions.
+export function printStickers(items = []) {
+  if (!items.length) return;
+  const html = stickerDocumentHtml(items.map((item) => renderStickerPageHtml(item)).join('\n'));
+  openAndPrintHtml(html);
 }

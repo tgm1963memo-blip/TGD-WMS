@@ -13,7 +13,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
   if (!draft) return null;
 
   return (
-    <div className="operational-report operational-report-a4" style={{ fontFamily: 'Sarabun, sans-serif', fontSize: 14, color: '#1e293b' }}>
+    <div className="operational-report operational-report-a4-landscape" style={{ fontFamily: 'Sarabun, sans-serif', fontSize: 14, color: '#1e293b' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #2d9348' }}>

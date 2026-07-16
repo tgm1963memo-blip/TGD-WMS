@@ -118,3 +118,18 @@ export function formatRequestWeight(value) {
   if (value === null || value === undefined || value === '') return '-';
   return `${value}`;
 }
+
+// Mirrors the server's has_receipt_variance flag (round(x,3) <> round(y,3) —
+// see tgd_review_customer_deposit_request), rather than comparing raw
+// String(actual) !== String(expected). Without rounding first, two weights
+// that are the same value to 3 decimal places but arrived via different
+// float arithmetic paths (e.g. 100.45 vs 100.44999999999999) show up as a
+// variance here even though the server-computed flag on the list page
+// says there isn't one.
+export function hasWeightVariance(actual, expected) {
+  if (actual == null || expected == null) return false;
+  const a = Math.round(Number(actual) * 1000) / 1000;
+  const b = Math.round(Number(expected) * 1000) / 1000;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return String(actual) !== String(expected);
+  return a !== b;
+}

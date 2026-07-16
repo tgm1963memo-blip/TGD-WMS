@@ -27,7 +27,10 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
-import { getBillingPeriodPreview } from './billingRateEngineService.js';
+import { getBillingPeriodPreview, buildCatalogMaps } from './billingRateEngineService.js';
+import { listAllProductServiceRates } from './productServiceRatesService.js';
+import { listCustomerProducts } from './customerProductCatalogService.js';
+import { resolveServiceRate } from '../utils/billingRateCalc.js';
 import { getCustomers } from './masterDataService.js';
 import {
   evaluateInvoiceDraftBplusExportReadiness,
@@ -172,6 +175,81 @@ async function fetchMovementsByIds(movementIds = []) {
   };
 }
 
+const RATE_SERVICE_TYPES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'OTHER']);
+
+// enrichClientMergedBillingMovementWeightRow classifies deposit/withdrawal
+// rows as INBOUND_HANDLING/OUTBOUND_HANDLING (see billingMovementWeightService.js)
+// — translate those into the rate card's own service_type vocabulary
+// (tgd_customer_product_service_rates.service_type check constraint) so a
+// configured rate can actually be looked up for the row.
+function toRateServiceType(billingServiceType) {
+  const value = String(billingServiceType ?? '').toUpperCase();
+  if (RATE_SERVICE_TYPES.has(value)) return value;
+  if (value === 'INBOUND_HANDLING') return 'HANDLING_IN';
+  if (value === 'OUTBOUND_HANDLING') return 'HANDLING_OUT';
+  return null;
+}
+
+// Movement rows selected on BillingMovementWeightReportPage never carry a
+// resolved rate/amount (see buildInvoiceDraftLineFromMovement) — unlike the
+// period-preview draft path (getBillingPeriodPreview), which resolves a
+// rate per deposit line via the same rate engine. This looks up the
+// customer's configured service rate for each movement the same way, using
+// whichever of customer_product_code/temperature_type the row's source
+// (deposit/withdrawal/opening-balance — see movementLedgerReportService.js)
+// carried through billingMovementWeightService.js's shaping. Rows from the
+// raw unified-movements view (adjustments/transfers) have no
+// customer_product_code to resolve against and are left with rate: null,
+// same as before.
+async function resolveMovementRates(movements = []) {
+  const customerIds = [...new Set(movements.map((m) => m.customer_id).filter(Boolean))];
+  if (customerIds.length === 0) return movements;
+
+  const ratesByCustomer = new Map();
+  const catalogByCustomer = new Map();
+  await Promise.all(customerIds.map(async (customerId) => {
+    // Best-effort: a rate-lookup failure shouldn't block creating the draft
+    // itself — it just means these movements keep rate/amount null, same
+    // as before this lookup existed.
+    try {
+      const [ratesResult, catalogResult] = await Promise.all([
+        listAllProductServiceRates({ customerId, isActive: true }),
+        listCustomerProducts({ customerId }),
+      ]);
+      ratesByCustomer.set(customerId, ratesResult?.data ?? []);
+      catalogByCustomer.set(customerId, buildCatalogMaps(catalogResult?.data ?? []));
+    } catch {
+      ratesByCustomer.set(customerId, []);
+      catalogByCustomer.set(customerId, buildCatalogMaps([]));
+    }
+  }));
+
+  return movements.map((movement) => {
+    if (movement.rate != null) return movement;
+
+    const serviceType = toRateServiceType(movement.billing_service_type);
+    if (!serviceType) return movement;
+
+    const catalogMaps = catalogByCustomer.get(movement.customer_id);
+    const customerProductId = movement.customer_product_code
+      ? catalogMaps?.productIdByCode.get(movement.customer_product_code) ?? null
+      : null;
+    const temperatureType = movement.temperature_type
+      ?? (movement.customer_product_code ? catalogMaps?.temperatureTypeByCode.get(movement.customer_product_code) : null)
+      ?? null;
+
+    const rate = resolveServiceRate(ratesByCustomer.get(movement.customer_id) ?? [], {
+      customerId: movement.customer_id,
+      customerProductId,
+      temperatureType,
+      serviceType,
+    });
+    if (!rate) return movement;
+
+    return { ...movement, rate: rate.rate != null ? Number(rate.rate) : null, service_rate_id: rate.id ?? null };
+  });
+}
+
 export async function findActiveDuplicateDraftLines(movementIds = []) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -294,10 +372,12 @@ export async function createBillingInvoiceDraftFromMovements({
     };
   }
 
+  const ratedMovements = await resolveMovementRates(movementResult.data);
+
   const draftNo = await resolveDraftNo();
   const payload = buildInvoiceDraftCreatePayload({
     draftNo,
-    movements: movementResult.data,
+    movements: ratedMovements,
     billingPeriodStart,
     billingPeriodEnd,
     note,

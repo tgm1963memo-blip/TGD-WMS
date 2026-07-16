@@ -47,6 +47,14 @@ export function shapeBillingMovementWeightRow(row = {}) {
 
     product_code: row.product_code ?? null,
 
+    // Deposit/withdrawal/opening-balance-sourced rows (see
+    // movementLedgerReportService.js) identify their product by
+    // customer_product_code, not the master product_id/product_code above —
+    // carried through here so a rate can be resolved per row (customer
+    // service rates are scoped by customer_product_id, reached via this
+    // code) when building an invoice draft line from a movement.
+    customer_product_code: row.customer_product_code ?? null,
+
     product_name: row.product_name ?? null,
 
     temperature_type: row.temperature_type ?? null,

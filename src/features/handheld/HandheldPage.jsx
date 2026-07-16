@@ -555,11 +555,17 @@ function ReceivingWorkflow({ onBack, t }) {
   function handleScan(val) {
     setScanValue(val);
     const q = val.trim().toLowerCase();
-    const match = lines.find((l) =>
+    // customer_product_code/product_name/lot_no aren't guaranteed unique across
+    // a document's lines (e.g. one LOT split across several deposit lines), so
+    // a plain .find() always resolves to the first (often already-received)
+    // line and silently re-confirms it instead of the new box actually in
+    // hand — same bug class already fixed for withdrawal picking's handleScan.
+    // Prefer a line that isn't received yet whenever a match is ambiguous.
+    const matchesQuery = (l) =>
       (l.customer_product_code ?? '').toLowerCase() === q ||
       (l.product_name ?? '').toLowerCase().includes(q) ||
-      (l.lot_no ?? '').toLowerCase() === q,
-    );
+      (l.lot_no ?? '').toLowerCase() === q;
+    const match = lines.find((l) => matchesQuery(l) && l.actual_boxes == null) ?? lines.find(matchesQuery);
     if (match) {
       triggerSuccessFeedback();
       setMatchedLine(match);
@@ -625,8 +631,13 @@ function ReceivingWorkflow({ onBack, t }) {
       depositDate: new Date().toISOString(),
     };
     setConfirmed((prev) => [confirmedItem, ...prev]);
+    // `Number(boxes) || null` would turn a legitimately-entered "0" (e.g. a
+    // weight-only receipt with box count left at 0) into null, making this
+    // line look un-received everywhere else in the page (progress count,
+    // sort order, and handleScan's ambiguous-match check above all key off
+    // actual_boxes != null) and inviting staff to scan/receive it again.
     setLines((prev) => prev.map((l) => l.id === matchedLine.id
-      ? { ...l, actual_boxes: Number(boxes) || null, actual_weight: Number(weight) || null } : l));
+      ? { ...l, actual_boxes: boxes !== '' ? Number(boxes) : null, actual_weight: weight !== '' ? Number(weight) : null } : l));
 
     setStickerItem(confirmedItem);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
@@ -1359,6 +1370,15 @@ function PickingWorkflow({ onBack, t }) {
       try { qrData = JSON.parse(raw); } catch { /* not JSON */ }
     }
 
+    // lot_no/customer_product_code/product_name are not guaranteed unique across
+    // a request's lines (e.g. the same product split across several lots/boxes),
+    // so a plain lines.find() would always resolve to the first (often already-
+    // picked) line and silently re-confirm it instead of the new box actually in
+    // hand, leaving the real line stuck at "รอดำเนินการ" forever. Prefer a line
+    // that isn't done yet whenever a match is ambiguous.
+    const findPreferUndone = (predicate) =>
+      lines.find((l) => predicate(l) && !isDone(l)) ?? lines.find(predicate);
+
     let match = null;
     let matchedByTrackingCode = false;
     if (qrData) {
@@ -1366,9 +1386,9 @@ function PickingWorkflow({ onBack, t }) {
       const qrProduct = (qrData.p ?? '').toLowerCase();
       const qrLoc = (qrData.loc ?? '').toLowerCase();
       // Match by lot first (most specific), then by location code, then by product name
-      match = lines.find((l) => qrLot && (l.lot_no ?? '').toLowerCase() === qrLot)
-        ?? lines.find((l) => qrLoc && (l.location ?? '').toLowerCase() === qrLoc)
-        ?? lines.find((l) => qrProduct && (l.product_name ?? '').toLowerCase().includes(qrProduct));
+      match = findPreferUndone((l) => qrLot && (l.lot_no ?? '').toLowerCase() === qrLot)
+        ?? findPreferUndone((l) => qrLoc && (l.location ?? '').toLowerCase() === qrLoc)
+        ?? findPreferUndone((l) => qrProduct && (l.product_name ?? '').toLowerCase().includes(qrProduct));
     } else {
       // A scanned tracking-code sticker QR is a bare string like "FR03072026001" —
       // check it first since it's a globally unique key, unlike product code/name/LOT.
@@ -1377,7 +1397,7 @@ function PickingWorkflow({ onBack, t }) {
         matchedByTrackingCode = true;
       } else {
         const q = raw.toLowerCase();
-        match = lines.find((l) =>
+        match = findPreferUndone((l) =>
           (l.customer_product_code ?? '').toLowerCase() === q ||
           (l.product_name ?? '').toLowerCase().includes(q) ||
           (l.lot_no ?? '').toLowerCase() === q,

@@ -91,15 +91,18 @@ export async function checkLocationHasInventory(locationId) {
   }
 
   // Check deposit lines that have actual received goods at this location.
-  // A line with actual_boxes recorded means warehouse physically placed goods here.
+  // A line with actual_boxes or actual_weight recorded means warehouse
+  // physically placed goods here — checking actual_boxes alone missed
+  // weight-only receipts (actual_boxes left null/0, only weight tracked),
+  // letting a second product get silently assigned to an already-occupied
+  // location.
   // No join needed — avoids PostgREST filter-on-related-table issues.
   if (!supabase) return false;
   const { data: lines } = await supabase
     .from('tgd_customer_deposit_request_lines')
     .select('id')
     .eq('location_id', locationId)
-    .not('actual_boxes', 'is', null)
-    .gt('actual_boxes', 0)
+    .or('actual_boxes.gt.0,actual_weight.gt.0')
     .limit(1);
 
   if (lines && lines.length > 0) {

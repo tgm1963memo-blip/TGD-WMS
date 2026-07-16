@@ -1,6 +1,6 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
-import { formatRequestWeight } from '../../utils/customerRequestCancelUtils.js';
+import { formatRequestWeight, hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
 
@@ -55,9 +55,9 @@ export function CustomerDepositRequestLinesDisplay({
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.exp_date)}</td>}
               {hasActual && (() => {
                 const hasVar = line.actual_boxes != null &&
-                  (line.actual_boxes !== line.expected_boxes || String(line.actual_weight) !== String(line.expected_weight));
+                  (line.actual_boxes !== line.expected_boxes || hasWeightVariance(line.actual_weight, line.expected_weight));
                 const boxColor = line.actual_boxes == null ? undefined : hasVar ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
-                const wtColor = line.actual_weight == null ? undefined : (String(line.actual_weight) !== String(line.expected_weight)) ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                const wtColor = line.actual_weight == null ? undefined : hasWeightVariance(line.actual_weight, line.expected_weight) ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
                 return (
                   <>
                     <td style={{ textAlign: 'right' }}>

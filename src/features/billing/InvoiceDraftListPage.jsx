@@ -420,6 +420,7 @@ export function InvoiceDraftListPage() {
       <ReportPreviewModal
         open={printOpen}
         title={`Invoice Draft — ${viewDraft?.draft_no ?? ''}`}
+        orientation="landscape"
         onClose={() => setPrintOpen(false)}
       >
         <InvoiceDraftPrintTemplate draft={viewDraft} lines={viewLines} />

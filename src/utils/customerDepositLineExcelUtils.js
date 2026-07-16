@@ -121,7 +121,13 @@ const REQUIRED_IMPORT_HEADERS = ['customer_product_code'];
 
 export async function parseCustomerDepositLineImportFile(file) {
   const { headers, rows } = await readExcelFile(file);
-  const missingHeaders = REQUIRED_IMPORT_HEADERS.filter((header) => !headers.includes(header));
+  // Compare case-insensitively and trimmed: a header cell retyped/reformatted
+  // in Excel (different casing, stray whitespace) is still the same column
+  // to a user, but used to fail this strict exact-match check.
+  const normalizedHeaders = headers.map((header) => header.trim().toLowerCase());
+  const missingHeaders = REQUIRED_IMPORT_HEADERS.filter(
+    (header) => !normalizedHeaders.includes(header.trim().toLowerCase()),
+  );
   if (missingHeaders.length) {
     return {
       rows: [],

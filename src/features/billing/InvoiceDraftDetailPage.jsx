@@ -341,6 +341,7 @@ export function InvoiceDraftDetailPage() {
       <ReportPreviewModal
         open={printOpen}
         title={`Invoice Draft — ${draft.draft_no ?? ''}`}
+        orientation="landscape"
         onClose={() => setPrintOpen(false)}
       >
         <InvoiceDraftPrintTemplate draft={draft} lines={state.lines} />

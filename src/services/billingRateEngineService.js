@@ -25,7 +25,7 @@ function missingSupabaseClientResult() {
 // temperature tier must key off the master's classification, not a
 // possibly-stale per-line snapshot, so an item master correction is
 // reflected in billing immediately.
-function buildCatalogMaps(catalogRows = []) {
+export function buildCatalogMaps(catalogRows = []) {
   const productIdByCode = new Map();
   const temperatureTypeByCode = new Map();
   for (const row of catalogRows) {
@@ -36,20 +36,25 @@ function buildCatalogMaps(catalogRows = []) {
   return { productIdByCode, temperatureTypeByCode };
 }
 
-// Finds, for each deposit line, the date it became fully depleted (if it
-// did) using only exactly-matched withdrawal lines (direct source link or
-// tracking code) — a withdrawal line pooled ambiguously across sibling
-// deposit lines (see stockBalanceCalc.js) has no clean per-line date
-// attribution, so those lines are conservatively left "still in storage"
-// (biases toward billing more, not less, rather than guessing a date).
-function computeExitDates(depositLines, withdrawalLines) {
+// Groups, per deposit line, the withdrawal events (weight + date) that
+// reduce how much of it is still in storage — using only exactly-matched
+// withdrawal lines (direct source link or tracking code). A withdrawal line
+// pooled ambiguously across sibling deposit lines (see stockBalanceCalc.js)
+// has no clean per-line attribution, so it's left out entirely rather than
+// guessed at — the deposit line keeps billing its full weight for those
+// withdrawals (biases toward billing more, not less).
+//
+// computeStorageInvoiceLines uses this to prorate the chargeable weight
+// down from the date of each partial withdrawal onward, instead of only
+// zeroing out a line once it's 100% withdrawn.
+function buildWithdrawalEventsByLine(depositLines, withdrawalLines) {
   const depositById = new Map(depositLines.map((dl) => [dl.id, dl]));
   const depositByTrackingCode = new Map();
   for (const dl of depositLines) {
     if (dl.tracking_code) depositByTrackingCode.set(dl.tracking_code, dl);
   }
 
-  const matchedByLine = new Map(); // deposit_line_id -> [{ weight, date }]
+  const eventsByLine = new Map(); // deposit_line_id -> [{ weight, date }]
   for (const wl of withdrawalLines) {
     let matchedId = null;
     if (wl.source_customer_deposit_request_line_id && depositById.has(wl.source_customer_deposit_request_line_id)) {
@@ -58,26 +63,12 @@ function computeExitDates(depositLines, withdrawalLines) {
       matchedId = depositByTrackingCode.get(wl.tracking_code).id;
     }
     if (matchedId == null) continue;
-    const bucket = matchedByLine.get(matchedId) ?? [];
-    bucket.push({ weight: Number(wl.picked_weight ?? 0), date: wl.picked_at ?? wl.requested_dispatch_date ?? null });
-    matchedByLine.set(matchedId, bucket);
+    const bucket = eventsByLine.get(matchedId) ?? [];
+    const date = wl.picked_at ?? wl.requested_dispatch_date ?? null;
+    bucket.push({ weight: Number(wl.picked_weight ?? 0), date: date ? String(date).split('T')[0] : null });
+    eventsByLine.set(matchedId, bucket);
   }
-
-  const exitDates = new Map();
-  for (const dl of depositLines) {
-    const matches = matchedByLine.get(dl.id) ?? [];
-    const totalExact = matches.reduce((sum, m) => sum + m.weight, 0);
-    const receivedWeight = Number(dl.actual_weight ?? dl.expected_weight ?? 0);
-    if (totalExact >= receivedWeight - 0.001 && matches.length > 0) {
-      const lastDate = matches
-        .map((m) => (m.date ? String(m.date).split('T')[0] : null))
-        .filter(Boolean)
-        .sort()
-        .pop();
-      exitDates.set(dl.id, lastDate ?? null);
-    }
-  }
-  return exitDates;
+  return eventsByLine;
 }
 
 // Computes the storage + auxiliary-service invoice lines a customer would
@@ -145,7 +136,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     }
   }
 
-  const exitDates = computeExitDates(rawDepositLines, rawWithdrawalLines);
+  const withdrawalEventsByLine = buildWithdrawalEventsByLine(rawDepositLines, rawWithdrawalLines);
 
   const depositLines = rawDepositLines.map((line) => ({
     id: line.id,
@@ -156,7 +147,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     temperature_type: temperatureTypeByCode.get(line.customer_product_code) ?? line.temperature_type ?? null,
     received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
     receipt_date: line.receipt_date,
-    exit_date: exitDates.get(line.id) ?? null,
+    withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],
     customer_product_code: line.customer_product_code ?? null,
   }));
 

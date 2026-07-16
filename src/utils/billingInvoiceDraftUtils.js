@@ -147,6 +147,7 @@ export function buildInvoiceDraftLineFromMovement(movement = {}, invoiceDraftId 
     billing_status: movement.billing_status ?? null,
     rate,
     amount,
+    service_rate_id: movement.service_rate_id ?? null,
     line_note: movement.line_note ?? null,
     duplicate_guard_active: true,
   };
@@ -183,8 +184,12 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
     service_rate_id: rate.id ?? null,
     period_days: rate.period_days ?? null,
     storage_days: storageLine.days ?? null,
+    // storageLine.weight is the weight-day-averaged on-hand weight over the
+    // period, not a single constant — it can differ from the deposit
+    // line's original received weight if a partial withdrawal happened
+    // mid-period, so the note spells that out for whoever reviews the draft.
     line_note: rate.period_days
-      ? `ค่าฝาก ${storageLine.periods} งวด (${storageLine.days} วัน / งวดละ ${rate.period_days} วัน)`
+      ? `ค่าฝาก ${storageLine.periods} งวด (${storageLine.days} วัน / งวดละ ${rate.period_days} วัน, น้ำหนักเฉลี่ยที่คิดค่าฝาก ${storageLine.weight} กก.)`
       : 'ค่าฝาก (ครั้งเดียว)',
     duplicate_guard_active: false,
   };

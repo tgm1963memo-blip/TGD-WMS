@@ -15,7 +15,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { getCustomerRequestPolicy } from '../../services/customerRequestPolicyService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
-import { getDepositCancelEligibility } from '../../utils/customerRequestCancelUtils.js';
+import { getDepositCancelEligibility, hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -96,7 +96,7 @@ export function CustomerDepositRequestDetailPage() {
   const hasActualReceipt = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const allReceived = lines.length > 0 && lines.every((l) => l.actual_boxes != null);
   const hasVariance = lines.some((l) =>
-    l.actual_boxes != null && (l.actual_boxes !== l.expected_boxes || String(l.actual_weight) !== String(l.expected_weight))
+    l.actual_boxes != null && (l.actual_boxes !== l.expected_boxes || hasWeightVariance(l.actual_weight, l.expected_weight))
   );
 
   return (
