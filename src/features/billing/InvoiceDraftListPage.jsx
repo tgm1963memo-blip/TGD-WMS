@@ -18,6 +18,7 @@ import {
   deleteBillingInvoiceDraft,
   previewBillingPeriodInvoice,
   createBillingInvoiceDraftForPeriod,
+  recalculateInvoiceDraftLineRates,
 } from '../../services/billingInvoiceDraftService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
@@ -42,6 +43,9 @@ export function InvoiceDraftListPage() {
   const [printOpen, setPrintOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [recalculatingId, setRecalculatingId] = useState(null);
+  const [recalculateError, setRecalculateError] = useState(null);
+  const [recalculateMsg, setRecalculateMsg] = useState('');
   const [storageBillOpen, setStorageBillOpen] = useState(false);
   const [storageBillCustomerId, setStorageBillCustomerId] = useState('');
   const [storageBillStart, setStorageBillStart] = useState('');
@@ -110,6 +114,27 @@ export function InvoiceDraftListPage() {
       return;
     }
 
+    reloadDrafts();
+  }
+
+  async function handleRecalculate(draft) {
+    if (!draft?.id) return;
+    setRecalculatingId(draft.id);
+    setRecalculateError(null);
+    setRecalculateMsg('');
+    const result = await recalculateInvoiceDraftLineRates(draft.id);
+    setRecalculatingId(null);
+
+    if (result.error) {
+      setRecalculateError(result.error);
+      return;
+    }
+
+    setRecalculateMsg(
+      result.data.updatedCount > 0
+        ? `คำนวณอัตราใหม่แล้ว ${result.data.updatedCount} รายการ`
+        : 'ไม่มีรายการที่ต้องคำนวณอัตราใหม่'
+    );
     reloadDrafts();
   }
 
@@ -235,6 +260,18 @@ export function InvoiceDraftListPage() {
         </div>
       ) : null}
 
+      {recalculateError ? (
+        <div className="section-card" role="alert" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-danger)', background: '#fff5f5' }}>
+          {formatInvoiceDraftError(recalculateError)}
+        </div>
+      ) : null}
+
+      {recalculateMsg ? (
+        <div className="section-card" role="status" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-success)', background: '#f0fdf4' }}>
+          {recalculateMsg}
+        </div>
+      ) : null}
+
       <DashboardSection title="Invoice Draft List">
         <InvoiceDraftListTable
           data={filteredDrafts}
@@ -242,7 +279,8 @@ export function InvoiceDraftListPage() {
           error={error}
           onView={handleView}
           onDelete={handleDelete}
-          canWrite={canWrite}
+          onRecalculate={handleRecalculate}
+          canWrite={canWrite && !recalculatingId}
         />
       </DashboardSection>
 

@@ -352,6 +352,12 @@ export function canApproveBillingInvoiceDraft(draft = {}) {
   return APPROVABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
 
+// Same editable window as cancel — once a draft moves past DRAFT/
+// READY_TO_REVIEW its line amounts shouldn't be silently rewritten anymore.
+export function canRecalculateBillingInvoiceDraft(draft = {}) {
+  return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
+}
+
 export function getMovementDraftSelectionState(row = {}) {
   if (row.active_duplicate_guard) {
     return { selectable: false, reason: 'Already linked to an active invoice draft' };

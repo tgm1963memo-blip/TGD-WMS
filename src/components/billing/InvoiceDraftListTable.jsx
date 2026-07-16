@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
-import { canDeleteBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
+import { canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -20,6 +20,7 @@ export function InvoiceDraftListTable({
   error = null,
   onView = null,
   onDelete = null,
+  onRecalculate = null,
   canWrite = false,
 }) {
   if (loading) return <LoadingState />;
@@ -75,6 +76,17 @@ export function InvoiceDraftListTable({
                 ) : (
                   <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
                 )}
+                {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    data-testid={`invoice-draft-recalculate-button-${draft.id}`}
+                    onClick={() => onRecalculate(draft)}
+                    title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
+                  >
+                    คำนวณอัตราใหม่
+                  </button>
+                ) : null}
                 {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
                   <button
                     className="btn btn-danger"

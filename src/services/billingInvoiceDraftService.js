@@ -338,6 +338,93 @@ export async function getBillingInvoiceDraftById(id) {
   };
 }
 
+// Backfills rate/amount on an existing draft's lines that predate the rate
+// lookup in resolveMovementRates/createBillingInvoiceDraftFromMovements —
+// those lines were persisted with rate/amount always null. Only lines
+// still missing a rate and with a source_movement_id are touched (storage/
+// auxiliary lines already resolve a rate at creation time; a line with no
+// source_movement_id has nothing to re-fetch). Re-derives the movement
+// fresh from its original source (deposit/withdrawal/opening-balance) via
+// fetchMovementsByIds so customer_product_code/temperature_type are
+// available again, exactly as if the draft were being created now.
+export async function recalculateInvoiceDraftLineRates(draftId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!draftId) return { data: null, error: validationError('Invoice draft id is required.') };
+
+  const draftResult = await getBillingInvoiceDraftById(draftId);
+  if (draftResult.error) return { data: null, error: draftResult.error };
+
+  const { draft, lines } = draftResult.data;
+  if (!CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status)) {
+    return {
+      data: null,
+      error: validationError('Invoice draft is no longer editable and cannot be recalculated.', {
+        status: draft.status,
+      }),
+    };
+  }
+
+  const linesNeedingRate = lines.filter((l) => l.rate == null && l.source_movement_id);
+  if (linesNeedingRate.length === 0) {
+    return { data: { draft, lines, updatedCount: 0 }, error: null };
+  }
+
+  const movementIds = [...new Set(linesNeedingRate.map((l) => String(l.source_movement_id)))];
+  const movementResult = await fetchMovementsByIds(movementIds);
+  if (movementResult.error) {
+    return { data: null, error: movementResult.error };
+  }
+
+  const ratedByMovementId = new Map(
+    (await resolveMovementRates(movementResult.data)).map((m) => [String(m.movement_id), m]),
+  );
+
+  let updatedCount = 0;
+  for (const line of linesNeedingRate) {
+    const rated = ratedByMovementId.get(String(line.source_movement_id));
+    if (!rated || rated.rate == null) continue;
+
+    const amount = Number(rated.rate) * Number(line.chargeable_weight ?? 0);
+    const updateResult = await supabase
+      .from(INVOICE_DRAFT_LINE_TABLE)
+      .update({ rate: Number(rated.rate), amount, service_rate_id: rated.service_rate_id ?? null })
+      .eq('id', line.id);
+
+    if (updateResult.error) {
+      return { data: null, error: normalizeServiceError(updateResult.error) };
+    }
+    updatedCount += 1;
+  }
+
+  if (updatedCount === 0) {
+    return { data: { draft, lines, updatedCount: 0 }, error: null };
+  }
+
+  const refreshed = await getBillingInvoiceDraftById(draftId);
+  if (refreshed.error) return { data: null, error: refreshed.error };
+
+  const totals = calculateInvoiceDraftTotals(refreshed.data.lines);
+  const headerUpdate = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .update({ total_amount: totals.total_amount })
+    .eq('id', draftId)
+    .select('*')
+    .single();
+
+  if (headerUpdate.error) {
+    return { data: null, error: normalizeServiceError(headerUpdate.error) };
+  }
+
+  return {
+    data: {
+      draft: shapeBillingInvoiceDraftHeader(headerUpdate.data),
+      lines: refreshed.data.lines,
+      updatedCount,
+    },
+    error: null,
+  };
+}
+
 export async function createBillingInvoiceDraftFromMovements({
   movementIds = [],
   billingPeriodStart = null,
