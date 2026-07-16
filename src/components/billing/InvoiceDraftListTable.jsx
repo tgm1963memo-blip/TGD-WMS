@@ -21,6 +21,7 @@ export function InvoiceDraftListTable({
   onView = null,
   onDelete = null,
   onRecalculate = null,
+  recalculatingId = null,
   canWrite = false,
 }) {
   if (loading) return <LoadingState />;
@@ -80,11 +81,12 @@ export function InvoiceDraftListTable({
                   <button
                     className="btn btn-outline"
                     type="button"
+                    disabled={recalculatingId === draft.id}
                     data-testid={`invoice-draft-recalculate-button-${draft.id}`}
                     onClick={() => onRecalculate(draft)}
                     title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
                   >
-                    คำนวณอัตราใหม่
+                    {recalculatingId === draft.id ? '⏳ กำลังคำนวณ...' : 'คำนวณอัตราใหม่'}
                   </button>
                 ) : null}
                 {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (

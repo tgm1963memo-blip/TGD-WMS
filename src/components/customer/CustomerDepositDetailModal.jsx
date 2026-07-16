@@ -8,7 +8,7 @@ import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOr
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeLabel, getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
-import { printSticker } from '../../utils/stickerPrint.jsx';
+import { printSticker, printStickers } from '../../utils/stickerPrint.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -24,6 +24,7 @@ import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -66,6 +67,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [notifying, setNotifying] = useState(false);
   const [lineNotes, setLineNotes] = useState({});
   const [savingNote, setSavingNote] = useState({});
+  const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -74,6 +76,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setActionMsg('');
     setError('');
     setComment('');
+    setSelectedLineIds(new Set());
 
     Promise.all([
       getCustomerDepositRequest(requestId),
@@ -268,13 +271,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setLotEditLine(null);
   }
 
-  function handlePrintSticker(line) {
+  function buildStickerItem(line) {
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
     const locationCode = allLocations.find((loc) => loc.id === line.location_id)?.code;
     const quantityParts = [];
     if (line.actual_boxes ?? line.expected_boxes) quantityParts.push(`${Number(line.actual_boxes ?? line.expected_boxes).toLocaleString()} กล่อง`);
     if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${Number(line.actual_weight ?? line.expected_weight).toLocaleString()} กก.`);
-    printSticker({
+    return {
       depositDate: header?.expected_arrival_date,
       customerName: customerData?.customer_name ?? customerData?.name ?? header?.contact_name ?? '',
       productCode: line.customer_product_code ?? line.internal_product_code ?? '',
@@ -286,7 +289,33 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       mfgDate: line.mfg_date,
       locationCode,
       trackingCode: line.tracking_code ?? '-',
+    };
+  }
+
+  function handlePrintSticker(line) {
+    printSticker(buildStickerItem(line));
+  }
+
+  function toggleLineSelected(lineId) {
+    setSelectedLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId); else next.add(lineId);
+      return next;
     });
+  }
+
+  function toggleSelectAllLines() {
+    setSelectedLineIds((prev) => {
+      const allIds = lines.map((l) => l.id);
+      const allSelected = allIds.length > 0 && allIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(allIds);
+    });
+  }
+
+  function handlePrintSelectedStickers() {
+    const items = lines.filter((l) => selectedLineIds.has(l.id)).map(buildStickerItem);
+    if (!items.length) return;
+    printStickers(items);
   }
 
   async function handleSaveLocation() {
@@ -376,11 +405,29 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
             {/* Lines table */}
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  type="button"
+                  disabled={selectedLineIds.size === 0}
+                  onClick={handlePrintSelectedStickers}
+                >
+                  🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                </button>
+              </div>
               <div className="responsive-table">
                 <table className="data-table" style={{ fontSize: 13 }}>
                   <thead>
                     <tr>
+                      <th style={{ width: 28 }}>
+                        <input
+                          type="checkbox"
+                          checked={lines.length > 0 && lines.every((l) => selectedLineIds.has(l.id))}
+                          onChange={toggleSelectAllLines}
+                          title="เลือกทั้งหมด"
+                        />
+                      </th>
                       <th style={{ whiteSpace: 'nowrap' }}>#</th>
                       <th style={{ whiteSpace: 'nowrap' }}>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
@@ -397,14 +444,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   <tbody>
                     {lines.length ? lines.map((line) => {
                       const isConfirmed = header.status === 'RECEIVED_CONFIRMED';
+                      const weightVariance = hasWeightVariance(line.actual_weight, line.expected_weight);
                       const hasVariance = line.actual_boxes != null &&
-                        (line.actual_boxes !== line.expected_boxes || String(line.actual_weight) !== String(line.expected_weight));
+                        (line.actual_boxes !== line.expected_boxes || weightVariance);
                       const actualBoxColor = line.actual_boxes == null
                         ? 'var(--tgd-muted-text)'
                         : hasVariance ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
                       const actualWtColor = line.actual_weight == null
                         ? 'var(--tgd-muted-text)'
-                        : (line.actual_weight !== line.expected_weight) ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
+                        : weightVariance ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
                       const weightPerBox = line.weight_per_box ?? (
                         line.expected_boxes && line.expected_weight
                           ? (Number(line.expected_weight) / Number(line.expected_boxes)).toFixed(2)
@@ -412,6 +460,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       );
                       return (
                         <tr key={line.id} style={hasVariance ? { background: '#fff9e6' } : {}}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedLineIds.has(line.id)}
+                              onChange={() => toggleLineSelected(line.id)}
+                            />
+                          </td>
                           <td>{line.line_no}</td>
                           <td>{line.customer_product_code ?? '-'}</td>
                           <td>{line.product_name ?? '-'}</td>
@@ -535,7 +590,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={11}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={12}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

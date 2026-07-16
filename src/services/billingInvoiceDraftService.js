@@ -365,41 +365,49 @@ export async function recalculateInvoiceDraftLineRates(draftId) {
   }
 
   const linesNeedingRate = lines.filter((l) => l.rate == null && l.source_movement_id);
-  if (linesNeedingRate.length === 0) {
-    return { data: { draft, lines, updatedCount: 0 }, error: null };
-  }
-
-  const movementIds = [...new Set(linesNeedingRate.map((l) => String(l.source_movement_id)))];
-  const movementResult = await fetchMovementsByIds(movementIds);
-  if (movementResult.error) {
-    return { data: null, error: movementResult.error };
-  }
-
-  const ratedByMovementId = new Map(
-    (await resolveMovementRates(movementResult.data)).map((m) => [String(m.movement_id), m]),
-  );
 
   let updatedCount = 0;
-  for (const line of linesNeedingRate) {
-    const rated = ratedByMovementId.get(String(line.source_movement_id));
-    if (!rated || rated.rate == null) continue;
+  const lineUpdateErrors = [];
 
-    const amount = Number(rated.rate) * Number(line.chargeable_weight ?? 0);
-    const updateResult = await supabase
-      .from(INVOICE_DRAFT_LINE_TABLE)
-      .update({ rate: Number(rated.rate), amount, service_rate_id: rated.service_rate_id ?? null })
-      .eq('id', line.id);
-
-    if (updateResult.error) {
-      return { data: null, error: normalizeServiceError(updateResult.error) };
+  if (linesNeedingRate.length > 0) {
+    const movementIds = [...new Set(linesNeedingRate.map((l) => String(l.source_movement_id)))];
+    const movementResult = await fetchMovementsByIds(movementIds);
+    if (movementResult.error) {
+      return { data: null, error: movementResult.error };
     }
-    updatedCount += 1;
+
+    const ratedByMovementId = new Map(
+      (await resolveMovementRates(movementResult.data)).map((m) => [String(m.movement_id), m]),
+    );
+
+    // Run line updates concurrently rather than one HTTP round-trip at a
+    // time — a draft can have hundreds of lines, and awaiting them
+    // sequentially took long enough in practice that a user closing/
+    // reloading the tab partway through left the header total permanently
+    // out of sync with the (successfully updated) lines.
+    const results = await Promise.all(linesNeedingRate.map(async (line) => {
+      const rated = ratedByMovementId.get(String(line.source_movement_id));
+      if (!rated || rated.rate == null) return null;
+
+      const amount = Number(rated.rate) * Number(line.chargeable_weight ?? 0);
+      const updateResult = await supabase
+        .from(INVOICE_DRAFT_LINE_TABLE)
+        .update({ rate: Number(rated.rate), amount, service_rate_id: rated.service_rate_id ?? null })
+        .eq('id', line.id);
+      return { error: updateResult.error };
+    }));
+
+    for (const result of results) {
+      if (!result) continue;
+      if (result.error) lineUpdateErrors.push(result.error);
+      else updatedCount += 1;
+    }
   }
 
-  if (updatedCount === 0) {
-    return { data: { draft, lines, updatedCount: 0 }, error: null };
-  }
-
+  // Always resync the header total from the lines' current state, not just
+  // when THIS call updated something — a prior run that updated lines but
+  // got interrupted before this step (or a rerun once every line already
+  // has a rate) would otherwise leave total_amount permanently stale/null.
   const refreshed = await getBillingInvoiceDraftById(draftId);
   if (refreshed.error) return { data: null, error: refreshed.error };
 
@@ -413,6 +421,15 @@ export async function recalculateInvoiceDraftLineRates(draftId) {
 
   if (headerUpdate.error) {
     return { data: null, error: normalizeServiceError(headerUpdate.error) };
+  }
+
+  if (lineUpdateErrors.length > 0) {
+    return {
+      data: null,
+      error: validationError(`Recalculated ${updatedCount} line(s), but ${lineUpdateErrors.length} failed to update.`, {
+        updatedCount, failedCount: lineUpdateErrors.length,
+      }),
+    };
   }
 
   return {

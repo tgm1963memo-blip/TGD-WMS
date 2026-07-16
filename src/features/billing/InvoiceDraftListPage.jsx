@@ -280,7 +280,8 @@ export function InvoiceDraftListPage() {
           onView={handleView}
           onDelete={handleDelete}
           onRecalculate={handleRecalculate}
-          canWrite={canWrite && !recalculatingId}
+          recalculatingId={recalculatingId}
+          canWrite={canWrite}
         />
       </DashboardSection>
 
