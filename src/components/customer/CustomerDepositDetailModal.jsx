@@ -8,7 +8,7 @@ import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOr
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeLabel, getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
-import { printSticker, printStickers } from '../../utils/stickerPrint.jsx';
+import { printSticker, printStickers, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -407,14 +407,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  type="button"
-                  disabled={selectedLineIds.size === 0}
-                  onClick={handlePrintSelectedStickers}
-                >
-                  🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <StickerRotationControl />
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    disabled={selectedLineIds.size === 0}
+                    onClick={handlePrintSelectedStickers}
+                  >
+                    🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                  </button>
+                </div>
               </div>
               <div className="responsive-table">
                 <table className="data-table" style={{ fontSize: 13 }}>

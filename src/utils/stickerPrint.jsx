@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -74,6 +75,61 @@ function renderStickerPageHtml({
 </div>`;
 }
 
+const ROTATION_STORAGE_KEY = 'tgd_sticker_rotation_deg';
+// Only the two quarter-turn directions are offered — the sticker content is
+// deliberately wider than the physical page (rotated to fit the true
+// 76.2mm-wide print head, see the CSS comment below); 0/180 would leave it
+// wider than the page instead of fixing anything.
+const ROTATION_CYCLE = [90, -90];
+const ROTATION_LABELS = { 90: '90° (ค่าเริ่มต้น)', '-90': '-90° (สลับด้าน)' };
+
+// Different physical label printers mount the roll a different way, so the
+// rotation the on-screen landscape layout needs to fit the true 76.2mm-wide
+// print head isn't the same on every machine — see the comment on
+// `rotate(...)` below. This persists a per-browser override so staff
+// printing from a different PC/printer than the one this label was
+// originally tuned against can fix it themselves without a code change,
+// without affecting machines that already print correctly (default stays
+// 90deg, the original tuned value).
+export function getStickerRotationDeg() {
+  const stored = Number(localStorage.getItem(ROTATION_STORAGE_KEY));
+  return ROTATION_CYCLE.includes(stored) ? stored : 90;
+}
+
+export function setStickerRotationDeg(deg) {
+  localStorage.setItem(ROTATION_STORAGE_KEY, String(deg));
+}
+
+export function cycleStickerRotationDeg() {
+  const current = getStickerRotationDeg();
+  const next = ROTATION_CYCLE[(ROTATION_CYCLE.indexOf(current) + 1) % ROTATION_CYCLE.length];
+  setStickerRotationDeg(next);
+  return next;
+}
+
+export function getStickerRotationLabel(deg = getStickerRotationDeg()) {
+  return ROTATION_LABELS[deg] ?? `${deg}°`;
+}
+
+// Small reusable control to drop next to any sticker-print button — lets
+// staff on a machine where labels print rotated/garbled flip through the
+// 4 quarter-turn options and immediately see the change reflected on their
+// next print, without involving a developer.
+export function StickerRotationControl({ style } = {}) {
+  const [deg, setDeg] = useState(() => getStickerRotationDeg());
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      title="ถ้าป้ายที่พิมพ์ออกมาบิดเบี้ยว/ผิดด้าน ให้กดปุ่มนี้เพื่อลองหมุนทิศทางใหม่ แล้วพิมพ์อีกครั้ง"
+      onClick={() => setDeg(cycleStickerRotationDeg())}
+      style={style}
+    >
+      🔄 การหมุนป้าย: {getStickerRotationLabel(deg)}
+    </button>
+  );
+}
+
 function stickerDocumentHtml(pagesHtml) {
   return `<!DOCTYPE html>
 <html>
@@ -120,8 +176,12 @@ function stickerDocumentHtml(pagesHtml) {
      the outer page at the true 76.2mm x 101.6mm footprint and rotate the
      landscape content 90deg to fit inside it sideways — nothing in the
      print job is ever wider than the print head. Turn the printed label a
-     quarter turn to read it; if it comes out rotated the wrong way on your
-     printer, flip the sign on "rotate(90deg)" below to -90deg.
+     quarter turn to read it; if it comes out rotated the wrong way on a
+     given machine, that's per-printer (different label-roll mounting
+     direction), not a code bug — the rotation is read from
+     getStickerRotationDeg()/localStorage rather than hardcoded, so staff on
+     that machine can flip it via <StickerRotationControl /> without
+     touching code.
      Each .sticker-page is also its own printed page (page-break-after),
      so N items print as N sequential labels off the thermal roll instead
      of being squeezed onto one. */
@@ -139,7 +199,7 @@ function stickerDocumentHtml(pagesHtml) {
     .sticker-page:last-child { page-break-after: auto; }
     .sticker {
       position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(90deg);
+      transform: translate(-50%, -50%) rotate(${getStickerRotationDeg()}deg);
       width: 101.6mm; height: 76.2mm;
     }
   }

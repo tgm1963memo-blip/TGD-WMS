@@ -26,7 +26,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
-import { printStickers } from '../../utils/stickerPrint.jsx';
+import { printStickers, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -517,14 +517,17 @@ export function CustomerAdminDepositReviewPage() {
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  type="button"
-                  disabled={selectedLineIds.size === 0}
-                  onClick={handlePrintSelectedStickers}
-                >
-                  🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <StickerRotationControl />
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    disabled={selectedLineIds.size === 0}
+                    onClick={handlePrintSelectedStickers}
+                  >
+                    🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                  </button>
+                </div>
               </div>
               <div className="responsive-table">
                 <table className="data-table">
