@@ -217,6 +217,10 @@ export function CustomerWithdrawalRequestCreatePage() {
 
     getDepositInventoryLines({ customerId: effectiveCustomerId, excludeWithdrawalRequestId: editId || undefined }).then((result) => {
       if (!active) return;
+      if (result.error) {
+        setSubmitError(result.error.message ?? 'โหลดรายการสินค้าคงเหลือไม่สำเร็จ กรุณาลองรีเฟรชหน้าใหม่');
+        return;
+      }
       const allLines = result.data ?? [];
 
       const linesByDeposit = {};

@@ -167,26 +167,32 @@ export async function getDepositInventoryLines(filters = {}) {
   // RPC's "claimed" computation (same deposit line id OR same tracking code,
   // any non-CANCELLED withdrawal request) so the client warns before the
   // server has to reject it.
-  const lineIds = (lines ?? []).map((l) => l.id);
-  const trackingCodes = [...new Set((lines ?? []).map((l) => l.tracking_code).filter(Boolean))];
-
+  //
+  // This used to match by embedding every one of THIS batch's deposit line
+  // ids + tracking codes into one .or() filter (source_line_id.in.(id1,id2,
+  // ...) — for a customer with hundreds of confirmed deposit lines (a real
+  // one has 430+), that produced a single GET request URL tens of thousands
+  // of characters long, which silently failed (no rows, and the caller here
+  // never even sees an error — see the callers' unguarded .then() with no
+  // .catch()) well past typical URL/header size limits. Scoping by this
+  // customer's id via the join instead avoids ever building a filter whose
+  // size depends on how much history the customer has.
   let claimedQuery = supabase
     .from('tgd_customer_withdrawal_request_lines')
-    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status)')
+    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status, customer_id)')
     .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED');
 
+  if (filters.customerId) {
+    claimedQuery = claimedQuery.eq('tgd_customer_withdrawal_requests.customer_id', filters.customerId);
+  }
   if (filters.excludeWithdrawalRequestId) {
     claimedQuery = claimedQuery.neq('withdrawal_request_id', filters.excludeWithdrawalRequestId);
   }
 
-  const orParts = [];
-  if (lineIds.length) orParts.push(`source_customer_deposit_request_line_id.in.(${lineIds.join(',')})`);
-  if (trackingCodes.length) orParts.push(`tracking_code.in.(${trackingCodes.map((c) => `"${c}"`).join(',')})`);
-
   const claimedByLineId = {};
   const claimedByTrackingCode = {};
-  if (orParts.length) {
-    const { data: claimedLines, error: cErr } = await claimedQuery.or(orParts.join(','));
+  {
+    const { data: claimedLines, error: cErr } = await claimedQuery;
     if (cErr) return { data: null, error: cErr };
     for (const cl of claimedLines ?? []) {
       // picked_boxes/weight is the CONFIRMED amount once recorded (a
