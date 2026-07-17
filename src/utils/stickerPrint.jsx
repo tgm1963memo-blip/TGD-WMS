@@ -2,11 +2,12 @@ import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-// Simplified label: date top-right + QR, then just product name/Location/
-// quantity, with the tracking code as the single big, bold focal element
-// at the bottom — trimmed down from the earlier 9-field version (customer
-// name, product code, lot, storage type, allergen, mfg date all dropped)
-// so the tracking code gets more of the label's area to itself.
+// Simplified label: customer name + date top-right + QR, then just product
+// name/Location/quantity, with the tracking code as the single big, bold
+// focal element at the bottom, and a blank framed box bottom-right for
+// handwritten notes — trimmed down from the earlier 9-field version
+// (product code, lot, storage type, allergen, mfg date still dropped) so
+// the tracking code keeps most of the label's area to itself.
 export function formatStickerDate(iso) {
   if (!iso) return '-';
   const s = String(iso).split('T')[0];
@@ -30,7 +31,7 @@ function splitTrackingCode(code) {
 // page-break-after so a multi-box deposit line prints one sticker per box
 // in a single print job instead of N separate popups).
 function renderStickerPageHtml({
-  depositDate, productName, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
 }) {
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
@@ -47,7 +48,10 @@ function renderStickerPageHtml({
         <td class="product-cell" colspan="2">
           <div class="product-flex">
             <div class="product-name">${productName || '-'}</div>
-            <div class="date-block">วันที่รับเข้า<br>${formatStickerDate(depositDate)}</div>
+            <div class="date-block">
+              ${customerName ? `<div class="customer-name">${customerName}</div>` : ''}
+              วันที่รับเข้า<br>${formatStickerDate(depositDate)}
+            </div>
           </div>
         </td>
         <td class="qr-cell" rowspan="2">${qrSvg}</td>
@@ -67,6 +71,13 @@ function renderStickerPageHtml({
           <div class="track-wrapper">
             <div class="track-code">${codeLine1}</div>
             <div class="track-code">${codeLine2}</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" class="note-row">
+          <div class="note-row-inner">
+            <div class="note-box"></div>
           </div>
         </td>
       </tr>
@@ -168,24 +179,21 @@ function stickerDocumentHtml(pagesHtml) {
   /* On screen (this preview popup): show each sticker as a plain landscape
      rectangle, unrotated, stacked with a gap — easy to check before
      printing.
-     When printing: the physical label roll is still 3in wide x 4in long
-     (76.2mm x 101.6mm) — a previous attempt at this label declared the
-     sticker itself 101.6mm wide (assuming a 4x3in roll) and it printed
-     truncated because the real print head is only 76.2mm wide (see
-     "sticker is 3x4in (portrait)" fix in git history). So for print we keep
-     the outer page at the true 76.2mm x 101.6mm footprint and rotate the
-     landscape content 90deg to fit inside it sideways — nothing in the
-     print job is ever wider than the print head. Turn the printed label a
-     quarter turn to read it; if it comes out rotated the wrong way on a
-     given machine, that's per-printer (different label-roll mounting
-     direction), not a code bug — the rotation is read from
-     getStickerRotationDeg()/localStorage rather than hardcoded, so staff on
-     that machine can flip it via <StickerRotationControl /> without
-     touching code.
+     When printing: the physical label roll is 10cm wide x 12cm long
+     (100mm x 120mm — sized up from the original 76.2mm x 101.6mm/3x4in
+     stock). So for print we keep the outer page at the true 100mm x 120mm
+     footprint and rotate the landscape content (120mm x 100mm) 90deg to
+     fit inside it sideways — nothing in the print job is ever wider than
+     the physical media. Turn the printed label a quarter turn to read it;
+     if it comes out rotated the wrong way on a given machine, that's
+     per-printer (different label-roll mounting direction), not a code bug
+     — the rotation is read from getStickerRotationDeg()/localStorage
+     rather than hardcoded, so staff on that machine can flip it via
+     <StickerRotationControl /> without touching code.
      Each .sticker-page is also its own printed page (page-break-after),
      so N items print as N sequential labels off the thermal roll instead
      of being squeezed onto one. */
-  .sticker-page { width: 101.6mm; height: 76.2mm; margin-bottom: 6mm; }
+  .sticker-page { width: 120mm; height: 100mm; margin-bottom: 6mm; }
   .sticker {
     width: 100%; height: 100%; box-sizing: border-box;
     border: 3px solid #000; border-radius: 4mm; padding: 1mm;
@@ -193,14 +201,14 @@ function stickerDocumentHtml(pagesHtml) {
   }
   @media print {
     .sticker-page {
-      width: 76.2mm; height: 101.6mm; overflow: hidden; position: relative;
+      width: 100mm; height: 120mm; overflow: hidden; position: relative;
       margin: 0; page-break-after: always;
     }
     .sticker-page:last-child { page-break-after: auto; }
     .sticker {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%) rotate(${getStickerRotationDeg()}deg);
-      width: 101.6mm; height: 76.2mm;
+      width: 120mm; height: 100mm;
     }
   }
 
@@ -219,6 +227,7 @@ function stickerDocumentHtml(pagesHtml) {
      boldness without that risk. */
   .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
   .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; }
+  .customer-name { font-size: 13px; font-weight: 700; margin-bottom: 1mm; }
 
   .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; }
   .info-label { font-size: 9px; color: #333; display: block; margin-bottom: 1px; }
@@ -227,6 +236,13 @@ function stickerDocumentHtml(pagesHtml) {
   .track-wrapper { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
   /* Tracking code is maximized to fill the remaining area */
   .track-code { font-family: 'Tahoma', sans-serif; font-size: 94px; font-weight: 900; line-height: 0.85; letter-spacing: -3px; -webkit-text-stroke: 2px #000; margin: 0; padding: 0; white-space: nowrap; }
+
+  /* Blank framed box, bottom-right — reserved for handwritten notes staff
+     were otherwise writing directly on the label itself with no dedicated
+     space for it. */
+  .note-row { height: 14mm; border: none !important; padding: 0 !important; }
+  .note-row-inner { display: flex; justify-content: flex-end; align-items: center; width: 100%; height: 100%; padding: 0 1.5mm; box-sizing: border-box; }
+  .note-box { width: 32mm; height: 10mm; border: 1.5px solid #000; border-radius: 1mm; }
 </style>
 </head>
 <body>
@@ -244,10 +260,10 @@ function openAndPrintHtml(html) {
 }
 
 export function printSticker({
-  depositDate, productName, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
 }) {
   const html = stickerDocumentHtml(renderStickerPageHtml({
-    depositDate, productName, quantityLabel, locationCode, trackingCode,
+    depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
   }));
   openAndPrintHtml(html);
 }

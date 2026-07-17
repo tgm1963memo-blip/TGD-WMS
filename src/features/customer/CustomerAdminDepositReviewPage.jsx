@@ -309,6 +309,7 @@ export function CustomerAdminDepositReviewPage() {
 
   function handlePrintSelectedStickers() {
     const depositDate = selected?.last_action_at ?? selected?.expected_arrival_date ?? null;
+    const customerName = selected?.customer?.customer_name || selected?.customer?.name || '';
     const items = lines
       .filter((l) => selectedLineIds.has(l.id))
       .map((l) => {
@@ -317,6 +318,7 @@ export function CustomerAdminDepositReviewPage() {
         if (l.actual_weight != null) quantityParts.push(`${Number(l.actual_weight).toLocaleString('th-TH')} กก.`);
         return {
           depositDate,
+          customerName,
           productName: l.product_name ?? l.customer_product_code ?? '-',
           quantityLabel: quantityParts.join(' / ') || '-',
           locationCode: l.location?.location_code ?? '-',
