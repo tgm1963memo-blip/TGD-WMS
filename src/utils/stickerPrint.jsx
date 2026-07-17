@@ -31,7 +31,7 @@ function splitTrackingCode(code) {
 // page-break-after so a multi-box deposit line prints one sticker per box
 // in a single print job instead of N separate popups).
 function renderStickerPageHtml({
-  depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
 }) {
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
@@ -75,9 +75,10 @@ function renderStickerPageHtml({
         </td>
       </tr>
       <tr>
-        <td colspan="3" class="note-row">
-          <div class="note-row-inner">
-            <div class="note-box"></div>
+        <td colspan="3" class="bottom-info-row">
+          <div class="bottom-info-box">
+            <div class="bottom-product-name">${productName || '-'}</div>
+            <div class="bottom-product-code">${productCode || '-'}</div>
           </div>
         </td>
       </tr>
@@ -237,12 +238,19 @@ function stickerDocumentHtml(pagesHtml) {
   /* Tracking code is maximized to fill the remaining area */
   .track-code { font-family: 'Tahoma', sans-serif; font-size: 94px; font-weight: 900; line-height: 0.85; letter-spacing: -3px; -webkit-text-stroke: 2px #000; margin: 0; padding: 0; white-space: nowrap; }
 
-  /* Blank framed box, bottom-right — reserved for handwritten notes staff
-     were otherwise writing directly on the label itself with no dedicated
-     space for it. */
-  .note-row { height: 14mm; border: none !important; padding: 0 !important; }
-  .note-row-inner { display: flex; justify-content: flex-end; align-items: center; width: 100%; height: 100%; padding: 0 1.5mm; box-sizing: border-box; }
-  .note-box { width: 32mm; height: 10mm; border: 1.5px solid #000; border-radius: 1mm; }
+  /* Framed box across the bottom — repeats product name + product code
+     large enough to read without hunting for the small top-left copy,
+     since the tracking code below it is what's usually scanned/matched
+     first and the product identity easily gets overlooked otherwise. */
+  .bottom-info-row { height: 16mm; border: none !important; padding: 0 !important; }
+  .bottom-info-box {
+    margin: 0 1.5mm 1.5mm; height: calc(100% - 1.5mm); box-sizing: border-box;
+    border: 1.5px solid #000; border-radius: 1mm;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 1mm 2mm; overflow: hidden;
+  }
+  .bottom-product-name { font-size: 15px; font-weight: 700; line-height: 1.15; text-align: center; }
+  .bottom-product-code { font-size: 12px; font-weight: 600; color: #333; line-height: 1.1; margin-top: 0.5mm; text-align: center; }
 </style>
 </head>
 <body>
@@ -252,7 +260,11 @@ ${pagesHtml}
 }
 
 function openAndPrintHtml(html) {
-  const win = window.open('', '_blank', 'width=520,height=380');
+  // Sized for the 120mm-wide unrotated preview (~453px at 96dpi) plus
+  // margin/browser-chrome headroom — the popup was still sized for the
+  // smaller 101.6mm label, so after the 10x12cm resize the preview no
+  // longer fit and scrolled/clipped instead of showing the whole label.
+  const win = window.open('', '_blank', 'width=600,height=520');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
@@ -260,10 +272,10 @@ function openAndPrintHtml(html) {
 }
 
 export function printSticker({
-  depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
 }) {
   const html = stickerDocumentHtml(renderStickerPageHtml({
-    depositDate, customerName, productName, quantityLabel, locationCode, trackingCode,
+    depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
   }));
   openAndPrintHtml(html);
 }

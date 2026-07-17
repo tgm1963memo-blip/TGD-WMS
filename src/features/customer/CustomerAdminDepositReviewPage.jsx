@@ -320,6 +320,7 @@ export function CustomerAdminDepositReviewPage() {
           depositDate,
           customerName,
           productName: l.product_name ?? l.customer_product_code ?? '-',
+          productCode: l.customer_product_code ?? l.internal_product_code ?? '',
           quantityLabel: quantityParts.join(' / ') || '-',
           locationCode: l.location?.location_code ?? '-',
           trackingCode: l.tracking_code ?? '',
