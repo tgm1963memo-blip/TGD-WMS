@@ -28,7 +28,12 @@ function fmtDT(iso) {
 }
 
 const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingBottom: 2 };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2 };
+// whiteSpace:normal + overflow-wrap/word-break so a long, unbroken value
+// (company name, address) wraps within its fixed-width cell instead of
+// overflowing into the next column — the exact same bug class already
+// fixed on the lines table below, just missed here originally since this
+// meta table's fields are usually short (dates, phone numbers).
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerDepositStaffWorkOrderPrint(props) {
   if (!props.header) return null;
@@ -133,13 +138,13 @@ function CustomerDepositStaffWorkOrderPrintPage({
         <tbody>
           <tr>
             <td style={META_KEY}>CUSTOMER NAME</td>
-            <td style={META_VAL}>{fmt(header.customer_name)}</td>
+            <td style={META_VAL}>{fmtWrap(header.customer_name, 10)}</td>
             <td style={META_KEY}>ATTN</td>
-            <td style={META_VAL}>{fmt(header.contact_name)}</td>
+            <td style={META_VAL}>{fmtWrap(header.contact_name, 10)}</td>
           </tr>
           <tr>
             <td style={META_KEY}>ADDRESS</td>
-            <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(header.customer_address)}</td>
+            <td colSpan={3} style={META_VAL}>{fmtWrap(header.customer_address, 12)}</td>
           </tr>
           <tr>
             <td style={META_KEY}>TEL</td>
