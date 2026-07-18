@@ -12,6 +12,11 @@ const CUSTOMER_WITHDRAWAL_CANCEL_STATUSES = new Set([
   'ADMIN_ACCEPTED',
 ]);
 
+const CUSTOMER_DEPOSIT_RECALL_STATUSES = new Set([
+  'SUBMITTED_BY_CUSTOMER',
+  'ADMIN_REVIEWING',
+]);
+
 const TERMINAL_DEPOSIT_STATUSES = new Set([
   'ADMIN_REJECTED',
   'RECEIVED_CONFIRMED',
@@ -112,6 +117,31 @@ export function getWithdrawalCancelEligibility(header, role, policy = DEFAULT_CU
     terminalStatuses: TERMINAL_WITHDRAWAL_STATUSES,
     draftStatus: 'WITHDRAWAL_DRAFT',
   });
+}
+
+// Recall (เรียกเอกสารกลับ) reopens a submitted deposit request for editing —
+// only valid before the admin's ACCEPT decision bridges it into a real
+// warehouse receiving document (tgd_bridge_customer_deposit_to_receiving,
+// see tgd_recall_customer_deposit_request). No lead-time gate like cancel
+// has: recalling doesn't abandon the shipment, it just pulls the
+// still-pending request back to reopen editing, so there's no "too close
+// to arrival" risk to guard against.
+export function getDepositRecallEligibility(header, role) {
+  const status = header?.status;
+
+  if (ADMIN_ROLES.has(role)) {
+    return { canRecall: CUSTOMER_DEPOSIT_RECALL_STATUSES.has(status), reasonKey: null };
+  }
+
+  if (!CUSTOMER_ROLES.has(role)) {
+    return { canRecall: false, reasonKey: 'customer_request_recall_role_denied' };
+  }
+
+  if (!CUSTOMER_DEPOSIT_RECALL_STATUSES.has(status)) {
+    return { canRecall: false, reasonKey: 'customer_request_recall_status_denied' };
+  }
+
+  return { canRecall: true, reasonKey: null };
 }
 
 export function formatRequestWeight(value) {

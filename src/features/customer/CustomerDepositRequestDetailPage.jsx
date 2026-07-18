@@ -6,6 +6,7 @@ import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPort
 import { CustomerDepositRequestLinesDisplay } from '../../components/customer/CustomerDepositRequestLinesDisplay.jsx';
 import { CustomerDepositRequestPrintDocument } from '../../components/customer/CustomerDepositRequestPrintDocument.jsx';
 import { CustomerRequestCancelPanel } from '../../components/customer/CustomerRequestCancelPanel.jsx';
+import { CustomerRequestRecallPanel } from '../../components/customer/CustomerRequestRecallPanel.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
@@ -15,7 +16,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { getCustomerRequestPolicy } from '../../services/customerRequestPolicyService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
-import { getDepositCancelEligibility, hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
+import { getDepositCancelEligibility, getDepositRecallEligibility, hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -92,6 +93,7 @@ export function CustomerDepositRequestDetailPage() {
   }
 
   const eligibility = getDepositCancelEligibility(header, role, policy);
+  const recallEligibility = getDepositRecallEligibility(header, role);
   const branding = getDocumentBrandingConfig();
   const hasActualReceipt = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const allReceived = lines.length > 0 && lines.every((l) => l.actual_boxes != null);
@@ -188,6 +190,13 @@ export function CustomerDepositRequestDetailPage() {
         </div>
         <CustomerDepositRequestLinesDisplay lines={lines} />
       </div>
+
+      <CustomerRequestRecallPanel
+        eligibility={recallEligibility}
+        onRecalled={() => navigate(`/customer/deposit-request/new?editId=${requestId}`)}
+        requestId={requestId}
+        testId="customer-deposit-recall-panel"
+      />
 
       <CustomerRequestCancelPanel
         eligibility={eligibility}

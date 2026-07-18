@@ -415,6 +415,21 @@ export async function cancelCustomerDepositRequest(requestId, comment = null) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Pulls a submitted deposit request back to DRAFT so the customer can edit
+// it — only valid while still awaiting admin review (see the RPC for the
+// exact status guard); once accepted into a warehouse receiving document
+// there's no going back.
+export async function recallCustomerDepositRequest(requestId, comment = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_recall_customer_deposit_request', {
+    p_request_id: requestId,
+    p_comment: toNullableText(comment),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function recordDepositLineActualReceipt(lineId, {
   actualBoxes,
   actualWeight,

@@ -6,21 +6,23 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { listCustomerDepositRequests, cancelCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
+import { listCustomerDepositRequests, cancelCustomerDepositRequest, recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
+import { getDepositRecallEligibility } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function CustomerDepositRequestListPage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy, role, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [recallingId, setRecallingId] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -101,6 +103,21 @@ export function CustomerDepositRequestListPage() {
     setState((current) => ({
       ...current,
       rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'CANCELLED' } : r),
+    }));
+  }
+
+  async function handleRecall(requestId) {
+    if (!window.confirm('ต้องการเรียกเอกสารกลับมาแก้ไขใช่หรือไม่?\nสถานะเอกสารจะกลับเป็น "ร่าง" และหลุดออกจากคิวตรวจสอบของเจ้าหน้าที่จนกว่าจะส่งใหม่')) return;
+    setRecallingId(requestId);
+    const result = await recallCustomerDepositRequest(requestId);
+    setRecallingId(null);
+    if (result.error) {
+      setState((current) => ({ ...current, error: result.error }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'DRAFT' } : r),
     }));
   }
 
@@ -244,6 +261,18 @@ export function CustomerDepositRequestListPage() {
                             >
                               {t('customer_request_copy_button')}
                             </Link>
+                          ) : null}
+                          {canWriteCustomerRequests && getDepositRecallEligibility(row, role).canRecall ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-deposit-recall-${row.id}`}
+                              disabled={recallingId === row.id}
+                              onClick={() => handleRecall(row.id)}
+                              title="ดึงเอกสารกลับมาเป็นร่างเพื่อแก้ไข ก่อนที่เจ้าหน้าที่จะเปิดใบงาน"
+                              type="button"
+                            >
+                              {recallingId === row.id ? 'กำลังเรียกกลับ...' : '↩ เรียกเอกสารกลับ'}
+                            </button>
                           ) : null}
                           {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
                             <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>

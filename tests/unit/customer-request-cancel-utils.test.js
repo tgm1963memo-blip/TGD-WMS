@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getDepositCancelEligibility,
+  getDepositRecallEligibility,
   getWithdrawalCancelEligibility,
   meetsCancelLeadTime,
 } from '../../src/utils/customerRequestCancelUtils.js';
@@ -49,5 +50,33 @@ describe('customerRequestCancelUtils', () => {
       { deposit_cancel_lead_days: 3, withdrawal_cancel_lead_days: 3 },
     );
     expect(result.canCancel).toBe(false);
+  });
+
+  describe('getDepositRecallEligibility', () => {
+    it('allows recall while awaiting admin review', () => {
+      expect(getDepositRecallEligibility({ status: 'SUBMITTED_BY_CUSTOMER' }, 'customer_user').canRecall).toBe(true);
+      expect(getDepositRecallEligibility({ status: 'ADMIN_REVIEWING' }, 'customer_admin').canRecall).toBe(true);
+    });
+
+    it('blocks recall once the work order has opened (WAREHOUSE_RECEIVING and beyond)', () => {
+      const result = getDepositRecallEligibility({ status: 'WAREHOUSE_RECEIVING' }, 'customer_user');
+      expect(result.canRecall).toBe(false);
+      expect(result.reasonKey).toBe('customer_request_recall_status_denied');
+    });
+
+    it('blocks recall for an already-editable DRAFT (nothing to recall)', () => {
+      expect(getDepositRecallEligibility({ status: 'DRAFT' }, 'customer_user').canRecall).toBe(false);
+    });
+
+    it('denies non-customer, non-admin roles', () => {
+      const result = getDepositRecallEligibility({ status: 'ADMIN_REVIEWING' }, 'warehouse_staff');
+      expect(result.canRecall).toBe(false);
+      expect(result.reasonKey).toBe('customer_request_recall_role_denied');
+    });
+
+    it('lets admin recall the same eligible statuses', () => {
+      expect(getDepositRecallEligibility({ status: 'ADMIN_REVIEWING' }, 'admin').canRecall).toBe(true);
+      expect(getDepositRecallEligibility({ status: 'WAREHOUSE_RECEIVING' }, 'admin').canRecall).toBe(false);
+    });
   });
 });
