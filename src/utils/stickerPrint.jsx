@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { insertSoftBreaks as withSoftBreaks } from './textWrapUtils.js';
 
 // Simplified label: customer name + date top-right + QR, then just product
 // name/Location/quantity, with the tracking code as the single big, bold
@@ -47,9 +48,9 @@ function renderStickerPageHtml({
       <tr>
         <td class="product-cell" colspan="2">
           <div class="product-flex">
-            <div class="product-name">${productName || '-'}</div>
+            <div class="product-name">${withSoftBreaks(productName) || '-'}</div>
             <div class="date-block">
-              ${customerName ? `<div class="customer-name">${customerName}</div>` : ''}
+              ${customerName ? `<div class="customer-name">${withSoftBreaks(customerName)}</div>` : ''}
               วันที่รับเข้า<br>${formatStickerDate(depositDate)}
             </div>
           </div>
@@ -77,8 +78,8 @@ function renderStickerPageHtml({
       <tr>
         <td colspan="3" class="bottom-info-row">
           <div class="bottom-info-box">
-            <div class="bottom-product-name">${productName || '-'}</div>
-            <div class="bottom-product-code">${productCode || '-'}</div>
+            <div class="bottom-product-name">${withSoftBreaks(productName) || '-'}</div>
+            <div class="bottom-product-code">${withSoftBreaks(productCode) || '-'}</div>
           </div>
         </td>
       </tr>

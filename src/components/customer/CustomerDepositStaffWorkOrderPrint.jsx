@@ -2,9 +2,14 @@ import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
+function fmtWrap(v, chunkSize = 6) {
+  const s = fmt(v);
+  return s === '-' ? s : insertSoftBreaks(s, chunkSize);
+}
 function fmtNum(v) { return v != null && v !== '' ? Number(v).toLocaleString() : '-'; }
 function fmtDate(v) {
   if (!v) return '-';
@@ -238,10 +243,10 @@ function CustomerDepositStaffWorkOrderPrintPage({
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
                 <td style={{ ...TD_WRAP, textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ ...TD_WRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmt(line.tracking_code)}</td>
-                <td style={TD_WRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
-                <td style={TD_WRAP}>{fmt(line.product_name)}</td>
-                <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={{ ...TD_WRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmtWrap(line.tracking_code)}</td>
+                <td style={TD_WRAP} title={fmt(line.lot_no)}>{fmtWrap(line.lot_no)}</td>
+                <td style={TD_WRAP}>{fmtWrap(line.product_name, 10)}</td>
+                <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmtWrap(line.customer_product_code ?? line.internal_product_code)}</td>
                 <td style={TD_WRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
                 {hasLocation && <td style={{ ...TD_WRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
                 <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
