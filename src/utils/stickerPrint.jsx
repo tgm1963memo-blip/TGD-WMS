@@ -215,7 +215,13 @@ function stickerDocumentHtml(pagesHtml) {
 
   /* Table Grid Layout (Minimized White Space) */
   table.layout { width: 100%; height: 100%; border-collapse: collapse; }
-  table.layout td { border: 2px solid #000; padding: 0.8mm 1.5mm; overflow: hidden; }
+  /* No overflow:hidden here — this used to silently clip any text field
+     (product name, customer name) that didn't fit its cell, losing
+     characters instead of wrapping. Rows without a hard-coded height (all
+     but .track-row) grow to fit their content in normal table layout, so
+     long text just wraps onto more lines and takes the space it needs
+     instead of being cut. */
+  table.layout td { border: 2px solid #000; padding: 0.8mm 1.5mm; }
   .qr-cell { width: 22mm; padding: 1mm !important; text-align: center; vertical-align: middle; }
   .qr-cell svg { width: 100%; height: auto; display: block; margin: 0 auto; }
 
@@ -226,9 +232,15 @@ function stickerDocumentHtml(pagesHtml) {
      comment on body {} above) — font-weight 700 alone (a real weight most
      Thai-capable fonts ship, unlike a faux/synthetic 900) gives plenty of
      boldness without that risk. */
-  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
-  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; }
-  .customer-name { font-size: 13px; font-weight: 700; margin-bottom: 1mm; }
+  /* overflow-wrap/word-break on every free-text field below: Thai text
+     commonly has no spaces between words, so without an explicit break
+     point a long product/customer name has nowhere to wrap — it either
+     overflows its box (bleeding into neighboring cells) or gets silently
+     clipped, both of which read as "missing"/garbled text on the printed
+     label. */
+  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; }
+  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; overflow-wrap: break-word; word-break: break-word; }
+  .customer-name { font-size: 13px; font-weight: 700; margin-bottom: 1mm; overflow-wrap: break-word; word-break: break-word; }
 
   .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; }
   .info-label { font-size: 9px; color: #333; display: block; margin-bottom: 1px; }
@@ -241,16 +253,19 @@ function stickerDocumentHtml(pagesHtml) {
   /* Framed box across the bottom — repeats product name + product code
      large enough to read without hunting for the small top-left copy,
      since the tracking code below it is what's usually scanned/matched
-     first and the product identity easily gets overlooked otherwise. */
-  .bottom-info-row { height: 16mm; border: none !important; padding: 0 !important; }
+     first and the product identity easily gets overlooked otherwise. No
+     fixed height/overflow:hidden — a long product name wraps onto more
+     lines and the row grows to fit rather than clipping it, trading a
+     little of the tracking code's space for never losing text. */
+  .bottom-info-row { border: none !important; padding: 0.5mm 0 !important; }
   .bottom-info-box {
-    margin: 0 1.5mm 1.5mm; height: calc(100% - 1.5mm); box-sizing: border-box;
+    margin: 0 1.5mm; box-sizing: border-box;
     border: 1.5px solid #000; border-radius: 1mm;
     display: flex; flex-direction: column; justify-content: center; align-items: center;
-    padding: 1mm 2mm; overflow: hidden;
+    padding: 1mm 2mm;
   }
-  .bottom-product-name { font-size: 15px; font-weight: 700; line-height: 1.15; text-align: center; }
-  .bottom-product-code { font-size: 12px; font-weight: 600; color: #333; line-height: 1.1; margin-top: 0.5mm; text-align: center; }
+  .bottom-product-name { font-size: 15px; font-weight: 700; line-height: 1.15; text-align: center; overflow-wrap: break-word; word-break: break-word; }
+  .bottom-product-code { font-size: 12px; font-weight: 600; color: #333; line-height: 1.1; margin-top: 0.5mm; text-align: center; overflow-wrap: break-word; word-break: break-word; }
 </style>
 </head>
 <body>

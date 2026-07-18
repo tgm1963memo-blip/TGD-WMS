@@ -226,34 +226,39 @@ function CustomerDepositStaffWorkOrderPrintPage({
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
             const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
-            // Reference numbers (LOT, tracking code, product code) must stay fully
-            // readable — wrap onto a second line rather than clip with an ellipsis,
-            // which would hide digits staff need for verification.
-            const TD_NOWRAP = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
+            // Reference numbers (LOT, tracking code, product code) and product
+            // names must stay fully readable — wrap onto a second line rather
+            // than clip with an ellipsis. Thai text commonly has no spaces
+            // between words, so without overflow-wrap/word-break a long
+            // product name has no break point at all: it doesn't wrap, it
+            // just overflows the fixed-width cell horizontally and paints
+            // over whatever is in the next column, reading as garbled
+            // overlapping text on the printed page.
+            const TD_WRAP = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
-                <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ ...TD_NOWRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmt(line.tracking_code)}</td>
-                <td style={TD_NOWRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
-                <td style={TD}>{fmt(line.product_name)}</td>
-                <td style={TD_NOWRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
-                <td style={TD_NOWRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
-                {hasLocation && <td style={{ ...TD_NOWRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
-                <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
-                <td style={{ ...TD_NOWRAP, textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
+                <td style={{ ...TD_WRAP, textAlign: 'center' }}>{idx + 1}</td>
+                <td style={{ ...TD_WRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmt(line.tracking_code)}</td>
+                <td style={TD_WRAP} title={fmt(line.lot_no)}>{fmt(line.lot_no)}</td>
+                <td style={TD_WRAP}>{fmt(line.product_name)}</td>
+                <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmt(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={TD_WRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
+                {hasLocation && <td style={{ ...TD_WRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
+                <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
+                <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
                 {hasActual && (
-                  <td style={{ ...TD_NOWRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD_WRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_boxes != null ? fmtNum(line.actual_boxes) : '-'}
                   </td>
                 )}
                 {hasActual && (
-                  <td style={{ ...TD_NOWRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
+                  <td style={{ ...TD_WRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_weight != null ? fmtNum(line.actual_weight) : '-'}
                   </td>
                 )}
-                <td style={TD_NOWRAP}>{fmtDate(line.mfg_date)}</td>
-                <td style={TD_NOWRAP}>{fmtDate(line.exp_date)}</td>
-                <td style={{ ...TD_NOWRAP, textAlign: 'center' }}>{fmt(line.argent_type)}</td>
+                <td style={TD_WRAP}>{fmtDate(line.mfg_date)}</td>
+                <td style={TD_WRAP}>{fmtDate(line.exp_date)}</td>
+                <td style={{ ...TD_WRAP, textAlign: 'center' }}>{fmt(line.argent_type)}</td>
                 {!hasActual && <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{fmt(line.actual_note ?? line.note)}</td>}
               </tr>
             );
