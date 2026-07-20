@@ -455,6 +455,36 @@ export async function recordDepositLineActualReceipt(lineId, {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Lets staff add a brand-new line to an already-submitted deposit request —
+// for when the customer's physical delivery included an item that wasn't
+// on their original declared list. Only works while the request is still
+// in a receiving-phase status (before receipt is confirmed) — see
+// tgd_admin_add_customer_deposit_request_line.
+export async function addAdminDepositRequestLine(depositRequestId, {
+  customerProductCode,
+  productName = null,
+  lotNo = null,
+  actualBoxes = null,
+  actualWeight = null,
+  temperatureType = null,
+  note = null,
+} = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_admin_add_customer_deposit_request_line', {
+    p_deposit_request_id: depositRequestId,
+    p_customer_product_code: toNullableText(customerProductCode),
+    p_product_name: toNullableText(productName),
+    p_lot_no: toNullableText(lotNo),
+    p_actual_boxes: toNullableNumber(actualBoxes),
+    p_actual_weight: toNullableNumber(actualWeight),
+    p_temperature_type: toNullableText(temperatureType),
+    p_note: toNullableText(note),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 // Update only the location on a deposit line — preserves actual_boxes/actual_weight unchanged
 export async function updateDepositLineLocation(lineId, locationId, existingLine = {}) {
   return recordDepositLineActualReceipt(lineId, {

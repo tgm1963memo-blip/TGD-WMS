@@ -17,6 +17,7 @@ import {
   reviewCustomerDepositRequest,
   cancelCustomerDepositRequest,
   recordDepositLineActualReceipt,
+  addAdminDepositRequestLine,
   enqueueCustomerDepositNotification,
   enqueueDepositRecountNotification,
 } from '../../services/customerDepositRequestService.js';
@@ -25,7 +26,12 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
-import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
+import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
+
+// Mirrors tgd_admin_add_customer_deposit_request_line's status guard —
+// adding an extra item only makes sense while still physically
+// receiving/counting, before receipt is confirmed.
+const ADD_LINE_STATUSES = ['WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'];
 import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 
 const REVIEW_STATUSES = [
@@ -63,6 +69,15 @@ export function CustomerAdminDepositReviewPage() {
   const [recountNote, setRecountNote] = useState('');
   const [recountRequestOpen, setRecountRequestOpen] = useState(false);
   const [recountRequestComment, setRecountRequestComment] = useState('');
+  const [addLineOpen, setAddLineOpen] = useState(false);
+  const [addLineCode, setAddLineCode] = useState('');
+  const [addLineName, setAddLineName] = useState('');
+  const [addLineLot, setAddLineLot] = useState('');
+  const [addLineBoxes, setAddLineBoxes] = useState('');
+  const [addLineWeight, setAddLineWeight] = useState('');
+  const [addLineTemp, setAddLineTemp] = useState('');
+  const [addLineNote, setAddLineNote] = useState('');
+  const [addingLine, setAddingLine] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -196,6 +211,42 @@ export function CustomerAdminDepositReviewPage() {
     const newStatus = result.data?.status ?? 'COUNT_VARIANCE_REVIEW';
     setActionMsg('เปิดใบงานตรวจนับใหม่แล้ว');
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  function openAddLine() {
+    setAddLineCode('');
+    setAddLineName('');
+    setAddLineLot('');
+    setAddLineBoxes('');
+    setAddLineWeight('');
+    setAddLineTemp('');
+    setAddLineNote('');
+    setError('');
+    setAddLineOpen(true);
+  }
+
+  async function handleAddLine() {
+    if (!selectedId || !addLineCode.trim()) return;
+    setAddingLine(true);
+    setError('');
+    const result = await addAdminDepositRequestLine(selectedId, {
+      customerProductCode: addLineCode,
+      productName: addLineName || null,
+      lotNo: addLineLot || null,
+      actualBoxes: addLineBoxes,
+      actualWeight: addLineWeight,
+      temperatureType: addLineTemp || null,
+      note: addLineNote || null,
+    });
+    setAddingLine(false);
+    if (result.error) {
+      setError(result.error.message ?? 'เพิ่มรายการไม่สำเร็จ');
+      return;
+    }
+    const linesResult = await listCustomerDepositRequestLines(selectedId);
+    setLines(linesResult.data ?? []);
+    setActionMsg('เพิ่มรายการสินค้าเรียบร้อย');
+    setAddLineOpen(false);
   }
 
   async function handleConfirmReceiving() {
@@ -521,6 +572,16 @@ export function CustomerAdminDepositReviewPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
                 <div style={{ display: 'flex', gap: 8 }}>
+                  {canWrite && ADD_LINE_STATUSES.includes(selected?.status) ? (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      onClick={openAddLine}
+                      title="สำหรับกรณีลูกค้าฝากสินค้าเข้ามาผิดรายการ (ไม่ตรงกับที่แจ้งไว้)"
+                    >
+                      ➕ เพิ่มรายการ
+                    </button>
+                  ) : null}
                   <StickerRotationControl />
                   <StickerPageSizeControl />
                   <button
@@ -881,6 +942,99 @@ export function CustomerAdminDepositReviewPage() {
             </label>
           </>
         ) : null}
+      </Modal>
+
+      {/* Add extra line — customer physically deposited an item not on
+          their original declared list */}
+      <Modal
+        isOpen={addLineOpen}
+        onClose={() => setAddLineOpen(false)}
+        title="เพิ่มรายการสินค้า"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              disabled={addingLine || !addLineCode.trim()}
+              onClick={handleAddLine}
+              type="button"
+            >
+              {addingLine ? '...' : t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setAddLineOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="banner banner-info" style={{ marginBottom: 12 }}>
+          สำหรับกรณีลูกค้าฝากสินค้าเข้ามาผิดรายการ (มีสินค้าที่ไม่ตรงกับที่แจ้งไว้ในใบฝากนี้)
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>รหัสสินค้าลูกค้า *</span>
+            <input
+              className="form-control"
+              value={addLineCode}
+              onChange={(e) => setAddLineCode(e.target.value)}
+              placeholder="เช่น 3200300000411"
+            />
+          </label>
+          <label className="form-field">
+            <span>ชื่อสินค้า (เว้นว่างได้ถ้ามีในแคตตาล็อกลูกค้า)</span>
+            <input
+              className="form-control"
+              value={addLineName}
+              onChange={(e) => setAddLineName(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>LOT</span>
+            <input className="form-control" value={addLineLot} onChange={(e) => setAddLineLot(e.target.value)} />
+          </label>
+          <label className="form-field">
+            <span>การจัดเก็บ</span>
+            <select className="form-control" value={addLineTemp} onChange={(e) => setAddLineTemp(e.target.value)}>
+              <option value="">-- เว้นว่าง (ใช้ตามแคตตาล็อก) --</option>
+              {Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>{t('admin_received_boxes')}</span>
+            <input
+              className="form-control"
+              type="number"
+              min={0}
+              value={addLineBoxes}
+              onChange={(e) => setAddLineBoxes(e.target.value)}
+            />
+          </label>
+          <label className="form-field">
+            <span>{t('admin_received_qty')}</span>
+            <input
+              className="form-control"
+              type="number"
+              min={0}
+              value={addLineWeight}
+              onChange={(e) => setAddLineWeight(e.target.value)}
+            />
+          </label>
+        </div>
+        <label className="form-field" style={{ marginTop: 8 }}>
+          <span>หมายเหตุ (Admin)</span>
+          <input
+            className="form-control"
+            placeholder="เช่น ลูกค้าส่งมาผิดรายการ พบระหว่างตรวจนับ..."
+            value={addLineNote}
+            onChange={(e) => setAddLineNote(e.target.value)}
+          />
+        </label>
       </Modal>
     </section>
   );
