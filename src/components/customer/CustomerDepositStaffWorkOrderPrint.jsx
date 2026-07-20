@@ -38,7 +38,7 @@ const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingB
 // overflowing into the next column — the exact same bug class already
 // fixed on the lines table below, just missed here originally since this
 // meta table's fields are usually short (dates, phone numbers).
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 4, lineHeight: 1.6, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerDepositStaffWorkOrderPrint(props) {
   if (!props.header) return null;
@@ -240,7 +240,13 @@ function CustomerDepositStaffWorkOrderPrintPage({
               (line.actual_boxes != null && line.actual_boxes !== line.expected_boxes) ||
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
-            const TD = { border: '1px solid #ccc', padding: '4px 6px', fontSize: 10 };
+            // Extra vertical padding + a taller line-height give wrapped Thai
+            // text room to breathe: tone marks/vowels sit above and below the
+            // base consonant, so a cramped line-height makes consecutive
+            // wrapped lines visually collide — reading as overlapping text
+            // even though each line is in its own cell, not actually sharing
+            // space with a neighboring column or row.
+            const TD = { border: '1px solid #ccc', padding: '7px 6px', fontSize: 10, lineHeight: 1.6, verticalAlign: 'top' };
             // Reference numbers (LOT, tracking code, product code) and product
             // names must stay fully readable — wrap onto a second line rather
             // than clip with an ellipsis. Thai text commonly has no spaces

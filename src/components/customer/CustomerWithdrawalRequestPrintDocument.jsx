@@ -41,12 +41,15 @@ const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0'
 // (e.g. CUSTOMER PRODUCT spanning 2-3 lines) got vertically centered and
 // visually collided with the taller neighboring cell's text. Top-aligning
 // every cell keeps each row's first line flush with the row's top border.
-const TD = { border: '1px solid #ccc', padding: '4px 2px', fontSize: 9, verticalAlign: 'top' };
+// lineHeight/extra vertical padding on top of that give wrapped Thai text
+// (tone marks/vowels above and below the base consonant) enough room that
+// consecutive wrapped lines don't crowd into each other either.
+const TD = { border: '1px solid #ccc', padding: '6px 2px', fontSize: 9, lineHeight: 1.6, verticalAlign: 'top' };
 // Reference numbers must stay fully readable, so wrap onto a second line
 // instead of clipping — hidden overflow would silently drop characters.
 const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-all' };
 const META_KEY = { fontWeight: 600, fontSize: 10, paddingBottom: 2, whiteSpace: 'nowrap' };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 4, lineHeight: 1.6, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerWithdrawalRequestPrintDocument(props) {
   if (!props.header) return null;

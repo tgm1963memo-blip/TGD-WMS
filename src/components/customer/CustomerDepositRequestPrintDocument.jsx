@@ -30,12 +30,16 @@ function fmtDT(iso) {
 }
 
 const TH = { border: '1px solid #bbb', padding: '4px 6px', background: '#f0f0f0', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' };
-const TD = { border: '1px solid #bbb', padding: '4px 6px', fontSize: 10 };
+// verticalAlign:'top' keeps a short single-line cell from vertically
+// centering against a taller wrapped neighbor in the same row; lineHeight
+// gives wrapped Thai text (tone marks/vowels above and below the base
+// consonant) room so consecutive wrapped lines don't crowd into each other.
+const TD = { border: '1px solid #bbb', padding: '6px 6px', fontSize: 10, lineHeight: 1.6, verticalAlign: 'top' };
 // Reference numbers must stay fully readable, so wrap onto a second line
 // instead of clipping — an ellipsis would hide digits needed for reference.
 const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
 const MK = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingRight: 4, paddingBottom: 2 };
-const MV = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' };
+const MV = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 4, lineHeight: 1.6, overflowWrap: 'break-word', wordBreak: 'break-word' };
 
 export function CustomerDepositRequestPrintDocument({
   header,
