@@ -46,13 +46,13 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
       {/* Lines Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, tableLayout: 'fixed' }}>
         <colgroup>
-          <col style={{ width: '11%' }} /> {/* เอกสารอ้างอิง */}
+          <col style={{ width: '10%' }} /> {/* เอกสารอ้างอิง */}
           <col style={{ width: '20%' }} /> {/* สินค้า */}
-          <col style={{ width: '9%' }} /> {/* ประเภท */}
+          <col style={{ width: '12%' }} /> {/* ประเภท */}
           <col style={{ width: '9%' }} /> {/* วันที่ */}
-          <col style={{ width: '9%' }} /> {/* จำนวน */}
+          <col style={{ width: '8%' }} /> {/* จำนวน */}
           <col style={{ width: '11%' }} /> {/* น้ำหนักชาร์จ */}
-          <col style={{ width: '8%' }} /> {/* งวด/วัน */}
+          <col style={{ width: '7%' }} /> {/* งวด/วัน */}
           <col style={{ width: '9%' }} /> {/* อัตรา */}
           <col style={{ width: '14%' }} /> {/* จำนวนเงิน */}
         </colgroup>
@@ -72,12 +72,12 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
         <tbody>
           {lines.length ? lines.map((line, i) => (
             <tr key={line.id ?? i} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafb' }}>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{line.source_document_no ?? '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', overflowWrap: 'break-word', wordBreak: 'break-word' }} title={line.source_document_no ?? '-'}>{line.source_document_no ?? '-'}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', overflowWrap: 'break-word', wordBreak: 'break-word' }} title={line.product_name ?? line.product_code ?? '-'}>
                 {line.product_name ?? line.product_code ?? '-'}
                 {line.line_note ? <div style={{ fontSize: 10, color: '#94a3b8' }}>{line.line_note}</div> : null}
               </td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap', fontSize: 11 }}>{line.movement_type ?? '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', overflowWrap: 'break-word', wordBreak: 'break-word', fontSize: 11 }}>{line.movement_type ?? '-'}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDate(line.movement_date)}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.qty != null ? Number(line.qty).toLocaleString('th-TH') : '-'} {line.uom ?? ''}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.chargeable_weight != null ? fmt(line.chargeable_weight) : '-'}</td>
