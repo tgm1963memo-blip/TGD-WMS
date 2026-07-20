@@ -170,9 +170,9 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{fmtQty(row.balanceVolume)}</td>
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{fmt(row.balanceWeight)}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.rate != null ? fmt(row.rate) : '-'}</td>
-                  <td style={{ ...TD, textAlign: 'right' }}>{row.handlingFee ? fmt(row.handlingFee) : '-'}</td>
-                  <td style={{ ...TD, textAlign: 'right' }}>{row.coldStorageCharge ? fmt(row.coldStorageCharge) : '-'}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{row.total ? fmt(row.total) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.handlingFee != null ? fmt(row.handlingFee) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.coldStorageCharge != null ? fmt(row.coldStorageCharge) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{row.total != null ? fmt(row.total) : '-'}</td>
                 </tr>
               ))}
               <tr style={{ background: '#f8fafb', fontWeight: 700 }}>
