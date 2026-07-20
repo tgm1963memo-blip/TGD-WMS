@@ -298,8 +298,18 @@ function stickerDocumentHtml(pagesHtml) {
      overflows its box (bleeding into neighboring cells) or gets silently
      clipped, both of which read as "missing"/garbled text on the printed
      label. */
-  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; }
-  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex-shrink: 0; overflow-wrap: break-word; word-break: break-word; }
+  /* flex: 1 1 <basis> + min-width: 0 on BOTH sides — a long customer name
+     in .date-block previously used flex-shrink:0, so the flex box gave it
+     its full intrinsic (unwrapped) width no matter what, leaving almost
+     nothing for .product-name; with word-break:break-word and no room left,
+     that squeezed the product name down to one character per line, reading
+     as "text falling/missing" on the printed label. Giving each side a
+     guaranteed basis share (and min-width:0, since flex items otherwise
+     refuse to shrink below their own content's natural minimum) makes both
+     sides wrap within their own fair half of the row instead of one crowding
+     the other out. */
+  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; flex: 1 1 55%; min-width: 0; }
+  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex: 1 1 45%; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
   .customer-name { font-size: 13px; font-weight: 700; margin-bottom: 1mm; overflow-wrap: break-word; word-break: break-word; }
 
   .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; }
