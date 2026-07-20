@@ -5,19 +5,11 @@
 // functions just do the math, so the logic is easy to unit-test/verify
 // against a worked example independent of live data.
 
+import { round2 } from './numberFormat.js';
+
 function toNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
-}
-
-// Round each line's charge to 2dp at the point it's computed, rather than
-// leaving it at full float precision and rounding only for display — since
-// rate is numeric(14,4) and weight can carry several decimals, the invoice
-// total (sum of unrounded amounts) would otherwise differ from the sum of
-// the individually-rounded amounts printed for each line, by a satang or
-// two.
-function round2(value) {
-  return Math.round(value * 100) / 100;
 }
 
 function toDateOnly(value) {

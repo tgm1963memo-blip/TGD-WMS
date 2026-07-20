@@ -82,7 +82,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.qty != null ? Number(line.qty).toLocaleString('th-TH') : '-'} {line.uom ?? ''}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.chargeable_weight != null ? fmt(line.chargeable_weight) : '-'}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap', fontSize: 11 }}>{line.storage_days != null ? `${line.storage_days} วัน` : '-'}</td>
-              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.rate != null ? Number(line.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+              <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{line.rate != null ? fmt(line.rate) : '-'}</td>
               <td style={{ border: '1px solid #e5e7eb', padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{line.amount != null ? fmt(line.amount) : '-'}</td>
             </tr>
           )) : (

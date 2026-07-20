@@ -11,6 +11,11 @@ function fmtWrap(v, chunkSize = 6) {
   return s === '-' ? s : insertSoftBreaks(s, chunkSize);
 }
 function fmtNum(v) { return v != null && v !== '' ? Number(v).toLocaleString() : '-'; }
+function fmtWeight(v) {
+  if (v == null || v === '') return '-';
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
+}
 function fmtDate(v) {
   if (!v) return '-';
   const s = String(v).split('T')[0];
@@ -255,7 +260,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 <td style={TD_WRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
                 {hasLocation && <td style={{ ...TD_WRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
                 <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
-                <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_weight)}</td>
+                <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtWeight(line.expected_weight)}</td>
                 {hasActual && (
                   <td style={{ ...TD_WRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
                     {line.actual_boxes != null ? fmtNum(line.actual_boxes) : '-'}
@@ -263,7 +268,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 )}
                 {hasActual && (
                   <td style={{ ...TD_WRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>
-                    {line.actual_weight != null ? fmtNum(line.actual_weight) : '-'}
+                    {line.actual_weight != null ? fmtWeight(line.actual_weight) : '-'}
                   </td>
                 )}
                 <td style={TD_WRAP}>{fmtDate(line.mfg_date)}</td>
@@ -278,9 +283,9 @@ function CustomerDepositStaffWorkOrderPrintPage({
           <tr style={{ fontWeight: 700, background: '#f5f5f5' }}>
             <td colSpan={hasLocation ? 7 : 6} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right' }}>TOTAL</td>
             <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredBoxes || null)}</td>
-            <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalDeclaredWeight || null)}</td>
+            <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtWeight(totalDeclaredWeight || null)}</td>
             {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualBoxes || null)}</td>}
-            {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtNum(totalActualWeight || null)}</td>}
+            {hasActual && <td style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtWeight(totalActualWeight || null)}</td>}
             <td colSpan={hasActual ? 3 : 4} />
           </tr>
         </tfoot>

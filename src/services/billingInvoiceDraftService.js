@@ -31,6 +31,7 @@ import { getBillingPeriodPreview, buildCatalogMaps } from './billingRateEngineSe
 import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveServiceRate } from '../utils/billingRateCalc.js';
+import { round2 } from '../utils/numberFormat.js';
 import { getCustomers } from './masterDataService.js';
 import {
   evaluateInvoiceDraftBplusExportReadiness,
@@ -389,7 +390,7 @@ export async function recalculateInvoiceDraftLineRates(draftId) {
       const rated = ratedByMovementId.get(String(line.source_movement_id));
       if (!rated || rated.rate == null) return null;
 
-      const amount = Number(rated.rate) * Number(line.chargeable_weight ?? 0);
+      const amount = round2(Number(rated.rate) * Number(line.chargeable_weight ?? 0));
       const updateResult = await supabase
         .from(INVOICE_DRAFT_LINE_TABLE)
         .update({ rate: Number(rated.rate), amount, service_rate_id: rated.service_rate_id ?? null })

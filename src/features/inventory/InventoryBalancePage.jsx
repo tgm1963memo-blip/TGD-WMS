@@ -6,6 +6,7 @@ import { getAllCustomerStockBalances } from '../../services/customerDepositReque
 import { getCustomers } from '../../services/masterDataService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 const BALANCE_EXPORT_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
@@ -234,7 +235,7 @@ export function InventoryBalancePage() {
           <StatCard label="ลูกค้า" value={customerGroups.length} unit="ราย" color="#3b82f6" />
           <StatCard label="ประเภทสินค้า" value={uniqueProducts} unit="รายการ" color="#8b5cf6" />
           <StatCard label="กล่องคงเหลือรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" color="#22c55e" />
-          <StatCard label="น้ำหนักคงเหลือรวม" value={grandTotalWeight.toLocaleString()} unit="กก." color="#f59e0b" />
+          <StatCard label="น้ำหนักคงเหลือรวม" value={formatFixed2(grandTotalWeight)} unit="กก." color="#f59e0b" />
         </div>
       )}
 
@@ -261,7 +262,7 @@ export function InventoryBalancePage() {
               }}>
                 <span style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>👤 {cg.customerName}</span>
                 <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  รวม {cg.totalBoxes.toLocaleString()} กล่อง · {cg.totalWeight.toLocaleString()} กก.
+                  รวม {cg.totalBoxes.toLocaleString()} กล่อง · {formatFixed2(cg.totalWeight)} กก.
                 </span>
                 <span style={{ fontSize: 12, opacity: 0.6 }}>{cg.products.length} ประเภทสินค้า</span>
               </div>
@@ -303,7 +304,7 @@ export function InventoryBalancePage() {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>น้ำหนัก (กก.)</div>
-                          <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalWeight.toLocaleString()}</div>
+                          <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{formatFixed2(pg.totalWeight)}</div>
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
                       </div>
@@ -349,8 +350,8 @@ export function InventoryBalancePage() {
                                   )}
                                 </td>
                                 <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
-                                  {l.actual_weight?.toLocaleString() ?? (
-                                    <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
+                                  {l.actual_weight != null ? formatFixed2(l.actual_weight) : (
+                                    <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{formatFixed2(l.expected_weight)}</span>
                                   )}
                                 </td>
                                 <td

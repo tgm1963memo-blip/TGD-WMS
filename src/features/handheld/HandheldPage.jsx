@@ -23,6 +23,7 @@ import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
@@ -617,7 +618,7 @@ function ReceivingWorkflow({ onBack, t }) {
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === matchedLine.customer_product_code);
     const quantityParts = [];
     if (boxes) quantityParts.push(`${Number(boxes).toLocaleString()} กล่อง`);
-    if (weight) quantityParts.push(`${Number(weight).toLocaleString()} กก.`);
+    if (weight) quantityParts.push(`${formatFixed2(weight)} กก.`);
     const confirmedItem = {
       line: matchedLine, boxes, weight, location: selectedLocation,
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
@@ -1914,7 +1915,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
     const locationCode = locations.find((loc) => loc.id === line.location_id)?.code;
     const quantityParts = [];
     if (line.actual_boxes ?? line.expected_boxes) quantityParts.push(`${Number(line.actual_boxes ?? line.expected_boxes).toLocaleString()} กล่อง`);
-    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${Number(line.actual_weight ?? line.expected_weight).toLocaleString()} กก.`);
+    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${formatFixed2(line.actual_weight ?? line.expected_weight)} กก.`);
     printSticker({
       depositDate: selectedDoc?.expected_arrival_date,
       customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',

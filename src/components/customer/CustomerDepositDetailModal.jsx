@@ -25,6 +25,7 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -276,7 +277,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const locationCode = allLocations.find((loc) => loc.id === line.location_id)?.code;
     const quantityParts = [];
     if (line.actual_boxes ?? line.expected_boxes) quantityParts.push(`${Number(line.actual_boxes ?? line.expected_boxes).toLocaleString()} กล่อง`);
-    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${Number(line.actual_weight ?? line.expected_weight).toLocaleString()} กก.`);
+    if (line.actual_weight ?? line.expected_weight) quantityParts.push(`${formatFixed2(line.actual_weight ?? line.expected_weight)} กก.`);
     return {
       depositDate: header?.expected_arrival_date,
       customerName: customerData?.customer_name ?? customerData?.name ?? header?.contact_name ?? '',

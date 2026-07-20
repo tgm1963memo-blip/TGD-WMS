@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
 import { canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -68,8 +69,8 @@ export function InvoiceDraftListTable({
               <td>{draft.billing_period_start ?? '-'}</td>
               <td>{draft.billing_period_end ?? '-'}</td>
               <td>{formatNumber(draft.total_qty)}</td>
-              <td>{formatNumber(draft.total_chargeable_weight)}</td>
-              <td>{draft.total_amount == null ? '-' : formatNumber(draft.total_amount)}</td>
+              <td>{formatFixed2(draft.total_chargeable_weight)}</td>
+              <td>{formatFixed2(draft.total_amount)}</td>
               <td>{formatDate(draft.created_at)}</td>
               <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {onView ? (

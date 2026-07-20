@@ -10,7 +10,7 @@ function fmtDate(v) {
   return v;
 }
 
-function fmtNum(v, decimals = 3) {
+function fmtNum(v, decimals = 2) {
   const n = Number(v);
   return Number.isFinite(n) && n !== 0
     ? n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })

@@ -6,6 +6,7 @@ import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPort
 import { getCustomerStockBalance } from '../../services/customerDepositRequestService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 function TempBadge({ type }) {
   const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
@@ -145,7 +146,7 @@ export function CustomerStockBalancePage() {
             </div>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #f59e0b' }}>
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>น้ำหนักคงเหลือรวม</div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{grandWeight.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กก.</span></div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{formatFixed2(grandWeight)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กก.</span></div>
             </div>
           </div>
 
@@ -212,7 +213,7 @@ export function CustomerStockBalancePage() {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>น้ำหนัก</div>
-                        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalWeight.toLocaleString()} กก.</div>
+                        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{formatFixed2(pg.totalWeight)} กก.</div>
                       </div>
                       <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
                     </div>
@@ -258,8 +259,8 @@ export function CustomerStockBalancePage() {
                                 )}
                               </td>
                               <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
-                                {l.actual_weight?.toLocaleString() ?? (
-                                  <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_weight ?? '-'}</span>
+                                {l.actual_weight != null ? formatFixed2(l.actual_weight) : (
+                                  <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{formatFixed2(l.expected_weight)}</span>
                                 )}
                               </td>
                               <td

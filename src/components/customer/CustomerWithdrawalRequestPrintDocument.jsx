@@ -1,10 +1,21 @@
 import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
+import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
-function fmtNum(v, decimals = 3) {
+// overflow-wrap/word-break alone don't guarantee a break point in long,
+// unbroken Thai text (no spaces between words) — see textWrapUtils.js.
+// Inserting an actual zero-width-space every few graphemes gives the
+// browser a real break opportunity regardless of the print rendering
+// pipeline's word-break support, same fix already applied to the sibling
+// deposit staff work order print.
+function fmtWrap(v, chunkSize = 8) {
+  const s = fmt(v);
+  return s === '-' ? s : insertSoftBreaks(s, chunkSize);
+}
+function fmtNum(v, decimals = 2) {
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '-';
 }
@@ -195,7 +206,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
               {!hideCustomerName ? (
                 <>
                   <td style={META_KEY}>CUSTOMER NAME</td>
-                  <td style={META_VAL}>{fmt(customerName)}</td>
+                  <td style={META_VAL}>{fmtWrap(customerName, 12)}</td>
                 </>
               ) : (
                 <td colSpan={2} style={{ border: 'none' }}></td>
@@ -205,7 +216,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             </tr>
             <tr>
               <td style={META_KEY}>ADDRESS</td>
-              <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmt(customerAddress)}</td>
+              <td colSpan={3} style={{ ...META_VAL, whiteSpace: 'normal' }}>{fmtWrap(customerAddress, 14)}</td>
             </tr>
             <tr>
               <td style={META_KEY}>TEL</td>
@@ -215,7 +226,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             </tr>
             <tr>
               <td style={META_KEY}>DELIVERY TO</td>
-              <td style={META_VAL}>{fmt(header.delivery_to ?? header.delivery_type)}</td>
+              <td style={META_VAL}>{fmtWrap(header.destination, 12)}</td>
               <td style={META_KEY}>NO</td>
               <td style={META_VAL}>{fmt(header.withdrawal_no ?? header.request_no)}</td>
             </tr>
@@ -234,7 +245,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             {header.note ? (
               <tr>
                 <td style={META_KEY}>REMARK</td>
-                <td colSpan={3} style={META_VAL}>{header.note}</td>
+                <td colSpan={3} style={META_VAL}>{fmtWrap(header.note, 14)}</td>
               </tr>
             ) : null}
           </tbody>
@@ -247,15 +258,15 @@ function CustomerWithdrawalRequestPrintDocumentPage({
           <col style={{ width: '3%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '13%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '17%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '7%' }} />
           <col style={{ width: '8%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '6%' }} />
-          <col style={{ width: '6%' }} />
+          <col style={{ width: '3%' }} />
+          <col style={{ width: '3%' }} />
           <col style={{ width: '6%' }} />
           <col style={{ width: '7%' }} />
         </colgroup>
@@ -298,14 +309,14 @@ function CustomerWithdrawalRequestPrintDocumentPage({
             return (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD, textAlign: 'center' }}>{idx + 1}</td>
-              <td style={TD_SAFE}><div>{fmt(line.tracking_code)}</div></td>
-              <td style={{ ...TD_SAFE, fontWeight: 600 }}><div>{fmt(line.lot_no)}</div></td>
-              <td style={TD_SAFE}><div>{fmt(line.customer_product_code ?? line.product_code)}</div></td>
+              <td style={TD_SAFE}><div>{fmtWrap(line.tracking_code)}</div></td>
+              <td style={{ ...TD_SAFE, fontWeight: 600 }}><div>{fmtWrap(line.lot_no)}</div></td>
+              <td style={TD_SAFE}><div>{fmtWrap(line.customer_product_code ?? line.product_code)}</div></td>
               <td style={TD_SAFE}>
-                <div>{fmt(line.product_name)}</div>
-                {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {line.batch_no}</div> : null}
+                <div>{fmtWrap(line.product_name, 10)}</div>
+                {line.batch_no ? <div style={{ fontSize: 9, color: '#666' }}>Batch: {fmtWrap(line.batch_no)}</div> : null}
               </td>
-              <td style={TD_SAFE}><div>{fmt(line.location)}</div></td>
+              <td style={TD_SAFE}><div>{fmtWrap(line.location)}</div></td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>
               <td style={{ ...TD, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>
               <td style={{ ...TD, textAlign: 'right' }}>{fmtNum(qty.weight)}</td>
@@ -321,8 +332,8 @@ function CustomerWithdrawalRequestPrintDocumentPage({
               <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                 {(line.note || line.admin_note) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {line.note ? <span>{line.note}</span> : null}
-                    {line.admin_note ? <span style={{ color: '#555', fontSize: 9 }}>({line.admin_note})</span> : null}
+                    {line.note ? <span>{fmtWrap(line.note)}</span> : null}
+                    {line.admin_note ? <span style={{ color: '#555', fontSize: 9 }}>({fmtWrap(line.admin_note)})</span> : null}
                   </div>
                 ) : '-'}
               </td>

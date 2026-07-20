@@ -84,6 +84,7 @@ export function CustomerDepositRequestCreatePage() {
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [importNotice, setImportNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -338,11 +339,13 @@ export function CustomerDepositRequestCreatePage() {
     setNextLineKey(DEPOSIT_LINE_DEFAULT_COUNT + 1);
     setAttachments([]);
     setSubmitError('');
+    setImportNotice('');
   }
 
   async function handleImportFile(file) {
     setImporting(true);
     setSubmitError('');
+    setImportNotice('');
 
     try {
       const { rows, errors: parseErrors } = await parseCustomerDepositLineImportFile(file);
@@ -352,19 +355,22 @@ export function CustomerDepositRequestCreatePage() {
         return;
       }
 
-      const { lines: importedLines, errors } = mapImportedRowsToDepositLines(rows, catalogProducts, nextLineKey);
-      if (errors.length) {
-        setSubmitError(errors.join(' '));
-        return;
-      }
+      // A handful of bad rows (unrecognized code, missing weight, etc.) used to
+      // discard the whole batch, including every row that parsed fine — import
+      // the valid rows and report the skipped ones instead, same as the
+      // row-by-row import in CustomerProductCatalogAdminPage.jsx.
+      const { lines: importedLines, errors: rowErrors } = mapImportedRowsToDepositLines(rows, catalogProducts, nextLineKey);
 
       if (!importedLines.length) {
-        setSubmitError(t('excel_import_empty'));
+        setSubmitError(rowErrors.length ? rowErrors.join(' ') : t('excel_import_empty'));
         return;
       }
 
       setLines(importedLines);
       setNextLineKey(importedLines[importedLines.length - 1].key + 1);
+      if (rowErrors.length) {
+        setImportNotice(`${importedLines.length} ${t('excel_import_success')} (${rowErrors.length} skipped) — ${rowErrors.join(' ')}`);
+      }
     } catch (importError) {
       setSubmitError(importError.message ?? t('excel_import_error'));
     } finally {
@@ -584,6 +590,7 @@ export function CustomerDepositRequestCreatePage() {
       ) : null}
 
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
+      {importNotice ? <div className="banner banner-warning" role="status">{importNotice}</div> : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-deposit-request-form" onSubmit={handleSubmit}>
         {isRequestProxy ? (

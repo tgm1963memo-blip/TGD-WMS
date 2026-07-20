@@ -1,5 +1,6 @@
 import { CompactExpandableTable } from '../ui/CompactExpandableTable.jsx';
 import { formatDetailValue, formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 function BillingStatusBadge({ status }) {
   if (!status) return <span className="status-badge status-badge--draft" data-testid="billing-status-badge">-</span>;
@@ -169,7 +170,7 @@ function buildSummaryColumns({
     {
       key: 'total_chargeable_weight',
       header: 'น้ำหนักรวม (กก.)',
-      render: (row) => <span className="table-meta-text">{formatNumber(row.total_chargeable_weight)}</span>,
+      render: (row) => <span className="table-meta-text">{formatFixed2(row.total_chargeable_weight)}</span>,
     },
     {
       key: 'billing_status',
@@ -210,9 +211,9 @@ function renderBillingDetail(group) {
               <td>{formatDetailValue(line.temperature_type)}</td>
               <td>{line.lot_no ?? line.lot_id ?? '-'}{line.pallet_no ?? line.pallet_id ? ` / ${line.pallet_no ?? line.pallet_id}` : ''}</td>
               <td style={{ textAlign: 'right' }}>{formatNumber(line.qty)}</td>
-              <td style={{ textAlign: 'right' }}>{formatNumber(line.net_weight)}</td>
-              <td style={{ textAlign: 'right' }}>{formatNumber(line.gross_weight)}</td>
-              <td style={{ textAlign: 'right' }}>{formatNumber(line.chargeable_weight)}</td>
+              <td style={{ textAlign: 'right' }}>{formatFixed2(line.net_weight)}</td>
+              <td style={{ textAlign: 'right' }}>{formatFixed2(line.gross_weight)}</td>
+              <td style={{ textAlign: 'right' }}>{formatFixed2(line.chargeable_weight)}</td>
               <td><BillingStatusBadge status={line.billing_status} /></td>
               <td data-testid="billing-exclusion-reason-badge">{formatDetailValue(line.billing_exclusion_reason)}</td>
               <td>{formatDetailValue(line.movement_id)}</td>

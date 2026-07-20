@@ -57,7 +57,7 @@ describe('BillingMovementWeightTable document grouping', () => {
 
     const groupedRow = screen.getByText('OB-20260630-042523').closest('tr');
     expect(within(groupedRow).getByText('30')).toBeInTheDocument(); // 10 + 20 qty
-    expect(within(groupedRow).getByText('300')).toBeInTheDocument(); // 100 + 200 weight
+    expect(within(groupedRow).getByText('300.00')).toBeInTheDocument(); // 100 + 200 weight
   });
 
   it('expanding a document row reveals its individual lines', () => {

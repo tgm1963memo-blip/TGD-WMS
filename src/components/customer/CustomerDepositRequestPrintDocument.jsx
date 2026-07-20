@@ -3,8 +3,17 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
+import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
+// overflow-wrap/word-break alone don't guarantee a break point in long,
+// unbroken Thai text (no spaces between words) — inserting a real
+// zero-width-space every few graphemes gives the browser a break
+// opportunity regardless of the print rendering pipeline's word-break support.
+function fmtWrap(v, chunkSize = 8) {
+  const s = fmt(v);
+  return s === '-' ? s : insertSoftBreaks(s, chunkSize);
+}
 function fmtDate(v) {
   if (!v) return '-';
   const s = String(v).split('T')[0];
@@ -134,13 +143,13 @@ export function CustomerDepositRequestPrintDocument({
           <tbody>
             <tr>
               <td style={MK}>CUSTOMER NAME</td>
-              <td style={MV}>{fmt(customerName)}</td>
+              <td style={MV}>{fmtWrap(customerName, 12)}</td>
               <td style={MK}>ATTN</td>
-              <td style={MV}>{fmt(header.contact_name)}</td>
+              <td style={MV}>{fmtWrap(header.contact_name, 12)}</td>
             </tr>
             <tr>
               <td style={MK}>ADDRESS</td>
-              <td colSpan={3} style={{ ...MV, whiteSpace: 'normal' }}>{fmt(customerAddress)}</td>
+              <td colSpan={3} style={{ ...MV, whiteSpace: 'normal' }}>{fmtWrap(customerAddress, 14)}</td>
             </tr>
             <tr>
               <td style={MK}>TEL</td>
@@ -170,13 +179,13 @@ export function CustomerDepositRequestPrintDocument({
               <td style={{ ...MK, whiteSpace: 'normal' }}>TRUCK &amp; CONT. NO</td>
               <td style={MV}>{fmt(header.vehicle_registration)}</td>
               <td style={MK}>RECEIVE FROM</td>
-              <td style={MV}>{fmt(header.receive_from)}</td>
+              <td style={MV}>{fmtWrap(header.receive_from, 12)}</td>
             </tr>
             <tr>
               <td style={MK}>สถานะ</td>
               <td style={MV}>{getDepositStatusLabel(header.status, t) || fmt(header.status)}</td>
               <td style={MK}>REMARK</td>
-              <td style={MV}>{fmt(header.note)}</td>
+              <td style={MV}>{fmtWrap(header.note, 12)}</td>
             </tr>
           </tbody>
         </table>
@@ -214,14 +223,14 @@ export function CustomerDepositRequestPrintDocument({
           {lines.length ? lines.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.line_no}</td>
-              <td style={TD_SAFE}>{line.customer_product_code ?? '-'}</td>
-              <td style={TD}>{line.product_name ?? '-'}</td>
+              <td style={TD_SAFE}>{fmtWrap(line.customer_product_code)}</td>
+              <td style={TD_SAFE}>{fmtWrap(line.product_name, 10)}</td>
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.weight_per_box ?? '-'}</td>
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
               <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.expected_boxes ?? '-'}</td>
               <td style={TD_SAFE}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
-              {hasLocation && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{line.location?.location_code || '-'}</td>}
-              {hasLot && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{line.lot_no || '-'}</td>}
+              {hasLocation && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{fmtWrap(line.location?.location_code)}</td>}
+              {hasLot && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{fmtWrap(line.lot_no)}</td>}
               {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.mfg_date)}</td>}
               {hasLot && <td style={{ ...TD_SAFE, textAlign: 'center' }}>{fmtDate(line.exp_date)}</td>}
               {hasActual && (
@@ -234,7 +243,7 @@ export function CustomerDepositRequestPrintDocument({
                   {line.actual_weight ?? '-'}
                 </td>
               )}
-              <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{line.note ?? line.actual_note ?? '-'}</td>
+              <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{fmtWrap(line.note ?? line.actual_note)}</td>
             </tr>
           )) : (
             <tr>
