@@ -26,7 +26,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { getTemperatureTypeLabel } from '../../utils/temperatureTypeLabels.js';
-import { printStickers, StickerRotationControl } from '../../utils/stickerPrint.jsx';
+import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -522,6 +522,7 @@ export function CustomerAdminDepositReviewPage() {
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <StickerRotationControl />
+                  <StickerPageSizeControl />
                   <button
                     className="btn btn-secondary btn-sm"
                     type="button"

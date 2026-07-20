@@ -143,7 +143,66 @@ export function StickerRotationControl({ style } = {}) {
   );
 }
 
+const PAGE_SIZE_STORAGE_KEY = 'tgd_sticker_page_size_mode';
+// 'auto' (default): no @page size is declared, so the printer's own
+// configured media/label size drives the physical page — correct for the
+// machine this label was tuned against. 'fixed': explicitly declare
+// `@page { size: 100mm 120mm }` — needed on a printer/driver whose
+// configured media doesn't already match the label (still set to the old
+// 76.2x101.6mm stock, or a generic default), which otherwise scales/clips
+// the 100x120mm content down to whatever smaller page the driver assumes,
+// printing content that runs off the physical label's edge.
+const PAGE_SIZE_MODES = ['auto', 'fixed'];
+const PAGE_SIZE_LABELS = { auto: 'อัตโนมัติ (ค่าเริ่มต้น)', fixed: 'บังคับ 100×120มม.' };
+
+export function getStickerPageSizeMode() {
+  const stored = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+  return PAGE_SIZE_MODES.includes(stored) ? stored : 'auto';
+}
+
+export function setStickerPageSizeMode(mode) {
+  localStorage.setItem(PAGE_SIZE_STORAGE_KEY, mode);
+}
+
+export function cycleStickerPageSizeMode() {
+  const current = getStickerPageSizeMode();
+  const next = PAGE_SIZE_MODES[(PAGE_SIZE_MODES.indexOf(current) + 1) % PAGE_SIZE_MODES.length];
+  setStickerPageSizeMode(next);
+  return next;
+}
+
+export function getStickerPageSizeLabel(mode = getStickerPageSizeMode()) {
+  return PAGE_SIZE_LABELS[mode] ?? mode;
+}
+
+// Pairs with <StickerRotationControl /> — for a printer where labels print
+// truncated/run off the edge instead of rotated/garbled, staff flip this to
+// force the true label dimensions instead of trusting the driver's own
+// (possibly wrong) configured media size.
+export function StickerPageSizeControl({ style } = {}) {
+  const [mode, setMode] = useState(() => getStickerPageSizeMode());
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      title="ถ้าป้ายที่พิมพ์ออกมาตกขอบ/ถูกตัดขอบ ให้กดปุ่มนี้เพื่อบังคับขนาดหน้ากระดาษ 100×120มม. แล้วพิมพ์อีกครั้ง"
+      onClick={() => setMode(cycleStickerPageSizeMode())}
+      style={style}
+    >
+      📐 ขนาดหน้าป้าย: {getStickerPageSizeLabel(mode)}
+    </button>
+  );
+}
+
 function stickerDocumentHtml(pagesHtml) {
+  // Default ('auto'): no @page size, printer's own configured media drives
+  // the physical page (correct on the machine this label was first tuned
+  // against — see the comment below). On a different printer whose driver
+  // still assumes the old/smaller stock size, forcing the true 100x120mm
+  // size here (via <StickerPageSizeControl />) stops it from scaling/
+  // clipping the label content down to that wrong assumed page, which is
+  // what "prints but runs off the edge" looks like.
+  const pageSizeRule = getStickerPageSizeMode() === 'fixed' ? 'size: 100mm 120mm;' : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -163,7 +222,7 @@ function stickerDocumentHtml(pagesHtml) {
      print instead of the label filling the page. The label's own border/
      radius already provides visual breathing room, so the page itself
      should have none. */
-  @page { margin: 0; }
+  @page { margin: 0; ${pageSizeRule} }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* Thai-capable fonts MUST lead this list. A prior change ("style: use
      Tahoma font on sticker") reordered this to Tahoma-first for a cleaner

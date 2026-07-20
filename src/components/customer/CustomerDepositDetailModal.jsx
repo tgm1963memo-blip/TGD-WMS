@@ -8,7 +8,7 @@ import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOr
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeLabel, getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
-import { printSticker, printStickers, StickerRotationControl } from '../../utils/stickerPrint.jsx';
+import { printSticker, printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -410,6 +410,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <StickerRotationControl />
+                  <StickerPageSizeControl />
                   <button
                     className="btn btn-secondary btn-sm"
                     type="button"
