@@ -29,9 +29,11 @@ import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissio
 import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 
 // Mirrors tgd_admin_add_customer_deposit_request_line's status guard —
-// adding an extra item only makes sense while still physically
-// receiving/counting, before receipt is confirmed.
-const ADD_LINE_STATUSES = ['WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'];
+// staff can add an extra item any time before receipt is confirmed,
+// starting from reviewing the customer's initial submission (not just
+// later during physical receiving), same "not yet confirmed" boundary the
+// per-line recount button already uses on this page.
+const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 
 const REVIEW_STATUSES = [
@@ -572,7 +574,7 @@ export function CustomerAdminDepositReviewPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {canWrite && ADD_LINE_STATUSES.includes(selected?.status) ? (
+                  {canWrite && selected && !ADD_LINE_EXCLUDED_STATUSES.includes(selected.status) ? (
                     <button
                       className="btn btn-secondary btn-sm"
                       type="button"
