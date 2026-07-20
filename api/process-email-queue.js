@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   // 3. Process each email
   for (const item of queue) {
     try {
-      const appUrl = cleanValue(process.env.VITE_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tgdwms.vercel.app');
+      const appUrl = cleanValue(process.env.VITE_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tgc-wms.vercel.app');
       const emailHtml = `<!DOCTYPE html>
 <html lang="th">
 <head>
