@@ -48,9 +48,12 @@ function renderStickerPageHtml({
       <tr>
         <td class="product-cell" colspan="2">
           <div class="product-flex">
-            <div class="product-name">${withSoftBreaks(productName) || '-'}</div>
+            <!-- The product name already repeats in the bottom info box
+                 below, so this large top-left slot shows the customer name
+                 instead of duplicating it — the customer name used to only
+                 appear small inside .date-block alongside the date. -->
+            <div class="product-name">${withSoftBreaks(customerName) || '-'}</div>
             <div class="date-block">
-              ${customerName ? `<div class="customer-name">${withSoftBreaks(customerName)}</div>` : ''}
               วันที่รับเข้า<br>${formatStickerDate(depositDate)}
             </div>
           </div>
@@ -298,19 +301,20 @@ function stickerDocumentHtml(pagesHtml) {
      overflows its box (bleeding into neighboring cells) or gets silently
      clipped, both of which read as "missing"/garbled text on the printed
      label. */
-  /* flex: 1 1 <basis> + min-width: 0 on BOTH sides — a long customer name
-     in .date-block previously used flex-shrink:0, so the flex box gave it
-     its full intrinsic (unwrapped) width no matter what, leaving almost
-     nothing for .product-name; with word-break:break-word and no room left,
-     that squeezed the product name down to one character per line, reading
-     as "text falling/missing" on the printed label. Giving each side a
+  /* flex: 1 1 <basis> + min-width: 0 on BOTH sides — .date-block used to
+     have flex-shrink:0, so the flex box gave it its full intrinsic
+     (unwrapped) width no matter what, leaving almost nothing for the
+     customer name on the left; with word-break:break-word and no room
+     left, that squeezed it down to one character per line, reading as
+     "text falling/missing" on the printed label. Giving each side a
      guaranteed basis share (and min-width:0, since flex items otherwise
      refuse to shrink below their own content's natural minimum) makes both
-     sides wrap within their own fair half of the row instead of one crowding
-     the other out. */
-  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; flex: 1 1 55%; min-width: 0; }
-  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex: 1 1 45%; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
-  .customer-name { font-size: 13px; font-weight: 700; margin-bottom: 1mm; overflow-wrap: break-word; word-break: break-word; }
+     sides wrap within their own share instead of one crowding the other
+     out. 65/35 (not an even split) because the left slot holds the
+     customer name — usually the longer string — while the right slot is
+     now just a short fixed-format date. */
+  .product-name { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; flex: 1 1 65%; min-width: 0; }
+  .date-block { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: right; flex: 1 1 35%; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
 
   .info-row td { font-size: 16px; font-weight: 700; line-height: 1; text-align: center; vertical-align: middle; }
   .info-label { font-size: 9px; color: #333; display: block; margin-bottom: 1px; }
@@ -344,16 +348,47 @@ ${pagesHtml}
 </html>`;
 }
 
-function openAndPrintHtml(html) {
-  // Sized for the 120mm-wide unrotated preview (~453px at 96dpi) plus
-  // margin/browser-chrome headroom — the popup was still sized for the
-  // smaller 101.6mm label, so after the 10x12cm resize the preview no
-  // longer fit and scrolled/clipped instead of showing the whole label.
-  const win = window.open('', '_blank', 'width=600,height=520');
+// Shrinks the popup to the actual rendered content size (plus the browser's
+// own chrome — title bar/borders — measured from the gap between outerWidth
+// and innerWidth) instead of leaving it at a fixed guessed size that left a
+// large blank margin around a single sticker. Capped to a fraction of the
+// screen's available height so a large bulk print job doesn't try to open a
+// window taller than the screen — that content still shows, just scrolled.
+function fitPopupToContent(win) {
+  try {
+    const rect = win.document.body.getBoundingClientRect();
+    const chromeWidth = Math.max(0, win.outerWidth - win.innerWidth);
+    const chromeHeight = Math.max(0, win.outerHeight - win.innerHeight);
+    const maxHeight = (win.screen?.availHeight || 900) * 0.9;
+    const targetWidth = Math.ceil(rect.width) + chromeWidth + 4;
+    const targetHeight = Math.min(Math.ceil(rect.height) + chromeHeight + 4, maxHeight);
+    win.resizeTo(targetWidth, targetHeight);
+  } catch {
+    // resizeTo can be blocked by some browsers/extensions on a
+    // non-user-sized popup — the preview still works at its opened size.
+  }
+}
+
+function openAndPrintHtml(html, pageCount = 1) {
+  // Opened small — fitPopupToContent resizes it to the actual rendered
+  // sticker size once loaded, rather than guessing a fixed size up front
+  // (which previously left a large blank margin around a single sticker).
+  const win = window.open('', '_blank', 'width=500,height=400');
   if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
   win.document.write(html);
   win.document.close();
-  win.onload = () => { setTimeout(() => win.print(), 500); };
+  // A fixed 500ms delay was tuned against a single label — printing many
+  // stickers in one job means many more table rows/QR SVGs to lay out
+  // before the page is actually ready, so print() could fire mid-layout on
+  // a slower shop-floor PC and send an incomplete/truncated job to the
+  // printer. Scale the delay with the page count (with a floor of 500ms so
+  // a single sticker isn't slowed down) rather than assuming one size fits
+  // every batch size.
+  const delay = Math.max(500, pageCount * 120);
+  win.onload = () => {
+    fitPopupToContent(win);
+    setTimeout(() => win.print(), delay);
+  };
 }
 
 export function printSticker({
@@ -362,7 +397,7 @@ export function printSticker({
   const html = stickerDocumentHtml(renderStickerPageHtml({
     depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
   }));
-  openAndPrintHtml(html);
+  openAndPrintHtml(html, 1);
 }
 
 // items: [{ depositDate, productName, quantityLabel, locationCode, trackingCode }]
@@ -371,5 +406,5 @@ export function printSticker({
 export function printStickers(items = []) {
   if (!items.length) return;
   const html = stickerDocumentHtml(items.map((item) => renderStickerPageHtml(item)).join('\n'));
-  openAndPrintHtml(html);
+  openAndPrintHtml(html, items.length);
 }
