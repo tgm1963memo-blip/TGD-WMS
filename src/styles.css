@@ -580,6 +580,26 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
   color: #111827;
   font-size: 12px;
   line-height: 1.45;
+  /* The app's global font (Inter, on body) has zero Thai glyph coverage,
+     so every Thai character in a print document was silently falling back
+     through the browser's generic OS font-substitution chain — which font
+     that resolves to (and its exact character widths) isn't guaranteed to
+     match between environments (a dev/test render vs. a real print
+     workstation), so text that fit fine in one place could legitimately
+     overflow its table cell in another, even with identical wrapping CSS.
+     Declaring the same explicit, hardware-tested Thai font stack already
+     proven correct for sticker printing (see stickerPrint.jsx) removes that
+     inconsistency for every print document sharing this class. */
+  font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif;
+}
+
+/* Same reasoning as .operational-report above — applies to the customer
+   deposit/withdrawal work-order print documents, which use this class
+   instead (without .operational-report). Declared here unconditionally
+   (not just inside @media print below) so the on-screen preview modal
+   renders with the same font the actual print will use. */
+.operational-report-print-document {
+  font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif;
 }
 
 .operational-report-a4 {

@@ -59,7 +59,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
   const { lots, grandTotal } = buildInvoiceLotLedger(lines);
 
   return (
-    <div className="operational-report operational-report-a4-landscape" style={{ fontFamily: 'Sarabun, sans-serif', fontSize: 13, color: '#1e293b' }}>
+    <div className="operational-report operational-report-a4-landscape" style={{ fontSize: 13, color: '#1e293b' }}>
 
       {/* ── Cover: company + document identity ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #2d9348' }}>
