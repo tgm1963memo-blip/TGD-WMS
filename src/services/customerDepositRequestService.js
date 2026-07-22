@@ -430,6 +430,23 @@ export async function recallCustomerDepositRequest(requestId, comment = null) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Recalls a deposit request whose receipt is ALREADY confirmed, within 24
+// hours of confirmation, back to WAREHOUSE_RECEIVING for correction — a
+// much bigger undo than recallCustomerDepositRequest above, since
+// CONFIRM_RECEIPT already created real stock movements/balances that this
+// reverses too. Blocked server-side if any of the deposit's stock has
+// already been withdrawn — see tgd_recall_confirmed_deposit_request.
+export async function recallConfirmedDepositRequest(requestId, comment = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_recall_confirmed_deposit_request', {
+    p_request_id: requestId,
+    p_comment: toNullableText(comment),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function recordDepositLineActualReceipt(lineId, {
   actualBoxes,
   actualWeight,

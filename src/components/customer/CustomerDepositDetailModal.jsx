@@ -15,6 +15,7 @@ import {
   reviewCustomerDepositRequest,
   recordDepositLineActualReceipt,
   addAdminDepositRequestLine,
+  recallConfirmedDepositRequest,
   updateDepositLineLocation,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
@@ -86,6 +87,9 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [addLineTemp, setAddLineTemp] = useState('');
   const [addLineNote, setAddLineNote] = useState('');
   const [addingLine, setAddingLine] = useState(false);
+  const [recallConfirmedOpen, setRecallConfirmedOpen] = useState(false);
+  const [recallConfirmedComment, setRecallConfirmedComment] = useState('');
+  const [recalling, setRecalling] = useState(false);
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -174,6 +178,14 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     : '';
   const canReject = header && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(header.status);
   const canRequestRecount = header && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(header.status);
+  // Client-side mirror of tgd_recall_confirmed_deposit_request's 24-hour
+  // window check — just for hiding the button once it's obviously too
+  // late; the RPC re-checks this authoritatively regardless (a stale
+  // client clock or race isn't a real risk since the server rejects it).
+  const canRecallConfirmed = header
+    && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(header.status)
+    && header.last_action_at
+    && (Date.now() - new Date(header.last_action_at).getTime()) <= 24 * 60 * 60 * 1000;
 
   async function handleRequestRecount() {
     if (!requestId) return;
@@ -185,6 +197,18 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const newStatus = r.data?.status ?? 'ADMIN_RECOUNT_REQUESTED';
     setActionMsg('ขอตรวจนับใหม่เรียบร้อยแล้ว — handheld สามารถนับสินค้าใหม่ได้');
     updateHeaderStatus(newStatus);
+  }
+
+  async function handleRecallConfirmed() {
+    if (!requestId) return;
+    setRecalling(true); setError('');
+    const r = await recallConfirmedDepositRequest(requestId, recallConfirmedComment || null);
+    setRecalling(false);
+    if (r.error) { setError(r.error.message ?? 'เรียกคืนไม่สำเร็จ'); return; }
+    setActionMsg('เรียกคืนเอกสารกลับมาแก้ไขแล้ว — สามารถแก้ไขจำนวนรับจริงและยืนยันใหม่ได้');
+    updateHeaderStatus('WAREHOUSE_RECEIVING');
+    setRecallConfirmedOpen(false);
+    setRecallConfirmedComment('');
   }
 
   function updateHeaderStatus(newStatus) {
@@ -698,6 +722,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   🔄 ขอตรวจนับใหม่
                 </button>
               ) : null}
+              {canRecallConfirmed ? (
+                <button
+                  className="btn btn-warning"
+                  disabled={submitting}
+                  onClick={() => { setRecallConfirmedComment(''); setRecallConfirmedOpen(true); }}
+                  title="เรียกเอกสารกลับมาแก้ไขจำนวนรับจริง (ภายใน 24 ชม. หลังยืนยัน และยังไม่มีการเบิกจากใบฝากนี้)"
+                  type="button"
+                >
+                  ↩️ เรียกคืนแก้ไข
+                </button>
+              ) : null}
               {canReject ? (
                 <button className="btn btn-danger" disabled={submitting} onClick={() => setRejectOpen(true)} type="button">
                   {t('admin_reject_request')}
@@ -726,6 +761,43 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         <label className="form-field">
           <span>{t('admin_reject_reason_label')}</span>
           <textarea className="form-control" rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder={t('admin_reject_reason_placeholder')} />
+        </label>
+      </Modal>
+
+      {/* Recall an already-confirmed receipt back to WAREHOUSE_RECEIVING —
+          reverses the stock movements/balances CONFIRM_RECEIPT created;
+          blocked server-side if any of this deposit's stock has already
+          been withdrawn. */}
+      <Modal
+        isOpen={recallConfirmedOpen}
+        onClose={() => setRecallConfirmedOpen(false)}
+        title="เรียกคืนเอกสารกลับมาแก้ไข"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-warning" disabled={recalling} onClick={handleRecallConfirmed} type="button">
+              {recalling ? '...' : 'ยืนยันเรียกคืน'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRecallConfirmedOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="banner banner-warning" style={{ marginBottom: 12 }}>
+          ⚠️ เอกสารนี้ยืนยันการรับเข้าแล้ว การเรียกคืนจะย้อนสถานะกลับไปเป็น "คลังรับสินค้า"
+          และยกเลิกรายการเคลื่อนไหวสต็อกที่สร้างไว้ — ทำได้เฉพาะภายใน 24 ชั่วโมงหลังยืนยัน
+          และจะถูกปฏิเสธหากมีการเบิกสินค้าจากใบฝากนี้ไปแล้ว
+        </div>
+        <label className="form-field">
+          <span>หมายเหตุ (ไม่บังคับ)</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={recallConfirmedComment}
+            onChange={(e) => setRecallConfirmedComment(e.target.value)}
+            placeholder="ระบุเหตุผลที่ต้องการเรียกคืน..."
+          />
         </label>
       </Modal>
 
