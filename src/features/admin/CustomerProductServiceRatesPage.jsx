@@ -164,10 +164,29 @@ export function CustomerProductServiceRatesPage() {
   }
 
   function openCreate() {
-    setForm({ ...EMPTY_FORM, customerId, productId });
+    // EMPTY_FORM.serviceType defaults to STORAGE, which now requires a
+    // storage-method category (see the productId <select> below) — the
+    // filter bar's productId is always either empty or a real product id,
+    // never a category, so it would be an invalid pre-fill here.
+    setForm({ ...EMPTY_FORM, customerId, productId: categoryTemperatureOf(productId) ? productId : '' });
     setFormProducts(products);
     setError('');
     setSuccess('');
+  }
+
+  // Storage (ค่าฝากสินค้า) rates must be scoped by storage method
+  // (temperature_type — CHILLED/FROZEN/FREEZE/FREEZE_FROZEN), never by an
+  // individual product or an unscoped "all items" bucket: storage billing
+  // is inherently about which storage method a lot sits under, not which
+  // specific SKU it is. Switching a rate's service type to STORAGE clears
+  // any non-category product selection so the admin is forced to pick a
+  // storage method before saving.
+  function handleServiceTypeChange(newServiceType) {
+    setForm((f) => (
+      newServiceType === 'STORAGE' && !categoryTemperatureOf(f.productId)
+        ? { ...f, serviceType: newServiceType, productId: '' }
+        : { ...f, serviceType: newServiceType }
+    ));
   }
 
   function openEdit(row) {
@@ -212,6 +231,10 @@ export function CustomerProductServiceRatesPage() {
         setError('กรุณาเลือกสินค้า');
         return;
       }
+    }
+    if (form.serviceType === 'STORAGE' && !categoryTemperature) {
+      setError('ค่าฝากสินค้า (STORAGE) ต้องกำหนดตามวิธีการจัดเก็บ (แช่เย็น/แช่แข็ง/ฯลฯ) เท่านั้น กรุณาเลือกวิธีการจัดเก็บแทนการเลือกสินค้ารายตัวหรือ "ทุกรายการ"');
+      return;
     }
     setSaving(true);
     setError('');
@@ -556,7 +579,7 @@ export function CustomerProductServiceRatesPage() {
                     </select>
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    สินค้า *
+                    {form.serviceType === 'STORAGE' ? 'วิธีการจัดเก็บ *' : 'สินค้า *'}
                     <select
                       className="form-control"
                       value={form.productId}
@@ -564,18 +587,24 @@ export function CustomerProductServiceRatesPage() {
                       disabled={!form.customerId}
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     >
-                      <option value="">— เลือกสินค้า —</option>
-                      <option value={ALL_ITEMS_VALUE}>— ทุกรายการ (ทุกอุณหภูมิ) —</option>
+                      <option value="">{form.serviceType === 'STORAGE' ? '— เลือกวิธีการจัดเก็บ —' : '— เลือกสินค้า —'}</option>
+                      {form.serviceType !== 'STORAGE' && (
+                        <option value={ALL_ITEMS_VALUE}>— ทุกรายการ (ทุกอุณหภูมิ) —</option>
+                      )}
                       {TEMPERATURE_TYPES.filter((t) => t.value).map((t) => (
                         <option key={t.value} value={`${CATEGORY_PREFIX}${t.value}`}>
-                          — ทุกรายการ: {t.label} —
+                          {form.serviceType === 'STORAGE' ? t.label : `— ทุกรายการ: ${t.label} —`}
                         </option>
                       ))}
-                      {formProducts.map((p) => (
+                      {form.serviceType !== 'STORAGE' && formProducts.map((p) => (
                         <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
                       ))}
                     </select>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>เลือกประเภท (แช่แข็ง/แช่เย็น) เพื่อกำหนดอัตราให้ทุกสินค้าในประเภทนั้นของลูกค้านี้ โดยไม่ต้องเลือกทีละรายการ</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                      {form.serviceType === 'STORAGE'
+                        ? 'ค่าฝากสินค้าคิดตามวิธีการจัดเก็บเท่านั้น ไม่สามารถกำหนดรายสินค้าหรือ "ทุกรายการ" ได้'
+                        : 'เลือกประเภท (แช่แข็ง/แช่เย็น) เพื่อกำหนดอัตราให้ทุกสินค้าในประเภทนั้นของลูกค้านี้ โดยไม่ต้องเลือกทีละรายการ'}
+                    </span>
                   </label>
                 </div>
               )}
@@ -588,7 +617,7 @@ export function CustomerProductServiceRatesPage() {
                   list="service-types-list"
                   className="form-control"
                   value={form.serviceType}
-                  onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))}
+                  onChange={(e) => handleServiceTypeChange(e.target.value)}
                   disabled={!!form.rateId}
                   style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}
                   placeholder="เลือกหรือพิมพ์ประเภทค่าบริการใหม่"
