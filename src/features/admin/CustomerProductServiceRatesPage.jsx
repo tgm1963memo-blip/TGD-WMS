@@ -469,7 +469,7 @@ export function CustomerProductServiceRatesPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="storage-rate-table">
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
-              {['ลูกค้า', 'สินค้า', 'ประเภทค่าบริการ', 'อัตรา', 'หน่วย', 'หมายเหตุ', 'สถานะ', ''].map((h) => (
+              {['ลูกค้า', 'วิธีการจัดเก็บ', 'ประเภทค่าบริการ', 'อัตรา', 'หน่วย', 'หมายเหตุ', 'สถานะ', ''].map((h) => (
                 <th key={h} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#374151', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
