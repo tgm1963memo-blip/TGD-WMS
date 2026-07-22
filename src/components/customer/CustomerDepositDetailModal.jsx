@@ -14,6 +14,7 @@ import {
   listCustomerDepositRequestLines,
   reviewCustomerDepositRequest,
   recordDepositLineActualReceipt,
+  addAdminDepositRequestLine,
   updateDepositLineLocation,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
@@ -26,6 +27,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -33,6 +35,12 @@ function fmtDate(v) {
   const p = s.split('-');
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
 }
+
+// Mirrors tgd_admin_add_customer_deposit_request_line's status guard —
+// staff can add an extra item any time before receipt is confirmed
+// (customer entered the wrong code, or the physical delivery didn't
+// include everything they declared).
+const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
   const t = useTranslation();
@@ -69,6 +77,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [lineNotes, setLineNotes] = useState({});
   const [savingNote, setSavingNote] = useState({});
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
+  const [addLineOpen, setAddLineOpen] = useState(false);
+  const [addLineCode, setAddLineCode] = useState('');
+  const [addLineName, setAddLineName] = useState('');
+  const [addLineLot, setAddLineLot] = useState('');
+  const [addLineBoxes, setAddLineBoxes] = useState('');
+  const [addLineWeight, setAddLineWeight] = useState('');
+  const [addLineTemp, setAddLineTemp] = useState('');
+  const [addLineNote, setAddLineNote] = useState('');
+  const [addingLine, setAddingLine] = useState(false);
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -188,6 +205,33 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const newStatus = r.data?.status ?? 'WAREHOUSE_RECEIVING';
     setActionMsg(t('admin_work_order_opened'));
     updateHeaderStatus(newStatus);
+  }
+
+  function openAddLine() {
+    setAddLineCode(''); setAddLineName(''); setAddLineLot('');
+    setAddLineBoxes(''); setAddLineWeight(''); setAddLineTemp(''); setAddLineNote('');
+    setError('');
+    setAddLineOpen(true);
+  }
+
+  async function handleAddLine() {
+    if (!requestId || !addLineCode.trim()) return;
+    setAddingLine(true); setError('');
+    const r = await addAdminDepositRequestLine(requestId, {
+      customerProductCode: addLineCode,
+      productName: addLineName || null,
+      lotNo: addLineLot || null,
+      actualBoxes: addLineBoxes,
+      actualWeight: addLineWeight,
+      temperatureType: addLineTemp || null,
+      note: addLineNote || null,
+    });
+    setAddingLine(false);
+    if (r.error) { setError(r.error.message ?? 'เพิ่มรายการไม่สำเร็จ'); return; }
+    const linesResult = await listCustomerDepositRequestLines(requestId);
+    setLines(linesResult.data ?? []);
+    setActionMsg('เพิ่มรายการสินค้าเรียบร้อย');
+    setAddLineOpen(false);
   }
 
   async function handleConfirmReceiving() {
@@ -409,6 +453,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
                 <div style={{ display: 'flex', gap: 8 }}>
+                  {header && !ADD_LINE_EXCLUDED_STATUSES.includes(header.status) ? (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      onClick={openAddLine}
+                      title="สำหรับกรณีลูกค้าใส่รหัสผิด หรือฝากสินค้าเข้ามาไม่ครบตามที่แจ้ง"
+                    >
+                      ➕ เพิ่มรายการ
+                    </button>
+                  ) : null}
                   <StickerRotationControl />
                   <StickerPageSizeControl />
                   <button
@@ -672,6 +726,78 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         <label className="form-field">
           <span>{t('admin_reject_reason_label')}</span>
           <textarea className="form-control" rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder={t('admin_reject_reason_placeholder')} />
+        </label>
+      </Modal>
+
+      {/* Add extra line — customer entered the wrong code, or the physical
+          delivery didn't include everything they declared */}
+      <Modal
+        isOpen={addLineOpen}
+        onClose={() => setAddLineOpen(false)}
+        title="เพิ่มรายการสินค้า"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              disabled={addingLine || !addLineCode.trim()}
+              onClick={handleAddLine}
+              type="button"
+            >
+              {addingLine ? '...' : t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setAddLineOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="banner banner-info" style={{ marginBottom: 12 }}>
+          สำหรับกรณีลูกค้าใส่รหัสสินค้าผิด หรือฝากสินค้าเข้ามาไม่ครบตามที่แจ้งไว้ในใบฝากนี้
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>รหัสสินค้าลูกค้า *</span>
+            <input className="form-control" value={addLineCode} onChange={(e) => setAddLineCode(e.target.value)} placeholder="เช่น 3200300000411" />
+          </label>
+          <label className="form-field">
+            <span>ชื่อสินค้า (เว้นว่างได้ถ้ามีในแคตตาล็อกลูกค้า)</span>
+            <input className="form-control" value={addLineName} onChange={(e) => setAddLineName(e.target.value)} />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>LOT</span>
+            <input className="form-control" value={addLineLot} onChange={(e) => setAddLineLot(e.target.value)} />
+          </label>
+          <label className="form-field">
+            <span>การจัดเก็บ</span>
+            <select className="form-control" value={addLineTemp} onChange={(e) => setAddLineTemp(e.target.value)}>
+              <option value="">-- เว้นว่าง (ใช้ตามแคตตาล็อก) --</option>
+              {Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>{t('admin_received_boxes')}</span>
+            <input className="form-control" type="number" min={0} value={addLineBoxes} onChange={(e) => setAddLineBoxes(e.target.value)} />
+          </label>
+          <label className="form-field">
+            <span>{t('admin_received_qty')}</span>
+            <input className="form-control" type="number" min={0} value={addLineWeight} onChange={(e) => setAddLineWeight(e.target.value)} />
+          </label>
+        </div>
+        <label className="form-field" style={{ marginTop: 8 }}>
+          <span>หมายเหตุ (Admin)</span>
+          <input
+            className="form-control"
+            placeholder="เช่น ลูกค้าส่งมาผิดรายการ พบระหว่างตรวจนับ..."
+            value={addLineNote}
+            onChange={(e) => setAddLineNote(e.target.value)}
+          />
         </label>
       </Modal>
 
