@@ -254,10 +254,12 @@ export function CustomerWithdrawalLinesTable({
             const hasNullLot = identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT
               && productMatchedLines.some((dl) => !dl.lot_no);
 
-            // Tracking-code options are enriched with product/LOT text so the
-            // searchable dropdown can be typed into by code, product name, or
-            // LOT — not just the bare tracking code — and so picking one
-            // (before a product is even chosen) shows what it resolves to.
+            // Tracking-code options are enriched with product/LOT/admin-note
+            // text so the searchable dropdown can be typed into by code,
+            // product name, LOT, or the admin note staff left when receiving
+            // (e.g. a location/reference jotted down at receiving time) —
+            // not just the bare tracking code — and so picking one (before a
+            // product is even chosen) shows what it resolves to.
             const trackingCodeDepositLines = getProductMatchedDepositLines(line, allDepositLines).filter((dl) => dl.tracking_code);
             const seenTrackingCodes = new Set();
             const trackingCodeOptions = [];
@@ -268,7 +270,7 @@ export function CustomerWithdrawalLinesTable({
               trackingCodeOptions.push({
                 value: dl.tracking_code,
                 label: `${dl.tracking_code} — ${productLabel}${dl.lot_no ? ` (LOT ${dl.lot_no})` : ''}`,
-                searchText: `${dl.tracking_code} ${productLabel} ${dl.customer_product_code ?? ''} ${dl.lot_no ?? ''}`,
+                searchText: `${dl.tracking_code} ${productLabel} ${dl.customer_product_code ?? ''} ${dl.lot_no ?? ''} ${dl.actual_note ?? ''}`,
               });
             });
             trackingCodeOptions.sort((a, b) => a.value.localeCompare(b.value));
