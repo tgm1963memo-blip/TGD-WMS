@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 
 const initialFilters = {
   dateFrom: '',
@@ -18,10 +19,16 @@ const BILLING_STATUS_OPTIONS = [
   'EXCLUDED',
 ];
 
+// Sourced from the same TEMPERATURE_TYPE_LABELS used on the deposit request
+// line itself (ใบฝาก) — this filter used to hard-code only FROZEN/CHILLED/
+// AMBIENT, so a deposit line actually stored under FREEZE or FREEZE_FROZEN
+// (both real, selectable values on the deposit line UI) could never be
+// isolated in this report. AMBIENT is kept as a trailing option since the
+// product catalog's temperature_type check constraint still allows it, even
+// though no deposit line currently uses it.
 const TEMPERATURE_TYPE_OPTIONS = [
   { value: '', label: 'All temperatures' },
-  { value: 'FROZEN', label: 'FROZEN — แช่แข็ง' },
-  { value: 'CHILLED', label: 'CHILLED — แช่เย็น' },
+  ...Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
   { value: 'AMBIENT', label: 'AMBIENT — อุณหภูมิห้อง' },
 ];
 
@@ -100,7 +107,7 @@ export function BillingMovementWeightFilterPanel({
         </div>
         <div className="form-group">
           <label className="form-label">
-            Temperature
+            Temperature (การจัดเก็บ)
             <select className="form-control" name="temperatureType" value={filters.temperatureType} onChange={updateField}>
               {TEMPERATURE_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value || 'all'} value={opt.value}>{opt.label}</option>

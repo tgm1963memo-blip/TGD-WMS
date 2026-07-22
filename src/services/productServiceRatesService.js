@@ -23,11 +23,19 @@ export const UNIT_BASIS = [
   { value: 'FLAT',       label: 'อัตราคงที่ (Flat)' },
 ];
 
+// Storage-method (วิธีการจัดเก็บ) options for scoping an "all items" rate —
+// widened to match the real domain a deposit request line can actually be
+// recorded under (see TEMPERATURE_TYPE_LABELS, used on the deposit line
+// itself). This used to only offer FROZEN/CHILLED/AMBIENT, so a rate could
+// never be scoped to FREEZE or FREEZE_FROZEN even though customers can and
+// do deposit goods under those storage methods.
 export const TEMPERATURE_TYPES = [
-  { value: '',        label: '— ทุกอุณหภูมิ —' },
-  { value: 'FROZEN',  label: 'แช่แข็ง (FROZEN)' },
-  { value: 'CHILLED', label: 'แช่เย็น (CHILLED)' },
-  { value: 'AMBIENT', label: 'อุณหภูมิห้อง (AMBIENT)' },
+  { value: '',             label: '— ทุกวิธีการจัดเก็บ —' },
+  { value: 'FROZEN',       label: 'แช่แข็ง (FROZEN)' },
+  { value: 'CHILLED',      label: 'แช่เย็น (CHILLED)' },
+  { value: 'FREEZE',       label: 'ฝากฟรีส (FREEZE)' },
+  { value: 'FREEZE_FROZEN', label: 'ฟรีสและฝากแช่ (FREEZE_FROZEN)' },
+  { value: 'AMBIENT',      label: 'อุณหภูมิห้อง (AMBIENT)' },
 ];
 
 export async function listProductServiceRates(customerProductId) {
