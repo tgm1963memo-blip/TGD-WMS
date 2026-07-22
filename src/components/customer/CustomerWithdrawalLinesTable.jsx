@@ -132,6 +132,19 @@ export function CustomerWithdrawalLinesTable({
     const first = matches[0];
     const lotSet = [...new Set(matches.map((m) => m.lot_no || ''))].filter(Boolean);
 
+    // Same product auto-fill selectSourceTrackingCode already does — staff
+    // searching by LOT/mfg/exp/admin-note before touching the product
+    // dropdown at all should see the product name too, not just dates,
+    // exactly like picking a tracking code already resolves everything.
+    // Only fills it in when no product is chosen yet, so it never
+    // clobbers a product the user deliberately picked first.
+    const product = (!line.customer_product_code && first)
+      ? catalogProducts.find((p) =>
+        (p.customer_product_code && p.customer_product_code === first.customer_product_code) ||
+        (p.product_name && p.product_name === first.product_name),
+      )
+      : null;
+
     updateLine(line.key, {
       identifier_value: value,
       lot_no: type === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? value : (lotSet.length === 1 ? lotSet[0] : ''),
@@ -141,7 +154,26 @@ export function CustomerWithdrawalLinesTable({
       // Only link to a specific deposit line (and its tracking code) when the
       // identifier unambiguously resolves to exactly one — LOT/date/note can
       // still match more than one deposit line.
+      source_deposit_request_id: matches.length === 1 ? matches[0].deposit_request_id : (line.source_deposit_request_id ?? ''),
       source_deposit_request_line_id: matches.length === 1 ? matches[0].id : '',
+      ...(product
+        ? {
+          catalog_product_id: product.id,
+          customer_product_code: product.customer_product_code ?? '',
+          product_code: normalizeCatalogBarcode(product),
+          product_name: product.product_name ?? '',
+          temperature_type: product.temperature_type ?? first?.temperature_type ?? 'FROZEN',
+          argent_type: product.argent_type ?? 'NON_ARGENT',
+        }
+        : (!line.customer_product_code && first
+          ? {
+            // No matching catalog entry (rare) — still surface the deposit
+            // line's own product identity so the row isn't left blank.
+            customer_product_code: first.customer_product_code ?? '',
+            product_name: first.product_name ?? '',
+            temperature_type: first.temperature_type ?? 'FROZEN',
+          }
+          : {})),
     });
   }
 
