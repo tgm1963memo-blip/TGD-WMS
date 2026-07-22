@@ -113,7 +113,16 @@ function TempBadge({ type }) {
 
 function ProductFormModal({ form, saving, error, onClose, onSave, onFieldChange }) {
   const isEdit = !!form.productId;
-  const uomDropdownVal = UOM_PRESETS.includes(form.uom) ? form.uom : form.uomCustom ? 'OTHER' : '';
+  // Tracks whether "อื่นๆ (ระบุเอง)" is the active dropdown choice, independent
+  // of whether uomCustom has been typed into yet — deriving this from
+  // uomCustom's truthiness alone meant picking "OTHER" on a brand-new
+  // product (where uomCustom starts empty) snapped the dropdown straight
+  // back to the blank placeholder on the very next render, hiding the
+  // custom-text input before anything could be typed into it.
+  const [uomIsCustom, setUomIsCustom] = useState(
+    () => Boolean(form.uomCustom) || (Boolean(form.uom) && !UOM_PRESETS.includes(form.uom)),
+  );
+  const uomDropdownVal = uomIsCustom ? 'OTHER' : (UOM_PRESETS.includes(form.uom) ? form.uom : '');
 
   return (
     <div style={{
@@ -176,8 +185,10 @@ function ProductFormModal({ form, saving, error, onClose, onSave, onFieldChange 
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === 'OTHER') {
+                    setUomIsCustom(true);
                     onFieldChange('uom', '');
                   } else {
+                    setUomIsCustom(false);
                     onFieldChange('uom', val);
                     onFieldChange('uomCustom', '');
                   }
@@ -193,6 +204,7 @@ function ProductFormModal({ form, saving, error, onClose, onSave, onFieldChange 
                   placeholder="ระบุหน่วย เช่น KG, Pcs"
                   value={form.uomCustom}
                   onChange={(e) => onFieldChange('uomCustom', e.target.value)}
+                  autoFocus
                 />
               )}
             </div>

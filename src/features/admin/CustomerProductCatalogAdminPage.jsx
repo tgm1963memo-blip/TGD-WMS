@@ -50,6 +50,15 @@ function TempBadge({ type }) {
 
 function ProductFormModal({ form, customers, saving, error, onClose, onSave, onFieldChange }) {
   const isEdit = !!form.productId;
+  // Tracks whether "อื่นๆ (ระบุเอง)" is the active dropdown choice, independent
+  // of whether uomCustom has been typed into yet — deriving this from
+  // uomCustom's truthiness alone (as before) meant picking "OTHER" on a
+  // brand-new product (where uomCustom starts empty) snapped the dropdown
+  // straight back to the blank placeholder on the very next render, hiding
+  // the custom-text input before the admin could type anything into it.
+  const [uomIsCustom, setUomIsCustom] = useState(
+    () => Boolean(form.uomCustom) || (Boolean(form.uom) && !UOM_PRESETS.includes(form.uom)),
+  );
   return (
     <div
       style={{
@@ -152,22 +161,20 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
             <div className="form-field" style={{ margin: 0 }}>
               <span>หน่วย (UOM)</span>
               {(() => {
-                const dropdownVal = UOM_PRESETS.includes(form.uom)
-                  ? form.uom
-                  : form.uomCustom
-                    ? 'OTHER'
-                    : '';
+                const dropdownVal = uomIsCustom ? 'OTHER' : (UOM_PRESETS.includes(form.uom) ? form.uom : '');
                 return (
                   <>
                     <select
                       className="form-control"
-                      style={{ marginBottom: dropdownVal === 'OTHER' ? 6 : 0 }}
+                      style={{ marginBottom: uomIsCustom ? 6 : 0 }}
                       value={dropdownVal}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === 'OTHER') {
+                          setUomIsCustom(true);
                           onFieldChange('uom', '');
                         } else {
+                          setUomIsCustom(false);
                           onFieldChange('uom', val);
                           onFieldChange('uomCustom', '');
                         }
@@ -177,12 +184,13 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
                       {UOM_PRESETS.map((u) => <option key={u} value={u}>{u}</option>)}
                       <option value="OTHER">อื่นๆ (ระบุเอง)</option>
                     </select>
-                    {dropdownVal === 'OTHER' && (
+                    {uomIsCustom && (
                       <input
                         className="form-control"
                         placeholder="ระบุหน่วย เช่น KG หรือ ชิ้น"
                         value={form.uomCustom}
                         onChange={(e) => onFieldChange('uomCustom', e.target.value)}
+                        autoFocus
                       />
                     )}
                   </>
