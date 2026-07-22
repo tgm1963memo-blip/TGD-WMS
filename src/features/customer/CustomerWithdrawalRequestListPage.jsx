@@ -11,16 +11,17 @@ import { ReportPrintActions } from '../../components/reports/ReportPrintActions.
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
-import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines, cancelCustomerWithdrawalRequest } from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines, cancelCustomerWithdrawalRequest, recallCustomerWithdrawalRequest } from '../../services/customerWithdrawalRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
+import { getWithdrawalRecallEligibility } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 
 export function CustomerWithdrawalRequestListPage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests, isRequestProxy, loading: profileLoading } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy, role, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
   const [detailRow, setDetailRow] = useState(null);
@@ -28,6 +29,7 @@ export function CustomerWithdrawalRequestListPage() {
   const [detailLinesLoading, setDetailLinesLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [recallingId, setRecallingId] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -89,6 +91,21 @@ export function CustomerWithdrawalRequestListPage() {
     setState((current) => ({
       ...current,
       rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'CANCELLED' } : r),
+    }));
+  }
+
+  async function handleRecall(requestId) {
+    if (!window.confirm('ต้องการเรียกเอกสารกลับมาแก้ไขใช่หรือไม่?\nสถานะเอกสารจะกลับเป็น "ร่าง" และหลุดออกจากคิวตรวจสอบของเจ้าหน้าที่จนกว่าจะส่งใหม่')) return;
+    setRecallingId(requestId);
+    const result = await recallCustomerWithdrawalRequest(requestId);
+    setRecallingId(null);
+    if (result.error) {
+      setState((current) => ({ ...current, error: result.error }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      rows: current.rows.map((r) => r.id === requestId ? { ...r, status: 'WITHDRAWAL_DRAFT' } : r),
     }));
   }
 
@@ -277,6 +294,18 @@ export function CustomerWithdrawalRequestListPage() {
                             >
                               {t('customer_request_copy_button')}
                             </Link>
+                          ) : null}
+                          {canWriteCustomerRequests && getWithdrawalRecallEligibility(row, role).canRecall ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`customer-withdrawal-recall-${row.id}`}
+                              disabled={recallingId === row.id}
+                              onClick={() => handleRecall(row.id)}
+                              title="ดึงเอกสารกลับมาเป็นร่างเพื่อแก้ไข ก่อนที่เจ้าหน้าที่จะเปิดใบงาน"
+                              type="button"
+                            >
+                              {recallingId === row.id ? 'กำลังเรียกกลับ...' : '↩ เรียกเอกสารกลับ'}
+                            </button>
                           ) : null}
                           {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (
                             <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(row.id)} type="button">ลบ</button>

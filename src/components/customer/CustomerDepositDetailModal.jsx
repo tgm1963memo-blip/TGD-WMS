@@ -62,6 +62,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [lotEditLotNo, setLotEditLotNo] = useState('');
   const [lotEditMfgDate, setLotEditMfgDate] = useState('');
   const [lotEditExpDate, setLotEditExpDate] = useState('');
+  const [lotEditProductCode, setLotEditProductCode] = useState('');
   const [locationLine, setLocationLine] = useState(null);
   const [allLocations, setAllLocations] = useState([]);
   const [locZone, setLocZone] = useState('');
@@ -320,6 +321,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   async function handleSaveLotEdit() {
     if (!lotEditLine) return;
     setSubmitting(true); setError('');
+    const newProductCode = lotEditProductCode.trim();
     const r = await recordDepositLineActualReceipt(lotEditLine.id, {
       actualBoxes: lotEditLine.actual_boxes,
       actualWeight: lotEditLine.actual_weight,
@@ -328,12 +330,22 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       mfgDate: lotEditMfgDate || null,
       expDate: lotEditExpDate || null,
       locationId: lotEditLine.location_id,
+      customerProductCode: newProductCode && newProductCode !== lotEditLine.customer_product_code ? newProductCode : null,
     });
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Save failed'); return; }
     setLines((prev) => prev.map((l) =>
       l.id === lotEditLine.id
-        ? { ...l, lot_no: lotEditLotNo || l.lot_no, mfg_date: lotEditMfgDate || null, exp_date: lotEditExpDate || null }
+        ? {
+            ...l,
+            lot_no: lotEditLotNo || l.lot_no,
+            mfg_date: lotEditMfgDate || null,
+            exp_date: lotEditExpDate || null,
+            customer_product_code: r.data?.customer_product_code ?? l.customer_product_code,
+            internal_product_code: r.data?.internal_product_code ?? l.internal_product_code,
+            product_name: r.data?.product_name ?? l.product_name,
+            temperature_type: r.data?.temperature_type ?? l.temperature_type,
+          }
         : l,
     ));
     setActionMsg(t('save'));
@@ -664,6 +676,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   setLotEditLotNo(line.lot_no ?? '');
                                   setLotEditMfgDate(line.mfg_date ?? '');
                                   setLotEditExpDate(line.exp_date ?? '');
+                                  setLotEditProductCode(line.customer_product_code ?? '');
                                 }}
                               >
                                 ✏️
@@ -954,6 +967,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             </p>
             <div className="form-grid" style={{ gap: 10 }}>
               <label className="form-field">
+                <span>รหัสสินค้า (Admin)</span>
+                <input
+                  className="form-control"
+                  type="text"
+                  value={lotEditProductCode}
+                  onChange={(e) => setLotEditProductCode(e.target.value)}
+                  placeholder="Customer product code"
+                />
+              </label>
+              <label className="form-field">
                 <span>เลข LOT</span>
                 <input
                   className="form-control"
@@ -972,6 +995,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <DateInputDMY value={lotEditExpDate} onChange={(e) => setLotEditExpDate(e.target.value)} />
               </label>
             </div>
+            {lotEditProductCode.trim() && lotEditProductCode.trim() !== lotEditLine.customer_product_code ? (
+              <p className="form-helper" style={{ marginTop: 10, marginBottom: 0 }}>
+                ⚠️ การเปลี่ยนรหัสสินค้าจะปรับชื่อสินค้าตามรายการสินค้าของลูกค้า (ถ้าพบรหัสใหม่ในแคตตาล็อก) — กระทบยอดคงเหลือ/การเรียกเก็บเงินที่อ้างอิงรายการนี้
+              </p>
+            ) : null}
           </>
         ) : null}
       </Modal>

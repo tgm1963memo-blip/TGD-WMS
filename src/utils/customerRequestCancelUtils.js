@@ -17,6 +17,11 @@ const CUSTOMER_DEPOSIT_RECALL_STATUSES = new Set([
   'ADMIN_REVIEWING',
 ]);
 
+const CUSTOMER_WITHDRAWAL_RECALL_STATUSES = new Set([
+  'SUBMITTED_BY_CUSTOMER',
+  'ADMIN_REVIEWING',
+]);
+
 const TERMINAL_DEPOSIT_STATUSES = new Set([
   'ADMIN_REJECTED',
   'RECEIVED_CONFIRMED',
@@ -138,6 +143,28 @@ export function getDepositRecallEligibility(header, role) {
   }
 
   if (!CUSTOMER_DEPOSIT_RECALL_STATUSES.has(status)) {
+    return { canRecall: false, reasonKey: 'customer_request_recall_status_denied' };
+  }
+
+  return { canRecall: true, reasonKey: null };
+}
+
+// Same recall concept as getDepositRecallEligibility, for withdrawal
+// requests — only valid before ADMIN_ACCEPTED bridges the request into a
+// real warehouse picking document (tgd_bridge_customer_withdrawal_to_internal,
+// see tgd_recall_customer_withdrawal_request).
+export function getWithdrawalRecallEligibility(header, role) {
+  const status = header?.status;
+
+  if (ADMIN_ROLES.has(role)) {
+    return { canRecall: CUSTOMER_WITHDRAWAL_RECALL_STATUSES.has(status), reasonKey: null };
+  }
+
+  if (!CUSTOMER_ROLES.has(role)) {
+    return { canRecall: false, reasonKey: 'customer_request_recall_role_denied' };
+  }
+
+  if (!CUSTOMER_WITHDRAWAL_RECALL_STATUSES.has(status)) {
     return { canRecall: false, reasonKey: 'customer_request_recall_status_denied' };
   }
 

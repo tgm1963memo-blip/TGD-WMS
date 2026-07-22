@@ -352,6 +352,22 @@ export async function cancelCustomerWithdrawalRequest(requestId, comment = null)
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Pulls a submitted withdrawal request back to WITHDRAWAL_DRAFT so the
+// customer can edit it — only valid while still awaiting admin review (see
+// the RPC for the exact status guard); once accepted into a warehouse
+// picking document there's no going back. Mirrors
+// recallCustomerDepositRequest in customerDepositRequestService.js.
+export async function recallCustomerWithdrawalRequest(requestId, comment = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_recall_customer_withdrawal_request', {
+    p_request_id: requestId,
+    p_comment: toNullableText(comment),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function recordWithdrawalLinePick(lineId, pickedBoxes, pickedWeight) {
   if (!supabase) return missingSupabaseClientResult();
 

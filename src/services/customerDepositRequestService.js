@@ -455,6 +455,7 @@ export async function recordDepositLineActualReceipt(lineId, {
   mfgDate = null,
   expDate = null,
   locationId = null,
+  customerProductCode = null,
 } = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -467,6 +468,7 @@ export async function recordDepositLineActualReceipt(lineId, {
     p_mfg_date: mfgDate || null,
     p_exp_date: expDate || null,
     p_location_id: locationId || null,
+    p_customer_product_code: toNullableText(customerProductCode),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
