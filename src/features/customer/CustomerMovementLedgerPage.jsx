@@ -5,6 +5,7 @@ import { MovementLedgerTable } from '../../components/reports/MovementLedgerTabl
 import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
+import { MultiSelectDropdown } from '../../components/ui/MultiSelectDropdown.jsx';
 import {
   getMovementLedgerRows,
   getConfirmedDepositReceiptRows,
@@ -16,12 +17,22 @@ import { mapMovementLedgerToInventoryReportData } from '../../services/operation
 import { aggregateFinalBalances, downloadMovementLedgerExcel } from '../../utils/movementLedgerExcelUtils.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomers } from '../../services/masterDataService.js';
+import { getCustomerStockBalance } from '../../services/customerDepositRequestService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const INBOUND_SKIP = new Set(['RECEIVE', 'RECEIVE_CONFIRM', 'RECEIVE_PENDING', 'INBOUND', 'RETURN', 'ADJUSTMENT_IN']);
 
 const initialState = { rows: [], priorRows: [], summary: null, loading: false, error: null };
+
+// Stable product identity for filtering/deduping — neither the stock-balance
+// RPC (tgd_get_customer_stock_balance) nor most deposit/withdrawal lines
+// carry a product_id, so customer_product_code (falling back to product_name
+// for the rare line missing a code) is the only identifier both the
+// pre-search stock rows and the post-search movement rows can agree on.
+function productKey(row) {
+  return row.customer_product_code || row.product_name || '';
+}
 
 function dayBefore(dateStr) {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -78,12 +89,17 @@ export function CustomerMovementLedgerPage() {
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [productFilter, setProductFilter] = useState('');
+  const [productFilters, setProductFilters] = useState([]);
   const [lotFilter, setLotFilter] = useState('');
   const [trackingCodeFilter, setTrackingCodeFilter] = useState('');
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
+  // Current-stock rows (tgd_get_customer_stock_balance) — fetched up front so
+  // the product/LOT/tracking-code filters are already populated and pickable
+  // before the customer runs a search, instead of only appearing once
+  // state.rows has loaded from a prior search.
+  const [stockBalanceRows, setStockBalanceRows] = useState([]);
   // Authoritative "remaining" total — same source as the stock balance
   // page's RPC (see getAuthoritativeBalanceTotals) — only valid as a
   // stand-in for this report's total when it isn't narrowed to a
@@ -99,6 +115,19 @@ export function CustomerMovementLedgerPage() {
       const cust = (data ?? []).find((c) => c.id === customerId);
       setCustomerDetails(cust ?? null);
     });
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!customerId) {
+      setStockBalanceRows([]);
+      return;
+    }
+    let active = true;
+    getCustomerStockBalance(customerId).then(({ data }) => {
+      if (!active) return;
+      setStockBalanceRows(data ?? []);
+    });
+    return () => { active = false; };
   }, [customerId]);
 
   function handleSearch(e) {
@@ -158,31 +187,28 @@ export function CustomerMovementLedgerPage() {
     return () => { isMounted = false; };
   }, [searched, customerId, profileLoading, dateFrom, dateTo]);
 
-  // Product/LOT/tracking-code options derived from loaded rows — lets the
-  // customer pick from what actually exists in their own history instead of
-  // having to know/type an exact LOT or tracking code.
-  const productOptions = searched && state.rows.length > 0
-    ? [...new Map(
-        state.rows
-          .filter((r) => r.product_name || r.customer_product_code)
-          .map((r) => [
-            r.product_id ?? r.customer_product_code,
-            { id: r.product_id ?? r.customer_product_code, label: r.product_name ?? r.customer_product_code },
-          ])
-      ).values()].sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
-    : [];
+  // Product/LOT/tracking-code options — sourced from current stock balance
+  // up front (so they're pickable before the first search), merged with
+  // whatever the loaded movement history additionally contains (so an
+  // already-fully-withdrawn LOT/product a customer just searched for still
+  // shows up as a filter choice, not just current stock).
+  const optionRows = searched && state.rows.length > 0
+    ? [...stockBalanceRows, ...state.rows]
+    : stockBalanceRows;
 
-  const lotOptions = searched && state.rows.length > 0
-    ? [...new Set(state.rows.map((r) => r.lot_no).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-    : [];
+  const productOptions = [...new Map(
+    optionRows
+      .filter((r) => r.product_name || r.customer_product_code)
+      .map((r) => [productKey(r), { value: productKey(r), label: r.product_name ?? r.customer_product_code }])
+  ).values()].sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
 
-  const trackingCodeOptions = searched && state.rows.length > 0
-    ? [...new Set(state.rows.map((r) => r.tracking_code).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-    : [];
+  const lotOptions = [...new Set(optionRows.map((r) => r.lot_no).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+  const trackingCodeOptions = [...new Set(optionRows.map((r) => r.tracking_code).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   // Apply client-side product/LOT/tracking-code filters
   function matchesFilters(r) {
-    if (productFilter && (r.product_id ?? r.customer_product_code) !== productFilter) return false;
+    if (productFilters.length > 0 && !productFilters.includes(productKey(r))) return false;
     if (lotFilter && r.lot_no !== lotFilter) return false;
     if (trackingCodeFilter && r.tracking_code !== trackingCodeFilter) return false;
     return true;
@@ -195,7 +221,7 @@ export function CustomerMovementLedgerPage() {
   const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
   // A product/LOT/tracking-code filter narrows filteredRows to a subset
   // the (unfiltered, per-customer) authoritative total wouldn't match.
-  const hasNarrowingFilter = Boolean(productFilter || lotFilter || trackingCodeFilter);
+  const hasNarrowingFilter = productFilters.length > 0 || Boolean(lotFilter || trackingCodeFilter);
   const effectiveAuthoritativeTotals = hasNarrowingFilter ? null : authoritativeTotals;
 
   return (
@@ -232,18 +258,15 @@ export function CustomerMovementLedgerPage() {
             />
           </div>
           {productOptions.length > 0 && (
-            <div>
+            <div style={{ minWidth: 220 }}>
               <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>สินค้า</label>
-              <select
-                className="form-input"
-                value={productFilter}
-                onChange={(e) => setProductFilter(e.target.value)}
-              >
-                <option value="">ทุกสินค้า</option>
-                {productOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                name="customer-movement-ledger-product-filter"
+                options={productOptions}
+                placeholder="ทุกสินค้า"
+                value={productFilters}
+                onChange={setProductFilters}
+              />
             </div>
           )}
           {lotOptions.length > 0 && (
@@ -281,12 +304,12 @@ export function CustomerMovementLedgerPage() {
           <button className="btn btn-primary" type="submit" disabled={!customerId || profileLoading}>
             ดูรายงาน
           </button>
-          {(dateFrom || dateTo || productFilter || lotFilter || trackingCodeFilter) && (
+          {(dateFrom || dateTo || productFilters.length > 0 || lotFilter || trackingCodeFilter) && (
             <button
               className="btn btn-secondary"
               type="button"
               onClick={() => {
-                setDateFrom(''); setDateTo(''); setProductFilter('');
+                setDateFrom(''); setDateTo(''); setProductFilters([]);
                 setLotFilter(''); setTrackingCodeFilter(''); setSearched(false);
               }}
             >

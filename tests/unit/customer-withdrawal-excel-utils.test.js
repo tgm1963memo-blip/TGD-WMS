@@ -1,0 +1,158 @@
+import { describe, expect, it } from 'vitest';
+import {
+  downloadCustomerWithdrawalLineTemplate,
+  mapImportedRowsToWithdrawalLines,
+  parseCustomerWithdrawalLineImportFile,
+} from '../../src/utils/customerWithdrawalLineExcelUtils.js';
+
+const CATALOG = [{
+  id: 'prod-1',
+  customer_product_code: 'SAMPLE-001',
+  product_name: 'Sample product',
+  internal_product_code: 'BAR-001',
+  temperature_type: 'FROZEN',
+  argent_type: 'NON_ARGENT',
+}];
+
+const DEPOSIT_LINES = [{
+  id: 'dl-1',
+  deposit_request_id: 'dr-1',
+  customer_product_code: 'SAMPLE-001',
+  product_name: 'Sample product',
+  lot_no: 'LOT-1',
+  tracking_code: 'TRK-1',
+  mfg_date: '2026-01-01',
+  exp_date: '2026-06-01',
+  actual_boxes: 10,
+  actual_weight: 100,
+}];
+
+describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines', () => {
+  it('maps a valid row matched by LOT to a withdrawal line, resolving the source deposit line', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      {
+        __row: 2,
+        customer_product_code: 'SAMPLE-001',
+        identifier_type: 'LOT',
+        identifier_value: 'LOT-1',
+        requested_boxes: '4',
+        note: 'test note',
+      },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].catalog_product_id).toBe('prod-1');
+    expect(lines[0].lot_no).toBe('LOT-1');
+    expect(lines[0].source_deposit_request_id).toBe('dr-1');
+    expect(lines[0].source_deposit_request_line_id).toBe('dl-1');
+    expect(lines[0].requested_boxes).toBe('4');
+    expect(lines[0].note).toBe('test note');
+  });
+
+  it('accepts a lowercase identifier_type and is case-insensitive on product code', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      {
+        __row: 2,
+        customer_product_code: 'sample-001',
+        identifier_type: 'tracking_code',
+        identifier_value: 'TRK-1',
+        requested_weight: '25',
+      },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].identifier_type).toBe('TRACKING_CODE');
+    expect(lines[0].source_deposit_request_line_id).toBe('dl-1');
+  });
+
+  it('rejects a row whose product code is not in the catalog', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'UNKNOWN', identifier_type: 'LOT', identifier_value: 'LOT-1', requested_boxes: '1' },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain('not in catalog');
+  });
+
+  it('rejects a row with an invalid identifier_type', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: 'BOGUS', identifier_value: 'x', requested_boxes: '1' },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain('identifier_type');
+  });
+
+  it('rejects a row missing both requested_boxes and requested_weight', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: 'LOT', identifier_value: 'LOT-1' },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain('requested_boxes or requested_weight');
+  });
+
+  it('rejects a row whose identifier does not resolve to any live stock', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: 'LOT', identifier_value: 'LOT-NONEXISTENT', requested_boxes: '1' },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain('not found or already fully withdrawn');
+  });
+
+  it('imports valid rows even when other rows in the same batch are skipped', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: 'LOT', identifier_value: 'LOT-1', requested_boxes: '2' },
+      { __row: 3, customer_product_code: 'UNKNOWN', identifier_type: 'LOT', identifier_value: 'LOT-1', requested_boxes: '2' },
+    ], CATALOG, DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(1);
+    expect(errors).toHaveLength(1);
+  });
+});
+
+describe('customerWithdrawalLineExcelUtils: downloadCustomerWithdrawalLineTemplate', () => {
+  it('does not throw when generating a template from deposit lines with remaining balance', () => {
+    expect(() => downloadCustomerWithdrawalLineTemplate(DEPOSIT_LINES, 'test-template.xlsx')).not.toThrow();
+  });
+
+  it('does not throw when there are no deposit lines (sample-row fallback)', () => {
+    expect(() => downloadCustomerWithdrawalLineTemplate([], 'test-template.xlsx')).not.toThrow();
+  });
+});
+
+describe('customerWithdrawalLineExcelUtils: parseCustomerWithdrawalLineImportFile', () => {
+  it('reports missing required columns', async () => {
+    const XLSX = await import('xlsx');
+    const sheet = XLSX.utils.aoa_to_sheet([['note'], ['a note']]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Lines');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const file = { arrayBuffer: async () => buffer };
+    const result = await parseCustomerWithdrawalLineImportFile(file);
+
+    expect(result.errors[0]).toContain('customer_product_code');
+  });
+
+  it('parses rows with required columns present', async () => {
+    const XLSX = await import('xlsx');
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['customer_product_code', 'identifier_type', 'identifier_value', 'requested_boxes'],
+      ['SAMPLE-001', 'LOT', 'LOT-1', '4'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Lines');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const file = { arrayBuffer: async () => buffer };
+    const result = await parseCustomerWithdrawalLineImportFile(file);
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].customer_product_code).toBe('SAMPLE-001');
+  });
+});

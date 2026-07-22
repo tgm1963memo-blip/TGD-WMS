@@ -6,6 +6,7 @@ import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPort
 import { CustomerProcessTimeline } from '../../components/customer/CustomerProcessTimeline.jsx';
 import { CustomerWithdrawalLinesTable } from '../../components/customer/CustomerWithdrawalLinesTable.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
+import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { CUSTOMER_WITHDRAWAL_STATUSES } from '../../data/customerPortalDemoData.js';
 import {
   createCustomerWithdrawalRequest,
@@ -33,6 +34,12 @@ import {
   getWithdrawalBalanceInfo,
   WITHDRAWAL_LINE_DEFAULT_COUNT,
 } from '../../utils/customerWithdrawalLineDefaults.js';
+import {
+  downloadCustomerWithdrawalLineTemplate,
+  exportCustomerWithdrawalLinesExcel,
+  mapImportedRowsToWithdrawalLines,
+  parseCustomerWithdrawalLineImportFile,
+} from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -61,7 +68,10 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [nextLineKey, setNextLineKey] = useState(WITHDRAWAL_LINE_DEFAULT_COUNT + 1);
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [depositLinesMap, setDepositLinesMap] = useState({});
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [submitError, setSubmitError] = useState('');
+  const [importNotice, setImportNotice] = useState('');
+  const [importing, setImporting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [copySourceNo, setCopySourceNo] = useState('');
@@ -235,6 +245,21 @@ export function CustomerWithdrawalRequestCreatePage() {
     return () => { active = false; };
   }, [effectiveCustomerId]);
 
+  useEffect(() => {
+    let active = true;
+    if (!effectiveCustomerId || copyFromId || editId) {
+      if (!copyFromId && !editId) setCatalogProducts([]);
+      return undefined;
+    }
+
+    listCustomerProducts({ customerId: effectiveCustomerId, activeOnly: true }).then((result) => {
+      if (!active) return;
+      setCatalogProducts(result.data ?? []);
+    });
+
+    return () => { active = false; };
+  }, [effectiveCustomerId, copyFromId, editId]);
+
   // Auto-fill pickup_contact with logged-in user's name on new forms
   useEffect(() => {
     if (!profile || isEditMode || copyFromId) return;
@@ -273,6 +298,39 @@ export function CustomerWithdrawalRequestCreatePage() {
     });
 
     setSubmitError('');
+  }
+
+  async function handleImportFile(file) {
+    setImporting(true);
+    setSubmitError('');
+    setImportNotice('');
+
+    try {
+      const { rows, errors: parseErrors } = await parseCustomerWithdrawalLineImportFile(file);
+
+      if (parseErrors.length) {
+        setSubmitError(parseErrors.join(' '));
+        return;
+      }
+
+      const allDepositLines = Object.values(depositLinesMap).flat();
+      const { lines: importedLines, errors: rowErrors } = mapImportedRowsToWithdrawalLines(rows, catalogProducts, allDepositLines, nextLineKey);
+
+      if (!importedLines.length) {
+        setSubmitError(rowErrors.length ? rowErrors.join(' ') : t('excel_import_empty'));
+        return;
+      }
+
+      setLines(importedLines);
+      setNextLineKey(importedLines[importedLines.length - 1].key + 1);
+      if (rowErrors.length) {
+        setImportNotice(`${importedLines.length} ${t('excel_import_success')} (${rowErrors.length} skipped) — ${rowErrors.join(' ')}`);
+      }
+    } catch (importError) {
+      setSubmitError(importError.message ?? t('excel_import_error'));
+    } finally {
+      setImporting(false);
+    }
   }
 
   function normalizeLotNo(rawLot) {
@@ -513,6 +571,7 @@ export function CustomerWithdrawalRequestCreatePage() {
       </div>
 
       {submitError ? <div className="banner banner-danger" role="alert">{submitError}</div> : null}
+      {importNotice ? <div className="banner banner-warning" role="status">{importNotice}</div> : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-withdrawal-request-form" onSubmit={handleSubmit}>
         {isRequestProxy ? (
@@ -527,7 +586,16 @@ export function CustomerWithdrawalRequestCreatePage() {
           <div className="customer-deposit-lines-header">
             <h3>{t('customer_withdrawal_lines_title')}</h3>
             <div className="action-row">
-              <button className="btn btn-secondary" data-testid="customer-withdrawal-add-line-button" onClick={addLine} type="button">
+              <ExcelImportExportToolbar
+                disabled={!canWriteCustomerRequests || importing}
+                exportTestId="customer-withdrawal-export-button"
+                importTestId="customer-withdrawal-import-input"
+                onExport={() => exportCustomerWithdrawalLinesExcel(lines)}
+                onImportFile={handleImportFile}
+                onTemplate={() => downloadCustomerWithdrawalLineTemplate(Object.values(depositLinesMap).flat())}
+                templateTestId="customer-withdrawal-template-button"
+              />
+              <button className="btn btn-secondary" data-testid="customer-withdrawal-add-line-button" disabled={importing} onClick={addLine} type="button">
                 {t('customer_deposit_add_line')}
               </button>
             </div>
