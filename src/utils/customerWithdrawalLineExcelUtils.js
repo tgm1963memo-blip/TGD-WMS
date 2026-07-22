@@ -1,7 +1,9 @@
 import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
 import { normalizeCatalogBarcode } from './customerProductExcelUtils.js';
+import { round2 } from './numberFormat.js';
 import {
   getMatchedDepositLine,
+  getProductMatchedDepositLines,
   WITHDRAWAL_IDENTIFIER_TYPES,
 } from './customerWithdrawalLineDefaults.js';
 
@@ -98,6 +100,51 @@ export function exportCustomerWithdrawalLinesExcel(lines = [], filename = 'custo
 
 const VALID_IDENTIFIER_TYPES = new Set(Object.values(WITHDRAWAL_IDENTIFIER_TYPES));
 
+// Receipt date for FIFO ordering — a property of the deposit REQUEST header
+// (when it was received), not the line — see getDepositInventoryLines in
+// customerDepositRequestService.js, which attaches the whole header as
+// `request` on every line it returns.
+function receiptDateOf(depositLine) {
+  return depositLine?.request?.last_action_at ?? depositLine?.request?.expected_arrival_date ?? '';
+}
+
+// Greedily allocates `requestedQty` (in `mode` units) across `candidateLines`
+// oldest-received first (FIFO), consuming each lot's remaining balance
+// before moving to the next. Returns one allocation per lot actually drawn
+// from, plus any shortfall if total available stock across every candidate
+// lot was less than requested (still allocates everything available rather
+// than rejecting the row — the caller surfaces the shortfall as a warning).
+function allocateFifoAcrossLots(candidateLines, requestedQty, mode) {
+  const sorted = [...candidateLines].sort((a, b) => new Date(receiptDateOf(a)) - new Date(receiptDateOf(b)));
+
+  const allocations = [];
+  let remaining = requestedQty;
+
+  for (const dl of sorted) {
+    if (remaining <= 0) break;
+    const available = depositLineBalance(dl, mode);
+    if (available <= 0) continue;
+
+    const take = Math.min(available, remaining);
+    const weightPerUnit = dl.weight_per_box != null && Number(dl.weight_per_box) > 0
+      ? Number(dl.weight_per_box)
+      : (depositLineBalance(dl, 'boxes') > 0 ? depositLineBalance(dl, 'weight') / depositLineBalance(dl, 'boxes') : null);
+
+    // Boxes are a discrete count (can't withdraw a fractional box), so a
+    // weight-driven allocation rounds its derived box count — same rounding
+    // the manual weight-to-boxes cross-calc already uses elsewhere
+    // (CustomerWithdrawalLinesTable.jsx). Weight stays a plain 2dp figure.
+    allocations.push({
+      depositLine: dl,
+      boxes: mode === 'boxes' ? take : (weightPerUnit ? Math.round(take / weightPerUnit) : null),
+      weight: mode === 'weight' ? round2(take) : (weightPerUnit ? round2(take * weightPerUnit) : null),
+    });
+    remaining -= take;
+  }
+
+  return { allocations, shortfall: Math.max(0, remaining) };
+}
+
 export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], allDepositLines = [], startKey = 1) {
   const catalogByCode = new Map(
     catalogProducts.map((product) => [String(product.customer_product_code ?? '').trim().toUpperCase(), product]),
@@ -119,14 +166,15 @@ export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], all
       return;
     }
 
-    const identifierType = String(row.identifier_type ?? '').trim().toUpperCase();
-    if (!VALID_IDENTIFIER_TYPES.has(identifierType)) {
+    const identifierTypeRaw = String(row.identifier_type ?? '').trim().toUpperCase();
+    const identifierValue = String(row.identifier_value ?? '').trim();
+    const identifierGiven = Boolean(identifierTypeRaw || identifierValue);
+
+    if (identifierGiven && !VALID_IDENTIFIER_TYPES.has(identifierTypeRaw)) {
       errors.push(`Row ${row.__row}: identifier_type must be one of ${[...VALID_IDENTIFIER_TYPES].join(', ')}.`);
       return;
     }
-
-    const identifierValue = String(row.identifier_value ?? '').trim();
-    if (!identifierValue) {
+    if (identifierGiven && !identifierValue) {
       errors.push(`Row ${row.__row}: identifier_value is required.`);
       return;
     }
@@ -138,38 +186,84 @@ export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], all
       return;
     }
 
-    const draftLine = {
-      key: startKey + lines.length,
+    const draftLineBase = {
       catalog_product_id: catalog.id,
       customer_product_code: catalog.customer_product_code ?? customerProductCode,
       product_code: normalizeCatalogBarcode(catalog),
       product_name: catalog.product_name ?? '',
       temperature_type: catalog.temperature_type ?? 'FROZEN',
       argent_type: catalog.argent_type ?? 'NON_ARGENT',
-      identifier_type: identifierType,
-      identifier_value: identifierValue,
-      lot_no: identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? identifierValue : '',
-      mfg_date: identifierType === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE ? identifierValue : '',
-      exp_date: identifierType === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE ? identifierValue : '',
       source_deposit_request_id: '',
       source_deposit_request_line_id: '',
-      withdrawal_qty_mode: requestedWeight && !requestedBoxes ? 'WEIGHT' : 'BOXES',
-      requested_qty: '',
-      requested_boxes: requestedBoxes,
-      requested_weight: requestedWeight,
       picking_rule: String(row.picking_rule ?? '').trim() || 'FEFO',
       note: String(row.note ?? '').trim(),
     };
 
+    if (!identifierGiven) {
+      // No LOT/tracking/date/note given — auto-pick stock via FIFO (oldest
+      // received first), spanning multiple lots if one alone isn't enough.
+      const candidates = getProductMatchedDepositLines(
+        { customer_product_code: draftLineBase.customer_product_code, product_name: draftLineBase.product_name },
+        allDepositLines,
+      );
+      const mode = requestedBoxes ? 'boxes' : 'weight';
+      const { allocations, shortfall } = allocateFifoAcrossLots(candidates, Number(requestedBoxes || requestedWeight), mode);
+
+      if (!allocations.length) {
+        errors.push(`Row ${row.__row}: no available stock found for ${draftLineBase.product_name || customerProductCode}.`);
+        return;
+      }
+
+      allocations.forEach((alloc) => {
+        const dl = alloc.depositLine;
+        const useTrackingCode = Boolean(dl.tracking_code);
+        lines.push({
+          ...draftLineBase,
+          key: startKey + lines.length,
+          identifier_type: useTrackingCode ? WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE : WITHDRAWAL_IDENTIFIER_TYPES.LOT,
+          identifier_value: useTrackingCode ? dl.tracking_code : (dl.lot_no ?? ''),
+          lot_no: dl.lot_no ?? '',
+          mfg_date: dl.mfg_date ?? '',
+          exp_date: dl.exp_date ?? '',
+          withdrawal_qty_mode: mode === 'weight' ? 'WEIGHT' : 'BOXES',
+          requested_qty: '',
+          requested_boxes: alloc.boxes != null ? String(alloc.boxes) : '',
+          requested_weight: alloc.weight != null ? String(alloc.weight) : '',
+          source_deposit_request_id: dl.deposit_request_id ?? '',
+          source_deposit_request_line_id: dl.id ?? '',
+        });
+      });
+
+      if (shortfall > 0) {
+        const requested = Number(requestedBoxes || requestedWeight);
+        errors.push(`Row ${row.__row}: only ${requested - shortfall} of ${requested} ${mode} available across all lots for ${draftLineBase.product_name || customerProductCode} — imported the available amount, shortfall ${shortfall}.`);
+      }
+      return;
+    }
+
+    const draftLine = {
+      ...draftLineBase,
+      key: startKey + lines.length,
+      identifier_type: identifierTypeRaw,
+      identifier_value: identifierValue,
+      lot_no: identifierTypeRaw === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? identifierValue : '',
+      mfg_date: identifierTypeRaw === WITHDRAWAL_IDENTIFIER_TYPES.MFG_DATE ? identifierValue : '',
+      exp_date: identifierTypeRaw === WITHDRAWAL_IDENTIFIER_TYPES.EXP_DATE ? identifierValue : '',
+      withdrawal_qty_mode: requestedWeight && !requestedBoxes ? 'WEIGHT' : 'BOXES',
+      requested_qty: '',
+      requested_boxes: requestedBoxes,
+      requested_weight: requestedWeight,
+    };
+
     const matched = getMatchedDepositLine(draftLine, allDepositLines);
     if (!matched) {
-      errors.push(`Row ${row.__row}: ${identifierType} "${identifierValue}" not found or already fully withdrawn for ${draftLine.product_name || customerProductCode}.`);
+      errors.push(`Row ${row.__row}: ${identifierTypeRaw} "${identifierValue}" not found or already fully withdrawn for ${draftLine.product_name || customerProductCode}.`);
       return;
     }
 
     lines.push({
       ...draftLine,
-      lot_no: identifierType === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? identifierValue : (matched.lot_no ?? ''),
+      lot_no: identifierTypeRaw === WITHDRAWAL_IDENTIFIER_TYPES.LOT ? identifierValue : (matched.lot_no ?? ''),
       mfg_date: draftLine.mfg_date || matched.mfg_date || '',
       exp_date: draftLine.exp_date || matched.exp_date || '',
       source_deposit_request_id: matched.deposit_request_id ?? '',
@@ -180,7 +274,9 @@ export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], all
   return { lines, errors };
 }
 
-const REQUIRED_IMPORT_HEADERS = ['customer_product_code', 'identifier_type', 'identifier_value'];
+// identifier_type/identifier_value are optional columns — a blank identifier
+// per row means "auto-pick stock via FIFO" (see allocateFifoAcrossLots).
+const REQUIRED_IMPORT_HEADERS = ['customer_product_code'];
 
 export async function parseCustomerWithdrawalLineImportFile(file) {
   const { headers, rows } = await readExcelFile(file);

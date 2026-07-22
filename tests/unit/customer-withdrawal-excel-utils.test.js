@@ -114,6 +114,101 @@ describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines', (
   });
 });
 
+const FIFO_DEPOSIT_LINES = [
+  {
+    id: 'dl-old',
+    deposit_request_id: 'dr-old',
+    customer_product_code: 'SAMPLE-001',
+    product_name: 'Sample product',
+    lot_no: 'LOT-OLD',
+    tracking_code: 'TRK-OLD',
+    actual_boxes: 5,
+    actual_weight: 50,
+    weight_per_box: 10,
+    request: { last_action_at: '2026-01-01T00:00:00Z' },
+  },
+  {
+    id: 'dl-mid',
+    deposit_request_id: 'dr-mid',
+    customer_product_code: 'SAMPLE-001',
+    product_name: 'Sample product',
+    lot_no: 'LOT-MID',
+    tracking_code: 'TRK-MID',
+    actual_boxes: 5,
+    actual_weight: 50,
+    weight_per_box: 10,
+    request: { last_action_at: '2026-02-01T00:00:00Z' },
+  },
+  {
+    id: 'dl-new',
+    deposit_request_id: 'dr-new',
+    customer_product_code: 'SAMPLE-001',
+    product_name: 'Sample product',
+    lot_no: 'LOT-NEW',
+    tracking_code: 'TRK-NEW',
+    actual_boxes: 5,
+    actual_weight: 50,
+    weight_per_box: 10,
+    request: { last_action_at: '2026-03-01T00:00:00Z' },
+  },
+];
+
+describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FIFO auto-lot selection', () => {
+  it('auto-picks the oldest lot when identifier_type/identifier_value are left blank and one lot is enough', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: '', identifier_value: '', requested_boxes: '3' },
+    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].source_deposit_request_line_id).toBe('dl-old');
+    expect(lines[0].identifier_type).toBe('TRACKING_CODE');
+    expect(lines[0].identifier_value).toBe('TRK-OLD');
+    expect(lines[0].requested_boxes).toBe('3');
+  });
+
+  it('spans multiple lots in FIFO order when the oldest lot alone is not enough', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '8' },
+    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(2);
+    expect(lines[0].source_deposit_request_line_id).toBe('dl-old');
+    expect(lines[0].requested_boxes).toBe('5');
+    expect(lines[1].source_deposit_request_line_id).toBe('dl-mid');
+    expect(lines[1].requested_boxes).toBe('3');
+  });
+
+  it('imports all available stock across lots and reports a shortfall warning instead of rejecting the row', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '20' },
+    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+
+    expect(lines).toHaveLength(3);
+    expect(lines.reduce((sum, l) => sum + Number(l.requested_boxes), 0)).toBe(15);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('shortfall 5');
+  });
+
+  it('rejects a blank-identifier row when the product has zero available stock anywhere', () => {
+    const { lines, errors } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '5' },
+    ], CATALOG, [], 1);
+
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain('no available stock found');
+  });
+
+  it('derives requested_weight from weight_per_box for a boxes-driven FIFO allocation', () => {
+    const { lines } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '3' },
+    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+
+    expect(lines[0].requested_weight).toBe('30');
+  });
+});
+
 describe('customerWithdrawalLineExcelUtils: downloadCustomerWithdrawalLineTemplate', () => {
   it('does not throw when generating a template from deposit lines with remaining balance', () => {
     expect(() => downloadCustomerWithdrawalLineTemplate(DEPOSIT_LINES, 'test-template.xlsx')).not.toThrow();
