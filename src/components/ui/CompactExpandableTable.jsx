@@ -14,6 +14,10 @@ export function CompactExpandableTable({
   tableTestId,
   detailLabel = 'Detail',
   hideDetailLabel = 'Hide',
+  // Optional per-row className (row) => string|undefined, appended after the
+  // expanded/collapsed class — lets a caller mark e.g. a group-boundary row
+  // without this generic table needing to know what a "group" means.
+  getRowClassName,
 }) {
   const [expandedKey, setExpandedKey] = useState(null);
 
@@ -32,6 +36,14 @@ export function CompactExpandableTable({
   return (
     <div className="table-responsive responsive-table compact-expandable-table" data-testid={tableTestId}>
       <table className="tgd-table compact-table">
+        {summaryColumns.some((column) => column.width) ? (
+          <colgroup>
+            {summaryColumns.map((column) => (
+              <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+            ))}
+            <col style={{ width: '72px' }} />
+          </colgroup>
+        ) : null}
         <thead>
           <tr>
             {summaryColumns.map((column) => (
@@ -44,12 +56,17 @@ export function CompactExpandableTable({
           {rows.map((row) => {
             const key = rowKey(row);
             const expanded = expandedKey === key;
+            const extraClassName = getRowClassName?.(row);
 
             return (
               <Fragment key={key}>
-                <tr className={expanded ? 'compact-table-row is-expanded' : 'compact-table-row'}>
+                <tr className={[expanded ? 'compact-table-row is-expanded' : 'compact-table-row', extraClassName].filter(Boolean).join(' ')}>
                   {summaryColumns.map((column) => (
-                    <td key={column.key} className="compact-table-cell" title={column.title?.(row)}>
+                    <td
+                      key={column.key}
+                      className={['compact-table-cell', column.cellClassName].filter(Boolean).join(' ')}
+                      title={column.title?.(row)}
+                    >
                       {column.render ? column.render(row) : row[column.key]}
                     </td>
                   ))}

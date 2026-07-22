@@ -453,7 +453,7 @@ export function MovementLedgerReportPage() {
         {!committedFilters ? (
           <EmptyState message="รอการค้นหา" description="กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูลรายการเคลื่อนไหว" />
         ) : (
-          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} />
+          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} grouped={sortMode === 'productLot'} />
         )}
       </DashboardSection>
 

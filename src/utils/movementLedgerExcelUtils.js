@@ -8,20 +8,27 @@ const HEADERS = [
   'คงเหลือ(กล่อง)', 'คงเหลือ(น้ำหนัก)'
 ];
 
-// Group strictly by customer + lot rather than customer + product + lot: a
-// physical lot already belongs to exactly one product in this business's
-// data model, and lot_no is the one identifier reliably present and
-// consistently formatted across every row source this report merges —
-// deposit, withdrawal, and stock_movement rows resolve product_id through
-// different, not-always-populated paths (see getConfirmedWithdrawalRows),
-// so keying on product_id risks silently splitting the same lot's
-// inbound/outbound rows into different buckets and producing a wrong
-// running balance. Rows with no lot_no at all (rare adjustment-type
-// movements) fall back to grouping by whatever product identifier is
-// available so they don't all collapse into one bucket.
+// Product identity for grouping — deliberately NOT product_id, since deposit,
+// withdrawal, and stock_movement rows resolve product_id through different,
+// not-always-populated paths (see getConfirmedWithdrawalRows). customer_
+// product_code/product_name are the fields productDisplay() already renders
+// successfully for every row source, so they're the reliable identifier here.
+function productIdentity(row) {
+  return row.product_code ?? row.customer_product_code ?? row.product_name ?? row.product_id ?? '';
+}
+
+// Grouped by customer + PRODUCT + lot, not customer + lot alone: a LOT
+// number in this business's real data is NOT always unique per product (the
+// same lot number has been observed reused across unrelated products), so
+// grouping by lot only collapsed different products' rows into one bucket —
+// their running balances got summed together, and sorting "by product" only
+// ever looked at the bucket's first row, silently scattering a product's own
+// rows across whatever lot-buckets its rows happened to land in. Rows with
+// no lot_no at all (rare adjustment-type movements) fall back to grouping by
+// product alone so they don't scatter across a fake per-row bucket.
 export function movementBalanceKey(row) {
-  if (row.lot_no) return `${row.customer_id ?? ''}|lot:${row.lot_no}`;
-  const product = row.product_id ?? row.customer_product_code ?? row.product_name ?? '';
+  const product = productIdentity(row);
+  if (row.lot_no) return `${row.customer_id ?? ''}|${product}|lot:${row.lot_no}`;
   return `${row.customer_id ?? ''}|product:${product}`;
 }
 

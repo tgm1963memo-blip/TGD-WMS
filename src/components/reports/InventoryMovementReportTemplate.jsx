@@ -22,32 +22,35 @@ function fmtQty(v) {
   return Number.isFinite(n) && n !== 0 ? n.toLocaleString('en') : '-';
 }
 
+// Plain magnitude, no +/- sign — the column header ("คงเหลือ"/BAL) already
+// says this is a remaining balance, and a running stock balance is a count
+// of physical goods on hand, never meaningfully "negative" from a reader's
+// point of view even on the rare row where the underlying math dips below
+// zero before being floored elsewhere.
 function fmtBalance(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '-';
   if (n === 0) return '0';
-  const s = Math.abs(n).toLocaleString('en');
-  return n > 0 ? `+${s}` : `-${s}`;
+  return Math.abs(n).toLocaleString('en');
 }
 
 function fmtBalanceWt(v, decimals = 3) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '-';
   if (n === 0) return '0.000';
-  const s = Math.abs(n).toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-  return n > 0 ? `+${s}` : `-${s}`;
+  return Math.abs(n).toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-const CELL = { border: '1px solid #bbb', padding: '3px 4px', verticalAlign: 'middle' };
+const CELL = { border: '1px solid #bbb', padding: '3px 4px', verticalAlign: 'middle', whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' };
 const TH = { ...CELL, background: '#f0f0f0', fontWeight: 700, fontSize: 8 };
 
 const COL_WIDTHS = [
-  '3%',   // NO
-  '7%',   // RECEIVED DATE
-  '7%',   // DELIVERY DATE
-  '3%',   // DESC/CODE
-  '8%',   // CUSTOMER PRODUCT
-  '7%',   // LOT
+  '2%',   // NO
+  '5%',   // RECEIVED DATE
+  '5%',   // DELIVERY DATE
+  '11%',  // DESC/CODE
+  '9%',   // CUSTOMER PRODUCT
+  '6%',   // LOT
   '6%',   // TRACKING NO
   '5%',   // WEIGHT KG
   '5%',   // BF VOLUME
@@ -271,26 +274,32 @@ export function InventoryMovementReportTemplate({
                   </tr>
                 ) : page.lines.map((line, i) => {
                   const index = rowStartIndex + i;
+                  // Marks where one LOT's rows end and the next lot's (or
+                  // product's) begin — applied per-cell, not on the <tr>,
+                  // since border-collapse tables render row-level borders
+                  // unreliably across browsers/print engines.
+                  const divider = line._isLastOfLotGroup ? { borderBottom: '2px solid #888' } : null;
+                  const cell = (extra) => ({ ...CELL, ...divider, ...extra });
                   return (
                     <tr key={line.id ?? index} style={{ background: index % 2 === 1 ? '#fafafa' : '#fff' }}>
-                      <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{index + 1}</td>
-                      <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{fmtDate(line.receivedDate)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{fmtDate(line.deliveryDate)}</td>
-                      <td style={{ ...CELL, fontSize: 8 }}>{line.descCode}</td>
-                      <td style={{ ...CELL, fontSize: 8 }}>{line.customerProduct}</td>
-                      <td style={{ ...CELL, fontSize: 8 }}>{line.lotNo}</td>
-                      <td style={{ ...CELL, fontSize: 8 }}>{line.trackingCode}</td>
-                      <td style={{ ...CELL, textAlign: 'right', fontSize: 8 }}>{fmtNum(line.weightKg)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#f3f4fd', fontSize: 8 }}>{fmtQty(line.balanceForwardVolume)}</td>
-                      <td style={{ ...CELL, textAlign: 'right',  background: '#f3f4fd', fontSize: 8 }}>{fmtNum(line.balanceForwardWeight)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#f1f8f2', fontSize: 8 }}>{fmtQty(line.receivedVolume)}</td>
-                      <td style={{ ...CELL, textAlign: 'right',  background: '#f1f8f2', fontSize: 8 }}>{fmtNum(line.receivedWeight)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#fdf2f5', fontSize: 8 }}>{fmtQty(line.deliveryVolume)}</td>
-                      <td style={{ ...CELL, textAlign: 'right',  background: '#fdf2f5', fontSize: 8 }}>{fmtNum(line.deliveryWeight)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#fffbf0', fontSize: 8, color: Number(line.balanceVolume) < 0 ? '#dc2626' : Number(line.balanceVolume) === 0 ? '#888' : undefined }}>{fmtBalance(line.balanceVolume)}</td>
-                      <td style={{ ...CELL, textAlign: 'right',  background: '#fffbf0', fontSize: 8, color: Number(line.balanceWeight) < 0 ? '#dc2626' : Number(line.balanceWeight) === 0 ? '#888' : undefined }}>{fmtBalanceWt(line.balanceWeight)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', fontSize: 8 }}>{line.volumeUnit}</td>
-                      <td style={{ ...CELL, fontSize: 8, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                      <td style={cell({ textAlign: 'center', fontSize: 8 })}>{index + 1}</td>
+                      <td style={cell({ textAlign: 'center', fontSize: 8 })}>{fmtDate(line.receivedDate)}</td>
+                      <td style={cell({ textAlign: 'center', fontSize: 8 })}>{fmtDate(line.deliveryDate)}</td>
+                      <td style={cell({ fontSize: 8 })}>{line._showProductCell === false ? '' : line.descCode}</td>
+                      <td style={cell({ fontSize: 8 })}>{line._showProductCell === false ? '' : line.customerProduct}</td>
+                      <td style={cell({ fontSize: 8 })}>{line.lotNo}</td>
+                      <td style={cell({ fontSize: 8 })}>{line.trackingCode}</td>
+                      <td style={cell({ textAlign: 'right', fontSize: 8 })}>{fmtNum(line.weightKg)}</td>
+                      <td style={cell({ textAlign: 'center', background: '#f3f4fd', fontSize: 8 })}>{fmtQty(line.balanceForwardVolume)}</td>
+                      <td style={cell({ textAlign: 'right',  background: '#f3f4fd', fontSize: 8 })}>{fmtNum(line.balanceForwardWeight)}</td>
+                      <td style={cell({ textAlign: 'center', background: '#f1f8f2', fontSize: 8 })}>{fmtQty(line.receivedVolume)}</td>
+                      <td style={cell({ textAlign: 'right',  background: '#f1f8f2', fontSize: 8 })}>{fmtNum(line.receivedWeight)}</td>
+                      <td style={cell({ textAlign: 'center', background: '#fdf2f5', fontSize: 8 })}>{fmtQty(line.deliveryVolume)}</td>
+                      <td style={cell({ textAlign: 'right',  background: '#fdf2f5', fontSize: 8 })}>{fmtNum(line.deliveryWeight)}</td>
+                      <td style={cell({ textAlign: 'center', background: '#fffbf0', fontSize: 8, color: Number(line.balanceVolume) < 0 ? '#dc2626' : Number(line.balanceVolume) === 0 ? '#888' : undefined })}>{fmtBalance(line.balanceVolume)}</td>
+                      <td style={cell({ textAlign: 'right',  background: '#fffbf0', fontSize: 8, color: Number(line.balanceWeight) < 0 ? '#dc2626' : Number(line.balanceWeight) === 0 ? '#888' : undefined })}>{fmtBalanceWt(line.balanceWeight)}</td>
+                      <td style={cell({ textAlign: 'center', fontSize: 8 })}>{line.volumeUnit}</td>
+                      <td style={cell({ fontSize: 8, overflowWrap: 'break-word', wordBreak: 'break-word' })}>
                         <div>{line.remark !== '-' ? line.remark : ''}</div>
                         {line.isClosed && (
                           <div style={{ marginTop: 2, display: 'inline-block', background: '#dc2626', color: '#fff', fontSize: 7, fontWeight: 800, padding: '1px 4px', borderRadius: 3, letterSpacing: '0.05em' }}>

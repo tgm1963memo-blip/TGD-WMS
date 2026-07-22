@@ -144,6 +144,26 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     };
   });
 
+  // When grouped by product-then-lot, collapse a repeated product's
+  // name/code down to the first row of its block (which can span several
+  // lots) and mark each lot's last row so the print template can draw a
+  // divider there — purely adjacency-based, so this is a no-op in plain
+  // chronological order (sortMode 'date'), where adjacent rows essentially
+  // never share a product+lot.
+  mappedLines.forEach((line, index) => {
+    if (sortMode !== 'productLot') {
+      line._showProductCell = true;
+      line._isLastOfLotGroup = false;
+      return;
+    }
+    const prev = mappedLines[index - 1];
+    const next = mappedLines[index + 1];
+    const sameProductAsPrev = prev && prev.customerProduct === line.customerProduct && prev.descCode === line.descCode;
+    const sameLotAsNext = next && next.customerProduct === line.customerProduct && next.descCode === line.descCode && next.lotNo === line.lotNo;
+    line._showProductCell = !sameProductAsPrev;
+    line._isLastOfLotGroup = !sameLotAsNext;
+  });
+
   // Running balance per lot, seeded from openingBalances (every movement
   // strictly before the report's Date From) so a lot received before the
   // selected period still shows its true remaining stock instead of going

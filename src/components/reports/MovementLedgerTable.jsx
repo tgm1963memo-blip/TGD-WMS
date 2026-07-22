@@ -28,10 +28,40 @@ export function isInbound(row) {
   return INBOUND_TYPES.has(raw) || raw.includes('RECEIVE') || raw.includes('INBOUND');
 }
 
+// Product identity used to decide whether two adjacent rows belong to the
+// same product block — mirrors movementBalanceKey's product half in
+// movementLedgerExcelUtils.js (kept as a local, independent copy rather than
+// an import: that util file already imports isInbound/fmtWt FROM this file,
+// so importing back from it here would create a circular dependency).
+export function productIdentityOf(row) {
+  return `${row.product_code ?? row.customer_product_code ?? ''}|${row.product_name ?? row.product_id ?? ''}`;
+}
+
+// Annotates each row with whether to show the product cell (only on the
+// first row of a run of adjacent same-product rows, so a product spanning
+// several lots shows its name/code once) and whether it's the last row of
+// its lot (so a divider can mark where one lot's rows end and the next
+// begins). Purely derived from row ADJACENCY, so it only visibly groups
+// anything when rows arrive pre-sorted by product-then-lot (sortMode
+// 'productLot' upstream) — in plain chronological order, adjacent rows
+// essentially never share a product+lot, so this is a no-op.
+export function annotateGroupedRows(rows) {
+  return rows.map((row, i) => {
+    const prev = rows[i - 1];
+    const next = rows[i + 1];
+    const sameProductAsPrev = prev && productIdentityOf(prev) === productIdentityOf(row);
+    const sameLotAsNext = next
+      && productIdentityOf(next) === productIdentityOf(row)
+      && (next.lot_no ?? '') === (row.lot_no ?? '');
+    return { ...row, _showProductCell: !sameProductAsPrev, _isLastOfLotGroup: !sameLotAsNext };
+  });
+}
+
 const summaryColumns = [
   {
     key: 'created_at',
     header: 'วันที่',
+    width: '7%',
     render: (row) => (
       <span className="table-meta-text">
         {formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false })}
@@ -41,24 +71,29 @@ const summaryColumns = [
   {
     key: 'movement_type',
     header: 'ประเภท',
+    width: '9%',
     render: (row) => <StatusBadge value={row.movement_type} />,
   },
   {
     key: 'tracking_code',
     header: 'รหัสติดตาม',
+    width: '9%',
     render: (row) => <span className="table-meta-text">{row.tracking_code || '-'}</span>,
     title: (row) => row.tracking_code,
   },
   {
     key: 'product_id',
     header: 'สินค้า',
+    width: '22%',
+    cellClassName: 'compact-table-cell--wide',
     render: (row) => {
+      if (row._showProductCell === false) return null;
       const code = row.product_code ?? row.customer_product_code ?? '';
       const name = row.product_name ?? row.source_document_no ?? row.product_id ?? '';
       const display = code ? `${code} - ${name}` : name;
       return (
-        <span className="compact-cell-text" title={display}>
-          {formatCompactText(display, 64)}
+        <span className="compact-cell-text compact-cell-text--wide" title={display}>
+          {formatCompactText(display, 96)}
         </span>
       );
     },
@@ -71,11 +106,13 @@ const summaryColumns = [
   {
     key: 'lot_no',
     header: 'lot',
+    width: '6%',
     render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
   },
   {
     key: 'mfg_date',
     header: 'วันผลิต',
+    width: '7%',
     render: (row) => (
       <span className="table-meta-text">
         {row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-'}
@@ -85,15 +122,17 @@ const summaryColumns = [
   {
     key: 'inbound_qty',
     header: 'รับเข้า(กล่อง)',
+    width: '7%',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
-      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>+{qty}</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>{qty}</span>;
     },
   },
   {
     key: 'inbound_weight',
     header: 'รับเข้า(น้ำหนัก)',
+    width: '8%',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>{fmtWt(row.weight)}</span>;
@@ -102,15 +141,17 @@ const summaryColumns = [
   {
     key: 'outbound_qty',
     header: 'จ่ายออก(กล่อง)',
+    width: '7%',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
-      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>-{qty}</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{qty}</span>;
     },
   },
   {
     key: 'outbound_weight',
     header: 'จ่ายออก(น้ำหนัก)',
+    width: '8%',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{fmtWt(row.weight)}</span>;
@@ -119,6 +160,7 @@ const summaryColumns = [
   {
     key: 'balance_qty',
     header: 'คงเหลือ(กล่อง)',
+    width: '6%',
     render: (row) => (
       <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
         {row.balanceQty ?? '-'}
@@ -128,6 +170,7 @@ const summaryColumns = [
   {
     key: 'balance_weight',
     header: 'คงเหลือ(น้ำหนัก)',
+    width: '8%',
     render: (row) => (
       <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
         {row.balanceWeight !== undefined ? fmtWt(row.balanceWeight) : '-'}
@@ -172,10 +215,11 @@ function renderMovementDetail(row) {
   );
 }
 
-export function MovementLedgerTable({ data = [], loading = false, error = null }) {
+export function MovementLedgerTable({ data = [], loading = false, error = null, grouped = false }) {
+  const rows = grouped ? annotateGroupedRows(data) : data;
   return (
     <CompactExpandableTable
-      rows={data}
+      rows={rows}
       rowKey={(row) => row.id ?? `${row.movement_type}-${row.created_at}-${row.reference_id}`}
       summaryColumns={summaryColumns}
       renderDetail={renderMovementDetail}
@@ -183,6 +227,7 @@ export function MovementLedgerTable({ data = [], loading = false, error = null }
       error={error}
       emptyMessage="ไม่พบข้อมูลรายการเคลื่อนไหว"
       tableTestId="movement-ledger-table"
+      getRowClassName={grouped ? (row) => (row._isLastOfLotGroup ? 'movement-ledger-lot-divider' : undefined) : undefined}
     />
   );
 }

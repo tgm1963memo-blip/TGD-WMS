@@ -424,6 +424,7 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .operations-table-card-body { overflow-x: auto; padding: 20px; }
 .compact-expandable-table .compact-table-row { height: 34px; }
 .compact-table-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.compact-table-cell--wide { max-width: none; overflow: visible; white-space: normal; word-break: break-word; }
 .compact-table-actions-header { width: 72px; }
 .compact-table-actions { width: 72px; text-align: right; }
 .compact-table-detail-btn { background: transparent; border: 1px solid var(--tgd-border); border-radius: 4px; color: var(--tgd-main-text); cursor: pointer; font-size: 11px; font-weight: 600; padding: 2px 8px; }
@@ -434,7 +435,12 @@ input::placeholder, textarea::placeholder { color: #a1a1aa; font-weight: 400; }
 .compact-detail-label { color: var(--tgd-muted-text); font-size: 10px; font-weight: 600; text-transform: uppercase; }
 .compact-detail-value { color: var(--tgd-main-text); font-size: 12px; overflow-wrap: anywhere; }
 .compact-cell-text { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
+.compact-cell-text--wide { max-width: none; white-space: normal; word-break: break-word; }
 .compact-cell-qty { font-size: 12px; font-weight: 700; white-space: nowrap; }
+/* Marks the last row of a LOT sub-group when the movement ledger is grouped
+   by product-then-lot, so one lot's rows visually end before the next
+   lot's (or product's) rows begin — see MovementLedgerTable.jsx. */
+.movement-ledger-lot-divider td { border-bottom: 2px solid var(--tgd-border, #d1d5db); }
 .app-shell--golive .main-content { padding-top: 28px; }
 .app-shell--golive .sprint-status,
 .page-shell--golive .sprint-status,
@@ -650,6 +656,10 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
 .operational-report-table td {
   border: 1px solid var(--tgd-border);
   padding: 6px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
 }
 
 .operational-report-totals {
