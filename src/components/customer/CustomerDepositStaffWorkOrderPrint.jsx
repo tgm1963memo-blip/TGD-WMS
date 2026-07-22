@@ -38,7 +38,7 @@ const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingB
 // overflowing into the next column — the exact same bug class already
 // fixed on the lines table below, just missed here originally since this
 // meta table's fields are usually short (dates, phone numbers).
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 4, lineHeight: 1.6, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 11, paddingBottom: 4, lineHeight: 1.6, whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-all' };
 
 export function CustomerDepositStaffWorkOrderPrint(props) {
   if (!props.header) return null;
@@ -69,6 +69,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
 
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const hasLocation = lines.some((l) => l.location?.location_code);
+  const isMerged = Array.isArray(header.source_request_nos) && header.source_request_nos.length > 1;
 
   return (
     <article
@@ -112,7 +113,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#333' }}>
+                <div style={{ fontSize: 11, color: '#333', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: '60mm' }}>
                   {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.request_no}</strong>
                   {header.expected_arrival_date && (
                     <span style={{ marginLeft: 10 }}>
@@ -121,7 +122,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
                   )}
                 </div>
               </div>
-              {header.request_no && (
+              {!isMerged && header.request_no && (
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
                   <QRCode value={header.request_no} size={54} style={{ width: 54, height: 54 }} />
                   <div style={{ fontSize: 8, color: '#666', marginTop: 1 }}>สแกนเปิดใบงาน</div>
@@ -184,24 +185,35 @@ function CustomerDepositStaffWorkOrderPrintPage({
         </tbody>
       </table>
 
+      {isMerged && (
+        <div style={{ marginBottom: 10, padding: '5px 10px', background: '#eef2ff', border: '1px solid #6366f1', borderRadius: 4, fontSize: 11 }}>
+          <strong>รวมจากเอกสาร {header.source_request_nos.length} ใบ:</strong> {header.source_request_nos.join(', ')}
+          {header._merge?.headerConflicts?.length ? (
+            <div style={{ marginTop: 4, color: '#b45309' }}>
+              ⚠ พบข้อมูลไม่ตรงกันระหว่างเอกสารที่รวมในบางฟิลด์: {header._merge.headerConflicts.map((c) => c.field).join(', ')}
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* ── Lines table ── */}
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
         <colgroup>
           <col style={{ width: '3%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: hasActual ? '15%' : '14%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '7%' }} />
-          {hasLocation && <col style={{ width: '7%' }} />}
+          <col style={{ width: hasLocation ? '9%' : '10%' }} />
+          <col style={{ width: hasLocation ? '8%' : (hasActual ? '9%' : '8%') }} />
+          <col style={{ width: hasLocation ? '19%' : '21%' }} />
+          <col style={{ width: hasLocation ? '9%' : '10%' }} />
           <col style={{ width: '6%' }} />
-          <col style={{ width: '7%' }} />
+          {hasLocation && <col style={{ width: '6%' }} />}
+          <col style={{ width: hasActual ? '5%' : '6%' }} />
+          <col style={{ width: hasActual ? '6%' : '7%' }} />
+          {hasActual && <col style={{ width: '5%' }} />}
           {hasActual && <col style={{ width: '6%' }} />}
-          {hasActual && <col style={{ width: '7%' }} />}
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '6%' }} />
-          <col style={{ width: hasActual ? '0%' : '14%' }} />
+          <col style={{ width: hasActual ? (hasLocation ? '6.5%' : '6%') : '6.5%' }} />
+          <col style={{ width: hasActual ? (hasLocation ? '6.5%' : '6%') : '6.5%' }} />
+          <col style={{ width: '5%' }} />
+          {!hasActual && <col style={{ width: hasLocation ? '15%' : '11%' }} />}
         </colgroup>
         <thead>
           {/* Slim identifier row — repeats on every printed page (thead
@@ -240,29 +252,39 @@ function CustomerDepositStaffWorkOrderPrintPage({
               (line.actual_boxes != null && line.actual_boxes !== line.expected_boxes) ||
               (line.actual_weight != null && String(line.actual_weight) !== String(line.expected_weight))
             );
-            // Extra vertical padding + a taller line-height give wrapped Thai
-            // text room to breathe: tone marks/vowels sit above and below the
-            // base consonant, so a cramped line-height makes consecutive
-            // wrapped lines visually collide — reading as overlapping text
-            // even though each line is in its own cell, not actually sharing
-            // space with a neighboring column or row.
-            const TD = { border: '1px solid #ccc', padding: '7px 6px', fontSize: 10, lineHeight: 1.6, verticalAlign: 'top' };
-            // Reference numbers (LOT, tracking code, product code) and product
-            // names must stay fully readable — wrap onto a second line rather
-            // than clip with an ellipsis. Thai text commonly has no spaces
-            // between words, so without overflow-wrap/word-break a long
-            // product name has no break point at all: it doesn't wrap, it
-            // just overflows the fixed-width cell horizontally and paints
-            // over whatever is in the next column, reading as garbled
-            // overlapping text on the printed page.
-            const TD_WRAP = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' };
+            const TD = {
+              border: '1px solid #ccc',
+              padding: '6px 5px',
+              fontSize: 10,
+              lineHeight: 1.5,
+              verticalAlign: 'top',
+              overflow: 'hidden',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+            };
+            const TD_WRAP = {
+              ...TD,
+              overflow: 'hidden',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+            };
             return (
               <tr key={line.id ?? line.line_no} style={isModified ? { background: '#fff9e6' } : {}}>
                 <td style={{ ...TD_WRAP, textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ ...TD_WRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>{fmtWrap(line.tracking_code)}</td>
-                <td style={TD_WRAP} title={fmt(line.lot_no)}>{fmtWrap(line.lot_no)}</td>
-                <td style={TD_WRAP}>{fmtWrap(line.product_name, 10)}</td>
-                <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>{fmtWrap(line.customer_product_code ?? line.internal_product_code)}</td>
+                <td style={{ ...TD_WRAP, fontWeight: 700 }} title={fmt(line.tracking_code)}>
+                  <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.tracking_code)}</div>
+                </td>
+                <td style={TD_WRAP} title={fmt(line.lot_no)}>
+                  <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.lot_no)}</div>
+                </td>
+                <td style={TD_WRAP}>
+                  <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.product_name)}</div>
+                </td>
+                <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>
+                  <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.customer_product_code ?? line.internal_product_code)}</div>
+                </td>
                 <td style={TD_WRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
                 {hasLocation && <td style={{ ...TD_WRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
                 <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
@@ -280,7 +302,13 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 <td style={TD_WRAP}>{fmtDate(line.mfg_date)}</td>
                 <td style={TD_WRAP}>{fmtDate(line.exp_date)}</td>
                 <td style={{ ...TD_WRAP, textAlign: 'center' }}>{fmt(line.argent_type)}</td>
-                {!hasActual && <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{fmt(line.actual_note ?? line.note)}</td>}
+                {!hasActual && (
+                  <td style={TD_WRAP}>
+                    <div style={{ width: '100%', minWidth: 0, overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                      {fmtWrap(line.actual_note ?? line.note)}
+                    </div>
+                  </td>
+                )}
               </tr>
             );
           })}
