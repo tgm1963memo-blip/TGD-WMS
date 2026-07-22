@@ -10,6 +10,7 @@ import {
   getStorageOpeningBalanceRows,
 } from './movementLedgerReportService.js';
 import {
+  ACTIVE_INVOICE_DRAFT_STATUSES,
   APPROVABLE_INVOICE_DRAFT_STATUSES,
   CANCELLABLE_INVOICE_DRAFT_STATUSES,
   INVOICE_DRAFT_LINE_TABLE,
@@ -273,6 +274,41 @@ export async function findActiveDuplicateDraftLines(movementIds = []) {
     data: findDuplicateDraftLines(normalizedIds, result.data ?? []),
     error: null,
   };
+}
+
+// Storage/service-period drafts have no per-movement source id to check
+// against (unlike findActiveDuplicateDraftLines, used for movement-based
+// drafts) — a period draft is scoped to a customer + date range instead, so
+// the duplicate check here is a date-range overlap against that customer's
+// other still-active drafts. Without this, nothing stops staff from billing
+// e.g. 1-15 and then again 10-20 for the same customer, double-charging the
+// overlapping days silently.
+export async function findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd, excludeDraftId = null }) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
+    return { data: [], error: null };
+  }
+
+  // A null billing_period_start/end (movement-based drafts, where the period
+  // is optional) never satisfies these comparisons in Postgres, so those
+  // rows are excluded from the overlap check without needing an explicit
+  // "is not null" filter.
+  let query = supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .select('id, draft_no, billing_period_start, billing_period_end, status')
+    .eq('customer_id', customerId)
+    .in('status', ACTIVE_INVOICE_DRAFT_STATUSES)
+    .lte('billing_period_start', billingPeriodEnd)
+    .gte('billing_period_end', billingPeriodStart);
+
+  if (excludeDraftId) query = query.neq('id', excludeDraftId);
+
+  const result = await query;
+  if (result.error) {
+    return { data: null, error: normalizeServiceError(result.error) };
+  }
+
+  return { data: result.data ?? [], error: null };
 }
 
 export async function listBillingInvoiceDrafts(filters = {}) {
@@ -575,6 +611,19 @@ export async function createBillingInvoiceDraftForPeriod({
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
     return { data: null, error: validationError('customerId, billingPeriodStart, and billingPeriodEnd are required.') };
+  }
+
+  const overlapResult = await findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd });
+  if (overlapResult.error) return { data: null, error: overlapResult.error };
+
+  if ((overlapResult.data ?? []).length > 0) {
+    const draftNos = overlapResult.data.map((d) => d.draft_no).filter(Boolean).join(', ');
+    return {
+      data: null,
+      error: validationError(`This customer already has an active invoice draft covering an overlapping billing period (${draftNos}).`, {
+        overlapping: overlapResult.data,
+      }),
+    };
   }
 
   const preview = await previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd });

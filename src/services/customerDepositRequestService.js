@@ -134,18 +134,32 @@ export async function getDepositInventoryLines(filters = {}) {
 
   const RECEIVED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'];
 
-  let hdrQuery = supabase
-    .from('tgd_customer_deposit_requests')
-    .select('id, request_no, customer_id, status, expected_arrival_date, reviewed_at, last_action_at')
-    .in('status', RECEIVED_STATUSES)
-    .order('last_action_at', { ascending: false })
-    .limit(500);
+  // Paginate by `id` (an immutable, unique key) instead of a single
+  // .limit(500) ordered by last_action_at. last_action_at is mutable — any
+  // admin action on ANY of the customer's other deposit requests bumps it —
+  // so a fixed "top 500 by last_action_at" window shifted between calls for
+  // customers with 500+ confirmed requests, silently dropping whole deposit
+  // headers (and their lines) from the balance computation with no error and
+  // no relation to actual stock changing. Looping until exhausted removes the
+  // cap entirely rather than picking a bigger arbitrary number.
+  const PAGE_SIZE = 1000;
+  const headers = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let hdrQuery = supabase
+      .from('tgd_customer_deposit_requests')
+      .select('id, request_no, customer_id, status, expected_arrival_date, reviewed_at, last_action_at')
+      .in('status', RECEIVED_STATUSES)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (filters.customerId) hdrQuery = hdrQuery.eq('customer_id', filters.customerId);
+    if (filters.customerId) hdrQuery = hdrQuery.eq('customer_id', filters.customerId);
 
-  const { data: headers, error: hErr } = await hdrQuery;
-  if (hErr) return { data: null, error: hErr };
-  if (!headers?.length) return { data: [], error: null };
+    const { data: page, error: hErr } = await hdrQuery;
+    if (hErr) return { data: null, error: hErr };
+    headers.push(...(page ?? []));
+    if (!page || page.length < PAGE_SIZE) break;
+  }
+  if (!headers.length) return { data: [], error: null };
 
   const ids = headers.map((h) => h.id);
 

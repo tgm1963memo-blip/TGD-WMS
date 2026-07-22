@@ -40,9 +40,11 @@ const utilsPath = path.join(process.cwd(), 'src/utils/billingInvoiceDraftUtils.j
 const {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
+  createBillingInvoiceDraftForPeriod,
   createBillingInvoiceDraftFromMovements,
   deleteBillingInvoiceDraft,
   findActiveDuplicateDraftLines,
+  findOverlappingBillingPeriodDrafts,
   getBillingInvoiceDraftById,
   getBillingInvoiceDraftBplusExportReadiness,
   listBillingInvoiceDrafts,
@@ -606,6 +608,87 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     const result = await findActiveDuplicateDraftLines(['mv-1']);
     expect(result.data).toHaveLength(1);
     expect(result.data[0].source_movement_id).toBe('mv-1');
+  });
+
+  it('findOverlappingBillingPeriodDrafts detects an active draft covering an overlapping date range', async () => {
+    fromMock.mockImplementation((table) => {
+      expect(table).toBe('tgd_billing_invoice_drafts');
+      const chain = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        gte: vi.fn(() => Promise.resolve({
+          data: [{ id: 'draft-9', draft_no: 'BID-20260601-0001', billing_period_start: '2026-06-10', billing_period_end: '2026-06-25', status: 'DRAFT' }],
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await findOverlappingBillingPeriodDrafts({
+      customerId: 'cust-1',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-15',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].draft_no).toBe('BID-20260601-0001');
+  });
+
+  it('findOverlappingBillingPeriodDrafts returns empty when no active draft overlaps', async () => {
+    fromMock.mockImplementation(() => {
+      const chain = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        gte: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      };
+      return chain;
+    });
+
+    const result = await findOverlappingBillingPeriodDrafts({
+      customerId: 'cust-1',
+      billingPeriodStart: '2026-07-01',
+      billingPeriodEnd: '2026-07-15',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(0);
+  });
+
+  it('createBillingInvoiceDraftForPeriod rejects when the customer already has an overlapping active draft', async () => {
+    fromMock.mockImplementation((table) => {
+      expect(table).toBe('tgd_billing_invoice_drafts');
+      const chain = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        neq: vi.fn(() => chain),
+        lte: vi.fn(() => chain),
+        gte: vi.fn(() => Promise.resolve({
+          data: [{ id: 'draft-9', draft_no: 'BID-20260601-0001', billing_period_start: '2026-06-10', billing_period_end: '2026-06-25', status: 'DRAFT' }],
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await createBillingInvoiceDraftForPeriod({
+      customerId: 'cust-1',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-15',
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error.message).toMatch(/overlapping billing period/i);
+    expect(result.error.message).toContain('BID-20260601-0001');
+    // Must short-circuit before touching preview/customer/draft-number lookups.
+    expect(fromMock).toHaveBeenCalledTimes(1);
   });
 
   it('documents approved active statuses for future gates', () => {
