@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { computeStorageInvoiceLines, computeAuxiliaryServiceLines, resolveServiceRate } from '../../src/utils/billingRateCalc.js';
+import {
+  computeStorageInvoiceLines, computeAuxiliaryServiceLines, resolveServiceRate, generateLotBillingCycles,
+} from '../../src/utils/billingRateCalc.js';
 
 const STORAGE_RATE_30D = {
   id: 'rate-1', service_type: 'STORAGE', unit_basis: 'PER_KG',
@@ -94,6 +96,68 @@ describe('computeAuxiliaryServiceLines', () => {
     });
     expect(line.quantity).toBe(5);
     expect(line.amount).toBe(16.67);
+  });
+});
+
+describe('generateLotBillingCycles', () => {
+  it('generates consecutive full periodDays cycles anchored to the lot\'s own receipt date', () => {
+    // First-ever run: seed the day before receipt so cycle 1 starts fresh.
+    const cycles = generateLotBillingCycles({
+      receiptDate: '2026-01-30',
+      periodDays: 15,
+      billedThroughDate: '2026-01-29',
+      billThroughDate: '2026-03-15', // receiptDate + 44 days = exactly 3 full cycles
+    });
+    expect(cycles).toEqual([
+      { start: '2026-01-30', end: '2026-02-13' },
+      { start: '2026-02-14', end: '2026-02-28' },
+      { start: '2026-03-01', end: '2026-03-15' },
+    ]);
+  });
+
+  it('clips the trailing cycle to billThroughDate when it falls mid-cycle', () => {
+    const cycles = generateLotBillingCycles({
+      receiptDate: '2026-01-30',
+      periodDays: 15,
+      billedThroughDate: '2026-01-29',
+      billThroughDate: '2026-02-19', // 6 days into the 2nd cycle
+    });
+    expect(cycles).toEqual([
+      { start: '2026-01-30', end: '2026-02-13' },
+      { start: '2026-02-14', end: '2026-02-19' },
+    ]);
+  });
+
+  it('resumes aligned to the original grid after a prior partial (mid-cycle) cutoff', () => {
+    // Picks up right where the previous test's partial cycle left off, and
+    // finishes that same grid cell rather than starting a new misaligned one.
+    const cycles = generateLotBillingCycles({
+      receiptDate: '2026-01-30',
+      periodDays: 15,
+      billedThroughDate: '2026-02-19',
+      billThroughDate: '2026-02-28',
+    });
+    expect(cycles).toEqual([{ start: '2026-02-20', end: '2026-02-28' }]);
+  });
+
+  it('returns nothing when already billed through the requested cutoff', () => {
+    const cycles = generateLotBillingCycles({
+      receiptDate: '2026-01-30',
+      periodDays: 15,
+      billedThroughDate: '2026-02-28',
+      billThroughDate: '2026-02-28',
+    });
+    expect(cycles).toEqual([]);
+  });
+
+  it('returns nothing when no billedThroughDate is provided (caller must require a seed first)', () => {
+    const cycles = generateLotBillingCycles({
+      receiptDate: '2026-01-30',
+      periodDays: 15,
+      billedThroughDate: null,
+      billThroughDate: '2026-03-15',
+    });
+    expect(cycles).toEqual([]);
   });
 });
 

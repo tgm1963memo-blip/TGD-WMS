@@ -115,6 +115,9 @@ export function shapeBillingInvoiceDraftLine(row = {}) {
     service_rate_id: row.service_rate_id ?? null,
     period_days: row.period_days == null ? null : toNumber(row.period_days),
     storage_days: row.storage_days == null ? null : toNumber(row.storage_days),
+    deposit_line_id: row.deposit_line_id ?? null,
+    billing_period_start: row.billing_period_start ?? null,
+    billing_period_end: row.billing_period_end ?? null,
     line_note: row.line_note ?? null,
     duplicate_guard_active: row.duplicate_guard_active !== false,
     created_at: row.created_at ?? null,
@@ -184,6 +187,9 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
     service_rate_id: rate.id ?? null,
     period_days: rate.period_days ?? null,
     storage_days: storageLine.days ?? null,
+    deposit_line_id: storageLine.depositLineId ?? null,
+    billing_period_start: storageLine.periodStart ?? null,
+    billing_period_end: storageLine.periodEnd ?? null,
     // storageLine.weight is the weight-day-averaged on-hand weight over the
     // period, not a single constant — it can differ from the deposit
     // line's original received weight if a partial withdrawal happened

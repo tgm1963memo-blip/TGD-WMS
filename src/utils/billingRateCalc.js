@@ -31,6 +31,18 @@ function maxDateStr(a, b) {
   return a > b ? a : b;
 }
 
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
 // Picks the best-matching configured rate for a product/customer + service
 // type. Precedence: an exact product-specific rate first, then a
 // customer-wide "all items" rate scoped to the same temperature_type, then
@@ -147,6 +159,49 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
   }
 
   return results;
+}
+
+// Splits the time since a lot's last billed date into consecutive N-day
+// cycles anchored to the lot's OWN receipt date (not a calendar month
+// boundary) — a lot received on the 30th bills in 30-day-aligned windows
+// (e.g. day 30 through day 13 next month for a 15-day rate), matching how
+// `computeStorageInvoiceLines` already treats period_days as a rolling day
+// count, not a calendar half-month split.
+//
+// billedThroughDate is the last date already charged for this lot (from a
+// prior auto-billing run's persisted line, or a one-time staff-entered
+// seed — see tgd_lot_billing_cutoff_overrides). Cycles resume the day
+// after it. A lot with NO billedThroughDate at all (never billed under
+// auto mode, no seed set) must not be passed here — the caller has to
+// treat that as "needs setup" and require a seed first, since silently
+// starting from the lot's receipt date risks double-billing a lot that
+// was already charged under the old manual date-range flow.
+//
+// The final cycle is clipped to billThroughDate even if that's short of a
+// full period_days window (a still-in-progress cycle gets billed for the
+// elapsed days so far, consistent with how a manual period's trailing
+// partial window already prorates via weightDays) — the next run will
+// pick up from there once billedThroughDate reflects that partial charge.
+export function generateLotBillingCycles({ receiptDate, periodDays, billedThroughDate, billThroughDate }) {
+  const anchor = toDateOnly(receiptDate);
+  const through = toDateOnly(billThroughDate);
+  const seeded = toDateOnly(billedThroughDate);
+  const periodDaysInt = Math.max(1, Math.round(toNumber(periodDays, 0)));
+  if (!anchor || !through || !seeded) return [];
+
+  let cursor = addDays(seeded, 1);
+  if (cursor < anchor) cursor = anchor;
+  if (cursor > through) return [];
+
+  const cycles = [];
+  while (cursor <= through) {
+    const cycleIndex = Math.floor(daysBetween(anchor, cursor) / periodDaysInt);
+    const gridEnd = addDays(anchor, (cycleIndex + 1) * periodDaysInt - 1);
+    const end = gridEnd < through ? gridEnd : through;
+    cycles.push({ start: cursor, end });
+    cursor = addDays(end, 1);
+  }
+  return cycles;
 }
 
 // Turns a customer's selected per-request auxiliary services (container

@@ -28,7 +28,7 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
-import { getBillingPeriodPreview, buildCatalogMaps } from './billingRateEngineService.js';
+import { getBillingPeriodPreview, getAutoLotBillingPreview, buildCatalogMaps } from './billingRateEngineService.js';
 import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveServiceRate } from '../utils/billingRateCalc.js';
@@ -677,6 +677,188 @@ export async function createBillingInvoiceDraftForPeriod({
     data: {
       draft: shapeBillingInvoiceDraftHeader(headerInsert.data),
       lines: (linesInsert.data ?? []).map(shapeBillingInvoiceDraftLine),
+    },
+    error: null,
+  };
+}
+
+// One-time per-lot seed for auto per-lot billing (see
+// getAutoLotBillingPreview) — records "storage was already charged through
+// this date" for a lot that predates the auto flow, so the first auto run
+// for that lot resumes from here instead of either refusing to bill it or
+// silently starting over from its receipt date (double-billing risk).
+export async function saveLotBillingCutoffSeed({ depositLineId, billedThroughDate, note = null, setBy = null }) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!depositLineId || !billedThroughDate) {
+    return { data: null, error: validationError('depositLineId and billedThroughDate are required.') };
+  }
+
+  const result = await supabase
+    .from('tgd_lot_billing_cutoff_overrides')
+    .upsert({
+      deposit_line_id: depositLineId,
+      billed_through_date: billedThroughDate,
+      note,
+      set_by_user_id: setBy,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'deposit_line_id' })
+    .select('*')
+    .single();
+
+  if (result.error) {
+    return { data: null, error: normalizeServiceError(result.error) };
+  }
+  return { data: result.data, error: null };
+}
+
+// Auto per-lot billing's duplicate guard: unlike findOverlappingBillingPeriodDrafts
+// (customer + header-date-range scoped, for the manual flow), auto mode can
+// legitimately produce several concurrently-active drafts for one customer
+// covering DIFFERENT lots with staggered cycle windows — so the guard here
+// is scoped per lot instead: does this specific deposit_line_id already have
+// a non-cancelled draft line whose billing_period_start/end overlaps one of
+// the newly generated cycle windows for that same lot?
+export async function findOverlappingLotBillingLines(lotCycles = []) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!lotCycles.length) return { data: [], error: null };
+
+  const depositLineIds = [...new Set(lotCycles.map((c) => c.depositLineId).filter(Boolean))];
+  if (!depositLineIds.length) return { data: [], error: null };
+
+  const result = await supabase
+    .from(INVOICE_DRAFT_LINE_TABLE)
+    .select('deposit_line_id, billing_period_start, billing_period_end, tgd_billing_invoice_drafts!inner(draft_no, status)')
+    .in('deposit_line_id', depositLineIds)
+    .not('billing_period_start', 'is', null)
+    .not('billing_period_end', 'is', null)
+    .neq('tgd_billing_invoice_drafts.status', INVOICE_DRAFT_STATUS.CANCELLED);
+
+  if (result.error) {
+    return { data: null, error: normalizeServiceError(result.error) };
+  }
+
+  const existingByLot = new Map();
+  for (const row of (result.data ?? [])) {
+    const bucket = existingByLot.get(row.deposit_line_id) ?? [];
+    bucket.push(row);
+    existingByLot.set(row.deposit_line_id, bucket);
+  }
+
+  const conflicts = [];
+  for (const cycle of lotCycles) {
+    const existingForLot = existingByLot.get(cycle.depositLineId) ?? [];
+    for (const existing of existingForLot) {
+      const overlaps = existing.billing_period_start <= cycle.end && existing.billing_period_end >= cycle.start;
+      if (overlaps) {
+        conflicts.push({ ...cycle, conflictingDraftNo: existing.tgd_billing_invoice_drafts?.draft_no ?? null });
+      }
+    }
+  }
+
+  return { data: conflicts, error: null };
+}
+
+// Creates a storage invoice draft using auto per-lot cycle billing (see
+// getAutoLotBillingPreview) instead of one staff-typed date range applied
+// to every lot. Lots still needing a one-time cutoff seed are skipped (not
+// billed) and reported back so the UI can prompt for them; this never
+// silently bills a lot that hasn't been explicitly set up.
+export async function createAutoLotBillingDraft({
+  customerId,
+  billThroughDate,
+  note = null,
+  internalReference = null,
+  createdBy = null,
+} = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId || !billThroughDate) {
+    return { data: null, error: validationError('customerId and billThroughDate are required.') };
+  }
+
+  const preview = await getAutoLotBillingPreview({ customerId, billThroughDate });
+  if (preview.error) return { data: null, error: preview.error };
+
+  const { lots, depositLines } = preview.data;
+  const billableLots = lots.filter((lot) => !lot.needsSetup && lot.cycles.length > 0);
+  const lotsNeedingSetup = lots.filter((lot) => lot.needsSetup);
+
+  if (billableLots.length === 0) {
+    return {
+      data: null,
+      error: validationError('No new storage cycles to bill for this customer/cutoff date.', { lotsNeedingSetup }),
+    };
+  }
+
+  const lotCycles = billableLots.flatMap((lot) => lot.cycles.map((c) => ({
+    depositLineId: lot.depositLineId, start: c.periodStart, end: c.periodEnd,
+  })));
+
+  const overlapResult = await findOverlappingLotBillingLines(lotCycles);
+  if (overlapResult.error) return { data: null, error: overlapResult.error };
+
+  if ((overlapResult.data ?? []).length > 0) {
+    return {
+      data: null,
+      error: validationError('One or more lots already have an active draft covering an overlapping cycle window.', {
+        conflicts: overlapResult.data,
+      }),
+    };
+  }
+
+  const depositLineById = new Map(depositLines.map((dl) => [dl.id, dl]));
+  const lines = billableLots.flatMap((lot) => lot.cycles.map(
+    (c) => buildInvoiceDraftLineFromStorageLine(c, depositLineById.get(lot.depositLineId) ?? {}),
+  ));
+
+  const totals = calculateInvoiceDraftTotals(lines);
+  const periodStarts = lines.map((l) => l.billing_period_start).filter(Boolean).sort();
+  const periodEnds = lines.map((l) => l.billing_period_end).filter(Boolean).sort();
+
+  const customersResult = await getCustomers();
+  const customerName = (customersResult.data ?? []).find((c) => c.id === customerId)?.customer_name ?? null;
+
+  const draftNo = await resolveDraftNo();
+  const header = {
+    draft_no: draftNo,
+    customer_id: customerId,
+    customer_name: customerName,
+    billing_period_start: periodStarts[0] ?? billThroughDate,
+    billing_period_end: periodEnds[periodEnds.length - 1] ?? billThroughDate,
+    status: INVOICE_DRAFT_STATUS.DRAFT,
+    ...totals,
+    currency: 'THB',
+    note,
+    internal_reference: internalReference,
+    created_by: createdBy,
+  };
+
+  const headerInsert = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .insert(header)
+    .select('*')
+    .single();
+
+  if (headerInsert.error) {
+    return { data: null, error: normalizeServiceError(headerInsert.error) };
+  }
+
+  const draftId = headerInsert.data.id;
+  const lineRows = lines.map((line) => ({ ...line, invoice_draft_id: draftId }));
+
+  const linesInsert = await supabase
+    .from(INVOICE_DRAFT_LINE_TABLE)
+    .insert(lineRows)
+    .select('*');
+
+  if (linesInsert.error) {
+    return { data: null, error: normalizeServiceError(linesInsert.error) };
+  }
+
+  return {
+    data: {
+      draft: shapeBillingInvoiceDraftHeader(headerInsert.data),
+      lines: (linesInsert.data ?? []).map(shapeBillingInvoiceDraftLine),
+      lotsNeedingSetup,
     },
     error: null,
   };

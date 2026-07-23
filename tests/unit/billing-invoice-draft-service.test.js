@@ -15,10 +15,13 @@ import {
   validateInvoiceDraftSourceRows,
 } from '../../src/utils/billingInvoiceDraftUtils.js';
 
-const { fromMock, rpcMock, getBillingMovementWeightRowsMock } = vi.hoisted(() => ({
+const {
+  fromMock, rpcMock, getBillingMovementWeightRowsMock, getAutoLotBillingPreviewMock,
+} = vi.hoisted(() => ({
   fromMock: vi.fn(),
   rpcMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
+  getAutoLotBillingPreviewMock: vi.fn(),
 }));
 
 vi.mock('../../src/services/supabaseClient.js', () => ({
@@ -33,6 +36,11 @@ vi.mock('../../src/services/billingMovementWeightService.js', () => ({
   shapeBillingMovementWeightRow: (row) => row,
 }));
 
+vi.mock('../../src/services/billingRateEngineService.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, getAutoLotBillingPreview: getAutoLotBillingPreviewMock };
+});
+
 const servicePath = path.join(process.cwd(), 'src/services/billingInvoiceDraftService.js');
 const migrationPath = path.join(process.cwd(), 'database/migrations/037_tgd_wms_billing_invoice_draft_foundation.sql');
 const utilsPath = path.join(process.cwd(), 'src/utils/billingInvoiceDraftUtils.js');
@@ -40,14 +48,17 @@ const utilsPath = path.join(process.cwd(), 'src/utils/billingInvoiceDraftUtils.j
 const {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
+  createAutoLotBillingDraft,
   createBillingInvoiceDraftForPeriod,
   createBillingInvoiceDraftFromMovements,
   deleteBillingInvoiceDraft,
   findActiveDuplicateDraftLines,
   findOverlappingBillingPeriodDrafts,
+  findOverlappingLotBillingLines,
   getBillingInvoiceDraftById,
   getBillingInvoiceDraftBplusExportReadiness,
   listBillingInvoiceDrafts,
+  saveLotBillingCutoffSeed,
 } = await import('../../src/services/billingInvoiceDraftService.js');
 
 const validMovement = {
@@ -162,6 +173,7 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     fromMock.mockReset();
     rpcMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
+    getAutoLotBillingPreviewMock.mockReset();
     rpcMock.mockResolvedValue({ data: 'BID-20260608-0001', error: null });
     getBillingMovementWeightRowsMock.mockResolvedValue({
       data: [validMovement, validMovementTwo],
@@ -689,6 +701,159 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(result.error.message).toContain('BID-20260601-0001');
     // Must short-circuit before touching preview/customer/draft-number lookups.
     expect(fromMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('saveLotBillingCutoffSeed upserts on deposit_line_id', async () => {
+    fromMock.mockImplementation((table) => {
+      expect(table).toBe('tgd_lot_billing_cutoff_overrides');
+      const chain = {
+        upsert: vi.fn((payload) => {
+          expect(payload.deposit_line_id).toBe('dl-1');
+          expect(payload.billed_through_date).toBe('2026-06-30');
+          return chain;
+        }),
+        select: vi.fn(() => chain),
+        single: vi.fn(async () => ({
+          data: { id: 'seed-1', deposit_line_id: 'dl-1', billed_through_date: '2026-06-30' },
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await saveLotBillingCutoffSeed({ depositLineId: 'dl-1', billedThroughDate: '2026-06-30' });
+    expect(result.error).toBeNull();
+    expect(result.data.deposit_line_id).toBe('dl-1');
+  });
+
+  it('saveLotBillingCutoffSeed rejects missing arguments without touching supabase', async () => {
+    const result = await saveLotBillingCutoffSeed({ depositLineId: null, billedThroughDate: '2026-06-30' });
+    expect(result.data).toBeNull();
+    expect(result.error.message).toMatch(/required/i);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('findOverlappingLotBillingLines flags a lot with an existing non-cancelled line covering an overlapping window', async () => {
+    fromMock.mockImplementation((table) => {
+      expect(table).toBe('tgd_billing_invoice_draft_lines');
+      const chain = {
+        select: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        not: vi.fn(() => chain),
+        neq: vi.fn(() => Promise.resolve({
+          data: [{
+            deposit_line_id: 'dl-1',
+            billing_period_start: '2026-06-01',
+            billing_period_end: '2026-06-15',
+            tgd_billing_invoice_drafts: { draft_no: 'BID-20260601-0002', status: 'DRAFT' },
+          }],
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await findOverlappingLotBillingLines([
+      { depositLineId: 'dl-1', start: '2026-06-10', end: '2026-06-24' },
+    ]);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].conflictingDraftNo).toBe('BID-20260601-0002');
+  });
+
+  it('findOverlappingLotBillingLines finds nothing when windows do not overlap', async () => {
+    fromMock.mockImplementation(() => {
+      const chain = {
+        select: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        not: vi.fn(() => chain),
+        neq: vi.fn(() => Promise.resolve({
+          data: [{
+            deposit_line_id: 'dl-1',
+            billing_period_start: '2026-06-01',
+            billing_period_end: '2026-06-15',
+            tgd_billing_invoice_drafts: { draft_no: 'BID-20260601-0002', status: 'DRAFT' },
+          }],
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await findOverlappingLotBillingLines([
+      { depositLineId: 'dl-1', start: '2026-06-16', end: '2026-06-30' },
+    ]);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(0);
+  });
+
+  it('findOverlappingLotBillingLines returns empty without querying when given no cycles', async () => {
+    const result = await findOverlappingLotBillingLines([]);
+    expect(result.data).toEqual([]);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('createAutoLotBillingDraft rejects with no billable cycles and reports lots needing setup', async () => {
+    getAutoLotBillingPreviewMock.mockResolvedValue({
+      data: {
+        lots: [{ depositLineId: 'dl-1', lotNo: '150', needsSetup: true, cycles: [] }],
+        depositLines: [],
+      },
+      error: null,
+    });
+
+    const result = await createAutoLotBillingDraft({ customerId: 'cust-1', billThroughDate: '2026-06-30' });
+
+    expect(result.data).toBeNull();
+    expect(result.error.message).toMatch(/no new storage cycles/i);
+    expect(result.error.details.lotsNeedingSetup).toHaveLength(1);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('createAutoLotBillingDraft rejects when a generated cycle overlaps an existing line for that lot', async () => {
+    getAutoLotBillingPreviewMock.mockResolvedValue({
+      data: {
+        lots: [{
+          depositLineId: 'dl-1',
+          lotNo: '150',
+          needsSetup: false,
+          cycles: [{
+            depositLineId: 'dl-1', customerId: 'cust-1', rate: { rate: 5, period_days: 15 },
+            periods: 1, days: 15, weight: 100, weightDays: 1500, amount: 500,
+            periodStart: '2026-06-01', periodEnd: '2026-06-15',
+          }],
+        }],
+        depositLines: [{ id: 'dl-1', customer_product_code: 'P1', lot_no: '150' }],
+      },
+      error: null,
+    });
+
+    fromMock.mockImplementation((table) => {
+      expect(table).toBe('tgd_billing_invoice_draft_lines');
+      const chain = {
+        select: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        not: vi.fn(() => chain),
+        neq: vi.fn(() => Promise.resolve({
+          data: [{
+            deposit_line_id: 'dl-1',
+            billing_period_start: '2026-06-05',
+            billing_period_end: '2026-06-19',
+            tgd_billing_invoice_drafts: { draft_no: 'BID-EXISTING', status: 'DRAFT' },
+          }],
+          error: null,
+        })),
+      };
+      return chain;
+    });
+
+    const result = await createAutoLotBillingDraft({ customerId: 'cust-1', billThroughDate: '2026-06-30' });
+
+    expect(result.data).toBeNull();
+    expect(result.error.message).toMatch(/overlapping cycle window/i);
+    expect(result.error.details.conflicts[0].conflictingDraftNo).toBe('BID-EXISTING');
   });
 
   it('documents approved active statuses for future gates', () => {
