@@ -39,7 +39,7 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
       customer_id,
       tgd_customer_withdrawal_request_lines(
         source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
-        customer_product_code, picked_boxes, picked_weight
+        customer_product_code, picked_boxes, picked_weight, requested_boxes, requested_weight
       )
     `)
     .eq('status', 'COMPLETED');
@@ -75,8 +75,16 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
         lot_no: line.lot_no ?? '',
         source_lot_no: line.source_lot_no ?? null,
         customer_product_code: line.customer_product_code ?? '',
-        picked_boxes: Number(line.picked_boxes ?? 0),
-        picked_weight: Number(line.picked_weight ?? 0),
+        // COMPLETED withdrawal lines can have only requested_* recorded (the
+        // handheld pick step allows a boxes-only or weight-only entry, and
+        // some are completed with neither ever filled in) — the RPC this
+        // must agree with falls back to requested_* for exactly this reason
+        // (supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql).
+        // Summing bare picked_boxes/picked_weight here undercounted what was
+        // actually withdrawn, making this total overstate remaining stock
+        // relative to the stock balance page.
+        picked_boxes: Number(line.picked_boxes ?? line.requested_boxes ?? 0),
+        picked_weight: Number(line.picked_weight ?? line.requested_weight ?? 0),
       });
     }
   }
@@ -153,7 +161,7 @@ export async function getStorageOpeningBalanceRows(customerId, asOfDate) {
       id, customer_id, last_action_at, requested_dispatch_date,
       tgd_customer_withdrawal_request_lines(
         source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
-        customer_product_code, picked_boxes, picked_weight, picked_at
+        customer_product_code, picked_boxes, picked_weight, requested_boxes, requested_weight, picked_at
       )
     `)
     .eq('customer_id', customerId)
@@ -204,8 +212,11 @@ export async function getStorageOpeningBalanceRows(customerId, asOfDate) {
   const allWithdrawalLines = [];
   for (const req of (withdrawalResult.data ?? [])) {
     for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
-      const boxes = Number(line.picked_boxes ?? 0);
-      const weight = Number(line.picked_weight ?? 0);
+      // Same requested_* fallback as getAuthoritativeBalanceTotals above —
+      // a COMPLETED line with only requested_* recorded still counts as
+      // withdrawn, matching the RPC this must agree with.
+      const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
+      const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
       if (boxes <= 0 && weight <= 0) continue;
       const pickedDate = (line.picked_at ?? req.requested_dispatch_date ?? req.last_action_at ?? '').split('T')[0] || null;
       allWithdrawalLines.push({
@@ -660,24 +671,25 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
 
   const rows = [];
   for (const req of (data ?? [])) {
-    // Only actually-picked lines count as a real outbound movement — a
-    // COMPLETED withdrawal can still have a line whose picked_boxes/
-    // picked_weight were never recorded (nothing was ever actually pulled
-    // and weighed for it). Falling back to requested_boxes/requested_weight
-    // here counted goods as shipped that were never actually confirmed
-    // picked, which is exactly what made this report's remaining weight
-    // disagree with the stock balance page (that RPC only ever sums
-    // picked_weight, never requested_weight).
+    // A COMPLETED withdrawal line can have only requested_boxes/
+    // requested_weight recorded (the handheld pick step allows a boxes-only
+    // or weight-only entry, and some lines are completed with neither
+    // picked_* ever filled in) — the stock balance RPC this report must
+    // agree with falls back to requested_* for exactly this reason
+    // (supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql).
+    // Requiring bare picked_boxes/picked_weight here dropped such lines
+    // entirely, understating what actually left the warehouse and making
+    // this report's remaining stock disagree with the balance page.
     const lines = (req.tgd_customer_withdrawal_request_lines ?? [])
-      .filter((l) => Number(l.picked_boxes ?? 0) > 0 || Number(l.picked_weight ?? 0) > 0);
+      .filter((l) => Number(l.picked_boxes ?? l.requested_boxes ?? 0) > 0 || Number(l.picked_weight ?? l.requested_weight ?? 0) > 0);
 
     for (const line of lines) {
       const movementDate = req.requested_dispatch_date ?? ((line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null);
       if (filters.dateFrom && movementDate && movementDate < filters.dateFrom) continue;
       if (filters.dateTo && movementDate && movementDate > filters.dateTo) continue;
 
-      const boxes = Number(line.picked_boxes ?? 0);
-      const weight = Number(line.picked_weight ?? 0);
+      const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
+      const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
 
       const resolvedProductId = resolveWithdrawalProductId(line, req.customer_id, inboundIndex, skuMap);
 
