@@ -1,5 +1,5 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -23,8 +23,14 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
+import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
+
+// Requests can only be combined into one printed work order while their
+// work order is still active — same set backing this page's own
+// canSendToHandheld/canConfirmWithdrawal checks.
+const BULK_PRINT_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
@@ -34,6 +40,12 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [lines, setLines] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRequestIds, setSelectedRequestIds] = useState(() => new Set());
+  const [mergedPrint, setMergedPrint] = useState(null);
+  const [combining, setCombining] = useState(false);
+  const [combineError, setCombineError] = useState('');
+  const isMountedRef = useRef(true);
+  useEffect(() => () => { isMountedRef.current = false; }, []);
   const [comment, setComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -166,6 +178,66 @@ export function CustomerAdminWithdrawalReviewPage() {
   }
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
+
+  const bulkEligibleRows = sortedData.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
+  const selectedRequestRows = sortedData
+    .filter((r) => selectedRequestIds.has(r.id))
+    .sort((a, b) => new Date(a.created_at ?? 0) - new Date(b.created_at ?? 0));
+  const hasCustomerMismatch = new Set(selectedRequestRows.map((r) => r.customer_id)).size > 1;
+
+  function toggleRequestSelected(id) {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllRequests(candidateRows) {
+    setSelectedRequestIds((prev) => {
+      const selectableIds = candidateRows.map((r) => r.id);
+      const allSelected = selectableIds.length > 0 && selectableIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(selectableIds);
+    });
+  }
+
+  function clearMergedPrint() {
+    setMergedPrint(null);
+    setSelectedRequestIds(new Set());
+    setCombineError('');
+  }
+
+  async function handleCombineSelected(selectedRows) {
+    if (selectedRows.length < 2) return;
+    setCombining(true);
+    setCombineError('');
+    const results = await Promise.all(selectedRows.map((r) => listCustomerWithdrawalRequestLines(r.id)));
+    if (!isMountedRef.current) return;
+    const failed = results.find((r) => r.error);
+    if (failed) {
+      setCombineError(failed.error.message ?? 'โหลดรายการไม่สำเร็จ');
+      setCombining(false);
+      return;
+    }
+    const emptyIndex = results.findIndex((r) => (r.data ?? []).length === 0);
+    if (emptyIndex !== -1) {
+      const emptyRequest = selectedRows[emptyIndex];
+      setCombineError(`เอกสาร ${emptyRequest.withdrawal_no ?? emptyRequest.id} ไม่มีรายการสินค้า — กรุณาเอาออกจากการเลือกก่อนรวม`);
+      setCombining(false);
+      return;
+    }
+    const entries = selectedRows.map((r, i) => ({
+      header: {
+        ...r,
+        customer_name: r.customer?.customer_name || r.customer?.name || null,
+        customer_address: r.customer?.address ?? null,
+        contact_fax: r.customer?.fax ?? null,
+      },
+      lines: results[i].data ?? [],
+    }));
+    setMergedPrint(mergeWithdrawalRequestsForPrint(entries));
+    setCombining(false);
+  }
   const branding = getDocumentBrandingConfig();
 
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
@@ -419,10 +491,54 @@ export function CustomerAdminWithdrawalReviewPage() {
             ) : null}
           </div>
         </div>
+        {selectedRequestIds.size > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--tgd-border)' }}>
+            <span>{selectedRequestIds.size} รายการที่เลือก</span>
+            {hasCustomerMismatch && (
+              <span className="banner banner-danger" style={{ padding: '2px 8px' }}>ไม่สามารถรวมเอกสารจากลูกค้าต่างกันได้</span>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={selectedRequestRows.length < 2 || hasCustomerMismatch || combining}
+              onClick={() => handleCombineSelected(selectedRequestRows)}
+            >
+              {combining ? 'กำลังรวม...' : 'รวมเป็นใบงานเดียว'}
+            </button>
+            <button type="button" className="btn btn-sm" onClick={clearMergedPrint}>ล้างการเลือก</button>
+            {combineError && <span className="banner banner-danger" style={{ padding: '2px 8px' }}>{combineError}</span>}
+          </div>
+        )}
+        {mergedPrint && (
+          <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--tgd-border)' }}>
+            <ReportPrintActions
+              disabled={false}
+              orientation="landscape"
+              title={`${mergedPrint.header.withdrawal_no} — ${t('withdrawal_review_customer_button')}`}
+              renderReport={(language) => (
+                <CustomerWithdrawalRequestPrintDocument
+                  branding={branding}
+                  header={mergedPrint.header}
+                  isStaff
+                  language={language}
+                  lines={mergedPrint.lines}
+                />
+              )}
+            />
+          </div>
+        )}
         <div className="responsive-table">
           <table className="data-table" data-testid="admin-withdrawal-review-table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="เลือกทั้งหมด"
+                    checked={bulkEligibleRows.length > 0 && bulkEligibleRows.every((r) => selectedRequestIds.has(r.id))}
+                    onChange={() => toggleSelectAllRequests(bulkEligibleRows)}
+                  />
+                </th>
                 <th onClick={() => requestSort('withdrawal_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('withdrawal_no')}</th>
                 <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>ลูกค้า {getSortIndicator('customer_id')}</th>
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
@@ -433,11 +549,20 @@ export function CustomerAdminWithdrawalReviewPage() {
             </thead>
             <tbody>
               {sortedData.length ? sortedData.map((row) => (
-                <tr 
+                <tr
                   key={row.id}
                   onClick={() => openDetail(row.id)}
                   style={{ cursor: 'pointer', background: selectedId === row.id ? '#f0f9ff' : 'inherit' }}
                 >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`เลือก ${row.withdrawal_no}`}
+                      disabled={!BULK_PRINT_ELIGIBLE_STATUSES.includes(row.status)}
+                      checked={selectedRequestIds.has(row.id)}
+                      onChange={() => toggleRequestSelected(row.id)}
+                    />
+                  </td>
                   <td>{row.withdrawal_no}</td>
                   <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
@@ -459,7 +584,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={5}>{t('admin_withdrawal_review_empty')}</td></tr>
+                <tr><td colSpan={7}>{t('admin_withdrawal_review_empty')}</td></tr>
               )}
             </tbody>
           </table>

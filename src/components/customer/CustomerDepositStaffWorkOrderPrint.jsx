@@ -281,6 +281,11 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 </td>
                 <td style={TD_WRAP}>
                   <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.product_name)}</div>
+                  {line._mergeConflicts ? (
+                    <div style={{ fontSize: 9, color: '#b45309' }}>
+                      ⚠ เอกสารต้นทางมีข้อมูลไม่ตรงกัน: {Object.keys(line._mergeConflicts).join(', ')}
+                    </div>
+                  ) : null}
                 </td>
                 <td style={TD_WRAP} title={fmt(line.customer_product_code ?? line.internal_product_code)}>
                   <div style={{ width: '100%', minWidth: 0, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>{fmt(line.customer_product_code ?? line.internal_product_code)}</div>

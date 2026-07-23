@@ -86,10 +86,10 @@ export function ReceivingReportTemplate({
         <tbody>
           {(data?.lines ?? []).map((line) => (
             <tr key={line.id}>
-              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.lotNo}</td>
-              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.customerProduct}</td>
-              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.code}</td>
-              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 }}>{line.qty}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{line.lotNo}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{line.customerProduct}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{line.code}</td>
+              <td style={{ border: '1px solid #bbb', padding: '6px 8px', fontSize: 11, overflow: 'hidden', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{line.qty}</td>
             </tr>
           ))}
         </tbody>

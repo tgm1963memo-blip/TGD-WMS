@@ -1,5 +1,5 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerDepositRequestLinesDisplay } from '../../components/customer/CustomerDepositRequestLinesDisplay.jsx';
@@ -21,6 +21,7 @@ import {
   enqueueCustomerDepositNotification,
   enqueueDepositRecountNotification,
 } from '../../services/customerDepositRequestService.js';
+import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -48,6 +49,11 @@ const REVIEW_STATUSES = [
   'CUSTOMER_NOTIFIED',
   'CANCELLED',
 ];
+
+// Requests can only be combined into one printed work order while their
+// work order is still active/not yet confirmed — the same status set this
+// page already uses for canRequestRecount/canConfirmReceiving.
+const BULK_PRINT_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'];
 
 export function CustomerAdminDepositReviewPage() {
   const t = useTranslation();
@@ -87,6 +93,12 @@ export function CustomerAdminDepositReviewPage() {
   const [notifying, setNotifying] = useState(false);
   const [globalSearchText, setGlobalSearchText] = useState('');
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
+  const [selectedRequestIds, setSelectedRequestIds] = useState(() => new Set());
+  const [mergedPrint, setMergedPrint] = useState(null);
+  const [combining, setCombining] = useState(false);
+  const isMountedRef = useRef(true);
+  useEffect(() => () => { isMountedRef.current = false; }, []);
+  const [combineError, setCombineError] = useState('');
 
   const filteredRows = rows.filter((row) => {
     if (!globalSearchText) return true;
@@ -150,6 +162,13 @@ export function CustomerAdminDepositReviewPage() {
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
   const branding = getDocumentBrandingConfig();
+
+  const bulkEligibleRows = sortedData.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
+  const selectedRequestRows = sortedData
+    .filter((r) => selectedRequestIds.has(r.id))
+    .sort((a, b) => new Date(a.created_at ?? 0) - new Date(b.created_at ?? 0));
+  const selectedCustomerIds = new Set(selectedRequestRows.map((r) => r.customer_id));
+  const hasCustomerMismatch = selectedCustomerIds.size > 1;
 
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canRequestRecount = canWrite && selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING'].includes(selected.status);
@@ -360,6 +379,60 @@ export function CustomerAdminDepositReviewPage() {
     });
   }
 
+  function toggleRequestSelected(id) {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllRequests(candidateRows) {
+    setSelectedRequestIds((prev) => {
+      const selectableIds = candidateRows.map((r) => r.id);
+      const allSelected = selectableIds.length > 0 && selectableIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(selectableIds);
+    });
+  }
+
+  function clearMergedPrint() {
+    setMergedPrint(null);
+    setSelectedRequestIds(new Set());
+    setCombineError('');
+  }
+
+  async function handleCombineSelected(selectedRequestRows) {
+    if (selectedRequestRows.length < 2) return;
+    setCombining(true);
+    setCombineError('');
+    const results = await Promise.all(selectedRequestRows.map((r) => listCustomerDepositRequestLines(r.id)));
+    if (!isMountedRef.current) return;
+    const failed = results.find((r) => r.error);
+    if (failed) {
+      setCombineError(failed.error.message ?? 'โหลดรายการไม่สำเร็จ');
+      setCombining(false);
+      return;
+    }
+    const emptyIndex = results.findIndex((r) => (r.data ?? []).length === 0);
+    if (emptyIndex !== -1) {
+      const emptyRequest = selectedRequestRows[emptyIndex];
+      setCombineError(`เอกสาร ${emptyRequest.request_no ?? emptyRequest.id} ไม่มีรายการสินค้า — กรุณาเอาออกจากการเลือกก่อนรวม`);
+      setCombining(false);
+      return;
+    }
+    const entries = selectedRequestRows.map((r, i) => ({
+      header: {
+        ...r,
+        customer_name: r.customer?.customer_name || r.customer?.name || null,
+        customer_address: r.customer?.address ?? null,
+        contact_fax: r.customer?.fax ?? null,
+      },
+      lines: results[i].data ?? [],
+    }));
+    setMergedPrint(mergeDepositRequestsForPrint(entries));
+    setCombining(false);
+  }
+
   function handlePrintSelectedStickers() {
     const depositDate = selected?.last_action_at ?? selected?.expected_arrival_date ?? null;
     const customerName = selected?.customer?.customer_name || selected?.customer?.name || '';
@@ -420,10 +493,53 @@ export function CustomerAdminDepositReviewPage() {
             />
           </div>
         </div>
+        {selectedRequestIds.size > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--tgd-border)' }}>
+            <span>{selectedRequestIds.size} รายการที่เลือก</span>
+            {hasCustomerMismatch && (
+              <span className="banner banner-danger" style={{ padding: '2px 8px' }}>ไม่สามารถรวมเอกสารจากลูกค้าต่างกันได้</span>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={selectedRequestRows.length < 2 || hasCustomerMismatch || combining}
+              onClick={() => handleCombineSelected(selectedRequestRows)}
+            >
+              {combining ? 'กำลังรวม...' : 'รวมเป็นใบงานเดียว'}
+            </button>
+            <button type="button" className="btn btn-sm" onClick={clearMergedPrint}>ล้างการเลือก</button>
+            {combineError && <span className="banner banner-danger" style={{ padding: '2px 8px' }}>{combineError}</span>}
+          </div>
+        )}
+        {mergedPrint && (
+          <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--tgd-border)' }}>
+            <ReportPrintActions
+              disabled={false}
+              orientation="landscape"
+              title={`${mergedPrint.header.request_no} — ${t('admin_staff_work_order')}`}
+              renderReport={(language) => (
+                <CustomerDepositStaffWorkOrderPrint
+                  branding={branding}
+                  header={mergedPrint.header}
+                  language={language}
+                  lines={mergedPrint.lines}
+                />
+              )}
+            />
+          </div>
+        )}
         <div className="responsive-table">
           <table className="data-table" data-testid="admin-deposit-review-table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="เลือกทั้งหมด"
+                    checked={bulkEligibleRows.length > 0 && bulkEligibleRows.every((r) => selectedRequestIds.has(r.id))}
+                    onChange={() => toggleSelectAllRequests(bulkEligibleRows)}
+                  />
+                </th>
                 <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
                 <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>ลูกค้า {getSortIndicator('customer_id')}</th>
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
@@ -435,6 +551,15 @@ export function CustomerAdminDepositReviewPage() {
             <tbody>
               {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`เลือก ${row.request_no}`}
+                      disabled={!BULK_PRINT_ELIGIBLE_STATUSES.includes(row.status)}
+                      checked={selectedRequestIds.has(row.id)}
+                      onChange={() => toggleRequestSelected(row.id)}
+                    />
+                  </td>
                   <td>{row.request_no}</td>
                   <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
@@ -456,7 +581,7 @@ export function CustomerAdminDepositReviewPage() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={5}>{t('admin_deposit_review_empty')}</td></tr>
+                <tr><td colSpan={7}>{t('admin_deposit_review_empty')}</td></tr>
               )}
             </tbody>
           </table>

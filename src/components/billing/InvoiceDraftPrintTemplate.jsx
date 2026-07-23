@@ -3,10 +3,22 @@ import { supabase } from '../../services/supabaseClient.js';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { buildInvoiceLotLedger } from '../../utils/invoiceLotLedgerUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 
 function fmt(value) {
   if (value == null) return '-';
   return formatFixed2(value);
+}
+
+// Thai text commonly has no natural word-break points, so a long product
+// name can overflow its cell instead of wrapping even with overflow-wrap
+// set — inserts a soft-break every `chunkSize` GRAPHEME clusters (not raw
+// characters), so a break never lands between a base consonant and its
+// combining tone/vowel mark. Same helper/pattern used by the deposit and
+// withdrawal print documents.
+function fmtWrap(value, chunkSize = 10) {
+  if (value == null || value === '') return '-';
+  return insertSoftBreaks(String(value), chunkSize);
 }
 
 function fmtQty(value) {
@@ -27,7 +39,7 @@ function fmtMonthYear(value) {
 }
 
 const TH = { border: '1px solid #cbd5e1', padding: '4px 5px', background: '#f1fdf4', fontSize: 9, fontWeight: 700, textAlign: 'center' };
-const TD = { border: '1px solid #e5e7eb', padding: '4px 5px', fontSize: 9, textAlign: 'center', verticalAlign: 'middle', overflowWrap: 'break-word', wordBreak: 'break-word' };
+const TD = { border: '1px solid #e5e7eb', padding: '4px 5px', fontSize: 9, textAlign: 'center', verticalAlign: 'middle', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
 
 // A customer's contact/address details aren't denormalized onto the draft
 // header (only customer_name is) — fetched separately here so this
@@ -103,20 +115,20 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           event row rather than split into fabricated sub-period rows. ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, tableLayout: 'fixed' }}>
         <colgroup>
-          <col style={{ width: '6%' }} /> {/* received date */}
-          <col style={{ width: '6%' }} /> {/* delivery date */}
+          <col style={{ width: '5%' }} /> {/* received date */}
+          <col style={{ width: '5%' }} /> {/* delivery date */}
           <col style={{ width: '7%' }} /> {/* lot no */}
           <col style={{ width: '11%' }} /> {/* customer product */}
           <col style={{ width: '6%' }} /> {/* desc / internal code */}
           <col style={{ width: '5%' }} /> {/* weight/unit */}
           <col style={{ width: '5%' }} /> {/* bal fwd volume */}
-          <col style={{ width: '6%' }} /> {/* bal fwd weight */}
+          <col style={{ width: '5%' }} /> {/* bal fwd weight */}
           <col style={{ width: '5%' }} /> {/* received volume */}
-          <col style={{ width: '6%' }} /> {/* received weight */}
+          <col style={{ width: '5%' }} /> {/* received weight */}
           <col style={{ width: '5%' }} /> {/* delivery volume */}
-          <col style={{ width: '6%' }} /> {/* delivery weight */}
+          <col style={{ width: '5%' }} /> {/* delivery weight */}
           <col style={{ width: '5%' }} /> {/* balance volume */}
-          <col style={{ width: '6%' }} /> {/* balance weight */}
+          <col style={{ width: '5%' }} /> {/* balance weight */}
           <col style={{ width: '5%' }} /> {/* handling fee rate */}
           <col style={{ width: '5%' }} /> {/* handling fee */}
           <col style={{ width: '5%' }} /> {/* cold storage charge */}
@@ -158,7 +170,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                   <td style={TD}>{i === 0 ? fmtDate(row.receivedDate) : ''}</td>
                   <td style={TD}>{fmtDate(row.deliveryDate)}</td>
                   <td style={{ ...TD, textAlign: 'left' }}>{i === 0 ? row.lotNo ?? '-' : ''}</td>
-                  <td style={{ ...TD, textAlign: 'left' }} title={row.productName ?? row.productCode ?? '-'}>{i === 0 ? (row.productName ?? row.productCode ?? '-') : ''}</td>
+                  <td style={{ ...TD, textAlign: 'left' }} title={row.productName ?? row.productCode ?? '-'}>{i === 0 ? fmtWrap(row.productName ?? row.productCode) : ''}</td>
                   <td style={TD}>{i === 0 ? row.productCode ?? '-' : ''}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.weightPerUnit != null ? fmt(row.weightPerUnit) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{fmtQty(row.balanceForwardVolume)}</td>

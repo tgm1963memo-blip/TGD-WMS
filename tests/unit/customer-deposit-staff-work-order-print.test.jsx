@@ -106,4 +106,21 @@ describe('CustomerDepositStaffWorkOrderPrint component', () => {
     expect(screen.queryByText('สแกนเปิดใบงาน')).not.toBeInTheDocument();
     expect(screen.getAllByText(/รวมจากเอกสาร 2 ใบ/).length).toBe(2);
   });
+
+  it('shows a per-line warning when merged lines disagree on an identity field', () => {
+    const conflictedLines = [
+      { ...mockLines[0], _mergeConflicts: { lot_no: ['LOT-998811', 'LOT-998812'] } },
+    ];
+
+    render(
+      <CustomerDepositStaffWorkOrderPrint
+        header={mockHeader}
+        lines={conflictedLines}
+        language="th"
+      />
+    );
+
+    expect(screen.getAllByText(/เอกสารต้นทางมีข้อมูลไม่ตรงกัน/).length).toBe(2);
+    expect(screen.getAllByText(/lot_no/).length).toBeGreaterThan(0);
+  });
 });

@@ -26,7 +26,7 @@ export function DeliverySlipTemplate({
 
   const NCOLS = 7;
   const TH = { border: '1px solid #bbb', padding: '6px 8px', background: '#f0f0f0', fontSize: 11, fontWeight: 700 };
-  const TD = { border: '1px solid #bbb', padding: '6px 8px', fontSize: 11 };
+  const TD = { border: '1px solid #bbb', padding: '6px 8px', fontSize: 11, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' };
 
   return (
     <article className="operational-report operational-report-a4" data-testid="delivery-slip-template" style={{ padding: 0 }}>

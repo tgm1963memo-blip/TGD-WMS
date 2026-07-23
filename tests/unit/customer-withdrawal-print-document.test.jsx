@@ -74,4 +74,21 @@ describe('CustomerWithdrawalRequestPrintDocument component', () => {
     expect(screen.queryByText('สแกนเปิดใบงาน')).not.toBeInTheDocument();
     expect(screen.getByText(/รวมจากเอกสาร 2 ใบ/)).toBeInTheDocument();
   });
+
+  it('shows a per-line warning when merged lines disagree on an identity field', () => {
+    const conflictedLines = [
+      { ...mockLines[0], _mergeConflicts: { lot_no: ['LOT-998811', 'LOT-998812'] } },
+    ];
+
+    render(
+      <CustomerWithdrawalRequestPrintDocument
+        header={mockHeader}
+        lines={conflictedLines}
+        language="th"
+      />
+    );
+
+    expect(screen.getByText(/เอกสารต้นทางมีข้อมูลไม่ตรงกัน/)).toBeInTheDocument();
+    expect(screen.getByText(/lot_no/)).toBeInTheDocument();
+  });
 });

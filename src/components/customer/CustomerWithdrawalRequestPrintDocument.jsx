@@ -35,7 +35,7 @@ function fmtDate(v) {
 }
 
 const NCOLS = 14;
-const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0', fontSize: 9, fontWeight: 700, textAlign: 'center', overflowWrap: 'break-word', wordBreak: 'break-word' };
+const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0', fontSize: 9, fontWeight: 700, textAlign: 'center', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
 // verticalAlign: 'top' — table cells default to middle-aligned, so a short
 // single-line cell (e.g. LOT NO) in the same row as a long wrapped cell
 // (e.g. CUSTOMER PRODUCT spanning 2-3 lines) got vertically centered and
@@ -47,9 +47,9 @@ const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0'
 const TD = { border: '1px solid #ccc', padding: '6px 2px', fontSize: 9, lineHeight: 1.6, verticalAlign: 'top' };
 // Reference numbers must stay fully readable, so wrap onto a second line
 // instead of clipping — hidden overflow would silently drop characters.
-const TD_SAFE = { ...TD, overflowWrap: 'break-word', wordBreak: 'break-all' };
+const TD_SAFE = { ...TD, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' };
 const META_KEY = { fontWeight: 600, fontSize: 10, paddingBottom: 2, whiteSpace: 'nowrap' };
-const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 4, lineHeight: 1.6, overflowWrap: 'break-word', wordBreak: 'break-word' };
+const META_VAL = { borderBottom: '1px solid #000', fontSize: 10, paddingBottom: 4, lineHeight: 1.6, overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
 
 export function CustomerWithdrawalRequestPrintDocument(props) {
   if (!props.header) return null;
@@ -77,6 +77,8 @@ function CustomerWithdrawalRequestPrintDocumentPage({
   if (!header) return null;
 
   const t = (key) => getTranslation(key, language);
+
+  const isMerged = Array.isArray(header.source_request_nos) && header.source_request_nos.length > 1;
 
   const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
   const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
@@ -175,7 +177,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#333' }}>
+                <div style={{ fontSize: 11, color: '#333', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: '60mm' }}>
                   {getTranslation('document_no', language) || 'เลขที่'}: <strong>{header.withdrawal_no ?? header.request_no}</strong>
                   {docDate && docDate !== '-' && (
                     <span style={{ marginLeft: 10 }}>
@@ -184,7 +186,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                   )}
                 </div>
               </div>
-              {(header.withdrawal_no ?? header.request_no) && (
+              {!isMerged && (header.withdrawal_no ?? header.request_no) && (
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
                   <QRCode value={String(header.withdrawal_no ?? header.request_no)} size={54} style={{ width: 54, height: 54 }} />
                   <div style={{ fontSize: 8, color: '#666', marginTop: 1 }}>สแกนเปิดใบงาน</div>
@@ -254,6 +256,17 @@ function CustomerWithdrawalRequestPrintDocumentPage({
           </tbody>
         </table>
       </div>
+
+      {isMerged && (
+        <div style={{ marginBottom: 10, padding: '5px 10px', background: '#eef2ff', border: '1px solid #6366f1', borderRadius: 4, fontSize: 11 }}>
+          <strong>รวมจากเอกสาร {header.source_request_nos.length} ใบ:</strong> {header.source_request_nos.join(', ')}
+          {header._merge?.headerConflicts?.length ? (
+            <div style={{ marginTop: 4, color: '#b45309' }}>
+              ⚠ พบข้อมูลไม่ตรงกันระหว่างเอกสารที่รวมในบางฟิลด์: {header._merge.headerConflicts.map((c) => c.field).join(', ')}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* ── Lines table ── */}
       <table className="operational-report-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
@@ -333,10 +346,15 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                 ) : null}
               </td>
               <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                {(line.note || line.admin_note) ? (
+                {(line.note || line.admin_note || line._mergeConflicts) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {line.note ? <span>{fmtWrap(line.note)}</span> : null}
                     {line.admin_note ? <span style={{ color: '#555', fontSize: 9 }}>({fmtWrap(line.admin_note)})</span> : null}
+                    {line._mergeConflicts ? (
+                      <span style={{ color: '#b45309', fontSize: 9 }}>
+                        ⚠ เอกสารต้นทางมีข้อมูลไม่ตรงกัน: {Object.keys(line._mergeConflicts).join(', ')}
+                      </span>
+                    ) : null}
                   </div>
                 ) : '-'}
               </td>
