@@ -131,3 +131,63 @@ describe('movement ledger report falls back to requested_boxes/requested_weight 
     expect(data[0].weight).toBe(600);
   });
 });
+
+describe('movement ledger report drops a box-depleted line entirely, matching the RPC WHERE clause', () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  // A deposit line whose boxes were fully picked (balance boxes == 0) but
+  // whose weight was under-recorded on the withdrawal (balance weight still
+  // positive) — the RPC's WHERE GREATEST(0, received_boxes - withdrawn) > 0
+  // filters on BOXES only and drops this line's weight too. Summing every
+  // line's weight unconditionally (the pre-fix behavior) silently inflated
+  // the grand total's weight while boxes still matched exactly, since boxes
+  // always contributed 0 either way.
+  const zeroBoxDepositRow = {
+    customer_id: 'cust-1',
+    tgd_customer_deposit_request_lines: [{
+      id: 'dl-2', line_no: 1, lot_no: 'L2', customer_product_code: 'P2', tracking_code: 'TRK-2',
+      actual_boxes: 10, actual_weight: 100, expected_boxes: 10, expected_weight: 100,
+    }],
+  };
+  const fullyPickedWithdrawalRow = {
+    customer_id: 'cust-1', withdrawal_no: 'WDR-2', status: 'COMPLETED',
+    last_action_at: '2026-07-01T00:00:00Z', requested_dispatch_date: '2026-07-01',
+    tgd_customer_withdrawal_request_lines: [{
+      id: 'wl-2', line_no: 1, source_customer_deposit_request_line_id: 'dl-2', tracking_code: null,
+      lot_no: 'L2', source_lot_no: null, customer_product_code: 'P2', product_id: null,
+      internal_product_code: null, product_name: 'Product 2',
+      // All 10 boxes picked, but weight under-recorded at only 60kg — a real
+      // completed-with-mismatched-dimensions state.
+      picked_boxes: 10, picked_weight: 60,
+      requested_boxes: 10, requested_weight: 100,
+      picked_at: '2026-07-01T00:00:00Z', picked_by_email: null,
+    }],
+  };
+
+  it('getAuthoritativeBalanceTotals excludes this line entirely once its box balance is 0', async () => {
+    fromMock.mockImplementation((name) => {
+      const chain = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        ilike: vi.fn(() => chain),
+        then: (resolve) => {
+          if (name === 'tgd_customer_deposit_requests') return resolve({ data: [zeroBoxDepositRow], error: null });
+          if (name === 'tgd_customer_withdrawal_requests') return resolve({ data: [fullyPickedWithdrawalRow], error: null });
+          return resolve({ data: [], error: null });
+        },
+      };
+      return chain;
+    });
+
+    const { data, error } = await getAuthoritativeBalanceTotals('cust-1');
+
+    expect(error).toBeNull();
+    // Box balance = 10 - 10 = 0 -> the whole line is excluded, so its
+    // leftover 40kg (100 - 60) weight balance must NOT leak into the total.
+    expect(data.totalBoxes).toBe(0);
+    expect(data.totalWeight).toBe(0);
+  });
+});

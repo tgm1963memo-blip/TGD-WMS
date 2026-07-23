@@ -91,9 +91,22 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
 
   const balances = computeDepositLineBalances(depositLines, withdrawalLines);
 
+  // Mirrors the RPC's own WHERE clause exactly (both
+  // tgd_get_customer_stock_balance and tgd_get_all_customer_stock_balances,
+  // supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql):
+  // `WHERE GREATEST(0, received_boxes - withdrawn_boxes) > 0` — a deposit
+  // line whose box balance has hit exactly 0 is dropped from the RPC
+  // entirely, box AND weight both, even if that line's weight balance is
+  // still positive (e.g. picked_weight under-recorded for a withdrawal that
+  // otherwise fully covered the boxes). Summing every line's weight
+  // unconditionally here — while boxes already only ever add 0 for such a
+  // line — silently inflated this total's weight above the balance page's,
+  // with box counts matching exactly the whole time (that's what made this
+  // one hard to spot: only weight was ever wrong).
   let totalBoxes = 0;
   let totalWeight = 0;
   for (const balance of balances.values()) {
+    if (balance.boxes <= 0) continue;
     totalBoxes += balance.boxes;
     totalWeight += balance.weight;
   }
@@ -243,7 +256,11 @@ export async function getStorageOpeningBalanceRows(customerId, asOfDate) {
   const rows = [];
   for (const dl of beforePeriodLines) {
     const balance = balances.get(dl.id) ?? { boxes: 0, weight: 0 };
-    if (balance.boxes <= 0 && balance.weight <= 0) continue;
+    // Box-only filter, matching the RPC's WHERE clause exactly (see the
+    // comment in getAuthoritativeBalanceTotals above) — a line whose box
+    // balance is 0 doesn't count as "brought forward" even if it has a
+    // residual positive weight balance.
+    if (balance.boxes <= 0) continue;
     const meta = lineMeta.get(dl.id) ?? {};
     rows.push({
       id: `opening-${dl.id}-asof-${asOfDate}`,
@@ -430,7 +447,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
       id, request_no, customer_id, status, expected_arrival_date, last_action_at,
       ${lineRelation}(
         id, line_no, product_id, customer_product_code, internal_product_code, product_name, lot_no,
-        actual_boxes, actual_weight, location_id, temperature_type, tracking_code
+        actual_boxes, actual_weight, expected_boxes, expected_weight, location_id, temperature_type, tracking_code
       )
     `)
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
@@ -472,8 +489,13 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     if (filters.dateFrom && receiptDate && receiptDate < filters.dateFrom) continue;
     if (filters.dateTo && receiptDate && receiptDate > filters.dateTo) continue;
 
+    // Same actual-then-expected fallback as getAuthoritativeBalanceTotals —
+    // a confirmed line with no actual_* recorded yet still has a received
+    // quantity via expected_*, and excluding it here (while the
+    // authoritative total counts it) understated this report's per-row/
+    // SUB TOTAL received figures relative to the grand TOTAL row.
     const confirmedLines = (req.tgd_customer_deposit_request_lines ?? [])
-      .filter((l) => (l.actual_boxes != null && Number(l.actual_boxes) > 0) || (l.actual_weight != null && Number(l.actual_weight) > 0));
+      .filter((l) => Number(l.actual_boxes ?? l.expected_boxes ?? 0) > 0 || Number(l.actual_weight ?? l.expected_weight ?? 0) > 0);
 
     for (const line of confirmedLines) {
       const resolvedProductId = resolveLineProductId(line, skuMap);
@@ -496,9 +518,9 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         product_id: resolvedProductId,
         lot_id: null,
         lot_no: line.lot_no ?? null,
-        qty: Number(line.actual_boxes ?? 0),
-        quantity: Number(line.actual_boxes ?? 0),
-        weight: Number(line.actual_weight ?? 0),
+        qty: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+        quantity: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+        weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
         uom: 'กล่อง',
         product_name: line.product_name ?? line.customer_product_code ?? null,
         customer_product_code: line.customer_product_code ?? null,
