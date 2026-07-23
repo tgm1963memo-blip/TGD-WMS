@@ -197,7 +197,7 @@ export function StickerPageSizeControl({ style } = {}) {
   );
 }
 
-function stickerDocumentHtml(pagesHtml) {
+function stickerDocumentHtml(pagesHtml, pageCount = 1) {
   // Default ('auto'): no @page size, printer's own configured media drives
   // the physical page (correct on the machine this label was first tuned
   // against — see the comment below). On a different printer whose driver
@@ -205,7 +205,23 @@ function stickerDocumentHtml(pagesHtml) {
   // size here (via <StickerPageSizeControl />) stops it from scaling/
   // clipping the label content down to that wrong assumed page, which is
   // what "prints but runs off the edge" looks like.
-  const pageSizeRule = getStickerPageSizeMode() === 'fixed' ? 'size: 100mm 120mm;' : '';
+  //
+  // Forced unconditionally (regardless of the auto/fixed toggle) whenever a
+  // job has more than one page: printing ONE sticker never showed this
+  // problem on any printer/browser tested, but printing several in the same
+  // job — every time, on every machine tried — came out with content
+  // bleeding/overlapping between labels. The one thing that's genuinely
+  // different about a multi-page job (not just "more of the same") is that
+  // every page after the first depends on the browser and the printer
+  // driver agreeing on physical page size to start a clean new page at each
+  // page-break-after boundary; in 'auto' mode neither side is ever told
+  // what that size actually is, so any driver/browser default that isn't
+  // exactly 100x120mm compounds page-to-page instead of just being wrong
+  // once. Removing that ambiguity for every page in a multi-page job (not
+  // only when the user has manually picked 'fixed') is what actually fixes
+  // the "1 is fine, N bleeds" symptom without changing single-sticker
+  // behavior, which already worked.
+  const pageSizeRule = (getStickerPageSizeMode() === 'fixed' || pageCount > 1) ? 'size: 100mm 120mm;' : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -266,9 +282,10 @@ function stickerDocumentHtml(pagesHtml) {
   @media print {
     .sticker-page {
       width: 100mm; height: 120mm; overflow: hidden; position: relative;
-      margin: 0; page-break-after: always;
+      margin: 0; page-break-after: always; break-after: page;
+      page-break-inside: avoid; break-inside: avoid;
     }
-    .sticker-page:last-child { page-break-after: auto; }
+    .sticker-page:last-child { page-break-after: auto; break-after: auto; }
     .sticker {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%) rotate(${getStickerRotationDeg()}deg);
@@ -405,6 +422,6 @@ export function printSticker({
 // given — used for "print stickers for selected lines" bulk actions.
 export function printStickers(items = []) {
   if (!items.length) return;
-  const html = stickerDocumentHtml(items.map((item) => renderStickerPageHtml(item)).join('\n'));
+  const html = stickerDocumentHtml(items.map((item) => renderStickerPageHtml(item)).join('\n'), items.length);
   openAndPrintHtml(html, items.length);
 }
