@@ -1,55 +1,51 @@
-import { supabase } from './supabaseClient.js';
-import { queryStockBalanceRows } from './stockBalanceRowQuery.js';
+import { getAllCustomerStockBalances } from './customerDepositRequestService.js';
+import { getCustomers } from './masterDataService.js';
+import { toLiveStockBalanceRows } from '../utils/liveStockBalanceRows.js';
 
-function missingSupabaseClientResult() {
-  return {
-    data: null,
-    error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
-  };
-}
-
-function applyBalanceFilters(query, filters = {}) {
-  let nextQuery = query;
-
-  if (filters.customerId) nextQuery = nextQuery.eq('customer_id', filters.customerId);
-  if (filters.warehouseId) nextQuery = nextQuery.eq('warehouse_id', filters.warehouseId);
-  if (filters.productId) nextQuery = nextQuery.eq('product_id', filters.productId);
-  if (filters.lotId) nextQuery = nextQuery.eq('lot_id', filters.lotId);
-  if (filters.locationId) nextQuery = nextQuery.eq('location_id', filters.locationId);
-  if (filters.palletId) nextQuery = nextQuery.eq('pallet_id', filters.palletId);
-
-  return nextQuery;
+// Reads the same live, freshly-computed balance the "ยอดคงเหลือ" pages use
+// (see liveStockBalanceRows.js for why) instead of the separately-maintained
+// per-location stock ledger table this report used to read, which could show a
+// different number than "ยอดคงเหลือ" for the same product/customer.
+function applyRowFilters(rows, filters = {}) {
+  return rows.filter((row) => {
+    if (filters.customerId && row.customer_id !== filters.customerId) return false;
+    if (filters.temperatureType) {
+      const wanted = Array.isArray(filters.temperatureType) ? filters.temperatureType : [filters.temperatureType];
+      if (wanted.length && !wanted.includes(row.temperature_type ?? '-')) return false;
+    }
+    if (filters.productId) {
+      const q = String(filters.productId).toLowerCase();
+      const hay = `${row.product_code ?? ''} ${row.product_name ?? ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.lotNo) {
+      if (!(row.lot_no ?? '').toLowerCase().includes(String(filters.lotNo).toLowerCase())) return false;
+    }
+    return true;
+  });
 }
 
 function summarizeBalanceRows(rows = []) {
   const customerIds = new Set();
-  const productIds = new Set();
-  const lotIds = new Set();
-  const palletIds = new Set();
+  const productCodes = new Set();
+  const lotNos = new Set();
 
   const totals = rows.reduce((summary, row) => {
     if (row.customer_id) customerIds.add(row.customer_id);
-    if (row.product_id) productIds.add(row.product_id);
-    if (row.lot_id) lotIds.add(row.lot_id);
-    if (row.pallet_id) palletIds.add(row.pallet_id);
+    if (row.product_code) productCodes.add(row.product_code);
+    if (row.lot_no) lotNos.add(row.lot_no);
 
-    summary.qty_on_hand += Number(row.qty_on_hand ?? 0);
-    summary.qty_allocated += Number(row.qty_allocated ?? 0);
-    summary.qty_available += Number(row.qty_available ?? 0);
+    summary.qty_boxes += row.qty_boxes;
+    summary.qty_weight += row.qty_weight;
 
     return summary;
-  }, {
-    qty_on_hand: 0,
-    qty_allocated: 0,
-    qty_available: 0,
-  });
+  }, { qty_boxes: 0, qty_weight: 0 });
 
   return {
     ...totals,
     customer_count: customerIds.size,
-    product_count: productIds.size,
-    lot_count: lotIds.size,
-    pallet_count: palletIds.size,
+    product_count: productCodes.size,
+    lot_count: lotNos.size,
   };
 }
 
@@ -61,15 +57,13 @@ function groupBalanceRows(rows = [], key) {
     const current = groups.get(groupKey) ?? {
       id: groupKey,
       group_id: groupKey,
-      qty_on_hand: 0,
-      qty_allocated: 0,
-      qty_available: 0,
+      qty_boxes: 0,
+      qty_weight: 0,
       row_count: 0,
     };
 
-    current.qty_on_hand += Number(row.qty_on_hand ?? 0);
-    current.qty_allocated += Number(row.qty_allocated ?? 0);
-    current.qty_available += Number(row.qty_available ?? 0);
+    current.qty_boxes += row.qty_boxes;
+    current.qty_weight += row.qty_weight;
     current.row_count += 1;
     groups.set(groupKey, current);
   });
@@ -78,9 +72,16 @@ function groupBalanceRows(rows = [], key) {
 }
 
 export async function getCustomerStorageBalanceRows(filters = {}) {
-  if (!supabase) return missingSupabaseClientResult();
+  const [balanceResult, customersResult] = await Promise.all([
+    getAllCustomerStockBalances(),
+    getCustomers(),
+  ]);
 
-  return queryStockBalanceRows(supabase, filters, applyBalanceFilters);
+  if (balanceResult.error) return { data: null, error: balanceResult.error };
+  if (customersResult.error) return { data: null, error: customersResult.error };
+
+  const rows = toLiveStockBalanceRows(balanceResult.data ?? [], customersResult.data ?? []);
+  return { data: applyRowFilters(rows, filters), error: null };
 }
 
 export async function getCustomerStorageBalanceSummary(filters = {}) {
@@ -96,7 +97,7 @@ export async function getStorageBalanceByCustomer(filters = {}) {
 
   if (error) return { data: null, error };
 
-  return { data: groupBalanceRows(data ?? [], 'customer_id'), error: null };
+  return { data: groupBalanceRows(data ?? [], 'customer_name'), error: null };
 }
 
 export async function getStorageBalanceByProduct(filters = {}) {
@@ -104,15 +105,7 @@ export async function getStorageBalanceByProduct(filters = {}) {
 
   if (error) return { data: null, error };
 
-  return { data: groupBalanceRows(data ?? [], 'product_id'), error: null };
-}
-
-export async function getStorageBalanceByWarehouse(filters = {}) {
-  const { data, error } = await getCustomerStorageBalanceRows(filters);
-
-  if (error) return { data: null, error };
-
-  return { data: groupBalanceRows(data ?? [], 'warehouse_id'), error: null };
+  return { data: groupBalanceRows(data ?? [], 'product_code'), error: null };
 }
 
 export async function getStorageBalanceByLot(filters = {}) {
@@ -120,5 +113,5 @@ export async function getStorageBalanceByLot(filters = {}) {
 
   if (error) return { data: null, error };
 
-  return { data: groupBalanceRows(data ?? [], 'lot_id'), error: null };
+  return { data: groupBalanceRows(data ?? [], 'lot_no'), error: null };
 }

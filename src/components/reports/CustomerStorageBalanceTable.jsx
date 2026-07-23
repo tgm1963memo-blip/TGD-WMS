@@ -1,21 +1,16 @@
 import { DataTable } from '../ui/DataTable.jsx';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 const columns = [
-  { key: 'customer_id', header: 'Customer', render: (row) => row.customer_name ?? row.customer_id ?? '-' },
-  { key: 'product_id', header: 'Product', render: (row) => row.product_name ?? row.product_id ?? '-' },
-  { key: 'lot_id', header: 'Lot', render: (row) => row.lot_no ?? row.lot_id ?? '-' },
-  { key: 'pallet_id', header: 'Pallet', render: (row) => row.pallet_no ?? row.pallet_id ?? '-' },
-  { key: 'warehouse_id', header: 'Warehouse', render: (row) => row.warehouse_name ?? row.warehouse_id ?? '-' },
-  { key: 'room_zone', header: 'Room / Zone', render: (row) => row.room_code ?? row.zone_code ?? '-' },
-  { key: 'location_id', header: 'Location', render: (row) => row.location_code ?? row.location_id ?? '-' },
-  { key: 'condition_status', header: 'Condition', render: (row) => row.condition_status ?? '-' },
-  { key: 'qty_on_hand', header: 'Stock Qty' },
-  { key: 'qty_allocated', header: 'Allocated Qty' },
-  { key: 'qty_available', header: 'Available Qty' },
+  { key: 'customer_name', header: 'Customer', render: (row) => row.customer_name ?? row.customer_id ?? '-' },
+  { key: 'product_code', header: 'Product', render: (row) => `${row.product_code ?? '-'}${row.product_name ? ` — ${row.product_name}` : ''}` },
+  { key: 'lot_no', header: 'Lot', render: (row) => row.lot_no ?? '-' },
+  { key: 'temperature_type', header: 'Temp', render: (row) => row.temperature_type ?? '-' },
+  { key: 'qty_boxes', header: 'Stock Qty (Boxes)', render: (row) => row.qty_boxes.toLocaleString() },
+  { key: 'qty_weight', header: 'Stock Weight (kg)', render: (row) => formatFixed2(row.qty_weight) },
   { key: 'uom', header: 'UOM' },
-  { key: 'storage_start_date', header: 'Storage Start', render: (row) => row.storage_start_date ?? '-' },
-  { key: 'last_movement_date', header: 'Last Movement', render: (row) => row.last_movement_date ?? row.created_at ?? '-' },
-  { key: 'billing_note', header: 'Billing Note', render: () => 'Monthly storage billing preparation' },
+  { key: 'received_at', header: 'Received', render: (row) => (row.received_at ?? '-').slice(0, 10) || '-' },
+  { key: 'request_no', header: 'Deposit Doc No.', render: (row) => row.request_no ?? '-' },
 ];
 
 export function CustomerStorageBalanceTable({ data, loading, error }) {

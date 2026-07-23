@@ -1,5 +1,6 @@
 import { DataTable } from '../ui/DataTable.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 
 function fmtDate(dateString) {
   if (!dateString || dateString === 'NO_EXPIRY_DATE') return dateString ?? '-';
@@ -7,22 +8,12 @@ function fmtDate(dateString) {
 }
 
 const columns = [
-  { key: 'customer_id', header: 'ลูกค้า', render: (row) => row.customer_name ?? row.customer_id ?? '-' },
-  { key: 'product_id', header: 'สินค้า', render: (row) => row.product_name ?? row.product_id ?? '-' },
-  { key: 'location_id', header: 'ตำแหน่งจัดเก็บ', render: (row) => row.location_code ?? row.location_id ?? '-' },
-  { key: 'qty_on_hand', header: 'ยอดรับเข้า' },
-  {
-    key: 'qty_allocated',
-    header: 'ยอดจัดสรร/เบิก',
-    render: (row) => Number(row.qty_allocated ?? 0) || '-',
-  },
-  {
-    key: 'qty_net',
-    header: 'ยอดคงเหลือสุทธิ',
-    render: (row) => Number(row.qty_on_hand ?? 0) - Number(row.qty_allocated ?? 0),
-  },
-  { key: 'uom', header: 'หน่วย' },
-  { key: 'storage_start_date', header: 'วันที่รับเข้า', render: (row) => fmtDate(row.storage_start_date ?? row.received_date) },
+  { key: 'customer_name', header: 'ลูกค้า', render: (row) => row.customer_name ?? row.customer_id ?? '-' },
+  { key: 'product_code', header: 'สินค้า', render: (row) => `${row.product_code ?? '-'}${row.product_name ? ` — ${row.product_name}` : ''}` },
+  { key: 'lot_no', header: 'LOT', render: (row) => row.lot_no ?? '-' },
+  { key: 'qty_boxes', header: 'ยอดคงเหลือ (กล่อง)', render: (row) => Number(row.qty_boxes ?? 0).toLocaleString() },
+  { key: 'qty_weight', header: 'ยอดคงเหลือ (กก.)', render: (row) => formatFixed2(row.qty_weight ?? 0) },
+  { key: 'storage_start_date', header: 'วันที่รับเข้า', render: (row) => fmtDate(row.storage_start_date ?? row.received_at) },
   { key: 'aging_days', header: 'อายุจัดเก็บ (วัน)' },
   { key: 'expiry_date', header: 'วันหมดอายุ', render: (row) => fmtDate(row.expiry_date ?? row.exp_date) },
   {

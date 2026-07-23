@@ -20,7 +20,6 @@ const initialFilters = {
   month: String(currentDate.getMonth() + 1).padStart(2, '0'),
   year: String(currentDate.getFullYear()),
   customerId: '',
-  warehouseId: '',
 };
 
 const initialState = {
@@ -44,7 +43,6 @@ function toPreviewFilters(filters) {
     dateFrom,
     dateTo,
     customerId: filters.customerId,
-    warehouseId: filters.warehouseId,
   };
 }
 
@@ -115,7 +113,6 @@ export function MonthlyStorageBillingSummaryPage() {
         <label>Month<input name="month" type="number" min="1" max="12" value={filters.month} onChange={updateFilter} /></label>
         <label>Year<input name="year" type="number" min="2020" value={filters.year} onChange={updateFilter} /></label>
         <label>Customer<input name="customerId" value={filters.customerId} onChange={updateFilter} placeholder="Customer ID" /></label>
-        <label>Warehouse<input name="warehouseId" value={filters.warehouseId} onChange={updateFilter} placeholder="Warehouse ID" /></label>
       </section>
 
       <DashboardSection title="Monthly Storage Billing Preview Summary">

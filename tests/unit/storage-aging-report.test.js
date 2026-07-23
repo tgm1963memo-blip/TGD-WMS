@@ -34,7 +34,7 @@ describe('Sprint 6D storage aging report foundation', () => {
     'tgd_create_adjustment_from_stock_count',
   ];
 
-  it('creates the storage aging report service with read-only functions and pure classifiers', () => {
+  it('creates the storage aging report service with read-only functions and pure classifiers, sourced from the live balance (not tgd_stock_balances)', () => {
     const source = readProjectFile(servicePath);
 
     expect(statSync(resolve(projectRoot, servicePath)).isFile()).toBe(true);
@@ -44,7 +44,6 @@ describe('Sprint 6D storage aging report foundation', () => {
       'getExpiryAlertRows',
       'getChargeableDaysPreview',
       'groupAgingByCustomer',
-      'groupAgingByWarehouse',
       'groupAgingByProduct',
       'classifyAgingBucket',
       'classifyExpiryStatus',
@@ -52,7 +51,11 @@ describe('Sprint 6D storage aging report foundation', () => {
       expect(source).toContain(functionName);
     });
 
-    expect(source).toContain('.select(');
+    // Sourced from the same live, freshly-computed balance the "ยอดคงเหลือ"
+    // pages use — not the separately-maintained tgd_stock_balances ledger,
+    // which is what previously made this report disagree with ยอดคงเหลือ.
+    expect(source).toContain('getAllCustomerStockBalances');
+    expect(source).not.toContain('tgd_stock_balances');
     expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     expect(source).not.toContain('.rpc(');
     forbiddenPostingTerms.forEach((term) => {

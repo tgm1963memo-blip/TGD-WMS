@@ -94,7 +94,7 @@ export function summarizeBillingPreviewRows(rows = []) {
     summary.total_customers = customerIds.size;
     summary.total_deposit_qty += Number(row.deposit_qty ?? row.inbound_qty ?? 0);
     summary.total_withdrawal_qty += Number(row.withdrawal_qty ?? row.outbound_qty ?? 0);
-    summary.total_remaining_qty += Number(row.remaining_qty ?? row.qty_on_hand ?? row.qty_available ?? 0);
+    summary.total_remaining_qty += Number(row.remaining_qty ?? row.qty_boxes ?? row.qty_on_hand ?? row.qty_available ?? 0);
     summary.estimated_chargeable_weight_qty += Number(row.chargeable_weight ?? row.chargeable_qty ?? 0);
     summary.operation_charge_activity_count += row.preview_source === 'OPERATION_CHARGE' ? 1 : 0;
 

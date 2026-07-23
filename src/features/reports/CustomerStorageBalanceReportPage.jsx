@@ -4,27 +4,22 @@ import { CustomerStorageBalanceTable } from '../../components/reports/CustomerSt
 import { CustomerStorageSummaryCard } from '../../components/reports/CustomerStorageSummaryCard.jsx';
 import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 import {
   getCustomerStorageBalanceRows,
   getCustomerStorageBalanceSummary,
   getStorageBalanceByCustomer,
   getStorageBalanceByLot,
-  getStorageBalanceByWarehouse,
 } from '../../services/customerStorageBalanceReportService.js';
 
 const initialState = {
   rows: [],
   summary: null,
   customerSummary: [],
-  warehouseSummary: [],
   lotSummary: [],
   loading: true,
   error: null,
 };
-
-function estimateChargeableQty(summary) {
-  return Number(summary?.qty_on_hand ?? 0);
-}
 
 function SummaryTable({ data = [], loading, error, label }) {
   if (loading) return <p className="sprint-status">Loading {label} summary...</p>;
@@ -36,9 +31,8 @@ function SummaryTable({ data = [], loading, error, label }) {
       <thead>
         <tr>
           <th>{label}</th>
-          <th>Stock Qty</th>
-          <th>Allocated Qty</th>
-          <th>Available Qty</th>
+          <th>Stock Qty (Boxes)</th>
+          <th>Stock Weight (kg)</th>
           <th>Rows</th>
         </tr>
       </thead>
@@ -46,9 +40,8 @@ function SummaryTable({ data = [], loading, error, label }) {
         {data.map((row) => (
           <tr key={row.id}>
             <td>{row.group_id}</td>
-            <td>{row.qty_on_hand}</td>
-            <td>{row.qty_allocated}</td>
-            <td>{row.qty_available}</td>
+            <td>{row.qty_boxes.toLocaleString()}</td>
+            <td>{formatFixed2(row.qty_weight)}</td>
             <td>{row.row_count}</td>
           </tr>
         ))}
@@ -69,15 +62,13 @@ export function CustomerStorageBalanceReportPage() {
       getCustomerStorageBalanceRows(filters),
       getCustomerStorageBalanceSummary(filters),
       getStorageBalanceByCustomer(filters),
-      getStorageBalanceByWarehouse(filters),
       getStorageBalanceByLot(filters),
-    ]).then(([rowsResult, summaryResult, customerResult, warehouseResult, lotResult]) => {
+    ]).then(([rowsResult, summaryResult, customerResult, lotResult]) => {
       if (!isMounted) return;
 
       const error = rowsResult.error
         ?? summaryResult.error
         ?? customerResult.error
-        ?? warehouseResult.error
         ?? lotResult.error
         ?? null;
 
@@ -85,7 +76,6 @@ export function CustomerStorageBalanceReportPage() {
         rows: rowsResult.data ?? [],
         summary: summaryResult.data,
         customerSummary: customerResult.data ?? [],
-        warehouseSummary: warehouseResult.data ?? [],
         lotSummary: lotResult.data ?? [],
         loading: false,
         error,
@@ -101,24 +91,17 @@ export function CustomerStorageBalanceReportPage() {
     <section className="page-shell">
       <PageHeader
         title="Customer Storage Balance Report"
-        description="Read-only cold storage report for customer-owned inventory and monthly storage billing preparation."
+        description="Read-only cold storage report for customer-owned inventory — computed live from confirmed deposits and completed withdrawals, same figures as ยอดคงเหลือ."
       />
-      <ReportFilterPanel onChange={setFilters} />
+      <ReportFilterPanel onChange={setFilters} showLotNo />
 
       <DashboardSection title="Customer-Owned Inventory Summary">
         <div className="summary-grid">
           <CustomerStorageSummaryCard label="Total Customers" value={state.summary?.customer_count} />
           <CustomerStorageSummaryCard label="Total Products / SKUs" value={state.summary?.product_count} />
           <CustomerStorageSummaryCard label="Total Lots" value={state.summary?.lot_count} />
-          <CustomerStorageSummaryCard label="Total Pallets" value={state.summary?.pallet_count} />
-          <CustomerStorageSummaryCard label="Total Stock Qty" value={state.summary?.qty_on_hand} />
-          <CustomerStorageSummaryCard label="Total Available Qty" value={state.summary?.qty_available} />
-          <CustomerStorageSummaryCard label="Total Allocated Qty" value={state.summary?.qty_allocated} />
-          <CustomerStorageSummaryCard
-            label="Estimated Chargeable Qty / Weight"
-            value={estimateChargeableQty(state.summary)}
-            helperText="Placeholder for monthly storage billing preparation"
-          />
+          <CustomerStorageSummaryCard label="Total Stock Qty (Boxes)" value={state.summary?.qty_boxes?.toLocaleString()} />
+          <CustomerStorageSummaryCard label="Total Stock Weight (kg)" value={formatFixed2(state.summary?.qty_weight ?? 0)} />
         </div>
       </DashboardSection>
 
@@ -130,12 +113,8 @@ export function CustomerStorageBalanceReportPage() {
         <SummaryTable data={state.customerSummary} loading={state.loading} error={state.error} label="Customer" />
       </DashboardSection>
 
-      <DashboardSection title="Warehouse Summary">
-        <SummaryTable data={state.warehouseSummary} loading={state.loading} error={state.error} label="Warehouse" />
-      </DashboardSection>
-
-      <DashboardSection title="Lot / Pallet Summary">
-        <SummaryTable data={state.lotSummary} loading={state.loading} error={state.error} label="Lot / Pallet" />
+      <DashboardSection title="Lot Summary">
+        <SummaryTable data={state.lotSummary} loading={state.loading} error={state.error} label="Lot" />
       </DashboardSection>
     </section>
   );

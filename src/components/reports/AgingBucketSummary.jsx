@@ -21,7 +21,7 @@ export function AgingBucketSummary({ data = [], loading, error, label }) {
           <tr key={row.id}>
             <td>{row.group_id}</td>
             <td>{row.row_count}</td>
-            <td>{row.qty_on_hand}</td>
+            <td>{row.qty_boxes}</td>
             <td>{row.average_aging_days}</td>
             <td>{row.chargeable_days_total}</td>
             <td>{row.near_expiry_lots}</td>

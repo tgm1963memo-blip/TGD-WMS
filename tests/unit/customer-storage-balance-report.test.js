@@ -33,7 +33,7 @@ describe('Sprint 6C customer storage balance report foundation', () => {
     'tgd_create_adjustment_from_stock_count',
   ];
 
-  it('keeps the customer storage balance service available and read-only', () => {
+  it('keeps the customer storage balance service available and read-only, sourced from the live balance (not tgd_stock_balances)', () => {
     const source = readProjectFile(servicePath);
 
     expect(statSync(resolve(projectRoot, servicePath)).isFile()).toBe(true);
@@ -42,13 +42,16 @@ describe('Sprint 6C customer storage balance report foundation', () => {
       'getCustomerStorageBalanceSummary',
       'getStorageBalanceByCustomer',
       'getStorageBalanceByProduct',
-      'getStorageBalanceByWarehouse',
       'getStorageBalanceByLot',
     ].forEach((functionName) => {
       expect(source).toContain(functionName);
     });
 
-    expect(source).toContain('queryStockBalanceRows');
+    // Sourced from the same live, freshly-computed balance the "ยอดคงเหลือ"
+    // pages use — not the separately-maintained tgd_stock_balances ledger,
+    // which is what previously made this report disagree with ยอดคงเหลือ.
+    expect(source).toContain('getAllCustomerStockBalances');
+    expect(source).not.toContain('tgd_stock_balances');
     expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     expect(source).not.toContain('.rpc(');
     forbiddenPostingTerms.forEach((term) => {
@@ -82,34 +85,21 @@ describe('Sprint 6C customer storage balance report foundation', () => {
     [
       'cold storage',
       'customer-owned inventory',
-      'monthly storage billing preparation',
       'Total Customers',
       'Total Products / SKUs',
       'Total Lots',
-      'Total Pallets',
-      'Total Stock Qty',
-      'Total Available Qty',
-      'Total Allocated Qty',
-      'Estimated Chargeable Qty / Weight',
+      'Total Stock Qty (Boxes)',
+      'Total Stock Weight (kg)',
       'Customer Storage Balance Table',
       'Customer Summary',
-      'Warehouse Summary',
-      'Lot / Pallet Summary',
+      'Lot Summary',
       'Customer',
       'Product',
       'Lot',
-      'Pallet',
-      'Warehouse',
-      'Room / Zone',
-      'Location',
-      'Condition',
-      'Stock Qty',
-      'Allocated Qty',
-      'Available Qty',
+      'Stock Qty (Boxes)',
+      'Stock Weight (kg)',
       'UOM',
-      'Storage Start',
-      'Last Movement',
-      'Billing Note',
+      'Received',
     ].forEach((term) => {
       expect(source).toContain(term);
     });

@@ -1,23 +1,26 @@
-import { supabase } from './supabaseClient.js';
+import { getAllCustomerStockBalances } from './customerDepositRequestService.js';
+import { getCustomers } from './masterDataService.js';
+import { toLiveStockBalanceRows } from '../utils/liveStockBalanceRows.js';
 
-function missingSupabaseClientResult() {
-  return {
-    data: null,
-    error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
-  };
-}
-
-function applyStorageFilters(query, filters = {}) {
-  let nextQuery = query;
-
-  if (filters.customerId) nextQuery = nextQuery.eq('customer_id', filters.customerId);
-  if (filters.warehouseId) nextQuery = nextQuery.eq('warehouse_id', filters.warehouseId);
-  if (filters.productId) nextQuery = nextQuery.eq('product_id', filters.productId);
-  if (filters.lotId) nextQuery = nextQuery.eq('lot_id', filters.lotId);
-  if (filters.locationId) nextQuery = nextQuery.eq('location_id', filters.locationId);
-  if (filters.palletId) nextQuery = nextQuery.eq('pallet_id', filters.palletId);
-
-  return nextQuery;
+// Reads the same live, freshly-computed balance the "ยอดคงเหลือ" pages use
+// (see liveStockBalanceRows.js) instead of the separately-maintained
+// per-location stock ledger table this used to read, which could disagree with
+// ยอดคงเหลือ for the same product/customer. Also: the previous version never
+// actually filtered by filters.dateFrom/dateTo despite the page passing
+// them — this was always a point-in-time current-balance read, not a real
+// historical snapshot, so switching data source loses no working
+// historical capability.
+function applyRowFilters(rows, filters = {}) {
+  return rows.filter((row) => {
+    if (filters.customerId && row.customer_id !== filters.customerId) return false;
+    if (filters.productId) {
+      const q = String(filters.productId).toLowerCase();
+      const hay = `${row.product_code ?? ''} ${row.product_name ?? ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.lotNo && !(row.lot_no ?? '').toLowerCase().includes(String(filters.lotNo).toLowerCase())) return false;
+    return true;
+  });
 }
 
 function groupByKey(rows = [], key) {
@@ -28,14 +31,14 @@ function groupByKey(rows = [], key) {
     const current = groups.get(groupKey) ?? {
       id: groupKey,
       group_id: groupKey,
-      qty_on_hand: 0,
+      qty_boxes: 0,
       weight: 0,
       chargeable_weight: 0,
       row_count: 0,
     };
 
-    current.qty_on_hand += Number(row.qty_on_hand ?? 0);
-    current.weight += Number(row.weight ?? row.gross_weight ?? row.net_weight ?? 0);
+    current.qty_boxes += Number(row.qty_boxes ?? 0);
+    current.weight += Number(row.qty_weight ?? 0);
     current.chargeable_weight += Number(row.chargeable_weight ?? 0);
     current.row_count += 1;
     groups.set(groupKey, current);
@@ -45,15 +48,16 @@ function groupByKey(rows = [], key) {
 }
 
 export async function getDailyStorageWeightPreview(filters = {}) {
-  if (!supabase) return missingSupabaseClientResult();
+  const [balanceResult, customersResult] = await Promise.all([
+    getAllCustomerStockBalances(),
+    getCustomers(),
+  ]);
 
-  return applyStorageFilters(
-    supabase
-      .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at')
-      .order('created_at', { ascending: false }),
-    filters,
-  );
+  if (balanceResult.error) return { data: null, error: balanceResult.error };
+  if (customersResult.error) return { data: null, error: customersResult.error };
+
+  const rows = toLiveStockBalanceRows(balanceResult.data ?? [], customersResult.data ?? []);
+  return { data: applyRowFilters(rows, filters), error: null };
 }
 
 export async function getMonthlyStorageWeightPreview(filters = {}) {
@@ -64,20 +68,16 @@ export async function getMonthlyStorageWeightPreview(filters = {}) {
   return {
     data: calculateChargeableWeight(data ?? [], {
       minimumWeight: filters.minimumWeight,
-      weightPerQty: filters.weightPerQty,
     }),
     error: null,
   };
 }
 
 export function calculateChargeableWeight(rows = [], options = {}) {
-  const weightPerQty = Number(options.weightPerQty ?? 1);
   const minimumWeight = Number(options.minimumWeight ?? 0);
 
   return rows.map((row) => {
-    const baseWeight = Number(row.weight ?? row.gross_weight ?? row.net_weight ?? 0);
-    const qtyWeight = Number(row.qty_on_hand ?? 0) * weightPerQty;
-    const calculatedWeight = baseWeight > 0 ? baseWeight : qtyWeight;
+    const calculatedWeight = Number(row.qty_weight ?? 0);
     const chargeableWeight = Math.max(calculatedWeight, minimumWeight);
 
     return {
@@ -89,13 +89,9 @@ export function calculateChargeableWeight(rows = [], options = {}) {
 }
 
 export function groupStorageWeightByCustomer(rows = []) {
-  return groupByKey(rows, 'customer_id');
-}
-
-export function groupStorageWeightByWarehouse(rows = []) {
-  return groupByKey(rows, 'warehouse_id');
+  return groupByKey(rows, 'customer_name');
 }
 
 export function groupStorageWeightByProduct(rows = []) {
-  return groupByKey(rows, 'product_id');
+  return groupByKey(rows, 'product_code');
 }

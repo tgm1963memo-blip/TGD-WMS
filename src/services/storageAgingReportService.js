@@ -1,23 +1,18 @@
-import { supabase } from './supabaseClient.js';
+import { getAllCustomerStockBalances } from './customerDepositRequestService.js';
+import { getCustomers } from './masterDataService.js';
+import { toLiveStockBalanceRows } from '../utils/liveStockBalanceRows.js';
 
-function missingSupabaseClientResult() {
-  return {
-    data: null,
-    error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
-  };
-}
-
-function applyStorageAgingFilters(query, filters = {}) {
-  let nextQuery = query;
-
-  if (filters.customerId) nextQuery = nextQuery.eq('customer_id', filters.customerId);
-  if (filters.productId) nextQuery = nextQuery.eq('product_id', filters.productId);
-  if (filters.warehouseId) nextQuery = nextQuery.eq('warehouse_id', filters.warehouseId);
-  if (filters.locationId) nextQuery = nextQuery.eq('location_id', filters.locationId);
-  if (filters.lotId) nextQuery = nextQuery.eq('lot_id', filters.lotId);
-  if (filters.palletId) nextQuery = nextQuery.eq('pallet_id', filters.palletId);
-
-  return nextQuery;
+function applyStorageAgingFilters(rows, filters = {}) {
+  return rows.filter((row) => {
+    if (filters.customerId && row.customer_id !== filters.customerId) return false;
+    if (filters.productId) {
+      const q = String(filters.productId).toLowerCase();
+      const hay = `${row.product_code ?? ''} ${row.product_name ?? ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.lotNo && !(row.lot_no ?? '').toLowerCase().includes(String(filters.lotNo).toLowerCase())) return false;
+    return true;
+  });
 }
 
 function parseDate(value) {
@@ -43,7 +38,7 @@ export function enrichAgingRows(rows = [], filters = {}) {
   const today = parseDate(filters.dateAsOf) ?? new Date();
 
   return rows.map((row) => {
-    const storageStartDate = row.storage_start_date ?? row.received_date ?? row.created_at;
+    const storageStartDate = row.storage_start_date ?? row.received_date ?? row.received_at;
     const agingDays = daysBetween(parseDate(storageStartDate), today);
     const expiryStatus = classifyExpiryStatus(row.expiry_date ?? row.exp_date, today);
     const agingBucket = classifyAgingBucket(agingDays);
@@ -71,12 +66,11 @@ export function enrichAgingRows(rows = [], filters = {}) {
     if (filters.search) {
       const searchText = String(filters.search).toLowerCase();
       const searchable = [
-        row.customer_id,
-        row.product_id,
-        row.lot_id,
-        row.pallet_id,
-        row.warehouse_id,
-        row.location_id,
+        row.customer_name,
+        row.product_code,
+        row.product_name,
+        row.lot_no,
+        row.tracking_code,
       ].join(' ').toLowerCase();
 
       return searchable.includes(searchText);
@@ -88,18 +82,15 @@ export function enrichAgingRows(rows = [], filters = {}) {
 
 export function summarizeAgingRows(rows = []) {
   const customerIds = new Set();
-  const lotIds = new Set();
-  const palletIds = new Set();
+  const lotNos = new Set();
 
   const summary = rows.reduce((acc, row) => {
     if (row.customer_id) customerIds.add(row.customer_id);
-    if (row.lot_id) lotIds.add(row.lot_id);
-    if (row.pallet_id) palletIds.add(row.pallet_id);
+    if (row.lot_no) lotNos.add(row.lot_no);
 
     acc.total_customers = customerIds.size;
-    acc.total_lots = lotIds.size;
-    acc.total_pallets = palletIds.size;
-    acc.total_stock_qty += Number(row.qty_on_hand ?? 0);
+    acc.total_lots = lotNos.size;
+    acc.total_stock_qty += Number(row.qty_boxes ?? 0);
     acc.estimated_chargeable_days += Number(row.chargeable_days ?? 0);
 
     if (row.aging_bucket === '0_30') acc.aging_0_30 += 1;
@@ -120,7 +111,6 @@ export function summarizeAgingRows(rows = []) {
   }, {
     total_customers: 0,
     total_lots: 0,
-    total_pallets: 0,
     total_stock_qty: 0,
     aging_0_30: 0,
     aging_31_60: 0,
@@ -150,7 +140,7 @@ function groupAgingRows(rows = [], key) {
       id: groupKey,
       group_id: groupKey,
       row_count: 0,
-      qty_on_hand: 0,
+      qty_boxes: 0,
       aging_days_total: 0,
       chargeable_days_total: 0,
       near_expiry_lots: 0,
@@ -158,7 +148,7 @@ function groupAgingRows(rows = [], key) {
     };
 
     current.row_count += 1;
-    current.qty_on_hand += Number(row.qty_on_hand ?? 0);
+    current.qty_boxes += Number(row.qty_boxes ?? 0);
     current.aging_days_total += Number(row.aging_days ?? 0);
     current.chargeable_days_total += Number(row.chargeable_days ?? 0);
     if (row.expiry_status === 'NEAR_EXPIRY') current.near_expiry_lots += 1;
@@ -172,69 +162,28 @@ function groupAgingRows(rows = [], key) {
   }));
 }
 
+// Reads the same live, freshly-computed balance the "ยอดคงเหลือ" pages use
+// (see liveStockBalanceRows.js) instead of the separately-maintained
+// per-location stock ledger table + a lot-master join + deposit-line expiry
+// fallback this used to read, which could disagree with ยอดคงเหลือ for the same
+// product/customer and used the ledger's own row-insert time as
+// "storage_start_date" rather than the deposit's actual receipt date. The
+// RPC's own exp_date/received_at cover both needs directly — no separate
+// tgd_lots/location lookups needed. Trade-off: no location/warehouse/pallet
+// data (deposit lines aren't tied to one in this schema).
 export async function getStorageAgingRows(filters = {}) {
-  if (!supabase) return missingSupabaseClientResult();
+  const [balanceResult, customersResult] = await Promise.all([
+    getAllCustomerStockBalances(),
+    getCustomers(),
+  ]);
 
-  const query = applyStorageAgingFilters(
-    supabase
-      .from('tgd_stock_balances')
-      .select('id, customer_id, product_id, lot_id, warehouse_id, location_id, pallet_id, qty_on_hand, qty_allocated, uom, created_at, tgd_lots(lot_number, expiry_date)')
-      .order('created_at', { ascending: true }),
-    filters,
-  );
+  if (balanceResult.error) return { data: null, error: balanceResult.error };
+  if (customersResult.error) return { data: null, error: customersResult.error };
 
-  const { data, error } = await query;
-  if (error) return { data: null, error };
+  const rows = toLiveStockBalanceRows(balanceResult.data ?? [], customersResult.data ?? []);
+  const filtered = applyStorageAgingFilters(rows, filters);
 
-  // Fetch location codes separately — tgd_stock_balances.location_id has no FK constraint
-  // so PostgREST nested join syntax cannot be used directly.
-  const locationIds = [...new Set((data ?? []).map((r) => r.location_id).filter(Boolean))];
-  const locationMap = {};
-  if (locationIds.length > 0) {
-    const { data: locs } = await supabase
-      .from('tgd_locations')
-      .select('id, location_code, location_name, name')
-      .in('id', locationIds);
-    for (const loc of (locs ?? [])) {
-      locationMap[loc.id] = {
-        location_code: loc.location_code ?? loc.name ?? null,
-        location_name: loc.location_name ?? loc.name ?? null,
-      };
-    }
-  }
-
-  let flat = (data ?? []).map((row) => ({
-    ...row,
-    location_code: locationMap[row.location_id]?.location_code ?? null,
-    location_name: locationMap[row.location_id]?.location_name ?? null,
-    expiry_date: row.tgd_lots?.expiry_date ?? null,
-    lot_number: row.tgd_lots?.lot_number ?? null,
-    lot_no: row.tgd_lots?.lot_number ?? null,
-    manufacture_date: null,
-    received_date: null,
-  }));
-
-  // Fallback: rows with no expiry_date in tgd_lots — look up from deposit request lines by lot_no
-  const nullExpLotNos = [...new Set(flat.filter((r) => !r.expiry_date && r.lot_no).map((r) => r.lot_no))];
-  if (nullExpLotNos.length > 0) {
-    const { data: lineData } = await supabase
-      .from('tgd_customer_deposit_request_lines')
-      .select('lot_no, exp_date')
-      .in('lot_no', nullExpLotNos)
-      .not('exp_date', 'is', null);
-    const lotExpMap = {};
-    for (const line of (lineData ?? [])) {
-      if (line.lot_no && line.exp_date && !lotExpMap[line.lot_no]) {
-        lotExpMap[line.lot_no] = line.exp_date;
-      }
-    }
-    flat = flat.map((r) => ({
-      ...r,
-      expiry_date: r.expiry_date ?? lotExpMap[r.lot_no] ?? null,
-    }));
-  }
-
-  return { data: enrichAgingRows(flat, filters), error: null };
+  return { data: enrichAgingRows(filtered, filters), error: null };
 }
 
 export async function getStorageAgingSummary(filters = {}) {
@@ -268,15 +217,11 @@ export async function getChargeableDaysPreview(filters = {}) {
 }
 
 export function groupAgingByCustomer(rows = []) {
-  return groupAgingRows(rows, 'customer_id');
-}
-
-export function groupAgingByWarehouse(rows = []) {
-  return groupAgingRows(rows, 'warehouse_id');
+  return groupAgingRows(rows, 'customer_name');
 }
 
 export function groupAgingByProduct(rows = []) {
-  return groupAgingRows(rows, 'product_id');
+  return groupAgingRows(rows, 'product_code');
 }
 
 export function classifyAgingBucket(days) {

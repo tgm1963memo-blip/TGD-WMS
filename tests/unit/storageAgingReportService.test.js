@@ -58,26 +58,26 @@ describe('storageAgingReportService', () => {
   describe('summarizeAgingRows', () => {
     const mockRows = [
       {
-        customer_id: 'c1', lot_id: 'l1', pallet_id: 'p1',
-        qty_on_hand: 10, chargeable_days: 5, aging_days: 15,
+        customer_id: 'c1', lot_no: 'l1',
+        qty_boxes: 10, chargeable_days: 5, aging_days: 15,
         aging_bucket: '0_30', expiry_status: 'EXPIRED',
         remaining_shelf_life_days: -5,
       },
       {
-        customer_id: 'c1', lot_id: 'l2', pallet_id: 'p2',
-        qty_on_hand: 20, chargeable_days: 10, aging_days: 45,
+        customer_id: 'c1', lot_no: 'l2',
+        qty_boxes: 20, chargeable_days: 10, aging_days: 45,
         aging_bucket: '31_60', expiry_status: 'NEAR_EXPIRY',
         remaining_shelf_life_days: 10,
       },
       {
-        customer_id: 'c2', lot_id: 'l3', pallet_id: 'p3',
-        qty_on_hand: 30, chargeable_days: 20, aging_days: 100,
+        customer_id: 'c2', lot_no: 'l3',
+        qty_boxes: 30, chargeable_days: 20, aging_days: 100,
         aging_bucket: 'OVER_90', expiry_status: 'GOOD',
         remaining_shelf_life_days: 180,
       },
       {
-        customer_id: 'c2', lot_id: 'l4', pallet_id: 'p4',
-        qty_on_hand: 5, chargeable_days: 3, aging_days: 10,
+        customer_id: 'c2', lot_no: 'l4',
+        qty_boxes: 5, chargeable_days: 3, aging_days: 10,
         aging_bucket: '0_30', expiry_status: 'NO_EXPIRY_DATE',
         remaining_shelf_life_days: null,
       },

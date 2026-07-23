@@ -26,7 +26,6 @@ describe('Sprint 6C-Prep cold storage billing support services', () => {
       'getMonthlyStorageWeightPreview',
       'calculateChargeableWeight',
       'groupStorageWeightByCustomer',
-      'groupStorageWeightByWarehouse',
       'groupStorageWeightByProduct',
     ],
     'src/services/operationChargeLogService.js': [
@@ -59,7 +58,6 @@ describe('Sprint 6C-Prep cold storage billing support services', () => {
       'getCustomerStorageBalanceSummary',
       'getStorageBalanceByCustomer',
       'getStorageBalanceByProduct',
-      'getStorageBalanceByWarehouse',
       'getStorageBalanceByLot',
     ],
   };

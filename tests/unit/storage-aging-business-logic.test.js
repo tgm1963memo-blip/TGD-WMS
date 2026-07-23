@@ -37,14 +37,14 @@ describe('classifyExpiryStatus', () => {
 describe('enrichAgingRows — remaining_shelf_life_days', () => {
   it('is null when expiry_date is null', () => {
     const [row] = enrichAgingRows([
-      { expiry_date: null, created_at: '2026-01-01T00:00:00.000Z' },
+      { expiry_date: null, received_at: '2026-01-01T00:00:00.000Z' },
     ], { dateAsOf: '2026-06-26' });
     expect(row.remaining_shelf_life_days).toBeNull();
   });
 
   it('is negative when item is expired (expiry_date in the past)', () => {
     const [row] = enrichAgingRows([
-      { expiry_date: '2026-01-01', created_at: '2025-01-01T00:00:00.000Z' },
+      { expiry_date: '2026-01-01', received_at: '2025-01-01T00:00:00.000Z' },
     ], { dateAsOf: '2026-06-26' });
     expect(row.remaining_shelf_life_days).toBeLessThan(0);
     // 2026-01-01 is 176 days before 2026-06-26
@@ -53,7 +53,7 @@ describe('enrichAgingRows — remaining_shelf_life_days', () => {
 
   it('is positive when item has future expiry', () => {
     const [row] = enrichAgingRows([
-      { expiry_date: '2026-12-31', created_at: '2026-01-01T00:00:00.000Z' },
+      { expiry_date: '2026-12-31', received_at: '2026-01-01T00:00:00.000Z' },
     ], { dateAsOf: '2026-06-26' });
     expect(row.remaining_shelf_life_days).toBeGreaterThan(0);
     // 2026-12-31 is 188 days after 2026-06-26
@@ -62,10 +62,10 @@ describe('enrichAgingRows — remaining_shelf_life_days', () => {
 
   it('correctly assigns expiry_status from expiry_date', () => {
     const rows = enrichAgingRows([
-      { expiry_date: null, created_at: '2026-01-01T00:00:00.000Z' },
-      { expiry_date: '2025-12-01', created_at: '2025-01-01T00:00:00.000Z' },
-      { expiry_date: '2026-07-10', created_at: '2026-06-01T00:00:00.000Z' },
-      { expiry_date: '2027-01-01', created_at: '2026-01-01T00:00:00.000Z' },
+      { expiry_date: null, received_at: '2026-01-01T00:00:00.000Z' },
+      { expiry_date: '2025-12-01', received_at: '2025-01-01T00:00:00.000Z' },
+      { expiry_date: '2026-07-10', received_at: '2026-06-01T00:00:00.000Z' },
+      { expiry_date: '2027-01-01', received_at: '2026-01-01T00:00:00.000Z' },
     ], { dateAsOf: '2026-06-26' });
 
     expect(rows[0].expiry_status).toBe('NO_EXPIRY_DATE');
@@ -76,7 +76,7 @@ describe('enrichAgingRows — remaining_shelf_life_days', () => {
 
   it('storage age (aging_days) equals days from received date to today', () => {
     const [row] = enrichAgingRows([
-      { expiry_date: null, created_at: '2026-01-01T00:00:00.000Z' },
+      { expiry_date: null, received_at: '2026-01-01T00:00:00.000Z' },
     ], { dateAsOf: '2026-06-26' });
     // 2026-01-01 to 2026-06-26 = 176 days
     expect(row.aging_days).toBe(176);
@@ -87,9 +87,8 @@ describe('summarizeAgingRows — aggregation', () => {
   const makeRows = (statuses) =>
     statuses.map((expiry_status, i) => ({
       customer_id: `c-${i}`,
-      lot_id: `lot-${i}`,
-      pallet_id: `pallet-${i}`,
-      qty_on_hand: 10,
+      lot_no: `lot-${i}`,
+      qty_boxes: 10,
       aging_days: 30,
       chargeable_days: 30,
       aging_bucket: '0_30',
@@ -122,7 +121,7 @@ describe('summarizeAgingRows — aggregation', () => {
   it('computes average_storage_age from aging_days', () => {
     const rows = [
       { ...makeRows(['GOOD'])[0], aging_days: 10 },
-      { ...makeRows(['GOOD'])[0], aging_days: 20, lot_id: 'lot-x', pallet_id: 'p-x', customer_id: 'c-x' },
+      { ...makeRows(['GOOD'])[0], aging_days: 20, lot_no: 'lot-x', customer_id: 'c-x' },
     ];
     const summary = summarizeAgingRows(rows);
     expect(summary.average_storage_age).toBe(15);
