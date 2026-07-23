@@ -16,7 +16,7 @@ import {
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
   updateWithdrawalLineAdminNote,
-  updateWithdrawalLineTrackingCode,
+  updateWithdrawalLineSource,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -51,6 +51,10 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [savingAdminNote, setSavingAdminNote] = useState({});
   const [lineTrackingCodes, setLineTrackingCodes] = useState({});
   const [savingTrackingCode, setSavingTrackingCode] = useState({});
+  const [lineProductCodes, setLineProductCodes] = useState({});
+  const [savingProductCode, setSavingProductCode] = useState({});
+  const [lineLotNos, setLineLotNos] = useState({});
+  const [savingLotNo, setSavingLotNo] = useState({});
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -598,7 +602,36 @@ export function CustomerAdminWithdrawalReviewPage() {
                     {lines.length ? lines.map((line) => (
                       <tr key={line.id}>
                         <td>{line.line_no}</td>
-                        <td>{line.customer_product_code ?? '-'}</td>
+                        <td style={{ minWidth: 130 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                              placeholder="รหัสสินค้า..."
+                              value={lineProductCodes[line.id] ?? line.customer_product_code ?? ''}
+                              onChange={(e) => setLineProductCodes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={!canWrite || savingProductCode[line.id]}
+                              style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                              onClick={async () => {
+                                setSavingProductCode((prev) => ({ ...prev, [line.id]: true }));
+                                const r = await updateWithdrawalLineSource(line.id, { customerProductCode: lineProductCodes[line.id] ?? '' });
+                                setSavingProductCode((prev) => ({ ...prev, [line.id]: false }));
+                                if (!r.error) {
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, ...r.data } : l));
+                                } else {
+                                  setError(r.error.message ?? 'บันทึกรหัสสินค้าไม่สำเร็จ');
+                                }
+                              }}
+                            >
+                              {savingProductCode[line.id] ? '…' : '💾'}
+                            </button>
+                          </div>
+                        </td>
                         <td>{line.product_name ?? '-'}</td>
                         <td style={{ minWidth: 140 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -617,10 +650,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                               style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
                               onClick={async () => {
                                 setSavingTrackingCode((prev) => ({ ...prev, [line.id]: true }));
-                                const r = await updateWithdrawalLineTrackingCode(line.id, lineTrackingCodes[line.id] ?? '');
+                                const r = await updateWithdrawalLineSource(line.id, { trackingCode: lineTrackingCodes[line.id] ?? '' });
                                 setSavingTrackingCode((prev) => ({ ...prev, [line.id]: false }));
                                 if (!r.error) {
-                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, tracking_code: lineTrackingCodes[line.id] } : l));
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, ...r.data } : l));
+                                  setLineProductCodes((prev) => ({ ...prev, [line.id]: r.data.customer_product_code ?? '' }));
+                                  setLineLotNos((prev) => ({ ...prev, [line.id]: r.data.lot_no ?? '' }));
+                                } else {
+                                  setError(r.error.message ?? 'บันทึกรหัสติดตามไม่สำเร็จ');
                                 }
                               }}
                             >
@@ -628,7 +665,36 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </button>
                           </div>
                         </td>
-                        <td>{line.lot_no ?? '-'}</td>
+                        <td style={{ minWidth: 110 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                              placeholder="ลอต..."
+                              value={lineLotNos[line.id] ?? line.lot_no ?? ''}
+                              onChange={(e) => setLineLotNos((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={!canWrite || savingLotNo[line.id]}
+                              style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                              onClick={async () => {
+                                setSavingLotNo((prev) => ({ ...prev, [line.id]: true }));
+                                const r = await updateWithdrawalLineSource(line.id, { lotNo: lineLotNos[line.id] ?? '' });
+                                setSavingLotNo((prev) => ({ ...prev, [line.id]: false }));
+                                if (!r.error) {
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, ...r.data } : l));
+                                } else {
+                                  setError(r.error.message ?? 'บันทึกลอตไม่สำเร็จ');
+                                }
+                              }}
+                            >
+                              {savingLotNo[line.id] ? '…' : '💾'}
+                            </button>
+                          </div>
+                        </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ marginBottom: 2 }}>
                             <span

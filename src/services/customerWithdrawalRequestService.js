@@ -391,14 +391,23 @@ export async function updateWithdrawalLineAdminNote(lineId, adminNote) {
   return { data, error };
 }
 
-export async function updateWithdrawalLineTrackingCode(lineId, trackingCode) {
+// Replaces the old bare tracking_code-only update (no role check at all).
+// When trackingCode is given, the RPC re-derives customer_product_code/
+// lot_no/source_customer_deposit_request_(line_)id from whatever deposit
+// lot that tracking code actually belongs to (globally unique), rejecting
+// the whole update if no such lot exists or it belongs to a different
+// customer -- so admin can't silently desync a withdrawal line's displayed
+// product/lot from the tracking code it's supposed to match. A direct edit
+// to customerProductCode/lotNo (trackingCode omitted) stays plain free text.
+export async function updateWithdrawalLineSource(lineId, { customerProductCode, lotNo, trackingCode } = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
-  const { data, error } = await supabase
-    .from('tgd_customer_withdrawal_request_lines')
-    .update({ tracking_code: toNullableText(trackingCode) })
-    .eq('id', lineId)
-    .select();
+  const { data, error } = await supabase.rpc('tgd_admin_update_withdrawal_line_source', {
+    p_line_id: lineId,
+    p_customer_product_code: customerProductCode ?? null,
+    p_lot_no: lotNo ?? null,
+    p_tracking_code: trackingCode ?? null,
+  });
 
   return { data, error };
 }
