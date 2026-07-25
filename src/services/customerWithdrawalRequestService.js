@@ -5,7 +5,7 @@ import {
   toNullableNumber,
   toNullableText,
 } from './customerPortalServiceUtils.js';
-import { getCustomerStockBalance } from './customerDepositRequestService.js';
+import { getDepositInventoryLines } from './customerDepositRequestService.js';
 
 const WITHDRAWAL_HEADER_SELECT = [
   'id',
@@ -103,7 +103,7 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
     .eq('id', requestId)
     .maybeSingle();
 
-  return { ...result, data: await attachRemainingLotBalance(result.data, requestRow?.customer_id ?? null) };
+  return { ...result, data: await attachRemainingLotBalance(result.data, requestRow?.customer_id ?? null, requestId) };
 }
 
 // For each line's source deposit batch, resolves how many boxes/kg remain
@@ -111,18 +111,24 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
 // delivery document can show staff what's left in that lot and where it's
 // stored.
 //
-// The remaining quantity itself is read straight from
-// tgd_get_customer_stock_balance (same RPC — and same fixed FIFO/tracking-
-// code allocation, see migration 112 — that powers the admin "ยอดคงเหลือ"
-// screen), rather than re-deriving it here from raw withdrawal rows. An
-// earlier version of this function re-summed withdrawals itself, keyed
-// strictly by each withdrawal line's own source_customer_deposit_request_
-// line_id — but most existing withdrawal lines never have that column
-// populated (see migration 112's investigation), so it silently summed to
-// zero and always reported the batch's full original quantity as
-// "remaining" even after it had been mostly withdrawn. Reusing the RPC
-// avoids maintaining two separate (and now provably inconsistent)
-// implementations of the same balance calculation.
+// The remaining quantity itself is read via getDepositInventoryLines, which
+// nets a batch's raw deposited quantity against EVERY non-CANCELLED
+// withdrawal line claiming it (matched by source_customer_deposit_request_
+// line_id, else tracking code) — the same "claimed balance" definition the
+// withdrawal-creation page already uses to warn customers before they
+// submit. This function used to read tgd_get_customer_stock_balance
+// instead, which only nets out withdrawals whose request has already
+// reached COMPLETED — so two withdrawal slips submitted back-to-back
+// against the same lot, neither yet completed, each computed "remaining"
+// against the same un-decremented baseline and both printed a nonzero
+// balance even once the lot was fully claimed between them. Real incident:
+// CWR-20260725-0006 printed "20 remaining" (200 kg) for tracking
+// FR260716050/lot API — CWR-20260725-0005, submitted ~50s earlier and still
+// WAREHOUSE_PICKING, had already claimed 20 of the lot's 84 boxes, so once
+// 0006's own 64-box claim is netted out on top (below), 0 should have shown.
+// excludeWithdrawalRequestId keeps this document's own line(s) out of the
+// "claimed by others" sum — the caller already nets those out itself via
+// each line's own picked/requested quantity.
 //
 // Batch resolution still happens locally, in priority order: direct
 // source_customer_deposit_request_line_id link, else the line's tracking
@@ -130,8 +136,8 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
 // the last of which is inherently ambiguous when a LOT spans multiple
 // deposit lines, so it just picks one sibling to represent for display;
 // the *quantity* shown for it is still that specific sibling's correct,
-// FIFO-allocated balance from the RPC, not a re-derived approximation.
-async function attachRemainingLotBalance(lines, customerId) {
+// already-netted balance, not a re-derived approximation.
+async function attachRemainingLotBalance(lines, customerId, requestId) {
   if (!supabase || !customerId) {
     return lines.map((l) => ({ ...l, lot_remaining_boxes: null, lot_remaining_weight: null, resolved_weight_per_box: null }));
   }
@@ -148,7 +154,7 @@ async function attachRemainingLotBalance(lines, customerId) {
       `)
       .eq('customer_id', customerId)
       .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']),
-    getCustomerStockBalance(customerId),
+    getDepositInventoryLines({ customerId, excludeWithdrawalRequestId: requestId }),
   ]);
 
   const depositLineList = (depositRequests ?? []).flatMap((r) => r.tgd_customer_deposit_request_lines ?? []);
@@ -157,9 +163,11 @@ async function attachRemainingLotBalance(lines, customerId) {
   }
 
   const depositLineById = new Map(depositLineList.map((d) => [d.id, d]));
-  // Balance rows only cover lines with a positive remaining balance (the
-  // RPC filters out zero-balance lines), so a resolved line missing here
-  // means it's fully withdrawn — correctly reported as 0, not null.
+  // getDepositInventoryLines only covers deposit requests still in
+  // RECEIVED_CONFIRMED/CUSTOMER_NOTIFIED (unlike the broader COMPLETED-
+  // inclusive status list above), so a resolved line missing here belongs to
+  // an already-COMPLETED deposit request — correctly reported as 0, not
+  // null, since a completed deposit has nothing left to withdraw from.
   const balanceByLineId = new Map((balances ?? []).map((b) => [b.id, b]));
 
   function resolveDepositLine(line) {
