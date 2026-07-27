@@ -33,6 +33,29 @@ export function buddhistDateToIso(value) {
 // everything else (ซอง, แพ็ค, กล่อง, ...) is treated as a count.
 const WEIGHT_UNITS = new Set(['กิโลกรัม', 'กก.', 'กก', 'kg', 'KG']);
 
+export function fixMojibakeThaiString(str) {
+  if (typeof str !== 'string' || !str) return str;
+  let hasLatin1Upper = false;
+  let hasThai = false;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code >= 0x0E00 && code <= 0x0E7F) {
+      hasThai = true;
+      break;
+    }
+    if (code >= 128 && code <= 255) {
+      hasLatin1Upper = true;
+    }
+  }
+  if (hasThai || !hasLatin1Upper) return str;
+
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) {
+    bytes[i] = str.charCodeAt(i) & 0xFF;
+  }
+  return new TextDecoder('windows-874').decode(bytes);
+}
+
 export async function readSalesOrderExcelFile(file) {
   const buffer = await file.arrayBuffer();
   const u8 = new Uint8Array(buffer);
@@ -65,7 +88,13 @@ export async function readSalesOrderExcelFile(file) {
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
   const sheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  
+  // If it was a real .xls file (OLE2) without cptable, XLSX parses it as Latin-1,
+  // causing Thai Mojibake. We recursively fix strings that look like Mojibake.
+  return rawRows.map((row) => 
+    row.map((cell) => typeof cell === 'string' ? fixMojibakeThaiString(cell) : cell)
+  );
 }
 
 // rawRows: array-of-arrays (XLSX.utils.sheet_to_json with header: 1).
