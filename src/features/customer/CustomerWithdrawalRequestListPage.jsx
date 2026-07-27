@@ -7,6 +7,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestLinesDisplay } from '../../components/customer/CustomerWithdrawalRequestLinesDisplay.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
+import { CustomerSalesOrderImportModal } from '../../components/customer/CustomerSalesOrderImportModal.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
@@ -34,6 +35,8 @@ export function CustomerWithdrawalRequestListPage() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
   const branding = getDocumentBrandingConfig();
 
@@ -74,7 +77,7 @@ export function CustomerWithdrawalRequestListPage() {
     return () => {
       active = false;
     };
-  }, [customerId, profileLoading, isRequestProxy]);
+  }, [customerId, profileLoading, isRequestProxy, refreshKey]);
 
   const columnCount = isRequestProxy ? 9 : 8;
   const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
@@ -119,18 +122,39 @@ export function CustomerWithdrawalRequestListPage() {
     });
   }
 
+  const effectiveCustomerId = isRequestProxy ? filterCustomer : customerId;
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-withdrawal-request-page">
       <PageHeader
         title={t('customer_withdrawal_title')}
         description={isRequestProxy ? t('customer_withdrawal_list_proxy_description') : t('customer_withdrawal_list_description')}
         actions={canWriteCustomerRequests ? (
-          <Link className="btn btn-primary" data-testid="customer-withdrawal-create-button" to="/customer/withdrawal-request/new">
-            {t('customer_withdrawal_create_button')}
-          </Link>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-secondary"
+              data-testid="customer-withdrawal-import-so-button"
+              disabled={!effectiveCustomerId}
+              title={!effectiveCustomerId ? 'เลือกลูกค้าก่อน' : undefined}
+              onClick={() => setImportOpen(true)}
+              type="button"
+            >
+              นำเข้าจากไฟล์ Sales Order
+            </button>
+            <Link className="btn btn-primary" data-testid="customer-withdrawal-create-button" to="/customer/withdrawal-request/new">
+              {t('customer_withdrawal_create_button')}
+            </Link>
+          </div>
         ) : null}
       />
       <CustomerPortalLiveBanner />
+
+      <CustomerSalesOrderImportModal
+        customerId={effectiveCustomerId}
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => setRefreshKey((k) => k + 1)}
+      />
 
       {isRequestProxy ? (
         <div className="banner banner-info" role="status">{t('customer_request_proxy_scope_banner')}</div>
