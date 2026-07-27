@@ -17,9 +17,7 @@ import {
 // the plan notes behind this feature (2026-07-27 session: bulk warehouse
 // pick, then sort per destination outside afterward). The customer can
 // select a subset of debtor groups to create withdrawal requests for now
-// and leave the rest for a later import run; a group with any unmatched
-// product code can't be selected until the file is corrected — blocking
-// is per-group, not all-or-nothing across the whole file.
+// and leave the rest for a later import run.
 function groupKey(group) {
   return `${group.debtorCode}|${group.debtorName}`;
 }
@@ -28,8 +26,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
   const [step, setStep] = useState('upload'); // upload | preview | submitting | done
   const [fileName, setFileName] = useState('');
   const [groups, setGroups] = useState([]);
-  const [unmatchedCodes, setUnmatchedCodes] = useState([]);
-  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [selectedKeys, setSelectedKeys] = useState(new Set()); // stores itemKey: `${groupKey(group)}|${productCode}`
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
 
@@ -37,7 +34,6 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
     setStep('upload');
     setFileName('');
     setGroups([]);
-    setUnmatchedCodes([]);
     setSelectedKeys(new Set());
     setError('');
     setResults([]);
@@ -62,23 +58,55 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         setError(catalogResult.error.message);
         return;
       }
-      const { groups: parsedGroups, unmatchedCodes: unmatched } = parseSalesOrderRows(rawRows, catalogResult.data ?? []);
+      const { groups: parsedGroups } = parseSalesOrderRows(rawRows, catalogResult.data ?? []);
       if (parsedGroups.length === 0) {
         setError('ไม่พบรายการสินค้าในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รูปแบบ "ใบส่งสินค้า" ที่ถูกต้อง');
         return;
       }
       setGroups(parsedGroups);
-      setUnmatchedCodes(unmatched);
-      setSelectedKeys(new Set(
-        parsedGroups.filter((g) => g.products.every((p) => p.matched)).map(groupKey),
-      ));
+      
+      // Select all matched products by default
+      const defaultSelected = new Set(
+        parsedGroups.flatMap(g => 
+          g.products.filter(p => p.matched).map(p => `${groupKey(g)}|${p.productCode}`)
+        )
+      );
+      setSelectedKeys(defaultSelected);
+      
       setStep('preview');
     } catch (err) {
       setError(err.message ?? 'ไม่สามารถอ่านไฟล์นี้ได้');
     }
   }
 
-  function toggleGroup(key) {
+  function isGroupFullySelected(group) {
+    const eligible = group.products.filter((p) => p.matched);
+    if (eligible.length === 0) return false;
+    const gKey = groupKey(group);
+    return eligible.every((p) => selectedKeys.has(`${gKey}|${p.productCode}`));
+  }
+
+  function toggleGroup(group) {
+    const eligible = group.products.filter((p) => p.matched);
+    if (eligible.length === 0) return;
+    
+    const fullySelected = isGroupFullySelected(group);
+    const gKey = groupKey(group);
+    
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (fullySelected) {
+        eligible.forEach((p) => next.delete(`${gKey}|${p.productCode}`));
+      } else {
+        eligible.forEach((p) => next.add(`${gKey}|${p.productCode}`));
+      }
+      return next;
+    });
+  }
+
+  function toggleItem(group, product) {
+    if (!product.matched) return;
+    const key = `${groupKey(group)}|${product.productCode}`;
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -89,7 +117,9 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
 
   function selectAllEligible() {
     setSelectedKeys(new Set(
-      groups.filter((g) => g.products.every((p) => p.matched)).map(groupKey),
+      groups.flatMap((g) => 
+        g.products.filter((p) => p.matched).map((p) => `${groupKey(g)}|${p.productCode}`)
+      )
     ));
   }
 
@@ -98,12 +128,17 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
   }
 
   async function handleSubmit() {
-    const selectedGroups = groups.filter((g) => selectedKeys.has(groupKey(g)));
+    // Filter groups to those that have at least one selected product
+    const groupsToSubmit = groups.map((group) => ({
+      ...group,
+      selectedProducts: group.products.filter((p) => selectedKeys.has(`${groupKey(group)}|${p.productCode}`))
+    })).filter((group) => group.selectedProducts.length > 0);
+
     setStep('submitting');
     setError('');
     const createResults = [];
 
-    for (const group of selectedGroups) {
+    for (const group of groupsToSubmit) {
       // Left as WITHDRAWAL_DRAFT, not auto-submitted — the file has no
       // pickup contact, vehicle, or delivery-type preference to go on, so
       // the customer reviews/fills those in via the normal edit flow
@@ -123,7 +158,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
       }
       const requestId = createResult.data?.id;
       const lineErrors = [];
-      for (const product of group.products) {
+      for (const product of group.selectedProducts) {
         // eslint-disable-next-line no-await-in-loop
         const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
           customerProductCode: product.productCode,
@@ -151,6 +186,11 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
     handleClose();
   }
 
+  // Count uniquely selected groups (groups that have > 0 selected items)
+  const selectedGroupsCount = groups.filter((g) => 
+    g.products.some((p) => selectedKeys.has(`${groupKey(g)}|${p.productCode}`))
+  ).length;
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" title="นำเข้าจากไฟล์ Sales Order">
       {step === 'upload' && (
@@ -167,16 +207,8 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
       {step === 'preview' && (
         <div>
           <p style={{ fontSize: 13, marginBottom: 8 }}>
-            ไฟล์: <strong>{fileName}</strong> — พบ {groups.length} กลุ่มลูกค้า, เลือกไว้ {selectedKeys.size} กลุ่ม
+            ไฟล์: <strong>{fileName}</strong> — พบ {groups.length} กลุ่มลูกค้า, เลือกไว้ {selectedGroupsCount} กลุ่ม
           </p>
-          {unmatchedCodes.length > 0 ? (
-            <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>
-              พบรหัสสินค้า {unmatchedCodes.length} รายการที่ไม่ตรงกับแคตตาล็อกของท่าน — กลุ่มที่มีรหัสเหล่านี้จะยังเลือกสร้างใบเบิกไม่ได้จนกว่าจะแก้ไขรหัสในไฟล์ต้นทางแล้วอัปโหลดใหม่:
-              <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
-                {unmatchedCodes.map((code) => <li key={code}>{code}</li>)}
-              </ul>
-            </div>
-          ) : null}
 
           <div className="action-row" style={{ marginBottom: 8 }}>
             <button className="btn btn-secondary btn-sm" type="button" onClick={selectAllEligible}>เลือกทั้งหมด</button>
@@ -186,16 +218,17 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
           {groups.map((group) => {
             const key = groupKey(group);
             const hasUnmatched = group.products.some((p) => !p.matched);
-            const isSelected = selectedKeys.has(key);
+            const hasEligible = group.products.some((p) => p.matched);
+            
             return (
-              <div key={key} className="table-card" style={{ marginBottom: 12, opacity: hasUnmatched ? 0.75 : 1 }}>
+              <div key={key} className="table-card" style={{ marginBottom: 12 }}>
                 <div className="table-card-header">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
                     <input
                       type="checkbox"
-                      checked={isSelected}
-                      disabled={hasUnmatched}
-                      onChange={() => toggleGroup(key)}
+                      checked={isGroupFullySelected(group)}
+                      disabled={!hasEligible}
+                      onChange={() => toggleGroup(group)}
                     />
                     {group.debtorName} ({group.debtorCode})
                   </label>
@@ -208,6 +241,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                   <table className="tgd-table">
                     <thead>
                       <tr>
+                        <th style={{ width: 40, textAlign: 'center' }}>เลือก</th>
                         <th>รหัสสินค้า</th>
                         <th>ชื่อสินค้า (แคตตาล็อก)</th>
                         <th>จำนวน</th>
@@ -215,16 +249,28 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                       </tr>
                     </thead>
                     <tbody>
-                      {group.products.map((p) => (
-                        <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : undefined}>
-                          <td>{p.productCode}</td>
-                          <td>{p.matchedProductName ?? '-'}</td>
-                          <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
-                          <td style={{ color: p.matched ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                            {p.matched ? 'ตรงกับแคตตาล็อก' : 'ไม่พบในแคตตาล็อก'}
-                          </td>
-                        </tr>
-                      ))}
+                      {group.products.map((p) => {
+                        const itemKey = `${key}|${p.productCode}`;
+                        const isSelected = selectedKeys.has(itemKey);
+                        return (
+                          <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : undefined}>
+                            <td style={{ textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={!p.matched}
+                                onChange={() => toggleItem(group, p)}
+                              />
+                            </td>
+                            <td>{p.productCode}</td>
+                            <td>{p.matchedProductName ?? '-'}</td>
+                            <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
+                            <td style={{ color: p.matched ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                              {p.matched ? 'ตรงกับแคตตาล็อก' : 'ไม่พบในแคตตาล็อก'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -242,7 +288,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
               disabled={selectedKeys.size === 0}
               onClick={handleSubmit}
             >
-              สร้างใบเบิก {selectedKeys.size} ใบ
+              สร้างใบเบิก {selectedGroupsCount} ใบ
             </button>
           </div>
         </div>
