@@ -92,6 +92,12 @@ export const navigationGroups = [
         path: '/customer/movement-ledger',
         testId: 'customer-movement-ledger-menu-item',
       },
+      {
+        label: 'จัดการสิทธิ์ผู้ใช้งาน',
+        key: 'customer_team_roles',
+        path: '/customer/team-roles',
+        testId: 'customer-team-roles-menu-item',
+      },
     ],
   },
   {

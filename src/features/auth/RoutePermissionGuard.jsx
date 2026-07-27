@@ -6,7 +6,7 @@ import { useUserRole } from './UserRoleProvider.jsx';
 
 export function RoutePermissionGuard() {
   const { pathname } = useLocation();
-  const { role, ready } = useUserRole();
+  const { role, ready, allowedMenuKeys } = useUserRole();
 
   if (!ready) {
     return (
@@ -16,7 +16,7 @@ export function RoutePermissionGuard() {
     );
   }
 
-  const decision = getRouteAccessDecision(role, pathname);
+  const decision = getRouteAccessDecision(role, pathname, allowedMenuKeys);
   if (!decision.allowed) {
     return <PermissionDeniedNotice />;
   }

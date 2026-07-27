@@ -8,10 +8,16 @@ import {
   setAuthenticatedUserRole,
 } from '../../security/currentUserRole.js';
 import { refreshRoleAreaPermissionCache } from '../../services/roleAreaPermissionCacheService.js';
+import { getCustomerCustomRole } from '../../services/customerCustomRoleService.js';
 
 const UserRoleContext = createContext({
   role: 'viewer',
   ready: false,
+  customerId: null,
+  // null = unrestricted (every existing customer_user's default) — sees
+  // every customer-portal menu, same as today. A non-null array restricts
+  // the sidebar/route guard to exactly those navigationGroups item keys.
+  allowedMenuKeys: null,
 });
 
 export function UserRoleProvider({ children }) {
@@ -21,6 +27,8 @@ export function UserRoleProvider({ children }) {
     role: getCurrentUserRole(),
     ready: false,
     resolvedUserId: null,
+    customerId: null,
+    allowedMenuKeys: null,
   });
 
 
@@ -35,7 +43,7 @@ export function UserRoleProvider({ children }) {
     if (!sessionUserId) {
       clearAuthenticatedUserRole();
       if (active) {
-        setState({ role: getCurrentUserRole(), ready: true, resolvedUserId: null });
+        setState({ role: getCurrentUserRole(), ready: true, resolvedUserId: null, customerId: null, allowedMenuKeys: null });
       }
       return undefined;
     }
@@ -52,11 +60,27 @@ export function UserRoleProvider({ children }) {
         const resolved = resolveUserProfileRole(result.data);
         setAuthenticatedUserRole(resolved.role);
         await refreshRoleAreaPermissionCache();
+
+        // Only a customer_user can be restricted (a customer_admin is
+        // never a valid assignment target — see
+        // tgd_assign_customer_user_custom_role) — no restriction to
+        // resolve otherwise, so allowedMenuKeys stays null (unrestricted).
+        let allowedMenuKeys = null;
+        if (resolved.role === 'customer_user' && result.data?.customer_custom_role_id) {
+          const roleResult = await getCustomerCustomRole(result.data.customer_custom_role_id);
+          // A deactivated (or deleted/unreadable) role must NOT fall back
+          // to unrestricted access — [] (nothing visible) is the safe
+          // default, not null (everything visible).
+          allowedMenuKeys = roleResult.data?.is_active ? (roleResult.data.allowed_menu_keys ?? []) : [];
+        }
         if (!active) return;
+
         setState({
           role: getCurrentUserRole(),
           ready: true,
           resolvedUserId: sessionUserId,
+          customerId: result.data?.customer_id ?? null,
+          allowedMenuKeys,
         });
       })
       .catch((e) => {
@@ -67,6 +91,8 @@ export function UserRoleProvider({ children }) {
           role: getCurrentUserRole(),
           ready: true,
           resolvedUserId: sessionUserId,
+          customerId: null,
+          allowedMenuKeys: null,
         });
       });
 
@@ -84,6 +110,8 @@ export function UserRoleProvider({ children }) {
   const contextValue = {
     role: state.role,
     ready,
+    customerId: state.customerId,
+    allowedMenuKeys: state.allowedMenuKeys,
   };
 
   return (

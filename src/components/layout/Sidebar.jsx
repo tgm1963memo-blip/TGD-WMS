@@ -16,7 +16,7 @@ import {
  */
 export function Sidebar({ isOpen, onClose }) {
   const t = useTranslation();
-  const { role: userRole } = useUserRole();
+  const { role: userRole, allowedMenuKeys } = useUserRole();
   const goLive = isGoLivePresentationEnabled();
 
   const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
@@ -25,6 +25,7 @@ export function Sidebar({ isOpen, onClose }) {
   const visibleGroups = filterNavigationGroupsForRole(
     navigationGroups.filter((group) => isNavigationGroupVisible(group.key)),
     userRole,
+    allowedMenuKeys,
   ).map((group) => ({
     ...group,
     items: group.items.filter((item) => isNavigationItemVisible(item.key)),
