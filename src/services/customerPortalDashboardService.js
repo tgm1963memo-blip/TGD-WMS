@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { getCustomerStorageBalanceSummary } from './customerStorageBalanceReportService.js';
+import { getCustomerStockBalance } from './customerDepositRequestService.js';
 
 const PENDING_DEPOSIT_STATUSES = ['DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'];
 const PENDING_WITHDRAWAL_STATUSES = ['WITHDRAWAL_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'];
@@ -25,10 +25,17 @@ async function countPendingWithdrawals(customerId) {
 }
 
 export async function getCustomerPortalDashboardSummary(customerId) {
+  // getAllCustomerStockBalances (used by the cross-customer admin storage
+  // report) requires an admin/staff role — calling it here for a real
+  // customer_user/customer_admin viewing their OWN portal home page fails
+  // outright with "Insufficient role to view all customer stock balances"
+  // before any per-customer filtering even happens. This widget only ever
+  // needs this one customer's own balance, so use the customer-scoped RPC
+  // (same one CustomerStockBalancePage already uses) instead.
   const [depositResult, withdrawalResult, stockResult] = await Promise.all([
     countPendingDeposits(customerId),
     countPendingWithdrawals(customerId),
-    getCustomerStorageBalanceSummary({ customerId }),
+    getCustomerStockBalance(customerId),
   ]);
 
   const firstError = depositResult.error || withdrawalResult.error || stockResult.error;
@@ -36,11 +43,15 @@ export async function getCustomerPortalDashboardSummary(customerId) {
     return { data: null, error: firstError };
   }
 
+  const lotNos = new Set(
+    (stockResult.data ?? []).map((row) => row.lot_no).filter(Boolean)
+  );
+
   return {
     data: {
       pendingDepositRequests: depositResult.count,
       pendingWithdrawalRequests: withdrawalResult.count,
-      availableStockLots: Number(stockResult.data?.lot_count ?? 0),
+      availableStockLots: lotNos.size,
       lastActivity: '-',
     },
     error: null,
