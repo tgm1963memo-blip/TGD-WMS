@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { MovementLedgerTable } from '../../components/reports/MovementLedgerTable.jsx';
@@ -86,12 +87,14 @@ function mergeMovementRows(result, depositResult, withdrawalResult) {
 export function CustomerMovementLedgerPage() {
   const { customerId, loading: profileLoading } = useCustomerPortalProfile();
   const { session } = useAuth();
+  const [searchParams] = useSearchParams();
+  const trackingCodeParam = searchParams.get('trackingCode');
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [productFilters, setProductFilters] = useState([]);
-  const [lotFilter, setLotFilter] = useState('');
-  const [trackingCodeFilter, setTrackingCodeFilter] = useState('');
+  const [lotFilters, setLotFilters] = useState([]);
+  const [trackingCodeFilters, setTrackingCodeFilters] = useState([]);
   const [state, setState] = useState(initialState);
   const [searched, setSearched] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
@@ -129,6 +132,17 @@ export function CustomerMovementLedgerPage() {
     });
     return () => { active = false; };
   }, [customerId]);
+
+  // Drill-down entry point from the Stock Balance page ("รายละเอียด" per
+  // lot row) — a tracking code in the URL pre-selects that filter and runs
+  // the search immediately, instead of landing on an empty, unsearched page
+  // the customer would have to filter and submit manually.
+  useEffect(() => {
+    if (!trackingCodeParam || !customerId) return;
+    setTrackingCodeFilters([trackingCodeParam]);
+    setSearched(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackingCodeParam, customerId]);
 
   function handleSearch(e) {
     e.preventDefault();
@@ -202,15 +216,19 @@ export function CustomerMovementLedgerPage() {
       .map((r) => [productKey(r), { value: productKey(r), label: r.product_name ?? r.customer_product_code }])
   ).values()].sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
 
-  const lotOptions = [...new Set(optionRows.map((r) => r.lot_no).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const lotOptions = [...new Set(optionRows.map((r) => r.lot_no).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((lot) => ({ value: lot, label: lot }));
 
-  const trackingCodeOptions = [...new Set(optionRows.map((r) => r.tracking_code).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const trackingCodeOptions = [...new Set(optionRows.map((r) => r.tracking_code).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((code) => ({ value: code, label: code }));
 
   // Apply client-side product/LOT/tracking-code filters
   function matchesFilters(r) {
     if (productFilters.length > 0 && !productFilters.includes(productKey(r))) return false;
-    if (lotFilter && r.lot_no !== lotFilter) return false;
-    if (trackingCodeFilter && r.tracking_code !== trackingCodeFilter) return false;
+    if (lotFilters.length > 0 && !lotFilters.includes(r.lot_no)) return false;
+    if (trackingCodeFilters.length > 0 && !trackingCodeFilters.includes(r.tracking_code)) return false;
     return true;
   }
   const filteredRows = state.rows.filter(matchesFilters);
@@ -221,7 +239,7 @@ export function CustomerMovementLedgerPage() {
   const customerLabel = customerDetails?.customer_name ?? customerDetails?.name ?? customerId ?? '-';
   // A product/LOT/tracking-code filter narrows filteredRows to a subset
   // the (unfiltered, per-customer) authoritative total wouldn't match.
-  const hasNarrowingFilter = productFilters.length > 0 || Boolean(lotFilter || trackingCodeFilter);
+  const hasNarrowingFilter = productFilters.length > 0 || lotFilters.length > 0 || trackingCodeFilters.length > 0;
   const effectiveAuthoritativeTotals = hasNarrowingFilter ? null : authoritativeTotals;
 
   return (
@@ -237,7 +255,12 @@ export function CustomerMovementLedgerPage() {
       ) : null}
 
       {/* ── Filter form ── */}
-      <form className="table-card no-print" style={{ padding: '20px 24px' }} onSubmit={handleSearch}>
+      {/* form-card, not table-card — table-card sets overflow:hidden, which
+          clipped the MultiSelectDropdown's absolutely-positioned popup at
+          this form's own bottom edge (looked like it rendered "behind" the
+          content below instead of on top of it). Every other filter/create
+          form in this app already uses form-card for the same reason. */}
+      <form className="form-card no-print" style={{ padding: '20px 24px' }} onSubmit={handleSearch}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>วันที่เริ่มต้น</label>
@@ -270,47 +293,41 @@ export function CustomerMovementLedgerPage() {
             </div>
           )}
           {lotOptions.length > 0 && (
-            <div>
+            <div style={{ minWidth: 180 }}>
               <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Lot</label>
-              <select
-                className="form-input"
-                data-testid="customer-movement-ledger-lot-select"
-                value={lotFilter}
-                onChange={(e) => setLotFilter(e.target.value)}
-              >
-                <option value="">ทุก Lot</option>
-                {lotOptions.map((lot) => (
-                  <option key={lot} value={lot}>{lot}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                name="customer-movement-ledger-lot-filter"
+                testId="customer-movement-ledger-lot-select"
+                options={lotOptions}
+                placeholder="ทุก Lot"
+                value={lotFilters}
+                onChange={setLotFilters}
+              />
             </div>
           )}
           {trackingCodeOptions.length > 0 && (
-            <div>
+            <div style={{ minWidth: 200 }}>
               <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>รหัสติดตาม (Tracking No.)</label>
-              <select
-                className="form-input"
-                data-testid="customer-movement-ledger-tracking-code-select"
-                value={trackingCodeFilter}
-                onChange={(e) => setTrackingCodeFilter(e.target.value)}
-              >
-                <option value="">ทุกรหัสติดตาม</option>
-                {trackingCodeOptions.map((code) => (
-                  <option key={code} value={code}>{code}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                name="customer-movement-ledger-tracking-code-filter"
+                testId="customer-movement-ledger-tracking-code-select"
+                options={trackingCodeOptions}
+                placeholder="ทุกรหัสติดตาม"
+                value={trackingCodeFilters}
+                onChange={setTrackingCodeFilters}
+              />
             </div>
           )}
           <button className="btn btn-primary" type="submit" disabled={!customerId || profileLoading}>
             ดูรายงาน
           </button>
-          {(dateFrom || dateTo || productFilters.length > 0 || lotFilter || trackingCodeFilter) && (
+          {(dateFrom || dateTo || productFilters.length > 0 || lotFilters.length > 0 || trackingCodeFilters.length > 0) && (
             <button
               className="btn btn-secondary"
               type="button"
               onClick={() => {
                 setDateFrom(''); setDateTo(''); setProductFilters([]);
-                setLotFilter(''); setTrackingCodeFilter(''); setSearched(false);
+                setLotFilters([]); setTrackingCodeFilters([]); setSearched(false);
               }}
             >
               ล้างตัวกรอง

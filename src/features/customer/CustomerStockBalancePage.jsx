@@ -1,5 +1,6 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -7,6 +8,7 @@ import { getCustomerStockBalance } from '../../services/customerDepositRequestSe
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { exportCustomerStockBalanceExcel } from '../../utils/customerStockBalanceExcelUtils.js';
 
 function TempBadge({ type }) {
   const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
@@ -172,6 +174,17 @@ export function CustomerStockBalancePage() {
                 {expandedKeys.size > 0 ? '▲ ย่อทั้งหมด' : '▼ ขยายทั้งหมด'}
               </button>
             )}
+            {filtered.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                data-testid="customer-stock-balance-export-excel"
+                style={{ alignSelf: 'flex-end' }}
+                onClick={() => exportCustomerStockBalanceExcel(filtered, `customer-stock-balance-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+              >
+                ดาวน์โหลด Excel
+              </button>
+            )}
           </div>
 
           <div className="table-card" style={{ overflow: 'hidden', padding: 0 }}>
@@ -233,7 +246,8 @@ export function CustomerStockBalancePage() {
                             <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กล่อง)</th>
                             <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>คงเหลือ (กก.)</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, maxWidth: 140 }}>หมายเหตุลูกค้า</th>
-                            <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, maxWidth: 140 }}>หมายเหตุ Admin</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, maxWidth: 140 }}>หมายเหตุ Admin</th>
+                            <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>รายละเอียด</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -270,10 +284,21 @@ export function CustomerStockBalancePage() {
                                 {l.note ?? '-'}
                               </td>
                               <td
-                                style={{ padding: '10px 16px', color: 'var(--tgd-muted-text)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                style={{ padding: '10px 12px', color: 'var(--tgd-muted-text)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                 title={l.actual_note ?? ''}
                               >
                                 {l.actual_note ?? '-'}
+                              </td>
+                              <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                                {l.tracking_code ? (
+                                  <Link
+                                    className="btn btn-outline"
+                                    style={{ padding: '4px 10px', fontSize: 12, whiteSpace: 'nowrap' }}
+                                    to={`/customer/movement-ledger?trackingCode=${encodeURIComponent(l.tracking_code)}`}
+                                  >
+                                    ดูรายละเอียด
+                                  </Link>
+                                ) : '-'}
                               </td>
                             </tr>
                           ))}

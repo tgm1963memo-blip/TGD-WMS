@@ -5,7 +5,8 @@ export function MultiSelectDropdown({
   value = [],
   onChange,
   placeholder = '— ทั้งหมด —',
-  name
+  name,
+  testId,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +59,7 @@ export function MultiSelectDropdown({
       <button
         type="button"
         className="form-control"
+        data-testid={testId}
         onClick={handleToggle}
         style={{
           textAlign: 'left',
