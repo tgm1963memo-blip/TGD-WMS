@@ -35,9 +35,33 @@ const WEIGHT_UNITS = new Set(['กิโลกรัม', 'กก.', 'กก', '
 
 export async function readSalesOrderExcelFile(file) {
   const buffer = await file.arrayBuffer();
-  // `codepage: 874` is for Thai Windows-874/TIS-620 encoding which is very common
-  // in legacy ERP systems exporting "Excel" files that are actually CSV/HTML.
-  const workbook = XLSX.read(buffer, { type: 'array', codepage: 874 });
+  const u8 = new Uint8Array(buffer);
+
+  // Check magic numbers to see if it's a real binary Excel file
+  // ZIP/XLSX: 50 4B 03 04 (PK\x03\x04)
+  // OLE2/XLS: D0 CF 11 E0 A1 B1 1A E1
+  const isZip = u8[0] === 0x50 && u8[1] === 0x4b && u8[2] === 0x03 && u8[3] === 0x04;
+  const isOle2 = u8[0] === 0xd0 && u8[1] === 0xcf && u8[2] === 0x11 && u8[3] === 0xe0;
+
+  let workbook;
+  if (!isZip && !isOle2) {
+    // It's likely an HTML or CSV file exported from an ERP with an .xls extension.
+    // Such legacy systems in Thailand usually use TIS-620/Windows-874 encoding.
+    let str;
+    try {
+      // First try to decode as strict UTF-8
+      str = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    } catch (e) {
+      // If it contains invalid UTF-8 bytes (like Thai TIS-620 characters),
+      // it will throw an error. Fallback to windows-874.
+      str = new TextDecoder('windows-874').decode(buffer);
+    }
+    workbook = XLSX.read(str, { type: 'string' });
+  } else {
+    // Real binary Excel file (XLS/XLSX)
+    workbook = XLSX.read(buffer, { type: 'array' });
+  }
+
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
   const sheet = workbook.Sheets[sheetName];
