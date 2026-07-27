@@ -19,7 +19,6 @@ export function CustomerDepositRequestListPage() {
   const { customerId, canWriteCustomerRequests, isRequestProxy, role, loading: profileLoading } = useCustomerPortalProfile();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [customerNames, setCustomerNames] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [recallingId, setRecallingId] = useState(null);
@@ -27,7 +26,6 @@ export function CustomerDepositRequestListPage() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-  const PAGE_SIZE = 5;
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
 
   useEffect(() => {
@@ -86,8 +84,6 @@ export function CustomerDepositRequestListPage() {
     if (filterDateTo && date > filterDateTo) return false;
     return true;
   });
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
-  const pagedData = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
 
@@ -153,14 +149,14 @@ export function CustomerDepositRequestListPage() {
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px 16px', marginTop: 4 }}>
           <input
             className="form-input"
-            onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearchText(e.target.value)}
             placeholder="ค้นหาเลขที่ / สถานะ / หมายเหตุ..."
             style={{ flex: '1 1 200px', minWidth: 180 }}
             type="text"
             value={searchText}
           />
           {isRequestProxy && (
-            <select className="form-input" value={filterCustomer} onChange={(e) => { setFilterCustomer(e.target.value); setCurrentPage(1); }}
+            <select className="form-input" value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}
               style={{ flex: '1 1 160px', minWidth: 160 }}>
               <option value="">-- ลูกค้าทุกราย --</option>
               {Object.entries(customerNames).map(([id, name]) => (
@@ -169,14 +165,14 @@ export function CustomerDepositRequestListPage() {
             </select>
           )}
           <input className="form-input" type="date" value={filterDateFrom}
-            onChange={(e) => { setFilterDateFrom(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
             style={{ flex: '1 1 140px', minWidth: 140 }} title="วันที่แจ้งฝาก (ตั้งแต่)" />
           <input className="form-input" type="date" value={filterDateTo}
-            onChange={(e) => { setFilterDateTo(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setFilterDateTo(e.target.value)}
             style={{ flex: '1 1 140px', minWidth: 140 }} title="วันที่แจ้งฝาก (ถึง)" />
           {(searchText || filterCustomer || filterDateFrom || filterDateTo) && (
             <button type="button" className="btn"
-              onClick={() => { setSearchText(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); setCurrentPage(1); }}
+              onClick={() => { setSearchText(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
               style={{ background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}>
               ล้างตัวกรอง
             </button>
@@ -184,7 +180,7 @@ export function CustomerDepositRequestListPage() {
         </div>
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
-          <table className="data-table" data-testid="customer-deposit-list-table">
+          <table className="data-table sticky-header-table" data-testid="customer-deposit-list-table">
             <thead>
               <tr>
                 <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
@@ -199,7 +195,7 @@ export function CustomerDepositRequestListPage() {
               </tr>
             </thead>
             <tbody>
-              {pagedData.length ? pagedData.map((row) => (
+              {filteredData.length ? filteredData.map((row) => (
                 <tr key={row.id}>
                   <td>{row.request_no}</td>
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
@@ -290,12 +286,10 @@ export function CustomerDepositRequestListPage() {
             </tbody>
           </table>
         </div>
-        {totalPages > 1 && (
-          <div className="action-row" style={{ justifyContent: 'center', padding: '12px 0', gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)} type="button">‹ ก่อนหน้า</button>
-            <span style={{ fontSize: 13, padding: '4px 8px' }}>{currentPage} / {totalPages} (ทั้งหมด {filteredData.length} รายการ)</span>
-            <button className="btn btn-secondary btn-sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} type="button">ถัดไป ›</button>
-          </div>
+        {filteredData.length > 0 && (
+          <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
+            ทั้งหมด {filteredData.length} รายการ
+          </p>
         )}
       </div>
     </section>

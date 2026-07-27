@@ -15,14 +15,21 @@ import {
 // withdrawal request PER DEBTOR GROUP found in the file — see
 // customerSalesOrderImportUtils.js for the parsing/aggregation rules and
 // the plan notes behind this feature (2026-07-27 session: bulk warehouse
-// pick, then sort per destination outside afterward). Per the explicit
-// decision this import blocks entirely on any unmatched product code —
-// no partial/silent creation.
+// pick, then sort per destination outside afterward). The customer can
+// select a subset of debtor groups to create withdrawal requests for now
+// and leave the rest for a later import run; a group with any unmatched
+// product code can't be selected until the file is corrected — blocking
+// is per-group, not all-or-nothing across the whole file.
+function groupKey(group) {
+  return `${group.debtorCode}|${group.debtorName}`;
+}
+
 export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onImported }) {
   const [step, setStep] = useState('upload'); // upload | preview | submitting | done
   const [fileName, setFileName] = useState('');
   const [groups, setGroups] = useState([]);
   const [unmatchedCodes, setUnmatchedCodes] = useState([]);
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
 
@@ -31,6 +38,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
     setFileName('');
     setGroups([]);
     setUnmatchedCodes([]);
+    setSelectedKeys(new Set());
     setError('');
     setResults([]);
   }
@@ -61,18 +69,41 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
       }
       setGroups(parsedGroups);
       setUnmatchedCodes(unmatched);
+      setSelectedKeys(new Set(
+        parsedGroups.filter((g) => g.products.every((p) => p.matched)).map(groupKey),
+      ));
       setStep('preview');
     } catch (err) {
       setError(err.message ?? 'ไม่สามารถอ่านไฟล์นี้ได้');
     }
   }
 
+  function toggleGroup(key) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function selectAllEligible() {
+    setSelectedKeys(new Set(
+      groups.filter((g) => g.products.every((p) => p.matched)).map(groupKey),
+    ));
+  }
+
+  function clearSelection() {
+    setSelectedKeys(new Set());
+  }
+
   async function handleSubmit() {
+    const selectedGroups = groups.filter((g) => selectedKeys.has(groupKey(g)));
     setStep('submitting');
     setError('');
     const createResults = [];
 
-    for (const group of groups) {
+    for (const group of selectedGroups) {
       // Left as WITHDRAWAL_DRAFT, not auto-submitted — the file has no
       // pickup contact, vehicle, or delivery-type preference to go on, so
       // the customer reviews/fills those in via the normal edit flow
@@ -125,8 +156,8 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
       {step === 'upload' && (
         <div>
           <p style={{ fontSize: 13, color: 'var(--tgd-muted-text)', marginBottom: 12 }}>
-            อัปโหลดไฟล์ใบส่งสินค้าจากระบบของท่าน ระบบจะรวมจำนวนสินค้าตามรหัสลูกหนี้ในไฟล์
-            และสร้างใบเบิก (ร่าง) แยกตามกลุ่มลูกค้า 1 ใบต่อกลุ่ม — ท่านตรวจสอบและกรอกข้อมูลเพิ่มก่อนส่งใบเบิกแต่ละใบเองอีกครั้ง
+            อัปโหลดไฟล์ใบส่งสินค้าจากระบบของท่าน ระบบจะรวมจำนวนสินค้าตามรหัสลูกหนี้ในไฟล์และแยกเป็นกลุ่มลูกค้า
+            ท่านสามารถเลือกได้ว่าจะสร้างใบเบิก (ร่าง) สำหรับกลุ่มใดก่อน — ท่านตรวจสอบและกรอกข้อมูลเพิ่มก่อนส่งใบเบิกแต่ละใบเองอีกครั้ง
           </p>
           <input type="file" accept=".xls,.xlsx" onChange={handleFileChange} data-testid="sales-order-import-file-input" />
           {error ? <div className="banner banner-danger" role="alert" style={{ marginTop: 12 }}>{error}</div> : null}
@@ -135,48 +166,71 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
 
       {step === 'preview' && (
         <div>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>ไฟล์: <strong>{fileName}</strong> — พบ {groups.length} กลุ่มลูกค้า</p>
+          <p style={{ fontSize: 13, marginBottom: 8 }}>
+            ไฟล์: <strong>{fileName}</strong> — พบ {groups.length} กลุ่มลูกค้า, เลือกไว้ {selectedKeys.size} กลุ่ม
+          </p>
           {unmatchedCodes.length > 0 ? (
             <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>
-              พบรหัสสินค้า {unmatchedCodes.length} รายการที่ไม่ตรงกับแคตตาล็อกของท่าน กรุณาแก้ไขรหัสในไฟล์ต้นทางแล้วอัปโหลดใหม่ก่อนดำเนินการต่อ:
+              พบรหัสสินค้า {unmatchedCodes.length} รายการที่ไม่ตรงกับแคตตาล็อกของท่าน — กลุ่มที่มีรหัสเหล่านี้จะยังเลือกสร้างใบเบิกไม่ได้จนกว่าจะแก้ไขรหัสในไฟล์ต้นทางแล้วอัปโหลดใหม่:
               <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
                 {unmatchedCodes.map((code) => <li key={code}>{code}</li>)}
               </ul>
             </div>
           ) : null}
 
-          {groups.map((group) => (
-            <div key={`${group.debtorCode}|${group.debtorName}`} className="table-card" style={{ marginBottom: 12 }}>
-              <div className="table-card-header">
-                <h3 style={{ fontSize: 14 }}>{group.debtorName} ({group.debtorCode})</h3>
-                <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{group.soNumbers.length} SO</span>
-              </div>
-              <div className="table-responsive">
-                <table className="tgd-table">
-                  <thead>
-                    <tr>
-                      <th>รหัสสินค้า</th>
-                      <th>ชื่อสินค้า (แคตตาล็อก)</th>
-                      <th>จำนวน</th>
-                      <th>สถานะ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.products.map((p) => (
-                      <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : undefined}>
-                        <td>{p.productCode}</td>
-                        <td>{p.matchedProductName ?? '-'}</td>
-                        <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
-                        <td style={{ color: p.matched ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                          {p.matched ? 'ตรงกับแคตตาล็อก' : 'ไม่พบในแคตตาล็อก'}
-                        </td>
+          <div className="action-row" style={{ marginBottom: 8 }}>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={selectAllEligible}>เลือกทั้งหมด</button>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={clearSelection}>ยกเลิกทั้งหมด</button>
+          </div>
+
+          {groups.map((group) => {
+            const key = groupKey(group);
+            const hasUnmatched = group.products.some((p) => !p.matched);
+            const isSelected = selectedKeys.has(key);
+            return (
+              <div key={key} className="table-card" style={{ marginBottom: 12, opacity: hasUnmatched ? 0.75 : 1 }}>
+                <div className="table-card-header">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={hasUnmatched}
+                      onChange={() => toggleGroup(key)}
+                    />
+                    {group.debtorName} ({group.debtorCode})
+                  </label>
+                  <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>
+                    {group.soNumbers.length} SO
+                    {hasUnmatched ? <span style={{ color: '#dc2626', marginLeft: 8 }}>มีรหัสที่ไม่พบในแคตตาล็อก</span> : null}
+                  </span>
+                </div>
+                <div className="table-responsive">
+                  <table className="tgd-table">
+                    <thead>
+                      <tr>
+                        <th>รหัสสินค้า</th>
+                        <th>ชื่อสินค้า (แคตตาล็อก)</th>
+                        <th>จำนวน</th>
+                        <th>สถานะ</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {group.products.map((p) => (
+                        <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : undefined}>
+                          <td>{p.productCode}</td>
+                          <td>{p.matchedProductName ?? '-'}</td>
+                          <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
+                          <td style={{ color: p.matched ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                            {p.matched ? 'ตรงกับแคตตาล็อก' : 'ไม่พบในแคตตาล็อก'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
 
@@ -185,10 +239,10 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
             <button
               className="btn btn-primary"
               type="button"
-              disabled={unmatchedCodes.length > 0}
+              disabled={selectedKeys.size === 0}
               onClick={handleSubmit}
             >
-              สร้างใบเบิก {groups.length} ใบ
+              สร้างใบเบิก {selectedKeys.size} ใบ
             </button>
           </div>
         </div>

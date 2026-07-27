@@ -206,7 +206,7 @@ export function CustomerWithdrawalRequestListPage() {
         </div>
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
-          <table className="data-table" data-testid="customer-withdrawal-list-table">
+          <table className="data-table sticky-header-table" data-testid="customer-withdrawal-list-table">
             <thead>
               <tr>
                 <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
