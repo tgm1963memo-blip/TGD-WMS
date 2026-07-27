@@ -35,11 +35,16 @@ function distinctNonNull(values) {
   return out;
 }
 
-// Groups lines across all source requests by (product code, lot), summing
-// quantity fields for matching groups. Lines that share a code but differ in
-// lot are never merged into the same row.
+// Groups lines across all source requests by (product code, tracking code),
+// summing quantity fields for matching groups. Lines that share a code but
+// differ in tracking code are never merged into the same row — grouping by
+// LOT instead (the old behavior) could merge two genuinely distinct
+// physical batches sharing one LOT label but different tracking codes (and
+// different weight_per_box) into a single printed row. See the incident
+// this fixes: 20260725090000_recalc_weight_per_box_on_correction.sql
+// documents a real LOT spanning batches that must stay distinguishable.
 export function mergeLineGroups(entries, fieldConfig) {
-  const { codeFields, lotFields, sumFields, identityFields, concatFields } = fieldConfig;
+  const { codeFields, trackingFields, sumFields, identityFields, concatFields } = fieldConfig;
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.header?.created_at ?? 0) - new Date(b.header?.created_at ?? 0)
   );
@@ -51,8 +56,8 @@ export function mergeLineGroups(entries, fieldConfig) {
     const requestNo = entry.header?.request_no ?? entry.header?.withdrawal_no ?? '';
     for (const line of entry.lines ?? []) {
       const code = normKey(firstNonNull(codeFields.map((f) => line[f])));
-      const lot = normKey(firstNonNull(lotFields.map((f) => line[f])));
-      const key = code || lot ? `${code}::${lot}` : `__id::${line.id}`;
+      const tracking = normKey(firstNonNull(trackingFields.map((f) => line[f])));
+      const key = code || tracking ? `${code}::${tracking}` : `__id::${line.id}`;
 
       if (!groups.has(key)) {
         groups.set(key, []);
@@ -143,7 +148,7 @@ export function mergeHeadersForPrint(headers, fieldConfig) {
 
 const DEPOSIT_LINE_FIELDS = {
   codeFields: ['customer_product_code', 'internal_product_code'],
-  lotFields: ['lot_no'],
+  trackingFields: ['tracking_code'],
   sumFields: ['expected_boxes', 'expected_weight', 'actual_boxes', 'actual_weight'],
   identityFields: [
     'lot_no', 'customer_product_code', 'internal_product_code', 'tracking_code',
@@ -168,7 +173,7 @@ const DEPOSIT_HEADER_FIELDS = {
 
 const WITHDRAWAL_LINE_FIELDS = {
   codeFields: ['customer_product_code', 'internal_product_code'],
-  lotFields: ['source_lot_no', 'lot_no'],
+  trackingFields: ['tracking_code'],
   sumFields: ['requested_qty', 'requested_boxes', 'requested_weight', 'picked_boxes', 'picked_weight'],
   identityFields: [
     'lot_no', 'source_lot_no', 'customer_product_code', 'internal_product_code', 'tracking_code',

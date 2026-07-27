@@ -46,16 +46,35 @@ describe('mergeDepositRequestsForPrint', () => {
     expect(lines[0]._mergeSourceRequestNos).toEqual(['CDR-0001', 'CDR-0002']);
   });
 
-  it('keeps lines with the same code but a different lot separate', () => {
+  it('merges lines with the same code and tracking code even when lot_no differs, flagging the conflict', () => {
+    // A single LOT label can legitimately span multiple physical batches
+    // with different tracking codes (and different weight_per_box — see
+    // 20260725090000_recalc_weight_per_box_on_correction.sql's incident
+    // notes). Grouping must key off tracking_code, not lot_no — two lines
+    // sharing a tracking_code (or both lacking one) are the same batch
+    // regardless of what lot_no says, so they merge; lot_no still shows up
+    // as a flagged mismatch rather than being silently dropped.
     const entries = [
-      { header: depositHeader({ id: 'req-1', request_no: 'CDR-0001' }), lines: [depositLine({ id: 'l1', lot_no: 'LOT-1' })] },
-      { header: depositHeader({ id: 'req-2', request_no: 'CDR-0002' }), lines: [depositLine({ id: 'l2', lot_no: 'LOT-2' })] },
+      { header: depositHeader({ id: 'req-1', request_no: 'CDR-0001' }), lines: [depositLine({ id: 'l1', lot_no: 'LOT-1', tracking_code: 'TRK-1' })] },
+      { header: depositHeader({ id: 'req-2', request_no: 'CDR-0002' }), lines: [depositLine({ id: 'l2', lot_no: 'LOT-2', tracking_code: 'TRK-1' })] },
+    ];
+
+    const { lines } = mergeDepositRequestsForPrint(entries);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]._mergeConflicts?.lot_no).toEqual(['LOT-1', 'LOT-2']);
+  });
+
+  it('keeps lines with the same code but a different tracking code separate', () => {
+    const entries = [
+      { header: depositHeader({ id: 'req-1', request_no: 'CDR-0001' }), lines: [depositLine({ id: 'l1', lot_no: 'LOT-1', tracking_code: 'TRK-1' })] },
+      { header: depositHeader({ id: 'req-2', request_no: 'CDR-0002' }), lines: [depositLine({ id: 'l2', lot_no: 'LOT-1', tracking_code: 'TRK-2' })] },
     ];
 
     const { lines } = mergeDepositRequestsForPrint(entries);
 
     expect(lines).toHaveLength(2);
-    expect(lines.map((l) => l.lot_no).sort()).toEqual(['LOT-1', 'LOT-2']);
+    expect(lines.map((l) => l.tracking_code).sort()).toEqual(['TRK-1', 'TRK-2']);
   });
 
   it('keeps a merged quantity field null when every contributing value is null', () => {
@@ -155,7 +174,7 @@ describe('mergeWithdrawalRequestsForPrint', () => {
     };
   }
 
-  it('groups by source_lot_no (falling back to lot_no) and sums requested/picked quantities independently', () => {
+  it('groups by tracking_code (source_lot_no/lot_no are display-only) and sums requested/picked quantities independently', () => {
     const entries = [
       { header: withdrawalHeader({ id: 'w1', withdrawal_no: 'WDR-0001', created_at: '2026-07-01T00:00:00Z' }), lines: [withdrawalLine({ id: 'l1' })] },
       { header: withdrawalHeader({ id: 'w2', withdrawal_no: 'WDR-0002', created_at: '2026-07-02T00:00:00Z' }), lines: [withdrawalLine({ id: 'l2', requested_boxes: 4, requested_weight: 40, picked_boxes: 4, picked_weight: 40 })] },
@@ -169,5 +188,16 @@ describe('mergeWithdrawalRequestsForPrint', () => {
     expect(lines[0].picked_boxes).toBe(12);
     expect(lines[0].picked_weight).toBe(120);
     expect(lines[0].lot_no).toBe('LOT-1');
+  });
+
+  it('keeps withdrawal lines with the same code but a different tracking code separate, even when source_lot_no matches', () => {
+    const entries = [
+      { header: withdrawalHeader({ id: 'w1', withdrawal_no: 'WDR-0001' }), lines: [withdrawalLine({ id: 'l1', tracking_code: 'TRK-1' })] },
+      { header: withdrawalHeader({ id: 'w2', withdrawal_no: 'WDR-0002' }), lines: [withdrawalLine({ id: 'l2', tracking_code: 'TRK-2' })] },
+    ];
+
+    const { lines } = mergeWithdrawalRequestsForPrint(entries);
+
+    expect(lines).toHaveLength(2);
   });
 });
