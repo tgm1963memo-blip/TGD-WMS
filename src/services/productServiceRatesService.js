@@ -10,6 +10,7 @@ export const SERVICE_TYPES = [
   { value: 'HANDLING_OUT', label: 'ค่านำออก',           labelEn: 'Handling Out' },
   { value: 'LABEL',        label: 'ค่าติดฉลาก',         labelEn: 'Labeling' },
   { value: 'FREEZING',     label: 'ค่าแช่แข็ง',         labelEn: 'Freezing' },
+  { value: 'R3_DOCUMENT',  label: 'ค่าบริการดำเนินการเอกสาร ร.3', labelEn: 'ร.3 Document Fee' },
   { value: 'OTHER',        label: 'ค่าบริการอื่นๆ',     labelEn: 'Other' },
 ];
 

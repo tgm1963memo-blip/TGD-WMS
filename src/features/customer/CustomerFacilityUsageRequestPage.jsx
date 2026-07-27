@@ -10,22 +10,42 @@ import {
   listCustomerFacilityUsageRequests,
   submitCustomerFacilityUsageRequest,
 } from '../../services/customerFacilityUsageService.js';
+import { listAllProductServiceRates, SERVICE_TYPES, UNIT_BASIS } from '../../services/productServiceRatesService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
-import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useLanguage, useTranslation } from '../../i18n/languageProvider.jsx';
 
 const INITIAL_FORM = {
   requested_usage_date: '',
-  usage_type: 'STORAGE_AREA',
+  service_rate_id: '',
   duration_hours: '',
   contact_name: '',
   contact_phone: '',
   note: '',
 };
 
+function serviceTypeLabel(value, language) {
+  const known = SERVICE_TYPES.find((s) => s.value === value);
+  if (!known) return value;
+  return language === 'en' ? known.labelEn : known.label;
+}
+
+function unitBasisLabel(value) {
+  return UNIT_BASIS.find((u) => u.value === value)?.label ?? value;
+}
+
+function formatRateOptionLabel(rate, language) {
+  const typeLabel = serviceTypeLabel(rate.service_type, language);
+  const amount = Number(rate.rate ?? 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${typeLabel} — ${amount} ${rate.currency ?? 'THB'} (${unitBasisLabel(rate.unit_basis)})`;
+}
+
 export function CustomerFacilityUsageRequestPage() {
   const t = useTranslation();
+  const { language } = useLanguage();
   const { customerId, canWriteCustomerRequests } = useCustomerPortalProfile();
   const [rows, setRows] = useState([]);
+  const [rateOptions, setRateOptions] = useState([]);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -51,6 +71,22 @@ export function CustomerFacilityUsageRequestPage() {
     loadRows();
   }, [customerId]);
 
+  useEffect(() => {
+    if (!customerId) {
+      setRateOptions([]);
+      setRatesLoaded(true);
+      return undefined;
+    }
+    let active = true;
+    setRatesLoaded(false);
+    listAllProductServiceRates({ customerId, isActive: true }).then((result) => {
+      if (!active) return;
+      setRateOptions(result.data ?? []);
+      setRatesLoaded(true);
+    });
+    return () => { active = false; };
+  }, [customerId]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);
@@ -59,7 +95,7 @@ export function CustomerFacilityUsageRequestPage() {
 
     const createResult = await createCustomerFacilityUsageRequest({
       requestedUsageDate: form.requested_usage_date,
-      usageType: form.usage_type,
+      serviceRateId: form.service_rate_id,
       durationHours: form.duration_hours,
       contactName: form.contact_name,
       contactPhone: form.contact_phone,
@@ -92,6 +128,13 @@ export function CustomerFacilityUsageRequestPage() {
     { key: 'usage_type', header: t('facility_usage_col_type') },
     { key: 'requested_usage_date', header: t('facility_usage_col_date') },
     { key: 'duration_hours', header: t('facility_usage_col_duration') },
+    {
+      key: 'service_rate_amount',
+      header: t('facility_usage_col_rate'),
+      render: (row) => (row.service_rate_amount != null
+        ? `${Number(row.service_rate_amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB (${unitBasisLabel(row.service_rate_unit_basis)})`
+        : '-'),
+    },
   ];
 
   if (loading) {
@@ -102,6 +145,8 @@ export function CustomerFacilityUsageRequestPage() {
     );
   }
 
+  const noRatesConfigured = ratesLoaded && rateOptions.length === 0;
+
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-facility-usage-page">
       <PageHeader title={t('facility_usage_title')} description={t('facility_usage_description')} />
@@ -109,6 +154,11 @@ export function CustomerFacilityUsageRequestPage() {
 
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
       {success ? <div className="alert-success-panel" role="status">{success}</div> : null}
+      {noRatesConfigured ? (
+        <div className="banner banner-warning" role="alert" data-testid="facility-usage-no-rates-banner">
+          {t('facility_usage_no_rates_configured')}
+        </div>
+      ) : null}
 
       <form className="form-card customer-portal-form" data-testid="customer-facility-usage-form" onSubmit={handleSubmit}>
         <div className="form-grid">
@@ -118,11 +168,22 @@ export function CustomerFacilityUsageRequestPage() {
           </label>
           <label className="form-field">
             <span>{t('facility_usage_col_type')}</span>
-            <select className="form-control" data-testid="facility-usage-type" onChange={(e) => setForm((c) => ({ ...c, usage_type: e.target.value }))} value={form.usage_type}>
-              <option value="STORAGE_AREA">STORAGE_AREA</option>
-              <option value="LOADING_DOCK">LOADING_DOCK</option>
-              <option value="INSPECTION_ROOM">INSPECTION_ROOM</option>
-              <option value="OTHER">OTHER</option>
+            <select
+              className="form-control"
+              data-testid="facility-usage-type"
+              disabled={noRatesConfigured}
+              onChange={(e) => setForm((c) => ({ ...c, service_rate_id: e.target.value }))}
+              required
+              value={form.service_rate_id}
+            >
+              <option disabled value="">
+                {t('facility_usage_col_type')}
+              </option>
+              {rateOptions.map((rate) => (
+                <option key={rate.id} value={rate.id}>
+                  {formatRateOptionLabel(rate, language)}
+                </option>
+              ))}
             </select>
           </label>
           <label className="form-field">
@@ -144,7 +205,7 @@ export function CustomerFacilityUsageRequestPage() {
         </div>
         <div className="action-row">
           <Link className="btn btn-secondary" to="/customer">{t('close')}</Link>
-          <button className="btn btn-primary" data-testid="facility-usage-submit-button" disabled={!canWriteCustomerRequests || submitting} type="submit">
+          <button className="btn btn-primary" data-testid="facility-usage-submit-button" disabled={!canWriteCustomerRequests || submitting || noRatesConfigured || !form.service_rate_id} type="submit">
             {submitting ? t('facility_usage_submitting') : t('facility_usage_submit')}
           </button>
         </div>

@@ -56,6 +56,7 @@ export function mapDepositHeaderForCopy(source) {
     contact_phone: source?.contact_phone ?? '',
     vehicle_registration: source?.vehicle_registration ?? '',
     arrival_time: source?.arrival_time ?? '',
+    requires_r3_document: source?.requires_r3_document ?? false,
   };
 }
 
@@ -95,6 +96,7 @@ export function mapWithdrawalHeaderForCopy(source) {
     destination: source?.destination ?? '',
     vehicle_registration: source?.vehicle_registration ?? '',
     note: source?.note ?? '',
+    requires_r3_document: source?.requires_r3_document ?? false,
   };
 }
 

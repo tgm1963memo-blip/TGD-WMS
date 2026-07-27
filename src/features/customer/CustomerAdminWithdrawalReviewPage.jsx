@@ -685,6 +685,10 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <div className="form-label">{t('customer_field_vehicle_registration')}</div>
                 <div>{selected.vehicle_registration || '-'}</div>
               </div>
+              <div>
+                <div className="form-label">{t('customer_field_r3_document')}</div>
+                <div>{selected.requires_r3_document ? '✔' : '-'}</div>
+              </div>
             </div>
 
             {/* Print action */}

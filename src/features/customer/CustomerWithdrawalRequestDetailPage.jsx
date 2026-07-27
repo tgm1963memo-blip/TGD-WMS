@@ -139,6 +139,7 @@ export function CustomerWithdrawalRequestDetailPage() {
           <div><strong>{t('customer_field_delivery_type')}:</strong> {header.delivery_type ?? '-'}</div>
           <div><strong>{t('customer_field_pickup_contact')}:</strong> {header.pickup_contact ?? '-'}</div>
           <div><strong>{t('customer_field_vehicle_registration')}:</strong> {header.vehicle_registration || '-'}</div>
+          <div><strong>{t('customer_field_r3_document')}:</strong> {header.requires_r3_document ? '✔' : '-'}</div>
           <div><strong>{t('customer_col_note')}:</strong> {header.note || '-'}</div>
         </div>
       </div>

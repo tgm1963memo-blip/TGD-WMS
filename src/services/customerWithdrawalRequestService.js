@@ -19,6 +19,7 @@ const WITHDRAWAL_HEADER_SELECT = [
   'destination',
   'vehicle_registration',
   'note',
+  'requires_r3_document',
   'created_by_email',
   'created_by_role',
   'submitted_at',
@@ -246,6 +247,7 @@ export async function createCustomerWithdrawalRequest({
   destination,
   note,
   vehicleRegistration,
+  requiresR3Document = false,
   customerId = null,
 }) {
   if (!supabase) return missingSupabaseClientResult();
@@ -258,6 +260,7 @@ export async function createCustomerWithdrawalRequest({
     p_note: toNullableText(note),
     p_customer_id: customerId,
     p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_requires_r3_document: Boolean(requiresR3Document),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
@@ -270,6 +273,7 @@ export async function updateCustomerWithdrawalRequestDraft(requestId, {
   destination,
   note,
   vehicleRegistration,
+  requiresR3Document = false,
 }) {
   if (!supabase) return missingSupabaseClientResult();
 
@@ -281,6 +285,7 @@ export async function updateCustomerWithdrawalRequestDraft(requestId, {
     p_destination: toNullableText(destination),
     p_note: toNullableText(note),
     p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_requires_r3_document: Boolean(requiresR3Document),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

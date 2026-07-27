@@ -87,7 +87,7 @@ async function fetchRateEngineInputs({ customerId }) {
     supabase
       .from('tgd_customer_deposit_requests')
       .select(`
-        id, customer_id, expected_arrival_date, last_action_at,
+        id, customer_id, expected_arrival_date, last_action_at, requires_r3_document,
         tgd_customer_deposit_request_lines(
           id, customer_product_code, temperature_type, tracking_code, lot_no,
           actual_boxes, actual_weight, expected_boxes, expected_weight
@@ -98,7 +98,7 @@ async function fetchRateEngineInputs({ customerId }) {
     supabase
       .from('tgd_customer_withdrawal_requests')
       .select(`
-        customer_id,
+        id, customer_id, requested_dispatch_date, requires_r3_document,
         tgd_customer_withdrawal_request_lines(
           source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at
@@ -161,8 +161,24 @@ async function fetchRateEngineInputs({ customerId }) {
     ]),
   );
 
+  // Deposit/withdrawal requests flagged as needing ร.3 processing — each
+  // bills a flat, one-time fee once the underlying document is confirmed
+  // (deposit: RECEIVED_CONFIRMED/CUSTOMER_NOTIFIED, matching the status
+  // filter already used for storage lines above; withdrawal: COMPLETED,
+  // matching the status filter already used for the withdrawal-events
+  // fetch above) — a still-open draft hasn't actually happened yet.
+  const r3FlaggedDocuments = [
+    ...(depositResult.data ?? [])
+      .filter((req) => req.requires_r3_document)
+      .map((req) => ({ id: req.id, date: requestReceiptDateById.get(req.id) ?? null })),
+    ...(withdrawalResult.data ?? [])
+      .filter((req) => req.requires_r3_document)
+      .map((req) => ({ id: req.id, date: req.requested_dispatch_date ?? null })),
+  ];
+
   return {
-    depositLines, depositRequestIds, rates: ratesResult.data ?? [], requestReceiptDateById, error: null,
+    depositLines, depositRequestIds, rates: ratesResult.data ?? [], requestReceiptDateById,
+    r3FlaggedDocuments, error: null,
   };
 }
 
@@ -178,7 +194,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   const inputs = await fetchRateEngineInputs({ customerId });
   if (inputs.error) return { data: null, error: inputs.error };
-  const { depositLines, depositRequestIds, rates, requestReceiptDateById } = inputs;
+  const { depositLines, depositRequestIds, rates, requestReceiptDateById, r3FlaggedDocuments } = inputs;
 
   const storageLines = computeStorageInvoiceLines({
     depositLines,
@@ -213,6 +229,25 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
       .filter((sel) => sel.rate);
 
     auxLines = computeAuxiliaryServiceLines({ selections });
+  }
+
+  // ร.3 document fee: one flat line per flagged deposit/withdrawal request
+  // whose confirmation date falls in this period, always quantity 1 — a
+  // fixed per-document fee, not something that scales with unit_basis math
+  // elsewhere (see the incident note on the migration that introduced this
+  // flag: the automatic engine ignores unit_basis and would otherwise
+  // multiply by weight).
+  const r3Rate = resolveServiceRate(rates, { customerId, serviceType: 'R3_DOCUMENT' });
+  if (r3Rate) {
+    const r3Selections = (r3FlaggedDocuments ?? [])
+      .filter((doc) => doc.date && doc.date >= periodStart && doc.date <= periodEnd)
+      .map((doc) => ({
+        depositRequestId: doc.id,
+        customerId,
+        rate: r3Rate,
+        quantity: 1,
+      }));
+    auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: r3Selections })];
   }
 
   return { data: { storageLines, auxLines, depositLines }, error: null };

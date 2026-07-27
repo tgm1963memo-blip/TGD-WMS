@@ -17,6 +17,9 @@ const FACILITY_USAGE_SELECT = [
   'contact_name',
   'contact_phone',
   'note',
+  'service_rate_id',
+  'service_rate_amount',
+  'service_rate_unit_basis',
   'submitted_at',
   'created_at',
 ].join(', ');
@@ -40,12 +43,12 @@ export async function createCustomerFacilityUsageRequest(payload = {}) {
 
   const { data, error } = await supabase.rpc('tgd_create_customer_facility_usage_request', {
     p_requested_usage_date: payload.requestedUsageDate ?? null,
-    p_usage_type: toNullableText(payload.usageType) ?? 'STORAGE_AREA',
     p_duration_hours: toNullableNumber(payload.durationHours),
     p_contact_name: toNullableText(payload.contactName),
     p_contact_phone: toNullableText(payload.contactPhone),
     p_note: toNullableText(payload.note),
     p_customer_id: payload.customerId ?? null,
+    p_service_rate_id: payload.serviceRateId ?? null,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

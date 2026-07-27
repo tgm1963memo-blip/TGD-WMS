@@ -36,6 +36,7 @@ describe('customerRequestCopyUtils', () => {
       note: 'note',
       vehicle_registration: '',
       arrival_time: '',
+      requires_r3_document: false,
     });
 
     const lines = mapDepositLinesForCopy([

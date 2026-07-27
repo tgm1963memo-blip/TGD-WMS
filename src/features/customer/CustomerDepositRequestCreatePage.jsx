@@ -55,6 +55,7 @@ const INITIAL_HEADER = {
   contact_phone: '',
   vehicle_registration: '',
   arrival_time: '',
+  requires_r3_document: false,
 };
 
 function formatFileSize(size) {
@@ -425,6 +426,7 @@ export function CustomerDepositRequestCreatePage() {
         note: header.note,
         vehicleRegistration: header.vehicle_registration,
         arrivalTime: header.arrival_time,
+        requiresR3Document: header.requires_r3_document,
       });
 
       if (updateResult.error) {
@@ -442,6 +444,7 @@ export function CustomerDepositRequestCreatePage() {
         note: header.note,
         vehicleRegistration: header.vehicle_registration,
         arrivalTime: header.arrival_time,
+        requiresR3Document: header.requires_r3_document,
         customerId: isRequestProxy ? proxyCustomerId : null,
       });
 
@@ -694,6 +697,15 @@ export function CustomerDepositRequestCreatePage() {
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
+          </label>
+          <label className="form-field form-field-span-2" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              data-testid="customer-deposit-r3-document"
+              checked={header.requires_r3_document}
+              onChange={(e) => updateHeaderField('requires_r3_document', e.target.checked)}
+            />
+            <span>{t('customer_field_r3_document')}</span>
           </label>
         </div>
 

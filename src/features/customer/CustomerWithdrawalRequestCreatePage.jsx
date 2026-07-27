@@ -51,6 +51,7 @@ const INITIAL_HEADER = {
   destination: '',
   vehicle_registration: '',
   note: '',
+  requires_r3_document: false,
 };
 
 export function CustomerWithdrawalRequestCreatePage() {
@@ -424,6 +425,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           destination: header.destination,
           note: header.note,
           vehicleRegistration: header.vehicle_registration,
+          requiresR3Document: header.requires_r3_document,
         });
 
         if (updateResult.error) {
@@ -440,6 +442,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           destination: header.destination,
           note: header.note,
           vehicleRegistration: header.vehicle_registration,
+          requiresR3Document: header.requires_r3_document,
           customerId: isRequestProxy ? proxyCustomerId : null,
         });
 
@@ -630,6 +633,15 @@ export function CustomerWithdrawalRequestCreatePage() {
           <label className="form-field form-field-span-2">
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
+          </label>
+          <label className="form-field form-field-span-2" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              data-testid="customer-withdrawal-r3-document"
+              checked={header.requires_r3_document}
+              onChange={(e) => updateHeaderField('requires_r3_document', e.target.checked)}
+            />
+            <span>{t('customer_field_r3_document')}</span>
           </label>
         </div>
         {hasBalanceExceeded ? (

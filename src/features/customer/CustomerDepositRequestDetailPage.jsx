@@ -180,6 +180,7 @@ export function CustomerDepositRequestDetailPage() {
           <div><strong>{t('customer_field_contact_name')}:</strong> {header.contact_name ?? '-'}</div>
           <div><strong>{t('customer_field_contact_phone')}:</strong> {header.contact_phone ?? '-'}</div>
           <div><strong>{t('customer_field_vehicle_registration')}:</strong> {header.vehicle_registration ?? '-'}</div>
+          <div><strong>{t('customer_field_r3_document')}:</strong> {header.requires_r3_document ? '✔' : '-'}</div>
           <div><strong>{t('customer_col_note')}:</strong> {header.note || '-'}</div>
         </div>
       </div>
