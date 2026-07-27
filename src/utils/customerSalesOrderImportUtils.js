@@ -35,7 +35,9 @@ const WEIGHT_UNITS = new Set(['กิโลกรัม', 'กก.', 'กก', '
 
 export async function readSalesOrderExcelFile(file) {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
+  // `codepage: 874` is for Thai Windows-874/TIS-620 encoding which is very common
+  // in legacy ERP systems exporting "Excel" files that are actually CSV/HTML.
+  const workbook = XLSX.read(buffer, { type: 'array', codepage: 874 });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
   const sheet = workbook.Sheets[sheetName];
