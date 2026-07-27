@@ -204,8 +204,31 @@ export async function getDepositInventoryLines(filters = {}) {
     claimedQuery = claimedQuery.neq('withdrawal_request_id', filters.excludeWithdrawalRequestId);
   }
 
+  // Real incident this guards against: a deposit line with 417 boxes had a
+  // MIX of withdrawal claims against it — some rows carried this line's id
+  // directly (source_customer_deposit_request_line_id), others only carried
+  // its tracking_code (source id left null) — both are genuine claims
+  // against the SAME physical batch. The previous version built two
+  // separate totals (claimedByLineId / claimedByTrackingCode) and picked
+  // "whichever bucket is non-empty" via `??`, on the assumption that a
+  // deposit line would only ever show up in one bucket — false here: the
+  // id-bucket had a real but PARTIAL total (195 boxes), so `??` used it
+  // instead of falling through to the complete tracking-code total (347),
+  // understating what was actually claimed by 152 boxes and overstating
+  // this document's printed remaining balance by the same amount (CWR-
+  // 20260727-0004 line 3, tracking FR260704036: printed "197 remaining"
+  // when the true remaining — matching tgd_get_customer_stock_balance — was
+  // 45). Attribute every claimed row to exactly ONE deposit line first
+  // (same priority as resolveDepositLine and the RPC's own JOIN condition:
+  // direct id, else tracking_code), THEN sum — so a line with claims split
+  // across both matching styles gets the full total, not whichever bucket
+  // happened to be checked first.
+  const depositLineByTrackingCode = new Map();
+  for (const l of lines ?? []) {
+    if (l.tracking_code) depositLineByTrackingCode.set(l.tracking_code, l);
+  }
+
   const claimedByLineId = {};
-  const claimedByTrackingCode = {};
   {
     const { data: claimedLines, error: cErr } = await claimedQuery;
     if (cErr) return { data: null, error: cErr };
@@ -219,29 +242,21 @@ export async function getDepositInventoryLines(filters = {}) {
       // only while still in progress (picked_* not yet recorded).
       const claimedBoxes = Number(cl.picked_boxes ?? cl.requested_boxes) || 0;
       const claimedWeight = Number(cl.picked_weight ?? cl.requested_weight) || 0;
-      if (cl.source_customer_deposit_request_line_id) {
-        const bucket = claimedByLineId[cl.source_customer_deposit_request_line_id] ?? { boxes: 0, weight: 0 };
-        bucket.boxes += claimedBoxes;
-        bucket.weight += claimedWeight;
-        claimedByLineId[cl.source_customer_deposit_request_line_id] = bucket;
-      }
-      if (cl.tracking_code) {
-        const bucket = claimedByTrackingCode[cl.tracking_code] ?? { boxes: 0, weight: 0 };
-        bucket.boxes += claimedBoxes;
-        bucket.weight += claimedWeight;
-        claimedByTrackingCode[cl.tracking_code] = bucket;
-      }
+
+      const matchedLineId = cl.source_customer_deposit_request_line_id
+        ?? (cl.tracking_code ? depositLineByTrackingCode.get(cl.tracking_code)?.id : null);
+      if (!matchedLineId) continue;
+
+      const bucket = claimedByLineId[matchedLineId] ?? { boxes: 0, weight: 0 };
+      bucket.boxes += claimedBoxes;
+      bucket.weight += claimedWeight;
+      claimedByLineId[matchedLineId] = bucket;
     }
   }
 
   const headerMap = Object.fromEntries(headers.map((h) => [h.id, h]));
   const enriched = (lines ?? []).map((l) => {
-    // A line matched by id and by tracking_code could double-count the same
-    // withdrawal row if it satisfies both — dedupe isn't needed here since
-    // both buckets are summed from the SAME underlying rows independently
-    // per deposit line, and every withdrawal row is attributed to exactly
-    // one deposit line in practice, so take whichever bucket is non-empty.
-    const claimed = claimedByLineId[l.id] ?? claimedByTrackingCode[l.tracking_code] ?? { boxes: 0, weight: 0 };
+    const claimed = claimedByLineId[l.id] ?? { boxes: 0, weight: 0 };
     const rawBoxes = Number(l.actual_boxes) || 0;
     const rawWeight = Number(l.actual_weight) || 0;
     return {
