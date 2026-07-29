@@ -4,12 +4,12 @@ import { resolveDefaultHomePath } from '../../security/defaultHomePath.js';
 import { useUserRole } from './UserRoleProvider.jsx';
 
 export function DefaultHomeRedirect() {
-  const { role, ready } = useUserRole();
+  const { role, ready, allowedMenuKeys } = useUserRole();
 
   if (!ready) {
     return <LoadingState message="Loading permissions..." />;
   }
 
-  const homePath = resolveDefaultHomePath(role);
+  const homePath = resolveDefaultHomePath(role, allowedMenuKeys);
   return <Navigate to={homePath} replace />;
 }
