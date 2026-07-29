@@ -268,6 +268,14 @@ export function BillingMovementWeightReportPage() {
         </div>
       ) : null}
 
+      <div className="section-card" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', border: '1px solid #93c5fd' }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#1e3a5f' }}>
+          ⓘ หน้านี้คำนวณเฉพาะ<strong>ค่ายก-ขน (HANDLING_IN/HANDLING_OUT)</strong> ต่อรายการเคลื่อนไหว — ถ้าลูกค้าไม่มีอัตรา
+          ค่ายก-ขนกำหนดไว้ (มีแต่อัตรา<strong>ค่าฝาก/STORAGE</strong> แบบคิดเป็นรอบ) แถว "อัตรา"/"งวด" จะว่างเสมอ ไม่ใช่ข้อผิดพลาด —
+          ให้ไปสร้างบิลค่าฝากที่หน้า Invoice Draft List ปุ่ม <strong>"+ สร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา"</strong> แทน
+        </p>
+      </div>
+
       <BillingMovementWeightFilterPanel
         value={filters}
         onChange={(f) => { setFilters(f); setCommittedFilters(f); }}
