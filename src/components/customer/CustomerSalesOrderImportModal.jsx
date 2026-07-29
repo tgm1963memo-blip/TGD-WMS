@@ -32,6 +32,21 @@ function groupKey(group) {
 // not a data error, so it gets its own distinct label instead of reusing
 // "ไม่พบในแคตตาล็อก" (not in catalog) or a bare "no stock found" message
 // that reads like the product doesn't exist.
+// A deposit line's balance already has every non-cancelled withdrawal
+// claim against it subtracted out (see getDepositInventoryLines) — this
+// just reads back WHICH withdrawal request(s) hold those claims, so a
+// "0 available" message can point at the customer's own other pending
+// request instead of leaving them to wonder if the deposit went missing.
+function describeClaimHolders(candidates) {
+  const withdrawalNos = new Set();
+  for (const dl of candidates) {
+    for (const claim of dl.claimed_by ?? []) {
+      if (claim.withdrawalNo) withdrawalNos.add(claim.withdrawalNo);
+    }
+  }
+  return [...withdrawalNos];
+}
+
 function withStockCheck(product, depositLines) {
   if (!product.matched) return { ...product, stockAvailableQty: null, stockShortfall: null };
   const canonicalCode = product.matchedProductCode ?? product.productCode;
@@ -44,6 +59,7 @@ function withStockCheck(product, depositLines) {
     stockAvailableQty: requestedQty - shortfall,
     stockShortfall: shortfall,
     stockMode: mode,
+    stockClaimedBy: shortfall > 0 ? describeClaimHolders(candidates) : [],
   };
 }
 
@@ -212,8 +228,12 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         const candidates = depositLines.filter((dl) => dl.customer_product_code === canonicalCode);
         const { allocations, shortfall } = allocateFefoAcrossLots(candidates, Number(requestedQty) || 0, mode);
 
+        const claimNote = product.stockClaimedBy?.length > 0
+          ? ` (ถูกจองไว้ในใบเบิกอื่นที่ยังไม่เสร็จสิ้น: ${product.stockClaimedBy.join(', ')})`
+          : '';
+
         if (!allocations.length) {
-          lineErrors.push(`${canonicalCode}: ของไม่เพียงพอ (คงเหลือ 0 ${mode === 'weight' ? 'กก.' : 'กล่อง'}) — ไม่ได้สร้างรายการนี้`);
+          lineErrors.push(`${canonicalCode}: ของไม่เพียงพอ (คงเหลือ 0 ${mode === 'weight' ? 'กก.' : 'กล่อง'})${claimNote} — ไม่ได้สร้างรายการนี้`);
           continue;
         }
 
@@ -238,7 +258,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         }
 
         if (shortfall > 0) {
-          lineErrors.push(`${canonicalCode}: สต๊อกไม่พอ ขาดอีก ${shortfall} ${mode === 'weight' ? 'กก.' : 'กล่อง'} — กรุณาตรวจสอบและเพิ่มรายการเองหลังจากนี้`);
+          lineErrors.push(`${canonicalCode}: สต๊อกไม่พอ ขาดอีก ${shortfall} ${mode === 'weight' ? 'กก.' : 'กล่อง'}${claimNote} — กรุณาตรวจสอบและเพิ่มรายการเองหลังจากนี้`);
         }
       }
       createResults.push({
@@ -350,6 +370,11 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                                 <span style={{ color: '#b45309' }}>
                                   เบิกได้บางส่วน (มี {p.stockAvailableQty} จาก {p.requestedBoxes ?? p.requestedWeight} {unit})
                                 </span>
+                              )}
+                              {hasShortage && p.stockClaimedBy?.length > 0 && (
+                                <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)', marginTop: 2 }}>
+                                  ของถูกจองไว้ในใบเบิกอื่นที่ยังไม่เสร็จสิ้น: {p.stockClaimedBy.join(', ')}
+                                </div>
                               )}
                             </td>
                           </tr>

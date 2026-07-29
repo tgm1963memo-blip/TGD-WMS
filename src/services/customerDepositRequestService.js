@@ -194,7 +194,7 @@ export async function getDepositInventoryLines(filters = {}) {
   // size depends on how much history the customer has.
   let claimedQuery = supabase
     .from('tgd_customer_withdrawal_request_lines')
-    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status, customer_id)')
+    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status, customer_id, withdrawal_no)')
     .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED');
 
   if (filters.customerId) {
@@ -247,16 +247,25 @@ export async function getDepositInventoryLines(filters = {}) {
         ?? (cl.tracking_code ? depositLineByTrackingCode.get(cl.tracking_code)?.id : null);
       if (!matchedLineId) continue;
 
-      const bucket = claimedByLineId[matchedLineId] ?? { boxes: 0, weight: 0 };
+      const bucket = claimedByLineId[matchedLineId] ?? { boxes: 0, weight: 0, by: [] };
       bucket.boxes += claimedBoxes;
       bucket.weight += claimedWeight;
+      // Surfaced to the customer when a balance check comes back short —
+      // "0 available" reads as a data error unless they can see it's their
+      // OWN other pending withdrawal request holding the stock, not a
+      // missing deposit.
+      bucket.by.push({
+        withdrawalNo: cl.tgd_customer_withdrawal_requests?.withdrawal_no ?? null,
+        boxes: claimedBoxes,
+        weight: claimedWeight,
+      });
       claimedByLineId[matchedLineId] = bucket;
     }
   }
 
   const headerMap = Object.fromEntries(headers.map((h) => [h.id, h]));
   const enriched = (lines ?? []).map((l) => {
-    const claimed = claimedByLineId[l.id] ?? { boxes: 0, weight: 0 };
+    const claimed = claimedByLineId[l.id] ?? { boxes: 0, weight: 0, by: [] };
     const rawBoxes = Number(l.actual_boxes) || 0;
     const rawWeight = Number(l.actual_weight) || 0;
     return {
@@ -264,6 +273,7 @@ export async function getDepositInventoryLines(filters = {}) {
       request: headerMap[l.deposit_request_id] ?? null,
       actual_boxes: Math.max(0, rawBoxes - claimed.boxes),
       actual_weight: Math.max(0, rawWeight - claimed.weight),
+      claimed_by: claimed.by,
     };
   });
 
