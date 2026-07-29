@@ -24,6 +24,29 @@ function groupKey(group) {
   return `${group.debtorCode}|${group.debtorName}`;
 }
 
+// Attaches a stock-availability check to each matched product — separate
+// from catalog matching (which only asks "do we know this code at all").
+// A code can match the catalog perfectly and still have zero AVAILABLE
+// balance right now because it's already claimed by another pending
+// withdrawal request (own or otherwise) — that's a normal, expected state,
+// not a data error, so it gets its own distinct label instead of reusing
+// "ไม่พบในแคตตาล็อก" (not in catalog) or a bare "no stock found" message
+// that reads like the product doesn't exist.
+function withStockCheck(product, depositLines) {
+  if (!product.matched) return { ...product, stockAvailableQty: null, stockShortfall: null };
+  const canonicalCode = product.matchedProductCode ?? product.productCode;
+  const mode = product.requestedWeight != null ? 'weight' : 'boxes';
+  const requestedQty = Number(mode === 'weight' ? product.requestedWeight : product.requestedBoxes) || 0;
+  const candidates = depositLines.filter((dl) => dl.customer_product_code === canonicalCode);
+  const { shortfall } = allocateFefoAcrossLots(candidates, requestedQty, mode);
+  return {
+    ...product,
+    stockAvailableQty: requestedQty - shortfall,
+    stockShortfall: shortfall,
+    stockMode: mode,
+  };
+}
+
 export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onImported }) {
   const [step, setStep] = useState('upload'); // upload | preview | submitting | done
   const [fileName, setFileName] = useState('');
@@ -72,14 +95,23 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         setError('ไม่พบรายการสินค้าในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รูปแบบ "ใบส่งสินค้า" ที่ถูกต้อง');
         return;
       }
-      setGroups(parsedGroups);
-      setDepositLines(depositResult.data ?? []);
-      
-      // Select all matched products by default
+      const linesForStockCheck = depositResult.data ?? [];
+      const checkedGroups = parsedGroups.map((g) => ({
+        ...g,
+        products: g.products.map((p) => withStockCheck(p, linesForStockCheck)),
+      }));
+      setGroups(checkedGroups);
+      setDepositLines(linesForStockCheck);
+
+      // Auto-select only items with enough available stock to fully cover
+      // the requested quantity — anything short (including zero available,
+      // e.g. already claimed by another pending withdrawal) starts
+      // unselected so the customer explicitly opts in to a partial/empty
+      // withdrawal instead of it happening silently.
       const defaultSelected = new Set(
-        parsedGroups.flatMap(g => 
-          g.products.filter(p => p.matched).map(p => `${groupKey(g)}|${p.productCode}`)
-        )
+        checkedGroups.flatMap((g) =>
+          g.products.filter((p) => p.matched && p.stockShortfall === 0).map((p) => `${groupKey(g)}|${p.productCode}`),
+        ),
       );
       setSelectedKeys(defaultSelected);
       
@@ -181,7 +213,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         const { allocations, shortfall } = allocateFefoAcrossLots(candidates, Number(requestedQty) || 0, mode);
 
         if (!allocations.length) {
-          lineErrors.push(`${canonicalCode}: ไม่พบสต๊อกคงเหลือสำหรับสินค้านี้`);
+          lineErrors.push(`${canonicalCode}: ของไม่เพียงพอ (คงเหลือ 0 ${mode === 'weight' ? 'กก.' : 'กล่อง'}) — ไม่ได้สร้างรายการนี้`);
           continue;
         }
 
@@ -292,8 +324,10 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                       {group.products.map((p) => {
                         const itemKey = `${key}|${p.productCode}`;
                         const isSelected = selectedKeys.has(itemKey);
+                        const unit = p.stockMode === 'weight' ? 'กก.' : 'กล่อง';
+                        const hasShortage = p.matched && p.stockShortfall > 0;
                         return (
-                          <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : undefined}>
+                          <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : (hasShortage ? { background: '#fffbeb' } : undefined)}>
                             <td style={{ textAlign: 'center' }}>
                               <input
                                 type="checkbox"
@@ -305,8 +339,18 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                             <td>{p.productCode}</td>
                             <td>{p.matchedProductName ?? '-'}</td>
                             <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
-                            <td style={{ color: p.matched ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                              {p.matched ? 'ตรงกับแคตตาล็อก' : 'ไม่พบในแคตตาล็อก'}
+                            <td style={{ fontWeight: 600 }}>
+                              {!p.matched ? (
+                                <span style={{ color: '#dc2626' }}>ไม่พบในแคตตาล็อก</span>
+                              ) : p.stockShortfall === 0 ? (
+                                <span style={{ color: '#16a34a' }}>พร้อมเบิก</span>
+                              ) : p.stockAvailableQty === 0 ? (
+                                <span style={{ color: '#dc2626' }}>ของไม่เพียงพอ (คงเหลือ 0 {unit})</span>
+                              ) : (
+                                <span style={{ color: '#b45309' }}>
+                                  เบิกได้บางส่วน (มี {p.stockAvailableQty} จาก {p.requestedBoxes ?? p.requestedWeight} {unit})
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
