@@ -1,8 +1,8 @@
 import { groupRoutesByPermissionArea } from './routePermissionCatalog.js';
 import { hasRoleAccess, roleThresholdLevel } from './roleAccess.js';
+import { setCustomRoleBaseRoles, resolveCustomRoleBaseRole } from './customRoleBaseRoles.js';
 
 const overridesByRole = new Map();
-const baseRoleByCode = new Map();
 
 const AREA_MIN_ROLE_CACHE = new Map();
 
@@ -33,7 +33,7 @@ export function resolveRoleForDefaults(roleCode) {
   const code = String(roleCode ?? '').trim().toLowerCase();
   if (!code) return 'viewer';
   if (code === 'admin') return 'admin';
-  return baseRoleByCode.get(code) ?? code;
+  return resolveCustomRoleBaseRole(code);
 }
 
 export function getDefaultAreaAccess(roleCode, permissionArea) {
@@ -58,7 +58,6 @@ function normalizeRoleCode(roleCode) {
 
 export function setRoleAreaPermissionCache(rows = [], roleDefinitions = []) {
   overridesByRole.clear();
-  baseRoleByCode.clear();
 
   for (const row of rows) {
     const roleCode = normalizeRoleCode(row.role_code);
@@ -70,13 +69,11 @@ export function setRoleAreaPermissionCache(rows = [], roleDefinitions = []) {
     overridesByRole.get(roleCode).set(area, Boolean(row.is_allowed));
   }
 
-  for (const def of roleDefinitions) {
-    const roleCode = normalizeRoleCode(def.role_code);
-    if (!roleCode) continue;
-    if (def.base_role && def.base_role !== roleCode) {
-      baseRoleByCode.set(roleCode, normalizeRoleCode(def.base_role));
-    }
-  }
+  // Custom-role base_role resolution is shared state (see
+  // customRoleBaseRoles.js) — populated unconditionally by
+  // roleAreaPermissionCacheService regardless of whether this specific
+  // area-permission fetch succeeds, so it isn't left stale/empty if only
+  // this half of a refresh fails.
 }
 
 export function getRoleAreaOverride(roleCode, permissionArea) {

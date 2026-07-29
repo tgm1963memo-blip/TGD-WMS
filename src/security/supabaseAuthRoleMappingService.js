@@ -5,6 +5,8 @@
  * or return a query descriptor for later execution.
  */
 
+import { isRegisteredCustomRole } from './customRoleBaseRoles.js';
+
 /**
  * List of known WMS roles.
  */
@@ -31,7 +33,7 @@ const KNOWN_ROLES = [
 export function normalizeWmsRole(role) {
   if (!role) return "viewer";
   const trimmed = String(role).trim().toLowerCase();
-  if (KNOWN_ROLES.includes(trimmed)) {
+  if (KNOWN_ROLES.includes(trimmed) || isRegisteredCustomRole(trimmed)) {
     return trimmed;
   }
   return "viewer";
@@ -44,7 +46,8 @@ export function normalizeWmsRole(role) {
  */
 export function isKnownWmsRole(role) {
   if (!role) return false;
-  return KNOWN_ROLES.includes(String(role).trim().toLowerCase());
+  const trimmed = String(role).trim().toLowerCase();
+  return KNOWN_ROLES.includes(trimmed) || isRegisteredCustomRole(trimmed);
 }
 
 /**

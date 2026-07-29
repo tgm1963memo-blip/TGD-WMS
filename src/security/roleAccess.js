@@ -1,3 +1,5 @@
+import { resolveCustomRoleBaseRole } from './customRoleBaseRoles.js';
+
 const CUSTOMER_ROLES = Object.freeze(['customer_admin', 'customer_user']);
 
 export const ROLE_HIERARCHY = {
@@ -17,7 +19,12 @@ function normalizeRole(role) {
  * Check if a user role meets or exceeds a required role.
  */
 export function hasRoleAccess(userRole, requiredRole) {
-  const user = normalizeRole(userRole);
+  // A custom role (created via RolePermissionsAdminPage, stored in
+  // tgd_role_definitions) is treated as its base_role here — otherwise an
+  // unrecognized role_code would fall through to ROLE_HIERARCHY's `?? 0`
+  // and be denied every route/menu, even though it's a legally assignable
+  // role at the database level.
+  const user = resolveCustomRoleBaseRole(normalizeRole(userRole));
   const required = normalizeRole(requiredRole);
 
   if (user === 'admin') {

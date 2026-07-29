@@ -3,6 +3,7 @@ import { listRoleFunctionPermissions } from './roleFunctionPermissionService.js'
 import { setRoleFunctionPermissionCache } from '../security/roleFunctionPermissions.js';
 import { setRoleAreaPermissionCache } from '../security/roleAreaPermissions.js';
 import { listRoleAreaPermissions } from './roleAreaPermissionService.js';
+import { setCustomRoleBaseRoles } from '../security/customRoleBaseRoles.js';
 
 let _refreshPromise = null;
 
@@ -24,6 +25,13 @@ export async function refreshRolePermissionCache() {
       }
 
       const roleDefinitions = rolesResult.data ?? [];
+
+      // Populated unconditionally (not gated on the area/function fetches
+      // below succeeding) — this is what lets a custom role (e.g. one
+      // created in RolePermissionsAdminPage) resolve to its base_role for
+      // route/sidebar access checks (see roleAccess.js), not just the
+      // admin-configurable permission matrix.
+      setCustomRoleBaseRoles(roleDefinitions);
 
       setRoleFunctionPermissionCache(
         functionResult.data ?? [],

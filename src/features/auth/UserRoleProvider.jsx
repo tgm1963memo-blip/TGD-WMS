@@ -57,9 +57,14 @@ export function UserRoleProvider({ children }) {
     getCurrentUserProfile(sessionUserId)
       .then(async (result) => {
         if (!active) return;
+        // Must run before resolveUserProfileRole: it populates the
+        // registered-custom-role cache that isKnownWmsRole/normalizeWmsRole
+        // check, so a custom role (see RolePermissionsAdminPage /
+        // tgd_role_definitions) isn't mistaken for a bogus role string and
+        // collapsed to 'viewer' just because this cache hadn't loaded yet.
+        await refreshRoleAreaPermissionCache();
         const resolved = resolveUserProfileRole(result.data);
         setAuthenticatedUserRole(resolved.role);
-        await refreshRoleAreaPermissionCache();
 
         // Only a customer_user can be restricted (a customer_admin is
         // never a valid assignment target — see

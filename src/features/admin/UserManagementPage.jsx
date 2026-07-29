@@ -6,7 +6,6 @@ import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
 import { getCurrentUserProfile } from '../../services/userProfileService.js';
 import {
-  ALL_ASSIGNABLE_ROLES,
   CUSTOMER_PORTAL_ROLES,
   createAuthUser,
   deleteUserProfile,
@@ -19,6 +18,7 @@ import { canManageUsers } from '../../security/userManagementPermissions.js';
 import { useTranslation, useLanguage } from '../../i18n/languageProvider.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { listCustomerCustomRoles } from '../../services/customerCustomRoleService.js';
+import { listRoleDefinitions } from '../../services/productServiceRatesService.js';
 
 const EMPTY_FORM = {
   profileId: '',
@@ -54,11 +54,32 @@ export function UserManagementPage() {
   const [deleteRow, setDeleteRow] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [customRoles, setCustomRoles] = useState([]);
+  const [roleDefinitions, setRoleDefinitions] = useState([]);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
     [customers],
   );
+
+  // Assignable roles come from tgd_role_definitions (already sorted by
+  // sort_order), not a hardcoded list — any custom role created on the
+  // "สิทธิ์และบทบาท" (RolePermissionsAdminPage) screen shows up here too.
+  const assignableRoles = useMemo(
+    () => roleDefinitions.filter((def) => def.is_active !== false),
+    [roleDefinitions],
+  );
+  const roleDefsByCode = useMemo(
+    () => Object.fromEntries(roleDefinitions.map((def) => [def.role_code, def])),
+    [roleDefinitions],
+  );
+  // A custom role's actual permission level is its base_role — used only to
+  // decide whether the customer selector applies, so a custom role built on
+  // top of customer_admin/customer_user still gets a customer_id like the
+  // system role would.
+  function resolveEffectiveRole(roleCode) {
+    const def = roleDefsByCode[roleCode];
+    return def && !def.is_system && def.base_role ? def.base_role : roleCode;
+  }
 
   const columns = [
     { key: 'email', header: t('user_mgmt_col_email'), truncate: true },
@@ -137,10 +158,11 @@ export function UserManagementPage() {
     setLoading(true);
     setError('');
 
-    const [profileResult, userResult, customerResult] = await Promise.all([
+    const [profileResult, userResult, customerResult, roleDefResult] = await Promise.all([
       getCurrentUserProfile(session?.user?.id),
       getUserProfiles(),
       getCustomers(),
+      listRoleDefinitions(),
     ]);
 
     const role = profileResult.data?.role ?? '';
@@ -154,6 +176,7 @@ export function UserManagementPage() {
     }
 
     setCustomers(customerResult.data ?? []);
+    setRoleDefinitions(roleDefResult.data ?? []);
     setLoading(false);
   }
 
@@ -276,7 +299,7 @@ export function UserManagementPage() {
       lastName:    form.lastName   || null,
       displayName: form.displayName || null,
       role:        form.role,
-      customerId:  CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
+      customerId:  CUSTOMER_PORTAL_ROLES.includes(resolveEffectiveRole(form.role)) ? form.customerId || null : null,
       customerCustomRoleId: form.role === 'customer_user' ? form.customerCustomRoleId || null : null,
       authUserId,
       pinCode:     form.pinCode    || null,
@@ -449,12 +472,14 @@ export function UserManagementPage() {
               required
               value={form.role}
             >
-              {ALL_ASSIGNABLE_ROLES.map((role) => (
-                <option key={role} value={role}>{role}</option>
+              {assignableRoles.map((def) => (
+                <option key={def.role_code} value={def.role_code}>
+                  {def.display_name} ({def.role_code})
+                </option>
               ))}
             </select>
           </label>
-          {CUSTOMER_PORTAL_ROLES.includes(form.role) ? (
+          {CUSTOMER_PORTAL_ROLES.includes(resolveEffectiveRole(form.role)) ? (
             <label className="form-field">
               <span>{t('user_mgmt_col_customer')}</span>
               <select
