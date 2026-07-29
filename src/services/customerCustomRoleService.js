@@ -59,3 +59,15 @@ export async function assignCustomerUserCustomRole(userProfileId, customRoleId =
   });
   return { data, error };
 }
+
+export async function createCustomerAdminTeamUser(authUserId, payload = {}) {
+  if (!supabase) return missing();
+  const { data, error } = await supabase.rpc('tgd_customer_admin_create_team_user', {
+    p_auth_user_id: authUserId,
+    p_email: payload.email,
+    p_display_name: payload.displayName ?? null,
+    p_first_name: payload.firstName ?? null,
+    p_last_name: payload.lastName ?? null,
+  });
+  return { data, error };
+}

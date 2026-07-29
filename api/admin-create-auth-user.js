@@ -68,7 +68,16 @@ export default async function handler(request, response) {
       return response.status(500).json({ error: profileError.message });
     }
 
-    if (profile?.role !== 'admin') {
+    // A staff admin may create a brand-new auth identity OR reset the
+    // password of an existing one (matches the existing "รีเซตรหัสผ่าน"
+    // flow in UserManagementPage). A customer_admin creating an employee
+    // for their own company may only create brand-new identities — letting
+    // them hit the "existing user" branch would let them silently take
+    // over the password of ANY pre-existing account in the whole system
+    // just by knowing its email, staff or other companies included.
+    const isStaffAdmin = profile?.role === 'admin';
+    const isCustomerAdmin = profile?.role === 'customer_admin';
+    if (!isStaffAdmin && !isCustomerAdmin) {
       return response.status(403).json({ error: 'Admin role required' });
     }
 
@@ -97,6 +106,9 @@ export default async function handler(request, response) {
     }
 
     if (existingUserId) {
+      if (isCustomerAdmin) {
+        return response.status(409).json({ error: 'อีเมลนี้มีผู้ใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น' });
+      }
       const { data: updated, error: updateError } = await serviceClient.auth.admin.updateUserById(existingUserId, {
         password: normalizedPassword,
         email_confirm: true,

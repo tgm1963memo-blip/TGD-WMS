@@ -9,7 +9,9 @@ import {
   deleteCustomerCustomRole,
   listCustomerTeamUsers,
   assignCustomerUserCustomRole,
+  createCustomerAdminTeamUser,
 } from '../../services/customerCustomRoleService.js';
+import { createAuthUser } from '../../services/userManagementService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 
 // The customer-portal menu items a role's checklist can restrict — every
@@ -23,6 +25,7 @@ const MENU_KEY_OPTIONS = (CUSTOMER_PORTAL_GROUP?.items ?? [])
   .map((item) => ({ key: item.key, label: item.label }));
 
 const EMPTY_ROLE_FORM = { roleId: null, roleName: '', allowedMenuKeys: [], isActive: true };
+const EMPTY_EMPLOYEE_FORM = { email: '', password: '', firstName: '', lastName: '' };
 
 export function CustomerTeamRolesPage() {
   const { customerId, role, loading: profileLoading } = useCustomerPortalProfile();
@@ -33,6 +36,9 @@ export function CustomerTeamRolesPage() {
   const [success, setSuccess] = useState('');
   const [roleForm, setRoleForm] = useState(EMPTY_ROLE_FORM);
   const [saving, setSaving] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState(EMPTY_EMPLOYEE_FORM);
+  const [employeeFormOpen, setEmployeeFormOpen] = useState(false);
+  const [creatingEmployee, setCreatingEmployee] = useState(false);
 
   async function loadAll() {
     if (!customerId) { setLoading(false); return; }
@@ -107,6 +113,37 @@ export function CustomerTeamRolesPage() {
       setError(result.error.message);
       return;
     }
+    await loadAll();
+  }
+
+  async function handleCreateEmployee(e) {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!employeeForm.password || employeeForm.password.length < 8) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+      return;
+    }
+    setCreatingEmployee(true);
+    const authResult = await createAuthUser({ email: employeeForm.email, password: employeeForm.password });
+    if (authResult.error) {
+      setCreatingEmployee(false);
+      setError(authResult.error.message);
+      return;
+    }
+    const profileResult = await createCustomerAdminTeamUser(authResult.data?.authUserId, {
+      email: employeeForm.email,
+      firstName: employeeForm.firstName,
+      lastName: employeeForm.lastName,
+    });
+    setCreatingEmployee(false);
+    if (profileResult.error) {
+      setError(profileResult.error.message);
+      return;
+    }
+    setSuccess(`เพิ่มพนักงาน ${employeeForm.email} เรียบร้อยแล้ว`);
+    setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+    setEmployeeFormOpen(false);
     await loadAll();
   }
 
@@ -218,7 +255,64 @@ export function CustomerTeamRolesPage() {
       </div>
 
       <div className="table-card">
-        <div className="table-card-header"><h3>พนักงานในบริษัท</h3></div>
+        <div className="table-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>พนักงานในบริษัท</h3>
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            onClick={() => setEmployeeFormOpen((open) => !open)}
+          >
+            {employeeFormOpen ? 'ยกเลิก' : '+ เพิ่มพนักงาน'}
+          </button>
+        </div>
+        {employeeFormOpen ? (
+          <form className="form-card customer-portal-form" onSubmit={handleCreateEmployee} style={{ margin: '0 0 12px' }}>
+            <div className="form-grid">
+              <label className="form-field">
+                <span>อีเมล</span>
+                <input
+                  className="form-control"
+                  type="email"
+                  required
+                  value={employeeForm.email}
+                  onChange={(e) => setEmployeeForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </label>
+              <label className="form-field">
+                <span>รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)</span>
+                <input
+                  className="form-control"
+                  type="password"
+                  minLength={8}
+                  required
+                  value={employeeForm.password}
+                  onChange={(e) => setEmployeeForm((f) => ({ ...f, password: e.target.value }))}
+                />
+              </label>
+              <label className="form-field">
+                <span>ชื่อ</span>
+                <input
+                  className="form-control"
+                  value={employeeForm.firstName}
+                  onChange={(e) => setEmployeeForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+              </label>
+              <label className="form-field">
+                <span>นามสกุล</span>
+                <input
+                  className="form-control"
+                  value={employeeForm.lastName}
+                  onChange={(e) => setEmployeeForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="action-row">
+              <button className="btn btn-primary" type="submit" disabled={creatingEmployee}>
+                {creatingEmployee ? 'กำลังเพิ่ม...' : 'เพิ่มพนักงาน'}
+              </button>
+            </div>
+          </form>
+        ) : null}
         <div className="table-responsive">
           <table className="tgd-table">
             <thead>
