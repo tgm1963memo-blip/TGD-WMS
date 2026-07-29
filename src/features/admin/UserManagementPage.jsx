@@ -18,6 +18,7 @@ import {
 import { canManageUsers } from '../../security/userManagementPermissions.js';
 import { useTranslation, useLanguage } from '../../i18n/languageProvider.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { listCustomerCustomRoles } from '../../services/customerCustomRoleService.js';
 
 const EMPTY_FORM = {
   profileId: '',
@@ -28,6 +29,7 @@ const EMPTY_FORM = {
   password: '',
   role: 'warehouse_staff',
   customerId: '',
+  customerCustomRoleId: '',
   authUserId: '',
   pinCode: '',
   isActive: true,
@@ -51,6 +53,7 @@ export function UserManagementPage() {
   const [resetting, setResetting] = useState(false);
   const [deleteRow, setDeleteRow] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [customRoles, setCustomRoles] = useState([]);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
@@ -66,6 +69,12 @@ export function UserManagementPage() {
       header: t('user_mgmt_col_customer'),
       truncate: true,
       render: (row) => (row.customer_id ? customerMap[row.customer_id] ?? row.customer_id : '-'),
+    },
+    {
+      key: 'customer_custom_role',
+      header: language === 'th' ? 'บทบาทที่กำหนดเอง' : 'Custom Role',
+      truncate: true,
+      render: (row) => (row.role === 'customer_user' ? (row.customer_custom_role?.role_name ?? '-') : '-'),
     },
     {
       key: 'auth_user_id',
@@ -152,6 +161,18 @@ export function UserManagementPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!isFormOpen || form.role !== 'customer_user' || !form.customerId) {
+      setCustomRoles([]);
+      return undefined;
+    }
+    let cancelled = false;
+    listCustomerCustomRoles(form.customerId).then((result) => {
+      if (!cancelled) setCustomRoles(result.data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [isFormOpen, form.role, form.customerId]);
+
   function startCreate() {
     setForm(EMPTY_FORM);
     setSuccess('');
@@ -169,6 +190,7 @@ export function UserManagementPage() {
       password: '',
       role: row.role ?? 'warehouse_staff',
       customerId: row.customer_id ?? '',
+      customerCustomRoleId: row.customer_custom_role_id ?? '',
       authUserId: row.auth_user_id ?? '',
       pinCode: row.pin_code ?? '',
       isActive: row.is_active !== false,
@@ -198,6 +220,22 @@ export function UserManagementPage() {
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+    setSuccess('');
+    setError('');
+  }
+
+  function updateRole(role) {
+    setForm((current) => ({
+      ...current,
+      role,
+      customerCustomRoleId: role === 'customer_user' ? current.customerCustomRoleId : '',
+    }));
+    setSuccess('');
+    setError('');
+  }
+
+  function updateCustomerId(customerId) {
+    setForm((current) => ({ ...current, customerId, customerCustomRoleId: '' }));
     setSuccess('');
     setError('');
   }
@@ -239,6 +277,7 @@ export function UserManagementPage() {
       displayName: form.displayName || null,
       role:        form.role,
       customerId:  CUSTOMER_PORTAL_ROLES.includes(form.role) ? form.customerId || null : null,
+      customerCustomRoleId: form.role === 'customer_user' ? form.customerCustomRoleId || null : null,
       authUserId,
       pinCode:     form.pinCode    || null,
       isActive:    form.isActive,
@@ -406,7 +445,7 @@ export function UserManagementPage() {
             <select
               className="form-control"
               data-testid="user-mgmt-role"
-              onChange={(e) => updateField('role', e.target.value)}
+              onChange={(e) => updateRole(e.target.value)}
               required
               value={form.role}
             >
@@ -421,13 +460,29 @@ export function UserManagementPage() {
               <select
                 className="form-control"
                 data-testid="user-mgmt-customer"
-                onChange={(e) => updateField('customerId', e.target.value)}
+                onChange={(e) => updateCustomerId(e.target.value)}
                 required
                 value={form.customerId}
               >
                 <option value="">{t('user_mgmt_select_customer')}</option>
                 {customers.map((row) => (
                   <option key={row.id} value={row.id}>{row.customer_code} — {row.customer_name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {form.role === 'customer_user' && form.customerId ? (
+            <label className="form-field">
+              <span>{language === 'th' ? 'บทบาทที่กำหนดเอง (จำกัดเมนู)' : 'Custom Role (menu restriction)'}</span>
+              <select
+                className="form-control"
+                data-testid="user-mgmt-custom-role"
+                onChange={(e) => updateField('customerCustomRoleId', e.target.value)}
+                value={form.customerCustomRoleId}
+              >
+                <option value="">{language === 'th' ? 'ไม่จำกัด (เข้าถึงได้ทุกเมนู)' : 'Unrestricted (all menus)'}</option>
+                {customRoles.map((role) => (
+                  <option key={role.id} value={role.id}>{role.role_name}</option>
                 ))}
               </select>
             </label>

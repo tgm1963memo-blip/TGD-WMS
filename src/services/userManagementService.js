@@ -89,6 +89,7 @@ export async function upsertUserProfile(payload = {}) {
     p_auth_user_id: payload.authUserId  ?? null,
     p_is_active:    typeof payload.isActive === 'boolean' ? payload.isActive : true,
     p_pin_code:     payload.pinCode     ?? null,
+    p_customer_custom_role_id: payload.customerCustomRoleId ?? null,
   });
 
   if (error) return { data: null, error };
