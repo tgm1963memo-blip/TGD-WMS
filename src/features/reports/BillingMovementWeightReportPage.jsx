@@ -20,6 +20,7 @@ import {
   createBillingInvoiceDraftFromMovements,
   findActiveDuplicateDraftLines,
 } from '../../services/billingInvoiceDraftService.js';
+import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import {
   applyActiveDuplicateDraftGuards,
@@ -212,6 +213,34 @@ export function BillingMovementWeightReportPage() {
       setDraftValidationError(new Error(clientValidation.errors.join(' ')));
       setDraftSuccess(null);
       return;
+    }
+
+    // This page only ever resolves HANDLING_IN/HANDLING_OUT rates (see the
+    // banner above) — a customer whose billing is entirely period-based
+    // STORAGE will always get a draft with every rate/amount blank, which
+    // has repeatedly been mistaken for a bug rather than the wrong flow.
+    // Warn before creating one instead of just explaining it after the
+    // fact.
+    const customersInSelection = [...new Map(
+      selectedRows.map((row) => [row.customer_id, row.customer_name ?? row.customer_id]),
+    ).entries()];
+    const customersMissingHandlingRate = [];
+    await Promise.all(customersInSelection.map(async ([customerId, customerName]) => {
+      if (!customerId) return;
+      const result = await listAllProductServiceRates({ customerId, isActive: true });
+      const rates = result?.data ?? [];
+      const hasHandlingRate = rates.some((r) => r.service_type === 'HANDLING_IN' || r.service_type === 'HANDLING_OUT');
+      if (!hasHandlingRate) customersMissingHandlingRate.push(customerName);
+    }));
+
+    if (customersMissingHandlingRate.length > 0) {
+      const proceed = window.confirm(
+        `ลูกค้าต่อไปนี้ไม่มีอัตราค่ายก-ขน (HANDLING_IN/HANDLING_OUT) กำหนดไว้ — ใบร่างที่จะสร้างจะมีอัตรา/ยอดเงินว่างเปล่าทุกบรรทัด:\n\n`
+        + `${customersMissingHandlingRate.join(', ')}\n\n`
+        + `หากลูกค้ารายนี้คิดค่าฝาก (STORAGE) แบบคิดเป็นรอบ ให้ไปใช้ปุ่ม "+ สร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา" ที่หน้า Invoice Draft List แทน\n\n`
+        + `ยืนยันจะสร้างใบร่างนี้ต่อหรือไม่?`,
+      );
+      if (!proceed) return;
     }
 
     setCreatingDraft(true);
