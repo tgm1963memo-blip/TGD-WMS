@@ -628,6 +628,14 @@ export function CustomerProductServiceRatesPage() {
                     <option key={s.value} value={s.value}>{s.label} ({s.labelEn})</option>
                   ))}
                 </datalist>
+                {form.serviceType && !SERVICE_TYPES.some((s) => s.value === form.serviceType) && (
+                  <p style={{ fontSize: 11, color: '#b45309', margin: '4px 0 0' }}>
+                    ⚠ "{form.serviceType}" เป็นประเภทที่กำหนดเอง (custom) — ใบแจ้งหนี้ที่คำนวณอัตโนมัติจากรายการเคลื่อนไหว
+                    (รับเข้า/เบิกออก/ค่าฝาก) จะ<strong>ไม่นำอัตรานี้มาคำนวณให้เอง</strong> ต้องเลือกด้วยตนเองเป็นบริการเสริมต่อคำขอ —
+                    ถ้าต้องการให้คิดค่าบริการรับเข้า/นำออกอัตโนมัติ กรุณาเลือก "ค่านำเข้า (Handling In)" หรือ
+                    "ค่านำออก (Handling Out)" จากรายการแทน
+                  </p>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
