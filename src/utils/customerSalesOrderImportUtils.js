@@ -205,6 +205,14 @@ export function matchSalesOrderGroupsToCatalog(groups = [], catalogProducts = []
       return {
         ...product,
         catalogProductId: catalog?.id ?? null,
+        // The canonical catalog code, not the raw as-typed file value — the
+        // file's code only needs to match case/whitespace-insensitively to
+        // resolve a catalog entry, but the byte-exact code is what downstream
+        // screens (e.g. the withdrawal edit page's catalogByCode lookup)
+        // match against verbatim. Storing the raw value here left orphaned
+        // withdrawal lines whose product dropdown silently showed blank even
+        // though the import itself matched the code correctly.
+        matchedProductCode: catalog?.customer_product_code ?? null,
         matchedProductName: catalog?.product_name ?? null,
         requestedBoxes: catalog && !isWeight ? product.qty : null,
         requestedWeight: catalog && isWeight ? product.qty : null,

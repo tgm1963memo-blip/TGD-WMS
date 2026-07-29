@@ -6,10 +6,12 @@ import {
   parseSalesOrderRows,
 } from '../../utils/customerSalesOrderImportUtils.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { getDepositInventoryLines } from '../../services/customerDepositRequestService.js';
 import {
   createCustomerWithdrawalRequest,
   upsertCustomerWithdrawalRequestLine,
 } from '../../services/customerWithdrawalRequestService.js';
+import { allocateFefoAcrossLots } from '../../utils/customerWithdrawalLineExcelUtils.js';
 
 // Bulk-import a customer's own ERP-exported "ใบส่งสินค้า" file into one
 // withdrawal request PER DEBTOR GROUP found in the file — see
@@ -27,6 +29,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
   const [fileName, setFileName] = useState('');
   const [groups, setGroups] = useState([]);
   const [selectedKeys, setSelectedKeys] = useState(new Set()); // stores itemKey: `${groupKey(group)}|${productCode}`
+  const [depositLines, setDepositLines] = useState([]);
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
 
@@ -35,6 +38,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
     setFileName('');
     setGroups([]);
     setSelectedKeys(new Set());
+    setDepositLines([]);
     setError('');
     setResults([]);
   }
@@ -50,12 +54,17 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
     setFileName(file.name);
     setError('');
     try {
-      const [rawRows, catalogResult] = await Promise.all([
+      const [rawRows, catalogResult, depositResult] = await Promise.all([
         readSalesOrderExcelFile(file),
         listCustomerProducts({ customerId }),
+        getDepositInventoryLines({ customerId }),
       ]);
       if (catalogResult.error) {
         setError(catalogResult.error.message);
+        return;
+      }
+      if (depositResult.error) {
+        setError(depositResult.error.message);
         return;
       }
       const { groups: parsedGroups } = parseSalesOrderRows(rawRows, catalogResult.data ?? []);
@@ -64,6 +73,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
         return;
       }
       setGroups(parsedGroups);
+      setDepositLines(depositResult.data ?? []);
       
       // Select all matched products by default
       const defaultSelected = new Set(
@@ -159,15 +169,45 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
       const requestId = createResult.data?.id;
       const lineErrors = [];
       for (const product of group.selectedProducts) {
-        // eslint-disable-next-line no-await-in-loop
-        const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
-          customerProductCode: product.productCode,
-          productName: product.matchedProductName ?? product.productName,
-          requestedBoxes: product.requestedBoxes,
-          requestedWeight: product.requestedWeight,
-          pickingRule: 'FEFO',
-        });
-        if (lineResult.error) lineErrors.push(`${product.productCode}: ${lineResult.error.message}`);
+        // Resolve by the catalog's own canonical code, not the raw file
+        // text — matchSalesOrderGroupsToCatalog already proved they refer
+        // to the same product; comparing the file's as-typed casing against
+        // deposit lines here would silently find zero stock for a product
+        // that has plenty, just recorded under the canonical code.
+        const canonicalCode = product.matchedProductCode ?? product.productCode;
+        const mode = product.requestedWeight != null ? 'weight' : 'boxes';
+        const requestedQty = mode === 'weight' ? product.requestedWeight : product.requestedBoxes;
+        const candidates = depositLines.filter((dl) => dl.customer_product_code === canonicalCode);
+        const { allocations, shortfall } = allocateFefoAcrossLots(candidates, Number(requestedQty) || 0, mode);
+
+        if (!allocations.length) {
+          lineErrors.push(`${canonicalCode}: ไม่พบสต๊อกคงเหลือสำหรับสินค้านี้`);
+          continue;
+        }
+
+        for (const alloc of allocations) {
+          const dl = alloc.depositLine;
+          // eslint-disable-next-line no-await-in-loop
+          const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
+            customerProductCode: canonicalCode,
+            productName: product.matchedProductName ?? product.productName,
+            requestedBoxes: alloc.boxes,
+            requestedWeight: alloc.weight,
+            sourceDepositRequestId: dl.deposit_request_id,
+            sourceDepositRequestLineId: dl.id,
+            sourceLotNo: dl.lot_no,
+            trackingCode: dl.tracking_code,
+            lotNo: dl.lot_no,
+            mfgDate: dl.mfg_date,
+            expDate: dl.exp_date,
+            pickingRule: 'FEFO',
+          });
+          if (lineResult.error) lineErrors.push(`${canonicalCode} (LOT ${dl.lot_no ?? '-'}): ${lineResult.error.message}`);
+        }
+
+        if (shortfall > 0) {
+          lineErrors.push(`${canonicalCode}: สต๊อกไม่พอ ขาดอีก ${shortfall} ${mode === 'weight' ? 'กก.' : 'กล่อง'} — กรุณาตรวจสอบและเพิ่มรายการเองหลังจากนี้`);
+        }
       }
       createResults.push({
         debtorName: group.debtorName,
@@ -314,7 +354,9 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                   </>
                 )}
                 {r.lineErrors?.length > 0 && (
-                  <span style={{ color: '#dc2626' }}> (มีรายการที่บันทึกไม่สำเร็จ {r.lineErrors.length} รายการ)</span>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: '#dc2626', fontSize: 12 }}>
+                    {r.lineErrors.map((msg, i) => <li key={i}>{msg}</li>)}
+                  </ul>
                 )}
               </li>
             ))}

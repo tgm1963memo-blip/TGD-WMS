@@ -82,6 +82,21 @@ describe('matchSalesOrderGroupsToCatalog', () => {
     expect(unmatchedProduct.catalogProductId).toBeNull();
   });
 
+  it('stores the catalog\'s own canonical code, not the raw file text, so downstream exact-match lookups still resolve', () => {
+    const catalogWithDifferentCasing = [
+      { id: 'cat-1', customer_product_code: 'ABC-123', product_name: 'Sample product' },
+    ];
+    const rawRowsWithCasingDrift = [
+      ['18/07/2569', 'SO-X/1', 'TSM-01-PA', 'บริษัท ไทยซอสเซสมาร์เก็ตติ้ง  จำกัด', ' สาขา :'],
+      ['abc-123', 'Sample product', '', 'ซอง', 50],
+    ];
+    const { groups } = parseSalesOrderRows(rawRowsWithCasingDrift, catalogWithDifferentCasing);
+    const product = groups[0].products[0];
+    expect(product.matched).toBe(true);
+    expect(product.productCode).toBe('abc-123');
+    expect(product.matchedProductCode).toBe('ABC-123');
+  });
+
   it('maps a weight-unit row (กิโลกรัม) to requestedWeight, not requestedBoxes', () => {
     const { groups } = parseSalesOrderRows(RAW_ROWS, CATALOG);
     const abc = groups.find((g) => g.debtorCode === 'ABC-01');

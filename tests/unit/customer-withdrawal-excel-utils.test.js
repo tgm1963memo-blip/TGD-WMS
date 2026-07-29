@@ -114,7 +114,7 @@ describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines', (
   });
 });
 
-const FIFO_DEPOSIT_LINES = [
+const FEFO_DEPOSIT_LINES = [
   {
     id: 'dl-old',
     deposit_request_id: 'dr-old',
@@ -125,7 +125,7 @@ const FIFO_DEPOSIT_LINES = [
     actual_boxes: 5,
     actual_weight: 50,
     weight_per_box: 10,
-    request: { last_action_at: '2026-01-01T00:00:00Z' },
+    exp_date: '2026-06-01',
   },
   {
     id: 'dl-mid',
@@ -137,7 +137,7 @@ const FIFO_DEPOSIT_LINES = [
     actual_boxes: 5,
     actual_weight: 50,
     weight_per_box: 10,
-    request: { last_action_at: '2026-02-01T00:00:00Z' },
+    exp_date: '2026-07-01',
   },
   {
     id: 'dl-new',
@@ -149,15 +149,15 @@ const FIFO_DEPOSIT_LINES = [
     actual_boxes: 5,
     actual_weight: 50,
     weight_per_box: 10,
-    request: { last_action_at: '2026-03-01T00:00:00Z' },
+    exp_date: '2026-08-01',
   },
 ];
 
-describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FIFO auto-lot selection', () => {
-  it('auto-picks the oldest lot when identifier_type/identifier_value are left blank and one lot is enough', () => {
+describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FEFO auto-lot selection', () => {
+  it('auto-picks the soonest-to-expire lot when identifier_type/identifier_value are left blank and one lot is enough', () => {
     const { lines, errors } = mapImportedRowsToWithdrawalLines([
       { __row: 2, customer_product_code: 'SAMPLE-001', identifier_type: '', identifier_value: '', requested_boxes: '3' },
-    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+    ], CATALOG, FEFO_DEPOSIT_LINES, 1);
 
     expect(errors).toEqual([]);
     expect(lines).toHaveLength(1);
@@ -167,10 +167,10 @@ describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FIF
     expect(lines[0].requested_boxes).toBe('3');
   });
 
-  it('spans multiple lots in FIFO order when the oldest lot alone is not enough', () => {
+  it('spans multiple lots in FEFO order when the soonest-to-expire lot alone is not enough', () => {
     const { lines, errors } = mapImportedRowsToWithdrawalLines([
       { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '8' },
-    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+    ], CATALOG, FEFO_DEPOSIT_LINES, 1);
 
     expect(errors).toEqual([]);
     expect(lines).toHaveLength(2);
@@ -183,7 +183,7 @@ describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FIF
   it('imports all available stock across lots and reports a shortfall warning instead of rejecting the row', () => {
     const { lines, errors } = mapImportedRowsToWithdrawalLines([
       { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '20' },
-    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+    ], CATALOG, FEFO_DEPOSIT_LINES, 1);
 
     expect(lines).toHaveLength(3);
     expect(lines.reduce((sum, l) => sum + Number(l.requested_boxes), 0)).toBe(15);
@@ -200,12 +200,26 @@ describe('customerWithdrawalLineExcelUtils: mapImportedRowsToWithdrawalLines FIF
     expect(errors[0]).toContain('no available stock found');
   });
 
-  it('derives requested_weight from weight_per_box for a boxes-driven FIFO allocation', () => {
+  it('derives requested_weight from weight_per_box for a boxes-driven FEFO allocation', () => {
     const { lines } = mapImportedRowsToWithdrawalLines([
       { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '3' },
-    ], CATALOG, FIFO_DEPOSIT_LINES, 1);
+    ], CATALOG, FEFO_DEPOSIT_LINES, 1);
 
     expect(lines[0].requested_weight).toBe('30');
+  });
+
+  it('sorts a lot with no recorded exp_date to the very end, behind every dated lot', () => {
+    const linesWithUnknownExpiry = [
+      { ...FEFO_DEPOSIT_LINES[1] }, // exp 2026-07-01
+      { ...FEFO_DEPOSIT_LINES[0], exp_date: null, id: 'dl-unknown', lot_no: 'LOT-UNKNOWN', tracking_code: 'TRK-UNKNOWN' },
+    ];
+    const { lines } = mapImportedRowsToWithdrawalLines([
+      { __row: 2, customer_product_code: 'SAMPLE-001', requested_boxes: '8' },
+    ], CATALOG, linesWithUnknownExpiry, 1);
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0].source_deposit_request_line_id).toBe('dl-mid');
+    expect(lines[1].source_deposit_request_line_id).toBe('dl-unknown');
   });
 });
 

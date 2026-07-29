@@ -100,22 +100,24 @@ export function exportCustomerWithdrawalLinesExcel(lines = [], filename = 'custo
 
 const VALID_IDENTIFIER_TYPES = new Set(Object.values(WITHDRAWAL_IDENTIFIER_TYPES));
 
-// Receipt date for FIFO ordering — a property of the deposit REQUEST header
-// (when it was received), not the line — see getDepositInventoryLines in
-// customerDepositRequestService.js, which attaches the whole header as
-// `request` on every line it returns.
-function receiptDateOf(depositLine) {
-  return depositLine?.request?.last_action_at ?? depositLine?.request?.expected_arrival_date ?? '';
+// FEFO sort key: soonest-expiring first. A lot with no recorded exp_date
+// sorts LAST, not first — treating "unknown" as "expires soonest" would
+// jump an uncertain lot ahead of one we *know* needs to move now, which is
+// backwards for the actual goal of FEFO (moving genuine near-expiry stock
+// before it spoils).
+function fefoSortValue(depositLine) {
+  const expDate = depositLine?.exp_date;
+  return expDate ? new Date(expDate).getTime() : Number.POSITIVE_INFINITY;
 }
 
 // Greedily allocates `requestedQty` (in `mode` units) across `candidateLines`
-// oldest-received first (FIFO), consuming each lot's remaining balance
+// soonest-to-expire first (FEFO), consuming each lot's remaining balance
 // before moving to the next. Returns one allocation per lot actually drawn
 // from, plus any shortfall if total available stock across every candidate
 // lot was less than requested (still allocates everything available rather
 // than rejecting the row — the caller surfaces the shortfall as a warning).
-function allocateFifoAcrossLots(candidateLines, requestedQty, mode) {
-  const sorted = [...candidateLines].sort((a, b) => new Date(receiptDateOf(a)) - new Date(receiptDateOf(b)));
+export function allocateFefoAcrossLots(candidateLines, requestedQty, mode) {
+  const sorted = [...candidateLines].sort((a, b) => fefoSortValue(a) - fefoSortValue(b));
 
   const allocations = [];
   let remaining = requestedQty;
@@ -200,14 +202,14 @@ export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], all
     };
 
     if (!identifierGiven) {
-      // No LOT/tracking/date/note given — auto-pick stock via FIFO (oldest
-      // received first), spanning multiple lots if one alone isn't enough.
+      // No LOT/tracking/date/note given — auto-pick stock via FEFO (soonest
+      // to expire first), spanning multiple lots if one alone isn't enough.
       const candidates = getProductMatchedDepositLines(
         { customer_product_code: draftLineBase.customer_product_code, product_name: draftLineBase.product_name },
         allDepositLines,
       );
       const mode = requestedBoxes ? 'boxes' : 'weight';
-      const { allocations, shortfall } = allocateFifoAcrossLots(candidates, Number(requestedBoxes || requestedWeight), mode);
+      const { allocations, shortfall } = allocateFefoAcrossLots(candidates, Number(requestedBoxes || requestedWeight), mode);
 
       if (!allocations.length) {
         errors.push(`Row ${row.__row}: no available stock found for ${draftLineBase.product_name || customerProductCode}.`);
@@ -275,7 +277,7 @@ export function mapImportedRowsToWithdrawalLines(rows, catalogProducts = [], all
 }
 
 // identifier_type/identifier_value are optional columns — a blank identifier
-// per row means "auto-pick stock via FIFO" (see allocateFifoAcrossLots).
+// per row means "auto-pick stock via FEFO" (see allocateFefoAcrossLots).
 const REQUIRED_IMPORT_HEADERS = ['customer_product_code'];
 
 export async function parseCustomerWithdrawalLineImportFile(file) {

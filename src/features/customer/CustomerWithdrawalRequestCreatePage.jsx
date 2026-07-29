@@ -187,8 +187,14 @@ export function CustomerWithdrawalRequestCreatePage() {
           product_id: line.product_id ?? '',
           product_name: line.product_name ?? '',
           source_deposit_request_id: line.source_customer_deposit_request_id ?? '',
-          identifier_type: 'LOT',
-          identifier_value: line.source_lot_no ?? line.lot_no ?? '',
+          // A LOT can span more than one tracking code (see the several
+          // "lot fanout" fixes elsewhere in this codebase) — when the line
+          // already has a specific tracking_code (e.g. from FEFO
+          // auto-allocation), re-loading it as a bare LOT identifier can
+          // resolve to a *different* batch under the same lot number than
+          // the one actually allocated. Prefer the precise identifier.
+          identifier_type: line.tracking_code ? 'TRACKING_CODE' : 'LOT',
+          identifier_value: line.tracking_code || line.source_lot_no || line.lot_no || '',
           lot_no: line.source_lot_no ?? line.lot_no ?? '',
           mfg_date: line.mfg_date ?? '',
           exp_date: line.exp_date ?? '',
