@@ -4,6 +4,7 @@ import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { listRoleDefinitions, upsertRoleDefinition } from '../../services/productServiceRatesService.js';
 import { PRODUCTION_ROLES, PRODUCTION_ROLE_DESCRIPTIONS } from '../../security/productionRoleModel.js';
 import { getUserProfiles } from '../../services/userManagementService.js';
+import { getCustomers } from '../../services/masterDataService.js';
 import { listRoleFunctionPermissions, resetRoleFunctionPermissions, saveRoleFunctionPermissionOverrides } from '../../services/roleFunctionPermissionService.js';
 import { refreshRolePermissionCache } from '../../services/roleAreaPermissionCacheService.js';
 import { listNavigationPermissionFunctionsByGroup, isWriteCapableFunctionKey } from '../../security/navigationPermissionCatalog.js';
@@ -360,8 +361,9 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
   );
 }
 
-function RoleCard({ role, userCount, onEdit, onEditPermissions, isPermissionExpanded }) {
+function RoleCard({ role, userCount, customerMap, onEdit, onEditPermissions, isPermissionExpanded }) {
   const canEditPermissions = role.role_code !== 'admin';
+  const scopedCustomerName = role.customer_id ? (customerMap[role.customer_id] ?? role.customer_id) : null;
   return (
     <div style={{
       background: '#fff',
@@ -387,6 +389,11 @@ function RoleCard({ role, userCount, onEdit, onEditPermissions, isPermissionExpa
           {role.base_role && role.base_role !== role.role_code ? ` → ${role.base_role}` : ''}
           {userCount != null ? ` · ${userCount} ผู้ใช้` : ''}
         </div>
+        {scopedCustomerName ? (
+          <div style={{ fontSize: 11, color: '#1d6fcf', marginTop: 2 }}>
+            จำกัดข้อมูลเฉพาะลูกค้า: <strong>{scopedCustomerName}</strong>
+          </div>
+        ) : null}
       </div>
       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
         {canEditPermissions && (
@@ -427,12 +434,14 @@ const EMPTY_ROLE_FORM = {
   displayName: '',
   description: '',
   baseRole: 'viewer',
+  customerId: '',
 };
 
 export function RolePermissionsAdminPage() {
   const [tab, setTab] = useState('roles');
   const [roles, setRoles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [permissionDraft, setPermissionDraft] = useState({});
   const [permissionBaseline, setPermissionBaseline] = useState({});
@@ -461,16 +470,23 @@ export function RolePermissionsAdminPage() {
   }, [permissions, matrixRoleCodes]);
 
   async function load() {
-    const [roleResult, userResult, permissionResult] = await Promise.all([
+    const [roleResult, userResult, permissionResult, customerResult] = await Promise.all([
       listRoleDefinitions(),
       getUserProfiles(),
       listRoleFunctionPermissions(),
+      getCustomers(),
     ]);
     setRoles(roleResult.data ?? []);
     setUsers(userResult.data ?? []);
     setPermissions(permissionResult.data ?? []);
+    setCustomers(customerResult.data ?? []);
     await refreshRolePermissionCache();
   }
+
+  const customerMap = useMemo(
+    () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
+    [customers],
+  );
 
   const permissionDirty = useMemo(
     () => !matrixDraftsAreEqual(permissionBaseline, permissionDraft),
@@ -545,6 +561,7 @@ export function RolePermissionsAdminPage() {
       displayName: roleForm.displayName,
       description: roleForm.description,
       baseRole:    roleForm.baseRole,
+      customerId:  roleForm.customerId || null,
     });
     setSaving(false);
     if (result.error) {
@@ -607,6 +624,7 @@ export function RolePermissionsAdminPage() {
               <RoleCard
                 role={r}
                 userCount={usersByRole[r.role_code]}
+                customerMap={customerMap}
                 isPermissionExpanded={expandedPermRole === r.role_code}
                 onEdit={(role) => setRoleForm({
                   id:          role.id,
@@ -614,6 +632,7 @@ export function RolePermissionsAdminPage() {
                   displayName: role.display_name,
                   description: role.description ?? '',
                   baseRole:    role.base_role ?? role.role_code,
+                  customerId:  role.customer_id ?? '',
                 })}
                 onEditPermissions={(role) => {
                   setExpandedPermRole((prev) => (prev === role.role_code ? null : role.role_code));
@@ -769,6 +788,26 @@ export function RolePermissionsAdminPage() {
                 </select>
                 <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
                   Role จะได้รับสิทธิ์เดียวกับ base role ที่เลือก
+                </p>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                  จำกัดข้อมูลเฉพาะลูกค้า (ไม่บังคับ)
+                </label>
+                <select
+                  className="form-control"
+                  value={roleForm.customerId}
+                  onChange={(e) => setRoleForm((f) => ({ ...f, customerId: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  <option value="">ไม่จำกัด (เห็นข้อมูลทุกลูกค้า)</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                  ถ้าเลือกลูกค้า ผู้ใช้ที่ได้รับ role นี้จะเห็น/ดำเนินการได้เฉพาะข้อมูลใบฝาก ใบเบิก
+                  และยอดคงเหลือของลูกค้ารายนี้เท่านั้น
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

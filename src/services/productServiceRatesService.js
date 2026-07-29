@@ -204,7 +204,7 @@ export async function listRoleDefinitions() {
   if (!supabase) return missing();
   return supabase
     .from('tgd_role_definitions')
-    .select('id, role_code, display_name, description, is_system, base_role, sort_order, is_active')
+    .select('id, role_code, display_name, description, is_system, base_role, customer_id, sort_order, is_active')
     .order('sort_order');
 }
 
@@ -215,6 +215,7 @@ export async function upsertRoleDefinition(payload = {}) {
       display_name: payload.displayName,
       description:  payload.description ?? null,
       base_role:    payload.baseRole ?? null,
+      customer_id:  payload.customerId ?? null,
     };
     return supabase.from('tgd_role_definitions').update(updateRow).eq('id', payload.id).select().single();
   }
@@ -224,6 +225,7 @@ export async function upsertRoleDefinition(payload = {}) {
     description:  payload.description ?? null,
     is_system:    false,
     base_role:    payload.baseRole ?? null,
+    customer_id:  payload.customerId ?? null,
     sort_order:   payload.sortOrder ?? 99,
     is_active:    payload.isActive ?? true,
   };
