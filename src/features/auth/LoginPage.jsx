@@ -10,7 +10,7 @@ import { getRouteAccessDecision } from '../../security/permissionGuard.js';
 
 export function LoginPage() {
   const { session, loading } = useAuth();
-  const { role, ready: roleReady } = useUserRole();
+  const { role, ready: roleReady, allowedMenuKeys } = useUserRole();
   const location = useLocation();
   const t = useTranslation();
   const goLive = isGoLivePresentationEnabled();
@@ -32,9 +32,9 @@ export function LoginPage() {
       );
     }
 
-    const homePath = resolveDefaultHomePath(role);
+    const homePath = resolveDefaultHomePath(role, allowedMenuKeys);
     const requestedPath = location.state?.from?.pathname;
-    const from = requestedPath && getRouteAccessDecision(role, requestedPath).allowed
+    const from = requestedPath && getRouteAccessDecision(role, requestedPath, allowedMenuKeys).allowed
       ? requestedPath
       : homePath;
     return <Navigate to={from} replace />;
