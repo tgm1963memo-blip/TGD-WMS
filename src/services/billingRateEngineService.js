@@ -16,6 +16,14 @@ function missingSupabaseClientResult() {
   };
 }
 
+export function chunkArray(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // Deposit lines rarely carry a resolvable master product_id (see
 // getConfirmedWithdrawalRows/getConfirmedDepositReceiptRows comments
 // elsewhere in this codebase), but a product-specific service rate is
@@ -295,30 +303,49 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate }) 
 
   const lotIds = recurringLots.map((r) => r.depositLine.id);
 
-  const [priorLinesResult, seedResult] = await Promise.all([
-    supabase
-      .from(INVOICE_DRAFT_LINE_TABLE)
-      .select('deposit_line_id, billing_period_end, tgd_billing_invoice_drafts!inner(status)')
-      .in('deposit_line_id', lotIds)
-      .not('billing_period_end', 'is', null)
-      .in('tgd_billing_invoice_drafts.status', NON_CANCELLED_INVOICE_DRAFT_STATUSES),
-    supabase
-      .from('tgd_lot_billing_cutoff_overrides')
-      .select('deposit_line_id, billed_through_date')
-      .in('deposit_line_id', lotIds),
-  ]);
+  // A customer with hundreds of storage-billed lots (a real one has 300+)
+  // turns .in('deposit_line_id', lotIds) into a GET request whose query
+  // string is tens of thousands of characters long — the server rejects
+  // that outright with a 400 Bad Request before it ever reaches the
+  // filter logic. Same class of bug as getDepositInventoryLines' own
+  // "customer's id via the join instead" fix; chunking the id list into
+  // batches keeps each request's URL well under any practical limit,
+  // regardless of how many lots this customer has.
+  const LOT_ID_CHUNK_SIZE = 150;
+  const lotIdChunks = chunkArray(lotIds, LOT_ID_CHUNK_SIZE);
 
-  if (priorLinesResult.error) return { data: null, error: priorLinesResult.error };
-  if (seedResult.error) return { data: null, error: seedResult.error };
+  const priorLinesRows = [];
+  const seedRows = [];
+  for (const chunk of lotIdChunks) {
+    // eslint-disable-next-line no-await-in-loop
+    const [priorLinesResult, seedResult] = await Promise.all([
+      supabase
+        .from(INVOICE_DRAFT_LINE_TABLE)
+        .select('deposit_line_id, billing_period_end, tgd_billing_invoice_drafts!inner(status)')
+        .in('deposit_line_id', chunk)
+        .not('billing_period_end', 'is', null)
+        .in('tgd_billing_invoice_drafts.status', NON_CANCELLED_INVOICE_DRAFT_STATUSES),
+      supabase
+        .from('tgd_lot_billing_cutoff_overrides')
+        .select('deposit_line_id, billed_through_date')
+        .in('deposit_line_id', chunk),
+    ]);
+
+    if (priorLinesResult.error) return { data: null, error: priorLinesResult.error };
+    if (seedResult.error) return { data: null, error: seedResult.error };
+
+    priorLinesRows.push(...(priorLinesResult.data ?? []));
+    seedRows.push(...(seedResult.data ?? []));
+  }
 
   const maxBilledThroughByLot = new Map();
-  for (const row of (priorLinesResult.data ?? [])) {
+  for (const row of priorLinesRows) {
     const current = maxBilledThroughByLot.get(row.deposit_line_id);
     if (!current || row.billing_period_end > current) {
       maxBilledThroughByLot.set(row.deposit_line_id, row.billing_period_end);
     }
   }
-  const seedByLot = new Map((seedResult.data ?? []).map((r) => [r.deposit_line_id, r.billed_through_date]));
+  const seedByLot = new Map(seedRows.map((r) => [r.deposit_line_id, r.billed_through_date]));
 
   const lots = recurringLots.map(({ depositLine, rate }) => {
     const billedThroughDate = maxBilledThroughByLot.get(depositLine.id) ?? seedByLot.get(depositLine.id) ?? null;

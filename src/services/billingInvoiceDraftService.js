@@ -28,7 +28,7 @@ import {
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
-import { getBillingPeriodPreview, getAutoLotBillingPreview, buildCatalogMaps } from './billingRateEngineService.js';
+import { getBillingPeriodPreview, getAutoLotBillingPreview, buildCatalogMaps, chunkArray } from './billingRateEngineService.js';
 import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveServiceRate } from '../utils/billingRateCalc.js';
@@ -725,20 +725,28 @@ export async function findOverlappingLotBillingLines(lotCycles = []) {
   const depositLineIds = [...new Set(lotCycles.map((c) => c.depositLineId).filter(Boolean))];
   if (!depositLineIds.length) return { data: [], error: null };
 
-  const result = await supabase
-    .from(INVOICE_DRAFT_LINE_TABLE)
-    .select('deposit_line_id, billing_period_start, billing_period_end, tgd_billing_invoice_drafts!inner(draft_no, status)')
-    .in('deposit_line_id', depositLineIds)
-    .not('billing_period_start', 'is', null)
-    .not('billing_period_end', 'is', null)
-    .neq('tgd_billing_invoice_drafts.status', INVOICE_DRAFT_STATUS.CANCELLED);
+  // Same URL-length hazard as getAutoLotBillingPreview — a customer with
+  // hundreds of billable lots would otherwise blow past the request size
+  // limit on a single .in() filter.
+  const rows = [];
+  for (const chunk of chunkArray(depositLineIds, 150)) {
+    // eslint-disable-next-line no-await-in-loop
+    const chunkResult = await supabase
+      .from(INVOICE_DRAFT_LINE_TABLE)
+      .select('deposit_line_id, billing_period_start, billing_period_end, tgd_billing_invoice_drafts!inner(draft_no, status)')
+      .in('deposit_line_id', chunk)
+      .not('billing_period_start', 'is', null)
+      .not('billing_period_end', 'is', null)
+      .neq('tgd_billing_invoice_drafts.status', INVOICE_DRAFT_STATUS.CANCELLED);
 
-  if (result.error) {
-    return { data: null, error: normalizeServiceError(result.error) };
+    if (chunkResult.error) {
+      return { data: null, error: normalizeServiceError(chunkResult.error) };
+    }
+    rows.push(...(chunkResult.data ?? []));
   }
 
   const existingByLot = new Map();
-  for (const row of (result.data ?? [])) {
+  for (const row of rows) {
     const bucket = existingByLot.get(row.deposit_line_id) ?? [];
     bucket.push(row);
     existingByLot.set(row.deposit_line_id, bucket);
