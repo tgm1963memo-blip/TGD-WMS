@@ -52,6 +52,7 @@ const DEPOSIT_LINE_SELECT = [
   'uom',
   'temperature_type',
   'note',
+  'pack_entry_mode',
   'actual_boxes',
   'actual_weight',
   'actual_note',
@@ -380,6 +381,7 @@ export async function upsertCustomerDepositRequestLine(requestId, line = {}) {
     p_uom: toNullableText(line.uom),
     p_temperature_type: toNullableText(line.temperatureType),
     p_note: toNullableText(line.note),
+    p_pack_entry_mode: toNullableText(line.packEntryMode),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

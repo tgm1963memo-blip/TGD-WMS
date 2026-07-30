@@ -70,7 +70,7 @@ export function mapDepositLinesForCopy(sourceLines = [], catalogProducts = []) {
     weight_per_box: toFormValue(line.weight_per_box),
     expected_boxes: toFormValue(line.expected_boxes),
     expected_weight: toFormValue(line.expected_weight),
-    pack_entry_mode: 'BOXES',
+    pack_entry_mode: line.pack_entry_mode ?? 'BOXES',
     line_note: line.note ?? '',
   }));
 

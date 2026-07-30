@@ -210,7 +210,7 @@ export function CustomerDepositRequestCreatePage() {
             weight_from_master: weightFromMaster,
             expected_boxes: String(line.expected_boxes ?? ''),
             expected_weight: String(line.expected_weight ?? ''),
-            pack_entry_mode: 'BOXES',
+            pack_entry_mode: line.pack_entry_mode ?? 'BOXES',
             line_note: line.note ?? '',
             lot_no: line.lot_no ?? '',
             mfg_date: line.mfg_date ?? '',
@@ -483,6 +483,7 @@ export function CustomerDepositRequestCreatePage() {
         mfgDate: line.mfg_date || null,
         expDate: line.exp_date || null,
         note: line.line_note,
+        packEntryMode: line.pack_entry_mode,
       });
 
       if (lineResult.error) {
