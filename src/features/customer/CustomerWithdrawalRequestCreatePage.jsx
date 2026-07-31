@@ -250,7 +250,13 @@ export function CustomerWithdrawalRequestCreatePage() {
     });
 
     return () => { active = false; };
-  }, [effectiveCustomerId]);
+    // editId must stay in deps: after a first save, handleSubmit navigates
+    // to ?editId=<newId> with { replace: true } on this same mounted page
+    // (no remount) — without refetching here, the draft's own just-saved
+    // lines keep counting as claims against themselves (excludeWithdrawalRequestId
+    // stays stale at its pre-save value), showing "เกินยอดคงเหลือ" on stock
+    // the customer actually still has.
+  }, [effectiveCustomerId, editId]);
 
   useEffect(() => {
     let active = true;
