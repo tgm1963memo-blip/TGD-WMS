@@ -5,6 +5,9 @@ import {
   toNullableNumber,
   toNullableText,
 } from './customerPortalServiceUtils.js';
+import { chunkArray } from './billingRateEngineService.js';
+
+const DEPOSIT_REQUEST_ID_CHUNK_SIZE = 150;
 
 const DEPOSIT_HEADER_SELECT = [
   'id',
@@ -165,13 +168,24 @@ export async function getDepositInventoryLines(filters = {}) {
 
   const ids = headers.map((h) => h.id);
 
-  const { data: lines, error: lErr } = await supabase
-    .from('tgd_customer_deposit_request_lines')
-    .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
-    .in('deposit_request_id', ids)
-    .order('line_no', { ascending: true });
+  // Same failure mode the comments above document for the claimedQuery
+  // filter further down: embedding every one of a customer's confirmed
+  // deposit request ids into one .in() filter produces a GET URL whose
+  // length scales with the customer's history (a real customer has 400+
+  // confirmed requests) and can silently fail well past typical URL/
+  // header size limits, dropping the balance baseline with no error.
+  // Chunk it the same way.
+  const lines = [];
+  for (const idChunk of chunkArray(ids, DEPOSIT_REQUEST_ID_CHUNK_SIZE)) {
+    const { data: chunkLines, error: lErr } = await supabase
+      .from('tgd_customer_deposit_request_lines')
+      .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
+      .in('deposit_request_id', idChunk)
+      .order('line_no', { ascending: true });
 
-  if (lErr) return { data: null, error: lErr };
+    if (lErr) return { data: null, error: lErr };
+    lines.push(...(chunkLines ?? []));
+  }
 
   // actual_boxes/actual_weight above are the RAW deposited totals, not what's
   // left after prior withdrawals. The withdrawal-request create page uses

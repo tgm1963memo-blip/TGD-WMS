@@ -198,7 +198,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           lot_no: line.source_lot_no ?? line.lot_no ?? '',
           mfg_date: line.mfg_date ?? '',
           exp_date: line.exp_date ?? '',
-          withdrawal_qty_mode: String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT',
+          withdrawal_qty_mode: line.pack_entry_mode ?? (String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT'),
           requested_qty: String(line.requested_qty ?? ''),
           requested_boxes: String(line.requested_boxes ?? ''),
           requested_weight: String(line.requested_weight ?? ''),
@@ -501,6 +501,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           requestedWeight: line.requested_weight,
           pickingRule: line.picking_rule,
           note: line.note,
+          packEntryMode: line.withdrawal_qty_mode,
         });
 
         if (lineResult.error) {

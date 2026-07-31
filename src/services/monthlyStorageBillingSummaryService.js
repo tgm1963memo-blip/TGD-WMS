@@ -1,5 +1,7 @@
 import { getOperationChargeLogs } from './operationChargeLogService.js';
 import { getMonthlyStorageWeightPreview } from './storageWeightSnapshotService.js';
+import { listAllProductServiceRates } from './productServiceRatesService.js';
+import { resolveServiceRate } from '../utils/billingRateCalc.js';
 
 function groupCombinedRows(rows = []) {
   const groups = new Map();
@@ -29,16 +31,21 @@ function groupCombinedRows(rows = []) {
 }
 
 export async function getMonthlyStorageBillingPreview(filters = {}) {
-  const [storageResult, operationResult] = await Promise.all([
+  const [storageResult, operationResult, ratesResult] = await Promise.all([
     getMonthlyStorageWeightPreview(filters),
     getOperationChargeLogs(filters),
+    listAllProductServiceRates({ serviceType: 'STORAGE', isActive: true }),
   ]);
 
   if (storageResult.error) return { data: null, error: storageResult.error };
   if (operationResult.error) return { data: null, error: operationResult.error };
+  if (ratesResult.error) return { data: null, error: ratesResult.error };
 
   return {
-    data: combineStorageAndOperationCharges(storageResult.data ?? [], operationResult.data ?? [], filters),
+    data: combineStorageAndOperationCharges(storageResult.data ?? [], operationResult.data ?? [], {
+      ...filters,
+      storageRates: ratesResult.data ?? [],
+    }),
     error: null,
   };
 }
@@ -51,13 +58,35 @@ export async function getCustomerBillingSummaryPreview(filters = {}) {
   return { data: groupCombinedRows(data ?? []), error: null };
 }
 
+// Resolves each row's own STORAGE rate from the same
+// tgd_customer_product_service_rates rates the real per-lot invoice
+// engine (computeStorageInvoiceLines in billingRateCalc.js) uses, instead
+// of a single flat options.storageRate multiplier -- no caller ever
+// supplied that filter, so storage_charge_preview was silently 0 for
+// every customer/month on this report, the billing export, and the
+// accounting staging preview. These snapshot rows only carry
+// customer_id/temperature_type (no customer_product_id), so this can
+// only match a customer-wide rate, not a product-specific override --
+// an acceptable approximation for a preview/summary report, same
+// resolution precedence resolveServiceRate already applies elsewhere.
 export function combineStorageAndOperationCharges(storageRows = [], operationRows = [], options = {}) {
-  const storageRate = Number(options.storageRate ?? 0);
-  const storagePreviewRows = storageRows.map((row) => ({
-    ...row,
-    preview_source: 'STORAGE_WEIGHT',
-    storage_charge_preview: Number(row.chargeable_weight ?? 0) * storageRate,
-  }));
+  const storageRates = options.storageRates ?? [];
+  const fallbackRate = Number(options.storageRate ?? 0);
+  const storagePreviewRows = storageRows.map((row) => {
+    const matchedRate = resolveServiceRate(storageRates, {
+      customerId: row.customer_id,
+      temperatureType: row.temperature_type,
+      serviceType: 'STORAGE',
+    });
+    const rate = matchedRate ? Number(matchedRate.rate ?? 0) : fallbackRate;
+
+    return {
+      ...row,
+      preview_source: 'STORAGE_WEIGHT',
+      storage_rate: rate,
+      storage_charge_preview: Number(row.chargeable_weight ?? 0) * rate,
+    };
+  });
 
   const operationPreviewRows = operationRows.map((row) => ({
     ...row,

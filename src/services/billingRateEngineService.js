@@ -211,6 +211,26 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     periodEnd,
   });
 
+  // computeStorageInvoiceLines silently `continue`s past any deposit line
+  // resolveServiceRate can't match a STORAGE rate for (see the identical
+  // gap tracked as unratedLots in getAutoLotBillingPreview below) -- redo
+  // just the rate-resolution half of its check here so a lot with no
+  // configured/matching rate is visible in the preview instead of simply
+  // being absent from storageLines with no explanation.
+  const unratedDepositLines = depositLines
+    .filter((dl) => !resolveServiceRate(rates, {
+      customerId: dl.customer_id,
+      customerProductId: dl.customer_product_id,
+      temperatureType: dl.temperature_type,
+      serviceType: 'STORAGE',
+    }))
+    .map((dl) => ({
+      depositLineId: dl.id,
+      lotNo: dl.lot_no,
+      customerProductCode: dl.customer_product_code,
+      temperatureType: dl.temperature_type,
+    }));
+
   let auxLines = [];
   if (depositRequestIds.length > 0) {
     const auxResult = await supabase
@@ -258,7 +278,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: r3Selections })];
   }
 
-  return { data: { storageLines, auxLines, depositLines }, error: null };
+  return { data: { storageLines, auxLines, depositLines, unratedDepositLines }, error: null };
 }
 
 // Auto per-lot billing preview: instead of one staff-typed date range
@@ -286,7 +306,17 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate }) 
   if (inputs.error) return { data: null, error: inputs.error };
   const { depositLines, rates } = inputs;
 
+  // A lot resolveServiceRate can't match at all (no rate configured for
+  // this customer/temperature combination, or a temperature_type that's
+  // gone null/unresolved -- e.g. after a catalog recode, see this
+  // session's several product-code fixes -- with no customer-wide
+  // generic STORAGE rate to fall back to) used to just vanish from
+  // recurringLots with nothing to indicate it was ever considered. Track
+  // it separately so staff can see it's silently excluded from every
+  // billing preview, the same visibility needsSetup already gives lots
+  // missing a billed-through date.
   const recurringLots = [];
+  const unratedLots = [];
   for (const dl of depositLines) {
     const rate = resolveServiceRate(rates, {
       customerId: dl.customer_id,
@@ -294,11 +324,20 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate }) 
       temperatureType: dl.temperature_type,
       serviceType: 'STORAGE',
     });
-    if (rate && rate.period_days != null) recurringLots.push({ depositLine: dl, rate });
+    if (rate && rate.period_days != null) {
+      recurringLots.push({ depositLine: dl, rate });
+    } else if (!rate) {
+      unratedLots.push({
+        depositLineId: dl.id,
+        lotNo: dl.lot_no,
+        customerProductCode: dl.customer_product_code,
+        temperatureType: dl.temperature_type,
+      });
+    }
   }
 
   if (recurringLots.length === 0) {
-    return { data: { lots: [], depositLines: [] }, error: null };
+    return { data: { lots: [], depositLines: [], unratedLots }, error: null };
   }
 
   const lotIds = recurringLots.map((r) => r.depositLine.id);
@@ -392,5 +431,5 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate }) 
     };
   });
 
-  return { data: { lots, depositLines: recurringLots.map((r) => r.depositLine) }, error: null };
+  return { data: { lots, depositLines: recurringLots.map((r) => r.depositLine), unratedLots }, error: null };
 }

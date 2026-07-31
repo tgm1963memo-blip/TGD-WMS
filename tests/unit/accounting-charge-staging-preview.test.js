@@ -73,7 +73,10 @@ describe('Sprint 7C: Accounting Charge Summary Staging Preview', () => {
     expect(canonicalPayload.rows.length).toBe(1);
     expect(canonicalPayload.rows[0].customer_code).toBe('CUST101');
     expect(canonicalPayload.rows[0].customer_name).toBe('Alpha Customer');
-    expect(canonicalPayload.rows[0].chargeable_qty).toBe(1051.0);
+    // chargeable_qty has no source in a billing summary row (only
+    // chargeable_weight does) -- it must NOT fall back to the Baht
+    // total_preview_amount (see accountingChargeStagingPreviewService.js).
+    expect(canonicalPayload.rows[0].chargeable_qty).toBe(0);
 
     // 2. Build Bplus Draft
     const bplusPayload = previewService.buildBplusDraftPayloadPreview(canonicalPayload, options);
@@ -81,7 +84,7 @@ describe('Sprint 7C: Accounting Charge Summary Staging Preview', () => {
     expect(bplusPayload.rows.length).toBe(1);
     expect(bplusPayload.rows[0].bplus_customer_code).toBe('CUST101');
     expect(bplusPayload.rows[0].bplus_service_code).toBe('STORAGE');
-    expect(bplusPayload.rows[0].bplus_quantity).toBe(1051.0);
+    expect(bplusPayload.rows[0].bplus_quantity).toBe(0);
     expect(bplusPayload.rows[0].bplus_weight).toBe(450.5); // matches mockSummaryRows chargeable_weight
 
     // 3. Validate

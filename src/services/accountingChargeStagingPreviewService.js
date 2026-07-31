@@ -20,7 +20,16 @@ export function buildCanonicalChargePayloadFromBillingSummary(summaryRows = [], 
       deposit_qty: row.deposit_qty ?? 0,
       withdrawal_qty: row.withdrawal_qty ?? 0,
       remaining_qty: row.remaining_qty ?? 0,
-      chargeable_qty: row.chargeable_qty ?? row.total_preview_amount ?? 0,
+      // groupCombinedRows (monthlyStorageBillingSummaryService.js) never
+      // produces a chargeable_qty (box/unit count) field -- only
+      // chargeable_weight. Falling back to total_preview_amount put a
+      // Baht charge total into a quantity/weight field (bplus_quantity
+      // via mapCanonicalRowToBplusDraft), and could let a row with
+      // genuinely zero weight pass the missing-qty/weight readiness
+      // check just because it had a nonzero charge amount. Weight is the
+      // only real chargeable figure this pipeline has; leave qty at 0
+      // rather than substitute an unrelated currency amount.
+      chargeable_qty: row.chargeable_qty ?? 0,
       chargeable_weight: row.chargeable_weight ?? 0,
       operation_charge_summary: {
         storage_charge: row.storage_charge_preview ?? 0,
