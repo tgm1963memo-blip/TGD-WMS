@@ -18,6 +18,7 @@ import { getWithdrawalCancelEligibility } from '../../utils/customerRequestCance
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 
 export function CustomerWithdrawalRequestDetailPage() {
   const t = useTranslation();
@@ -119,6 +120,13 @@ export function CustomerWithdrawalRequestDetailPage() {
               )}
               title={header.withdrawal_no}
             />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCustomerWithdrawalDocumentExcel(header, lines)}
+            >
+              ดาวน์โหลด Excel
+            </button>
             <Link className="btn btn-secondary" data-testid="customer-withdrawal-detail-back" to="/customer/withdrawal-request">
               {t('customer_withdrawal_back_to_list')}
             </Link>

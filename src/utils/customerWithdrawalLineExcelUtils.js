@@ -1,4 +1,5 @@
-import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
+import * as XLSX from 'xlsx';
+import { downloadExcelRows, downloadExcelWorkbook, readExcelFile } from './excelFileUtils.js';
 import { normalizeCatalogBarcode } from './customerProductExcelUtils.js';
 import { round2 } from './numberFormat.js';
 import {
@@ -297,4 +298,96 @@ export async function parseCustomerWithdrawalLineImportFile(file) {
     rows: rows.map((row, index) => ({ ...row, __row: index + 2 })),
     errors: [],
   };
+}
+
+function fmtExcelDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const parts = s.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
+}
+
+// picked_* is the CONFIRMED quantity once recorded — can legitimately
+// differ from what was originally requested (recount/handheld pick) — same
+// fallback rule CustomerWithdrawalRequestPrintDocument uses so the exported
+// spreadsheet always matches the printed document's figures.
+function confirmedWithdrawalQty(line) {
+  return {
+    boxes: line.picked_boxes ?? line.requested_boxes ?? null,
+    weight: line.picked_weight ?? line.requested_weight ?? null,
+  };
+}
+
+const WITHDRAWAL_DOCUMENT_LINE_HEADERS = [
+  '#', 'TRACKING NO', 'LOT NO', 'ITEM CODE', 'CUSTOMER PRODUCT', 'LOCATION',
+  'MFG DATE', 'EXP DATE', 'T.WEIGHT KG', 'BOX', 'คงเหลือในล็อต (กล่อง)', 'คงเหลือในล็อต (กก.)', 'REMARK',
+];
+
+// Pure builder (no file I/O) so the row layout can be unit tested without
+// touching XLSX.writeFile — a header key/value block followed by the same
+// line table shown on the printed document.
+export function buildCustomerWithdrawalDocumentRows(header = {}, lines = []) {
+  const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
+  const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
+  const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
+  const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
+  const docDate = header.requested_dispatch_date
+    ? header.requested_dispatch_date
+    : header.created_at ? header.created_at.split('T')[0] : '-';
+  const docNo = header.withdrawal_no ?? header.request_no ?? '-';
+
+  const rows = [
+    ['เลขที่เอกสาร', docNo],
+    ['ลูกค้า', customerName],
+    ['ที่อยู่', customerAddress],
+    ['โทร', contactPhone],
+    ['แฟกซ์', contactFax],
+    ['วันที่', fmtExcelDate(docDate)],
+    ['ปลายทาง', header.destination ?? '-'],
+    ['ทะเบียนรถ', header.vehicle_registration ?? '-'],
+    ['ผู้ติดต่อรับสินค้า', header.pickup_contact ?? '-'],
+    ['อุณหภูมิรถ', header.truck_temp ?? '-'],
+    ['อุณหภูมิห้อง', header.room_temp ?? '-'],
+    ['หมายเหตุ', header.note ?? '-'],
+    [],
+    WITHDRAWAL_DOCUMENT_LINE_HEADERS,
+  ];
+
+  let totalBoxes = 0;
+  let totalWeight = 0;
+
+  lines.forEach((line, idx) => {
+    const qty = confirmedWithdrawalQty(line);
+    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
+    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
+    rows.push([
+      idx + 1,
+      line.tracking_code ?? '-',
+      line.lot_no ?? '-',
+      line.customer_product_code ?? line.product_code ?? '-',
+      line.product_name ?? '-',
+      line.location ?? '-',
+      fmtExcelDate(line.mfg_date),
+      fmtExcelDate(line.exp_date),
+      qty.weight ?? '-',
+      qty.boxes ?? '-',
+      line.lot_remaining_boxes ?? '-',
+      line.lot_remaining_weight ?? '-',
+      [line.note, line.admin_note].filter(Boolean).join(' / ') || '-',
+    ]);
+  });
+
+  rows.push(['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', '', '', '']);
+
+  return { rows, docNo };
+}
+
+// Exports one withdrawal request (header + lines) as a single-sheet
+// spreadsheet — so staff/customers can download the document itself, not
+// just a bulk line-import template (that's what
+// exportCustomerWithdrawalLinesExcel above is for).
+export function exportCustomerWithdrawalDocumentExcel(header = {}, lines = [], filename) {
+  const { rows, docNo } = buildCustomerWithdrawalDocumentRows(header, lines);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  downloadExcelWorkbook(sheet, filename ?? `${docNo}.xlsx`, 'Withdrawal');
 }

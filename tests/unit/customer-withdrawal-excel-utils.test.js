@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCustomerWithdrawalDocumentRows,
   downloadCustomerWithdrawalLineTemplate,
   mapImportedRowsToWithdrawalLines,
   parseCustomerWithdrawalLineImportFile,
@@ -263,5 +264,84 @@ describe('customerWithdrawalLineExcelUtils: parseCustomerWithdrawalLineImportFil
     expect(result.errors).toEqual([]);
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].customer_product_code).toBe('SAMPLE-001');
+  });
+});
+
+describe('customerWithdrawalLineExcelUtils: buildCustomerWithdrawalDocumentRows', () => {
+  const header = {
+    withdrawal_no: 'WDR-0001',
+    customer_name: 'Acme Foods',
+    customer_address: '123 Main St',
+    contact_phone: '02-000-0000',
+    requested_dispatch_date: '2026-07-21',
+    destination: 'Warehouse B',
+    vehicle_registration: 'AB-1234',
+    note: 'handle with care',
+  };
+
+  const lines = [
+    {
+      id: 'wl-1',
+      tracking_code: 'TRK-1',
+      lot_no: 'LOT-1',
+      customer_product_code: 'SAMPLE-001',
+      product_name: 'Sample product',
+      mfg_date: '2026-01-01',
+      exp_date: '2026-06-01',
+      requested_boxes: 10,
+      requested_weight: 100,
+    },
+    {
+      id: 'wl-2',
+      tracking_code: 'TRK-2',
+      lot_no: 'LOT-2',
+      customer_product_code: 'SAMPLE-002',
+      product_name: 'Another product',
+      requested_boxes: 4,
+      requested_weight: 40,
+      picked_boxes: 3,
+      picked_weight: 30,
+    },
+  ];
+
+  it('includes the document header fields as key/value rows', () => {
+    const { rows, docNo } = buildCustomerWithdrawalDocumentRows(header, lines);
+
+    expect(docNo).toBe('WDR-0001');
+    expect(rows).toContainEqual(['เลขที่เอกสาร', 'WDR-0001']);
+    expect(rows).toContainEqual(['ลูกค้า', 'Acme Foods']);
+    expect(rows).toContainEqual(['ทะเบียนรถ', 'AB-1234']);
+  });
+
+  it('uses picked quantity over requested quantity once a pick is recorded', () => {
+    const { rows } = buildCustomerWithdrawalDocumentRows(header, lines);
+    const lineHeaderIdx = rows.findIndex((r) => r[0] === '#');
+    const line2Row = rows[lineHeaderIdx + 2];
+
+    // columns: #, TRACKING NO, LOT NO, ITEM CODE, CUSTOMER PRODUCT, LOCATION, MFG DATE, EXP DATE, T.WEIGHT KG, BOX, ...
+    expect(line2Row[8]).toBe(30);
+    expect(line2Row[9]).toBe(3);
+  });
+
+  it('falls back to requested quantity when nothing has been picked yet', () => {
+    const { rows } = buildCustomerWithdrawalDocumentRows(header, lines);
+    const lineHeaderIdx = rows.findIndex((r) => r[0] === '#');
+    const line1Row = rows[lineHeaderIdx + 1];
+
+    expect(line1Row[8]).toBe(100);
+    expect(line1Row[9]).toBe(10);
+  });
+
+  it('appends a TOTAL row summing weight and boxes across all lines', () => {
+    const { rows } = buildCustomerWithdrawalDocumentRows(header, lines);
+    const totalRow = rows[rows.length - 1];
+
+    expect(totalRow).toContain('TOTAL');
+    expect(totalRow).toContain(130); // 100 + 30
+    expect(totalRow).toContain(13); // 10 + 3
+  });
+
+  it('does not throw when there are no lines', () => {
+    expect(() => buildCustomerWithdrawalDocumentRows(header, [])).not.toThrow();
   });
 });

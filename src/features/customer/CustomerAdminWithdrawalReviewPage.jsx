@@ -17,6 +17,7 @@ import {
   recordWithdrawalLinePick,
   updateWithdrawalLineAdminNote,
   updateWithdrawalLineSource,
+  addAdminWithdrawalRequestLine,
 } from '../../services/customerWithdrawalRequestService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -24,6 +25,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
+import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
@@ -31,6 +33,11 @@ const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCE
 // work order is still active — same set backing this page's own
 // canSendToHandheld/canConfirmWithdrawal checks.
 const BULK_PRINT_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
+
+// A withdrawal line can only be added while the request is actively being
+// worked (already accepted, either awaiting or mid-picking) — matches
+// tgd_admin_add_customer_withdrawal_request_line's own status guard.
+const ADD_LINE_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
@@ -67,6 +74,15 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [savingProductCode, setSavingProductCode] = useState({});
   const [lineLotNos, setLineLotNos] = useState({});
   const [savingLotNo, setSavingLotNo] = useState({});
+  const [addLineOpen, setAddLineOpen] = useState(false);
+  const [addLineCode, setAddLineCode] = useState('');
+  const [addLineName, setAddLineName] = useState('');
+  const [addLineTrackingCode, setAddLineTrackingCode] = useState('');
+  const [addLineLot, setAddLineLot] = useState('');
+  const [addLineBoxes, setAddLineBoxes] = useState('');
+  const [addLineWeight, setAddLineWeight] = useState('');
+  const [addLineNote, setAddLineNote] = useState('');
+  const [addingLine, setAddingLine] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -168,6 +184,41 @@ export function CustomerAdminWithdrawalReviewPage() {
 
     return () => { active = false; };
   }, [selectedId]);
+
+  function openAddLine() {
+    setAddLineCode('');
+    setAddLineName('');
+    setAddLineTrackingCode('');
+    setAddLineLot('');
+    setAddLineBoxes('');
+    setAddLineWeight('');
+    setAddLineNote('');
+    setError('');
+    setAddLineOpen(true);
+  }
+
+  async function handleAddLine() {
+    if (!selectedId || !addLineCode.trim()) return;
+    setAddingLine(true);
+    setError('');
+    const result = await addAdminWithdrawalRequestLine(selectedId, {
+      customerProductCode: addLineCode,
+      productName: addLineName || null,
+      trackingCode: addLineTrackingCode || null,
+      lotNo: addLineLot || null,
+      requestedBoxes: addLineBoxes || null,
+      requestedWeight: addLineWeight || null,
+      note: addLineNote || null,
+    });
+    setAddingLine(false);
+    if (result.error) {
+      setError(result.error.message ?? 'เพิ่มรายการไม่สำเร็จ');
+      return;
+    }
+    await refreshLines(selectedId);
+    setActionMsg('เพิ่มรายการสินค้าเรียบร้อย');
+    setAddLineOpen(false);
+  }
 
   function openDetail(id) {
     setSelectedId(id);
@@ -525,6 +576,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                 />
               )}
             />
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: 8 }}
+              onClick={() => exportCustomerWithdrawalDocumentExcel(mergedPrint.header, mergedPrint.lines)}
+            >
+              ดาวน์โหลด Excel
+            </button>
           </div>
         )}
         <div className="responsive-table">
@@ -707,11 +766,30 @@ export function CustomerAdminWithdrawalReviewPage() {
                 )}
                 title={selected.withdrawal_no}
               />
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: 8 }}
+                onClick={() => exportCustomerWithdrawalDocumentExcel(selected, lines)}
+              >
+                ดาวน์โหลด Excel
+              </button>
             </div>
 
             {/* Lines table with actual qty column and recount button */}
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ margin: '0 0 8px' }}>{t('document_lines')}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>{t('document_lines')}</h4>
+                {canWrite && ADD_LINE_ELIGIBLE_STATUSES.includes(selected.status) ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={openAddLine}
+                  >
+                    ➕ เพิ่มรายการ
+                  </button>
+                ) : null}
+              </div>
               <div className="responsive-table">
                 <table className="data-table">
                   <thead>
@@ -1089,6 +1167,104 @@ export function CustomerAdminWithdrawalReviewPage() {
             </div>
           </>
         ) : null}
+      </Modal>
+
+      {/* Add extra line — the notified lot doesn't have enough stock to
+          cover the requested quantity, so staff need a SEPARATE line
+          sourced from a different lot/tracking code for the shortfall,
+          rather than retagging the one existing line (which would just
+          swap the source, not add to it). */}
+      <Modal
+        isOpen={addLineOpen}
+        onClose={() => setAddLineOpen(false)}
+        title="เพิ่มรายการสินค้า"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              disabled={addingLine || !addLineCode.trim()}
+              onClick={handleAddLine}
+              type="button"
+            >
+              {addingLine ? '...' : t('save')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setAddLineOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="banner banner-info" style={{ marginBottom: 12 }}>
+          สำหรับกรณี lot ที่ลูกค้าแจ้งมามีสินค้าไม่เพียงพอ — เพิ่มรายการนี้เพื่อเบิกส่วนที่ขาดจาก lot/รหัสติดตามอื่น
+        </div>
+        {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 8 }}>{error}</div> : null}
+        <div className="form-grid">
+          <label className="form-field">
+            <span>รหัสสินค้าลูกค้า *</span>
+            <input
+              className="form-control"
+              value={addLineCode}
+              onChange={(e) => setAddLineCode(e.target.value)}
+              placeholder="เช่น 10440-17"
+            />
+          </label>
+          <label className="form-field">
+            <span>ชื่อสินค้า (เว้นว่างได้ถ้ามีในแคตตาล็อกลูกค้า)</span>
+            <input
+              className="form-control"
+              value={addLineName}
+              onChange={(e) => setAddLineName(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>รหัสติดตาม (lot ที่จะเบิกแทน)</span>
+            <input
+              className="form-control"
+              value={addLineTrackingCode}
+              onChange={(e) => setAddLineTrackingCode(e.target.value)}
+              placeholder="เว้นว่างถ้าให้ระบบเลือกอัตโนมัติ (FEFO)"
+            />
+          </label>
+          <label className="form-field">
+            <span>LOT</span>
+            <input className="form-control" value={addLineLot} onChange={(e) => setAddLineLot(e.target.value)} />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>กล่องที่ต้องการเบิกเพิ่ม</span>
+            <input
+              className="form-control"
+              type="number"
+              min={0}
+              value={addLineBoxes}
+              onChange={(e) => setAddLineBoxes(e.target.value)}
+            />
+          </label>
+          <label className="form-field">
+            <span>น้ำหนัก (กก.)</span>
+            <input
+              className="form-control"
+              type="number"
+              min={0}
+              step={0.01}
+              value={addLineWeight}
+              onChange={(e) => setAddLineWeight(e.target.value)}
+            />
+          </label>
+        </div>
+        <label className="form-field" style={{ marginTop: 8 }}>
+          <span>หมายเหตุ (Admin)</span>
+          <input
+            className="form-control"
+            placeholder="เช่น lot เดิมมีไม่พอ เบิกเพิ่มจาก lot อื่นแทน..."
+            value={addLineNote}
+            onChange={(e) => setAddLineNote(e.target.value)}
+          />
+        </label>
       </Modal>
     </section>
   );

@@ -427,6 +427,37 @@ export async function updateWithdrawalLineSource(lineId, { customerProductCode, 
   return { data, error };
 }
 
+// Lets warehouse/admin staff add a brand-new line to a request that's
+// already ADMIN_ACCEPTED/WAREHOUSE_PICKING — for when the notified lot
+// doesn't have enough stock and the shortfall needs a SEPARATE line
+// sourced from a different lot/tracking code, not just a retag of the
+// one existing line (see tgd_admin_add_customer_withdrawal_request_line,
+// migration 20260801100000).
+export async function addAdminWithdrawalRequestLine(withdrawalRequestId, {
+  customerProductCode,
+  trackingCode = null,
+  lotNo = null,
+  productName = null,
+  requestedBoxes = null,
+  requestedWeight = null,
+  note = null,
+} = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_admin_add_customer_withdrawal_request_line', {
+    p_withdrawal_request_id: withdrawalRequestId,
+    p_customer_product_code: toNullableText(customerProductCode),
+    p_tracking_code: toNullableText(trackingCode),
+    p_lot_no: toNullableText(lotNo),
+    p_product_name: toNullableText(productName),
+    p_requested_boxes: toNullableNumber(requestedBoxes),
+    p_requested_weight: toNullableNumber(requestedWeight),
+    p_note: toNullableText(note),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function enqueueCustomerWithdrawalNotification(requestId, customerId, documentNo, submitterEmail = null, note = null) {
   if (!supabase) return missingSupabaseClientResult();
 
