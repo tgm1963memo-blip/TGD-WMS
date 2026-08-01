@@ -80,12 +80,17 @@ export async function listCustomerDepositRequests(filters = {}) {
   return query;
 }
 
-export async function getCustomerStockBalance(customerId) {
+// asOfDate (YYYY-MM-DD, optional): shows the balance as it stood at the
+// end of that historical day instead of the live current balance — see
+// migration 20260801120000 for the exact "confirmed by then / completed
+// by then" definition this switches to.
+export async function getCustomerStockBalance(customerId, asOfDate = null) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId) return { data: [], error: null };
 
   const { data, error } = await supabase.rpc('tgd_get_customer_stock_balance', {
     p_customer_id: customerId,
+    p_as_of_date: asOfDate || null,
   });
 
   if (error) return { data: null, error };
@@ -109,10 +114,12 @@ export async function getCustomerStockBalance(customerId) {
   return { data: rows, error: null };
 }
 
-export async function getAllCustomerStockBalances() {
+export async function getAllCustomerStockBalances(asOfDate = null) {
   if (!supabase) return missingSupabaseClientResult();
 
-  const { data, error } = await supabase.rpc('tgd_get_all_customer_stock_balances');
+  const { data, error } = await supabase.rpc('tgd_get_all_customer_stock_balances', {
+    p_as_of_date: asOfDate || null,
+  });
   if (error) return { data: null, error };
 
   const rows = (Array.isArray(data) ? data : []).map((r) => ({

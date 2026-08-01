@@ -45,6 +45,7 @@ export function CustomerStockBalancePage() {
   const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
+  const [asOfDate, setAsOfDate] = useState('');
   const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function CustomerStockBalancePage() {
     setLoading(true);
     setError(null);
 
-    getCustomerStockBalance(customerId).then(({ data, error: err }) => {
+    getCustomerStockBalance(customerId, asOfDate || null).then(({ data, error: err }) => {
       if (!active) return;
       setLines(data ?? []);
       setError(err ?? null);
@@ -63,7 +64,7 @@ export function CustomerStockBalancePage() {
     });
 
     return () => { active = false; };
-  }, [customerId, profileLoading]);
+  }, [customerId, profileLoading, asOfDate]);
 
   function toggleKey(key) {
     setExpandedKeys((prev) => {
@@ -120,8 +121,10 @@ export function CustomerStockBalancePage() {
     <section className="page-shell customer-portal-page" data-testid="customer-stock-balance-page">
       <PageHeader
         title={t('customer_stock_balance_title')}
-        description={t('customer_stock_balance_description')}
-        actions={<span className="status-badge status-badge--open" data-testid="customer-stock-live-badge">{t('customer_live_data_badge')}</span>}
+        description={asOfDate ? `ยอดคงเหลือ ณ วันที่ ${formatDate(asOfDate)}` : t('customer_stock_balance_description')}
+        actions={asOfDate ? null : (
+          <span className="status-badge status-badge--open" data-testid="customer-stock-live-badge">{t('customer_live_data_badge')}</span>
+        )}
       />
 
       <CustomerPortalLiveBanner />
@@ -164,6 +167,26 @@ export function CustomerStockBalancePage() {
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </label>
+            <label className="form-field" style={{ margin: 0, flex: '0 0 180px' }}>
+              <span>ณ วันที่ (เว้นว่าง = ปัจจุบัน)</span>
+              <input
+                className="form-control"
+                type="date"
+                data-testid="customer-stock-balance-as-of-date"
+                value={asOfDate}
+                onChange={(e) => setAsOfDate(e.target.value)}
+              />
+            </label>
+            {asOfDate && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ alignSelf: 'flex-end' }}
+                onClick={() => setAsOfDate('')}
+              >
+                ล้างวันที่
+              </button>
+            )}
             {productGroups.length > 0 && (
               <button
                 type="button"
@@ -180,7 +203,7 @@ export function CustomerStockBalancePage() {
                 className="btn btn-outline"
                 data-testid="customer-stock-balance-export-excel"
                 style={{ alignSelf: 'flex-end' }}
-                onClick={() => exportCustomerStockBalanceExcel(filtered, `customer-stock-balance-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+                onClick={() => exportCustomerStockBalanceExcel(filtered, `customer-stock-balance-${asOfDate || new Date().toISOString().slice(0, 10)}.xlsx`)}
               >
                 ดาวน์โหลด Excel
               </button>

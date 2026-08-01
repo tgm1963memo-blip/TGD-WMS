@@ -75,6 +75,7 @@ export function InventoryBalancePage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedTemperature, setSelectedTemperature] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [asOfDate, setAsOfDate] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [detailId, setDetailId] = useState(null);
 
@@ -83,14 +84,17 @@ export function InventoryBalancePage() {
   }, []);
 
   useEffect(() => {
+    let active = true;
     setLoading(true);
     setError(null);
-    getAllCustomerStockBalances().then(({ data, error: err }) => {
+    getAllCustomerStockBalances(asOfDate || null).then(({ data, error: err }) => {
+      if (!active) return;
       setLines(data ?? []);
       setError(err ?? null);
       setLoading(false);
     });
-  }, []);
+    return () => { active = false; };
+  }, [asOfDate]);
 
   function toggleKey(key) {
     setExpandedKeys((prev) => {
@@ -158,7 +162,7 @@ export function InventoryBalancePage() {
       const customerLabel = customer?.customer_name ?? customer?.customer_code ?? line.request?.customer_id ?? '-';
       return balanceExportRow(line, customerLabel);
     });
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = asOfDate || new Date().toISOString().slice(0, 10);
     downloadExcelRows(rows, BALANCE_EXPORT_HEADERS, `stock-balance-${stamp}.xlsx`, 'Stock Balance');
   }
 
@@ -166,7 +170,9 @@ export function InventoryBalancePage() {
     <section className={getPageShellClassName()}>
       <PageHeader
         title="ยอดคงเหลือสินค้า"
-        description="สินค้าที่รับเข้าคลังแล้ว หักการเบิกที่ยืนยันแล้ว (เฉพาะรายการที่มียอดคงเหลือ)"
+        description={asOfDate
+          ? `ยอดคงเหลือ ณ วันที่ ${formatDate(asOfDate)} — สินค้าที่รับเข้าคลังและยืนยันแล้วภายในวันดังกล่าว หักการเบิกที่เสร็จสิ้นแล้วภายในวันดังกล่าว`
+          : 'สินค้าที่รับเข้าคลังแล้ว หักการเบิกที่ยืนยันแล้ว (เฉพาะรายการที่มียอดคงเหลือ)'}
       />
 
       {/* Filters */}
@@ -207,9 +213,19 @@ export function InventoryBalancePage() {
             onChange={(e) => setSearchText(e.target.value)}
           />
         </label>
-        {(selectedCustomerId || searchText || selectedTemperature) && (
+        <label className="form-field" style={{ margin: 0, flex: '0 0 180px' }}>
+          <span>ณ วันที่ (เว้นว่าง = ปัจจุบัน)</span>
+          <input
+            className="form-control"
+            type="date"
+            data-testid="inventory-balance-as-of-date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+          />
+        </label>
+        {(selectedCustomerId || searchText || selectedTemperature || asOfDate) && (
           <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-end' }}
-            onClick={() => { setSelectedCustomerId(''); setSearchText(''); setSelectedTemperature(''); }}>
+            onClick={() => { setSelectedCustomerId(''); setSearchText(''); setSelectedTemperature(''); setAsOfDate(''); }}>
             ล้างตัวกรอง
           </button>
         )}
