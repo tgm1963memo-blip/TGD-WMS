@@ -19,6 +19,7 @@ import {
   updateDepositLineLocation,
   enqueueCustomerDepositNotification,
 } from '../../services/customerDepositRequestService.js';
+import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
@@ -42,6 +43,30 @@ function fmtDate(v) {
 // (customer entered the wrong code, or the physical delivery didn't
 // include everything they declared).
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+
+// tgd_customer_document_timeline_events.action values this document type
+// actually produces (customerDocumentTimelineService.js reads the raw
+// table) — friendlier Thai labels for the audit-log view below, action
+// codes not listed here just fall back to showing the raw code.
+const TIMELINE_ACTION_LABELS = {
+  CREATE_DRAFT: 'สร้างร่างเอกสาร',
+  UPDATE_DRAFT: 'แก้ไขร่างเอกสาร',
+  DELETE_LINE: 'ลบรายการสินค้า',
+  SUBMIT: 'ส่งคำขอ',
+  RECALL: 'เรียกคืนร่างเอกสาร',
+  CANCEL: 'ยกเลิกเอกสาร',
+  REVIEW_REVIEWING: 'เริ่มตรวจสอบ',
+  REVIEW_ACCEPT: 'เปิดใบงาน (อนุมัติ)',
+  REVIEW_REJECT: 'ปฏิเสธคำขอ',
+  REVIEW_REQUEST_RECOUNT: 'ขอตรวจนับใหม่',
+  REVIEW_CONFIRM_RECEIPT: 'ยืนยันรับเข้าคลัง',
+  ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
+  ADMIN_RECALL_CONFIRMED: 'เรียกคืนเอกสารที่ยืนยันแล้ว',
+};
+
+function timelineActionLabel(action) {
+  return TIMELINE_ACTION_LABELS[action] ?? action;
+}
 
 export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatusChange }) {
   const t = useTranslation();
@@ -91,6 +116,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [recallConfirmedOpen, setRecallConfirmedOpen] = useState(false);
   const [recallConfirmedComment, setRecallConfirmedComment] = useState('');
   const [recalling, setRecalling] = useState(false);
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -100,11 +127,14 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setError('');
     setComment('');
     setSelectedLineIds(new Set());
+    setTimelineEvents([]);
+    setTimelineOpen(false);
 
     Promise.all([
       getCustomerDepositRequest(requestId),
       listCustomerDepositRequestLines(requestId),
-    ]).then(([hRes, lRes]) => {
+      listCustomerDocumentTimelineEvents('CUSTOMER_DEPOSIT_REQUEST', requestId),
+    ]).then(([hRes, lRes, tRes]) => {
       if (!active) return;
       setHeader(hRes.data ?? null);
       const loadedLines = lRes.data ?? [];
@@ -112,6 +142,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       const initNotes = {};
       loadedLines.forEach((l) => { initNotes[l.id] = l.actual_note ?? ''; });
       setLineNotes(initNotes);
+      setTimelineEvents(tRes.data ?? []);
       setLoading(false);
       if (hRes.data?.customer_id) {
         getCustomers().then((cResult) => {
@@ -215,6 +246,14 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   function updateHeaderStatus(newStatus) {
     setHeader((prev) => prev ? { ...prev, status: newStatus } : prev);
     onStatusChange?.(requestId, newStatus);
+    refreshTimeline();
+  }
+
+  function refreshTimeline() {
+    if (!requestId) return;
+    listCustomerDocumentTimelineEvents('CUSTOMER_DEPOSIT_REQUEST', requestId).then((result) => {
+      setTimelineEvents(result.data ?? []);
+    });
   }
 
   async function handleOpenWorkOrder() {
@@ -257,6 +296,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setLines(linesResult.data ?? []);
     setActionMsg('เพิ่มรายการสินค้าเรียบร้อย');
     setAddLineOpen(false);
+    refreshTimeline();
   }
 
   async function handleConfirmReceiving() {
@@ -482,7 +522,61 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 )}
                 title={`${header.request_no} — ${t('admin_staff_work_order')}`}
               />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setTimelineOpen((v) => !v)}
+              >
+                📜 {timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}
+              </button>
             </div>
+
+            {/* Edit/audit log — every status transition and admin action
+                recorded against this document (tgd_customer_document_timeline_events) */}
+            {timelineOpen ? (
+              <div className="table-card" style={{ marginBottom: 16, padding: 0 }}>
+                <div className="responsive-table">
+                  <table className="data-table" style={{ fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ whiteSpace: 'nowrap' }}>วันที่/เวลา</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>การทำงาน</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>สถานะ</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>ผู้ทำรายการ</th>
+                        <th>หมายเหตุ / รายละเอียด</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timelineEvents.length ? timelineEvents.map((ev) => (
+                        <tr key={ev.id}>
+                          <td style={{ whiteSpace: 'nowrap' }}>{formatDocumentDate(ev.created_at)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{timelineActionLabel(ev.action)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {ev.from_status && ev.from_status !== ev.to_status
+                              ? `${ev.from_status} → ${ev.to_status}`
+                              : (ev.to_status ?? '-')}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {ev.actor_email ?? '-'}
+                            {ev.actor_role ? <span style={{ color: 'var(--tgd-muted-text)' }}> ({ev.actor_role})</span> : null}
+                          </td>
+                          <td>
+                            {ev.comment ?? ''}
+                            {ev.metadata_json && Object.keys(ev.metadata_json).length ? (
+                              <div style={{ color: 'var(--tgd-muted-text)', fontSize: 11 }}>
+                                {Object.entries(ev.metadata_json).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={5}>ยังไม่มีประวัติการแก้ไข</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
 
             {/* Lines table */}
             <div style={{ marginBottom: 16 }}>
