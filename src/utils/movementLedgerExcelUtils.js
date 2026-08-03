@@ -17,17 +17,30 @@ function productIdentity(row) {
   return row.product_code ?? row.customer_product_code ?? row.product_name ?? row.product_id ?? '';
 }
 
-// Grouped by customer + PRODUCT + lot, not customer + lot alone: a LOT
-// number in this business's real data is NOT always unique per product (the
-// same lot number has been observed reused across unrelated products), so
-// grouping by lot only collapsed different products' rows into one bucket —
-// their running balances got summed together, and sorting "by product" only
-// ever looked at the bucket's first row, silently scattering a product's own
+// Grouped by customer + PRODUCT + lot (or, when groupBy is 'trackingCode',
+// + tracking code instead), not customer + lot alone: a LOT number in this
+// business's real data is NOT always unique per product (the same lot
+// number has been observed reused across unrelated products), so grouping
+// by lot only collapsed different products' rows into one bucket — their
+// running balances got summed together, and sorting "by product" only ever
+// looked at the bucket's first row, silently scattering a product's own
 // rows across whatever lot-buckets its rows happened to land in. Rows with
-// no lot_no at all (rare adjustment-type movements) fall back to grouping by
-// product alone so they don't scatter across a fake per-row bucket.
-export function movementBalanceKey(row) {
+// no lot_no/tracking_code at all (rare adjustment-type movements) fall back
+// to grouping by product alone so they don't scatter across a fake per-row
+// bucket.
+//
+// The trackingCode mode exists because a single LOT can itself span several
+// tracking codes (several receiving batches under one lot label) — grouping
+// by lot alone merges those distinct physical batches' balances together,
+// which is exactly right for a lot-level stock card but hides which
+// specific batch is running low/out. Grouping by tracking code instead
+// shows each physical batch's own balance.
+export function movementBalanceKey(row, groupBy = 'lot') {
   const product = productIdentity(row);
+  if (groupBy === 'trackingCode') {
+    if (row.tracking_code) return `${row.customer_id ?? ''}|${product}|trk:${row.tracking_code}`;
+    return `${row.customer_id ?? ''}|product:${product}`;
+  }
   if (row.lot_no) return `${row.customer_id ?? ''}|${product}|lot:${row.lot_no}`;
   return `${row.customer_id ?? ''}|product:${product}`;
 }
@@ -38,25 +51,28 @@ function productDisplay(row) {
   return code ? `${code} - ${name}` : name;
 }
 
-// Regroups rows by product then lot, keeping each group's existing relative
-// order intact (rows are expected to already be date-sorted going in, so a
+// Regroups rows by product then lot (or product then tracking code, when
+// groupBy is 'trackingCode'), keeping each group's existing relative order
+// intact (rows are expected to already be date-sorted going in, so a
 // group's internal order stays chronological). Shared by the on-screen
 // table, the PDF report, and the Excel export so all three offer the same
-// "sort by date" vs "sort by product/lot" choice consistently.
-export function sortRowsByProductThenLot(rows = []) {
+// "sort by date" vs "sort by product/lot" vs "sort by product/tracking
+// code" choice consistently.
+export function sortRowsByProductThenLot(rows = [], groupBy = 'lot') {
   const groups = new Map();
   rows.forEach((row) => {
-    const key = movementBalanceKey(row);
+    const key = movementBalanceKey(row, groupBy);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   });
 
+  const secondaryField = groupBy === 'trackingCode' ? 'tracking_code' : 'lot_no';
   const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
     const aFirst = groups.get(a)[0];
     const bFirst = groups.get(b)[0];
     const productCompare = productDisplay(aFirst).localeCompare(productDisplay(bFirst), 'th');
     if (productCompare !== 0) return productCompare;
-    return String(aFirst.lot_no ?? '').localeCompare(String(bFirst.lot_no ?? ''), 'th');
+    return String(aFirst[secondaryField] ?? '').localeCompare(String(bFirst[secondaryField] ?? ''), 'th');
   });
 
   return sortedKeys.flatMap((key) => groups.get(key));
@@ -81,10 +97,10 @@ function addMovement(balance, row) {
 // Final balance per customer+lot after every row passed in, for use as the
 // "brought forward" opening balance of a later period (e.g. all movements
 // strictly before the report's Date From).
-export function aggregateFinalBalances(rows = []) {
+export function aggregateFinalBalances(rows = [], groupBy = 'lot') {
   const balances = new Map();
   rows.forEach((row) => {
-    const key = movementBalanceKey(row);
+    const key = movementBalanceKey(row, groupBy);
     balances.set(key, addMovement(balances.get(key) ?? zeroBalance(), row));
   });
   return balances;
@@ -135,15 +151,15 @@ function movementExcelRow(row, balance) {
 // group opening with a ยกมา (brought forward) balance carried over from
 // openingBalances, so a reader can see each lot's full picture — opening
 // stock, every movement, and the resulting balance — in one place.
-function buildGroupedExcelRows(rows, openingBalances) {
-  const ordered = sortRowsByProductThenLot(rows);
+function buildGroupedExcelRows(rows, openingBalances, groupBy = 'lot') {
+  const ordered = sortRowsByProductThenLot(rows, groupBy);
 
   const excelRows = [];
   let currentKey = null;
   let balance = zeroBalance();
 
   ordered.forEach((row) => {
-    const key = movementBalanceKey(row);
+    const key = movementBalanceKey(row, groupBy);
     if (key !== currentKey) {
       currentKey = key;
       balance = openingBalances.get(key) ?? zeroBalance();
@@ -159,10 +175,10 @@ function buildGroupedExcelRows(rows, openingBalances) {
 // Flat chronological export (no product/lot grouping or ยกมา rows) — each
 // row still carries its own lot's running balance, seeded from
 // openingBalances, just displayed in plain date order.
-function buildDateOrderedExcelRows(rows, openingBalances) {
+function buildDateOrderedExcelRows(rows, openingBalances, groupBy = 'lot') {
   const running = new Map();
   return rows.map((row) => {
-    const key = movementBalanceKey(row);
+    const key = movementBalanceKey(row, groupBy);
     const balance = addMovement(running.get(key) ?? openingBalances.get(key) ?? zeroBalance(), row);
     running.set(key, balance);
     return movementExcelRow(row, balance);
@@ -190,7 +206,7 @@ function totalsExcelRow(totals) {
 // remaining balance is summed once per distinct lot (its final balance —
 // opening plus this period's net movement), not once per row, since a lot's
 // balance appears on every one of its rows as a running total.
-function computeGrandTotals(rows, openingBalances, authoritativeTotals = null) {
+function computeGrandTotals(rows, openingBalances, authoritativeTotals = null, groupBy = 'lot') {
   let receivedQty = 0;
   let receivedWeight = 0;
   let deliveredQty = 0;
@@ -218,7 +234,7 @@ function computeGrandTotals(rows, openingBalances, authoritativeTotals = null) {
 
   const finalBalanceByKey = new Map();
   dateSorted.forEach((row) => {
-    const key = movementBalanceKey(row);
+    const key = movementBalanceKey(row, groupBy);
     const seed = finalBalanceByKey.get(key) ?? openingBalances.get(key) ?? zeroBalance();
     finalBalanceByKey.set(key, addMovement(seed, row));
   });
@@ -260,12 +276,13 @@ function computeGrandTotals(rows, openingBalances, authoritativeTotals = null) {
 }
 
 export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Map(), sortMode = 'productLot', authoritativeTotals = null) {
+  const groupBy = sortMode === 'productTrackingCode' ? 'trackingCode' : 'lot';
   const excelRows = sortMode === 'date'
-    ? buildDateOrderedExcelRows(rows, openingBalances)
-    : buildGroupedExcelRows(rows, openingBalances);
+    ? buildDateOrderedExcelRows(rows, openingBalances, groupBy)
+    : buildGroupedExcelRows(rows, openingBalances, groupBy);
 
   if (rows.length > 0) {
-    excelRows.push(totalsExcelRow(computeGrandTotals(rows, openingBalances, authoritativeTotals)));
+    excelRows.push(totalsExcelRow(computeGrandTotals(rows, openingBalances, authoritativeTotals, groupBy)));
   }
 
   return excelRows;

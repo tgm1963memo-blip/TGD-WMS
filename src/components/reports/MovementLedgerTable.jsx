@@ -39,21 +39,22 @@ export function productIdentityOf(row) {
 
 // Annotates each row with whether to show the product cell (only on the
 // first row of a run of adjacent same-product rows, so a product spanning
-// several lots shows its name/code once) and whether it's the last row of
-// its lot (so a divider can mark where one lot's rows end and the next
-// begins). Purely derived from row ADJACENCY, so it only visibly groups
-// anything when rows arrive pre-sorted by product-then-lot (sortMode
-// 'productLot' upstream) — in plain chronological order, adjacent rows
-// essentially never share a product+lot, so this is a no-op.
-export function annotateGroupedRows(rows) {
+// several lots/tracking codes shows its name/code once) and whether it's
+// the last row of its group (so a divider can mark where one lot's/tracking
+// code's rows end and the next begins). Purely derived from row ADJACENCY,
+// so it only visibly groups anything when rows arrive pre-sorted by
+// product-then-lot or product-then-tracking-code upstream — in plain
+// chronological order, adjacent rows essentially never share a group.
+export function annotateGroupedRows(rows, groupBy = 'lot') {
+  const field = groupBy === 'trackingCode' ? 'tracking_code' : 'lot_no';
   return rows.map((row, i) => {
     const prev = rows[i - 1];
     const next = rows[i + 1];
     const sameProductAsPrev = prev && productIdentityOf(prev) === productIdentityOf(row);
-    const sameLotAsNext = next
+    const sameGroupAsNext = next
       && productIdentityOf(next) === productIdentityOf(row)
-      && (next.lot_no ?? '') === (row.lot_no ?? '');
-    return { ...row, _showProductCell: !sameProductAsPrev, _isLastOfLotGroup: !sameLotAsNext };
+      && (next[field] ?? '') === (row[field] ?? '');
+    return { ...row, _showProductCell: !sameProductAsPrev, _isLastOfLotGroup: !sameGroupAsNext };
   });
 }
 
@@ -215,8 +216,8 @@ function renderMovementDetail(row) {
   );
 }
 
-export function MovementLedgerTable({ data = [], loading = false, error = null, grouped = false }) {
-  const rows = grouped ? annotateGroupedRows(data) : data;
+export function MovementLedgerTable({ data = [], loading = false, error = null, grouped = false, groupBy = 'lot' }) {
+  const rows = grouped ? annotateGroupedRows(data, groupBy) : data;
   return (
     <CompactExpandableTable
       rows={rows}

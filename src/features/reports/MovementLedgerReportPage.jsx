@@ -174,7 +174,11 @@ export function MovementLedgerReportPage() {
   const [pendingFilters, setPendingFilters] = useState({});
   const [committedFilters, setCommittedFilters] = useState(null);
   const [state, setState] = useState(initialState);
-  const [openingBalances, setOpeningBalances] = useState(new Map());
+  // Every movement strictly before the report's Date From — kept in state
+  // (not just fed once into a single openingBalances computation) so
+  // switching sortMode can recompute opening balances under the newly
+  // selected grouping without a refetch.
+  const [priorRows, setPriorRows] = useState([]);
   // Authoritative "remaining" total — sourced from the same algorithm as
   // the stock balance page's RPC (see getAuthoritativeBalanceTotals), not
   // re-derived from date-filtered movement rows, so the report's grand
@@ -182,9 +186,20 @@ export function MovementLedgerReportPage() {
   const [authoritativeTotals, setAuthoritativeTotals] = useState(null);
   // Controls row order for the on-screen table, the PDF report, and the
   // Excel export all at once: plain chronological order, or grouped by
-  // product then lot (a stock-card view showing each lot's full history
-  // together instead of interleaved with every other product/lot by date).
+  // product then lot / product then tracking code (a stock-card view
+  // showing each lot's or each physical batch's full history together
+  // instead of interleaved with every other product by date).
   const [sortMode, setSortMode] = useState('productLot');
+  // A LOT can span several tracking codes (several receiving batches under
+  // one lot label) — grouping by lot pools those batches' balances
+  // together, while grouping by tracking code keeps each physical batch's
+  // own balance separate. Both the on-screen table and the Excel/PDF
+  // exports below key off this same mapping.
+  const groupBy = sortMode === 'productTrackingCode' ? 'trackingCode' : 'lot';
+  const openingBalances = useMemo(
+    () => aggregateFinalBalances(priorRows, groupBy),
+    [priorRows, groupBy],
+  );
   const [customerOptions, setCustomerOptions] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [locationOptions, setLocationOptions] = useState([]);
@@ -308,22 +323,23 @@ export function MovementLedgerReportPage() {
         loading: false,
         error: main.error,
       });
-      setOpeningBalances(aggregateFinalBalances(priorRows));
+      setPriorRows(priorRows);
     });
 
     return () => { isMounted = false; };
   }, [committedFilters]);
 
   const t = (key) => getTranslation(key, language);
+  const isGrouped = sortMode !== 'date';
   const displayRows = useMemo(() => {
-    const ordered = sortMode === 'productLot' ? sortRowsByProductThenLot(state.rows) : state.rows;
+    const ordered = isGrouped ? sortRowsByProductThenLot(state.rows, groupBy) : state.rows;
     const running = new Map();
     let currentKey = null;
     let balance = { qty: 0, weight: 0 };
 
     return ordered.map((row) => {
-      const key = movementBalanceKey(row);
-      if (sortMode === 'productLot') {
+      const key = movementBalanceKey(row, groupBy);
+      if (isGrouped) {
         if (key !== currentKey) {
           currentKey = key;
           balance = openingBalances.get(key) ?? { qty: 0, weight: 0 };
@@ -343,7 +359,7 @@ export function MovementLedgerReportPage() {
         weight: Math.max(0, balance.weight + (inbound ? weight : -weight)),
       };
 
-      if (sortMode === 'productLot') {
+      if (isGrouped) {
         balance = nextBalance;
       } else {
         running.set(key, nextBalance);
@@ -355,7 +371,7 @@ export function MovementLedgerReportPage() {
         balanceWeight: nextBalance.weight,
       };
     });
-  }, [state.rows, sortMode, openingBalances]);
+  }, [state.rows, isGrouped, groupBy, openingBalances]);
 
   return (
     <section className={`page-shell${goLive ? ' page-shell--golive' : ''}`}>
@@ -400,6 +416,16 @@ export function MovementLedgerReportPage() {
               onChange={() => setSortMode('productLot')}
             />
             สินค้าและ Lot
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="movement-ledger-sort-mode"
+              value="productTrackingCode"
+              checked={sortMode === 'productTrackingCode'}
+              onChange={() => setSortMode('productTrackingCode')}
+            />
+            สินค้าและรหัสติดตาม
           </label>
         </div>
       ) : null}
@@ -453,7 +479,7 @@ export function MovementLedgerReportPage() {
         {!committedFilters ? (
           <EmptyState message="รอการค้นหา" description="กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูลรายการเคลื่อนไหว" />
         ) : (
-          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} grouped={sortMode === 'productLot'} />
+          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} grouped={isGrouped} groupBy={groupBy} />
         )}
       </DashboardSection>
 

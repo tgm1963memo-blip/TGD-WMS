@@ -85,6 +85,8 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   // Classify each row as inbound or outbound
   const INBOUND_TYPES = ['RECEIVE_CONFIRM', 'RECEIVE', 'INBOUND', 'ADJUSTMENT_IN', 'RETURN'];
   const OUTBOUND_TYPES = ['DISPATCH', 'DELIVERY', 'OUTBOUND', 'ISSUE', 'ADJUSTMENT_OUT'];
+  const isGrouped = sortMode !== 'date';
+  const groupBy = sortMode === 'productTrackingCode' ? 'trackingCode' : 'lot';
 
   // Always establish chronological order first — this is what keeps each
   // lot's running balance mathematically correct below, regardless of
@@ -100,8 +102,8 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     return aOut - bOut;
   });
 
-  const orderedRows = sortMode === 'productLot'
-    ? sortRowsByProductThenLot(dateSortedRows)
+  const orderedRows = isGrouped
+    ? sortRowsByProductThenLot(dateSortedRows, groupBy)
     : dateSortedRows;
 
   const mappedLines = orderedRows.map((row, index) => {
@@ -121,7 +123,7 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
       // risks silently splitting the same lot's inbound/outbound rows into
       // different balances and could show a withdrawal going negative even
       // when the lot had plenty of stock received earlier.
-      _balanceKey: movementBalanceKey(row),
+      _balanceKey: movementBalanceKey(row, groupBy),
       date: dateStr,
       receivedDate: isInbound ? dateStr : '-',
       deliveryDate: isOutbound ? dateStr : '-',
@@ -144,14 +146,15 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     };
   });
 
-  // When grouped by product-then-lot, collapse a repeated product's
-  // name/code down to the first row of its block (which can span several
-  // lots) and mark each lot's last row so the print template can draw a
-  // divider there — purely adjacency-based, so this is a no-op in plain
-  // chronological order (sortMode 'date'), where adjacent rows essentially
-  // never share a product+lot.
+  // When grouped by product-then-lot (or product-then-tracking-code),
+  // collapse a repeated product's name/code down to the first row of its
+  // block (which can span several lots/tracking codes) and mark each
+  // group's last row so the print template can draw a divider there —
+  // purely adjacency-based, so this is a no-op in plain chronological order
+  // (sortMode 'date'), where adjacent rows essentially never share a
+  // product+lot/tracking code.
   mappedLines.forEach((line, index) => {
-    if (sortMode !== 'productLot') {
+    if (!isGrouped) {
       line._showProductCell = true;
       line._isLastOfLotGroup = false;
       return;
@@ -159,9 +162,10 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     const prev = mappedLines[index - 1];
     const next = mappedLines[index + 1];
     const sameProductAsPrev = prev && prev.customerProduct === line.customerProduct && prev.descCode === line.descCode;
-    const sameLotAsNext = next && next.customerProduct === line.customerProduct && next.descCode === line.descCode && next.lotNo === line.lotNo;
+    const sameGroupAsNext = next && next.customerProduct === line.customerProduct && next.descCode === line.descCode
+      && (groupBy === 'trackingCode' ? next.trackingCode === line.trackingCode : next.lotNo === line.lotNo);
     line._showProductCell = !sameProductAsPrev;
-    line._isLastOfLotGroup = !sameLotAsNext;
+    line._isLastOfLotGroup = !sameGroupAsNext;
   });
 
   // Running balance per lot, seeded from openingBalances (every movement

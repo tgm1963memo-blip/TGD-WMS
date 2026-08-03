@@ -92,3 +92,50 @@ describe('operationalReportMapper: mapMovementLedgerToInventoryReportData produc
     expect(flat.lines.every((l) => l._isLastOfLotGroup === false)).toBe(true);
   });
 });
+
+// Regression coverage for the motivating case of the trackingCode grouping
+// mode: one LOT spanning two different tracking codes (two receiving
+// batches under the same lot label) must be kept as two SEPARATE balance
+// groups when grouping by tracking code, even though grouping by lot
+// alone would pool them into one.
+const ROW_TRK1 = { customer_id: 'c1', product_code: 'P1', product_name: 'Product 1', lot_no: '150', tracking_code: 'FR260101001', movement_date: '2026-01-01' };
+const ROW_TRK2 = { customer_id: 'c1', product_code: 'P1', product_name: 'Product 1', lot_no: '150', tracking_code: 'FR260102001', movement_date: '2026-01-02' };
+
+describe('movementLedgerExcelUtils: movementBalanceKey with groupBy trackingCode', () => {
+  it('gives two tracking codes sharing the same lot distinct keys', () => {
+    expect(movementBalanceKey(ROW_TRK1, 'trackingCode')).not.toBe(movementBalanceKey(ROW_TRK2, 'trackingCode'));
+  });
+
+  it('gives the same tracking code the same key regardless of other rows', () => {
+    const sameTrackingDifferentRow = { ...ROW_TRK1, movement_date: '2026-03-01' };
+    expect(movementBalanceKey(ROW_TRK1, 'trackingCode')).toBe(movementBalanceKey(sameTrackingDifferentRow, 'trackingCode'));
+  });
+
+  it('defaults to lot-based grouping when groupBy is omitted, pooling both tracking codes under the same lot key', () => {
+    expect(movementBalanceKey(ROW_TRK1)).toBe(movementBalanceKey(ROW_TRK2));
+  });
+});
+
+describe('sortRowsByProductThenLot with groupBy trackingCode', () => {
+  it('sorts by product then tracking code, keeping each tracking code as its own block', () => {
+    const ordered = sortRowsByProductThenLot([ROW_TRK2, ROW_TRK1], 'trackingCode');
+    expect(ordered.map((r) => r.tracking_code)).toEqual(['FR260101001', 'FR260102001']);
+  });
+});
+
+describe('operationalReportMapper: productTrackingCode sort mode', () => {
+  it('treats two tracking codes under one lot as separate balance groups, unlike productLot mode', () => {
+    const rows = [ROW_TRK1, ROW_TRK2];
+
+    const byTrackingCode = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productTrackingCode' });
+    const distinctKeys = new Set(byTrackingCode.lines.map((l) => l._balanceKey));
+    expect(distinctKeys.size).toBe(2);
+    // Different tracking codes under the same product -> each is the last
+    // (and only) row of its own group, so a divider shows after both.
+    expect(byTrackingCode.lines.every((l) => l._isLastOfLotGroup)).toBe(true);
+
+    const byLot = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot' });
+    const distinctLotKeys = new Set(byLot.lines.map((l) => l._balanceKey));
+    expect(distinctLotKeys.size).toBe(1);
+  });
+});
