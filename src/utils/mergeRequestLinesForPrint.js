@@ -201,11 +201,48 @@ export function mergeDepositRequestsForPrint(entries) {
   };
 }
 
+// Tracking codes are minted as {2-letter temperature prefix}{YYMMDD}{3-digit
+// sequence} (see tgd_generate_deposit_line_tracking_code) — the date the lot
+// was received into the warehouse is embedded directly in the code. Parsing
+// it out (rather than sorting the code as a plain string) means lines with
+// different temperature prefixes still interleave correctly by actual date,
+// e.g. a CHILLED lot received before a FROZEN lot still prints first even
+// though 'CH' > 'FR' alphabetically.
+function trackingCodeReceivedDate(trackingCode) {
+  const m = /^[A-Z]{2}(\d{2})(\d{2})(\d{2})\d{3}$/.exec(String(trackingCode ?? '').trim().toUpperCase());
+  if (!m) return null;
+  const [, yy, mm, dd] = m;
+  return `20${yy}-${mm}-${dd}`;
+}
+
+// Combined work-order rows for a pickup should list oldest-received stock
+// first (FEFO picking order), not whichever source request happened to be
+// created first. Lines whose tracking code doesn't match the dated format
+// (legacy/manual codes, or no tracking code at all — e.g. a bare FEFO line
+// with no specific batch chosen yet) sort after every dated line, keeping
+// their original relative order rather than being scattered arbitrarily.
+function sortLinesByTrackingCodeReceivedDate(lines) {
+  return lines
+    .map((line, index) => ({ line, index, date: trackingCodeReceivedDate(line.tracking_code) }))
+    .sort((a, b) => {
+      if (a.date && b.date) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return String(a.line.tracking_code).localeCompare(String(b.line.tracking_code));
+      }
+      if (a.date && !b.date) return -1;
+      if (!a.date && b.date) return 1;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.line);
+}
+
 export function mergeWithdrawalRequestsForPrint(entries) {
-  const lines = mergeLineGroups(entries, WITHDRAWAL_LINE_FIELDS).map((line) => ({
-    ...line,
-    lot_no: line.lot_no ?? line.source_lot_no ?? null,
-  }));
+  const lines = sortLinesByTrackingCodeReceivedDate(
+    mergeLineGroups(entries, WITHDRAWAL_LINE_FIELDS).map((line) => ({
+      ...line,
+      lot_no: line.lot_no ?? line.source_lot_no ?? null,
+    }))
+  );
   return {
     header: mergeHeadersForPrint(entries.map((e) => e.header), WITHDRAWAL_HEADER_FIELDS),
     lines,

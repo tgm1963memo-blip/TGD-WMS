@@ -200,4 +200,30 @@ describe('mergeWithdrawalRequestsForPrint', () => {
 
     expect(lines).toHaveLength(2);
   });
+
+  it('orders merged lines by the receiving date embedded in the tracking code (FEFO), not by source request order', () => {
+    const entries = [
+      // Created/listed out of date order on purpose — the merged print
+      // order must follow the tracking code's embedded date, not this.
+      { header: withdrawalHeader({ id: 'w1', withdrawal_no: 'WDR-0003', created_at: '2026-07-03T00:00:00Z' }), lines: [withdrawalLine({ id: 'l3', tracking_code: 'FR260801001' })] },
+      { header: withdrawalHeader({ id: 'w2', withdrawal_no: 'WDR-0001', created_at: '2026-07-01T00:00:00Z' }), lines: [withdrawalLine({ id: 'l1', tracking_code: 'FR260730002' })] },
+      { header: withdrawalHeader({ id: 'w3', withdrawal_no: 'WDR-0002', created_at: '2026-07-02T00:00:00Z' }), lines: [withdrawalLine({ id: 'l2', tracking_code: 'CH260729001' })] },
+    ];
+
+    const { lines } = mergeWithdrawalRequestsForPrint(entries);
+
+    expect(lines.map((l) => l.tracking_code)).toEqual(['CH260729001', 'FR260730002', 'FR260801001']);
+  });
+
+  it('sorts undated/legacy tracking codes after every dated line, preserving their relative order', () => {
+    const entries = [
+      { header: withdrawalHeader({ id: 'w1' }), lines: [withdrawalLine({ id: 'l1', tracking_code: 'TRK-OLD-1' })] },
+      { header: withdrawalHeader({ id: 'w2' }), lines: [withdrawalLine({ id: 'l2', tracking_code: 'FR260701001' })] },
+      { header: withdrawalHeader({ id: 'w3' }), lines: [withdrawalLine({ id: 'l3', tracking_code: 'TRK-OLD-2' })] },
+    ];
+
+    const { lines } = mergeWithdrawalRequestsForPrint(entries);
+
+    expect(lines.map((l) => l.tracking_code)).toEqual(['FR260701001', 'TRK-OLD-1', 'TRK-OLD-2']);
+  });
 });
