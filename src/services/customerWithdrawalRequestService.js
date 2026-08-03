@@ -62,20 +62,37 @@ const WITHDRAWAL_LINE_SELECT = [
   'created_at',
 ].join(', ');
 
+// A hardcoded .limit(100) here silently dropped any request older than
+// the 100 most recent matches — e.g. CWR-20260704-0014 (COMPLETED,
+// otherwise a normal match for REVIEW_STATUSES) had 186 newer requests
+// ahead of it, so it never even reached CustomerAdminWithdrawalReviewPage's
+// `rows` state for the search box to find, with no error shown anywhere.
+// created_at is set once at insert and never mutated, so plain offset
+// pagination (unlike the last_action_at-ordered case fixed elsewhere in
+// this codebase) can't drift a row out of view between pages.
 export async function listCustomerWithdrawalRequests(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
-  let query = supabase
-    .from('tgd_customer_withdrawal_requests')
-    .select(WITHDRAWAL_HEADER_SELECT)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  const PAGE_SIZE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = supabase
+      .from('tgd_customer_withdrawal_requests')
+      .select(WITHDRAWAL_HEADER_SELECT)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.status) query = query.eq('status', filters.status);
-  if (filters.statusIn?.length) query = query.in('status', filters.statusIn);
+    if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+    if (filters.status) query = query.eq('status', filters.status);
+    if (filters.statusIn?.length) query = query.in('status', filters.statusIn);
 
-  return query;
+    const { data: page, error } = await query;
+    if (error) return { data: null, error };
+    rows.push(...(page ?? []));
+    if (!page || page.length < PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
 }
 
 export async function getCustomerWithdrawalRequest(requestId) {

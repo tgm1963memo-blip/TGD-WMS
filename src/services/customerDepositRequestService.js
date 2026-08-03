@@ -64,20 +64,35 @@ const DEPOSIT_LINE_SELECT = [
   'created_at',
 ].join(', ');
 
+// Same fix as listCustomerWithdrawalRequests (customerWithdrawalRequestService.js):
+// a fixed .limit(200) would silently drop any request older than the 200
+// most recent matches once volume passes that mark, with the admin review
+// page's search box then unable to find something that was never fetched
+// and no error shown anywhere. created_at is set once at insert and never
+// mutated, so plain offset pagination is safe here.
 export async function listCustomerDepositRequests(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
-  let query = supabase
-    .from('tgd_customer_deposit_requests')
-    .select(DEPOSIT_HEADER_SELECT)
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const PAGE_SIZE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = supabase
+      .from('tgd_customer_deposit_requests')
+      .select(DEPOSIT_HEADER_SELECT)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  if (filters.status) query = query.eq('status', filters.status);
-  if (filters.statusIn?.length) query = query.in('status', filters.statusIn);
+    if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+    if (filters.status) query = query.eq('status', filters.status);
+    if (filters.statusIn?.length) query = query.in('status', filters.statusIn);
 
-  return query;
+    const { data: page, error } = await query;
+    if (error) return { data: null, error };
+    rows.push(...(page ?? []));
+    if (!page || page.length < PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
 }
 
 // asOfDate (YYYY-MM-DD, optional): shows the balance as it stood at the
