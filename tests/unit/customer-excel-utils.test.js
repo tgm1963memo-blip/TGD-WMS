@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCustomerDepositDocumentRows,
   mapImportedRowsToDepositLines,
   parseCustomerDepositLineImportFile,
 } from '../../src/utils/customerDepositLineExcelUtils.js';
@@ -41,6 +42,33 @@ describe('customerDepositLineExcelUtils', () => {
     expect(lines[0].weight_per_box).toBe('10');
     expect(lines[0].expected_boxes).toBe('5');
     expect(lines[0].line_note).toBe('note');
+  });
+
+  it('builds document rows with a header block, line table, and totals row', () => {
+    const header = {
+      request_no: 'CDR-0001',
+      customer_name: 'Acme Foods',
+      expected_arrival_date: '2026-08-01',
+      vehicle_registration: 'AB-1234',
+      note: 'handle with care',
+    };
+    const lines = [
+      { line_no: 1, tracking_code: 'FR260801001', lot_no: 'LOT-1', customer_product_code: 'SAMPLE-001', product_name: 'Sample', actual_boxes: 10, actual_weight: 100 },
+      { line_no: 2, tracking_code: 'FR260801002', lot_no: 'LOT-1', customer_product_code: 'SAMPLE-002', product_name: 'Sample 2', expected_boxes: 5, expected_weight: 25 },
+    ];
+
+    const { rows, docNo } = buildCustomerDepositDocumentRows(header, lines);
+
+    expect(docNo).toBe('CDR-0001');
+    expect(rows[0]).toEqual(['เลขที่เอกสาร', 'CDR-0001']);
+    const lineHeaderIndex = rows.findIndex((r) => r[0] === '#');
+    expect(rows[lineHeaderIndex + 1]).toEqual([1, 'FR260801001', 'LOT-1', 'SAMPLE-001', 'Sample', '-', '-', '-', 100, 10, '-']);
+    // Second line has no actual_* recorded yet — falls back to expected_*.
+    expect(rows[lineHeaderIndex + 2]).toEqual([2, 'FR260801002', 'LOT-1', 'SAMPLE-002', 'Sample 2', '-', '-', '-', 25, 5, '-']);
+    const totalsRow = rows[rows.length - 1];
+    expect(totalsRow[7]).toBe('TOTAL');
+    expect(totalsRow[8]).toBe(125);
+    expect(totalsRow[9]).toBe(15);
   });
 });
 

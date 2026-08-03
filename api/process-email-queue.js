@@ -1,9 +1,56 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { buildDocumentExcelBuffer } from './_lib/documentExcelBuilders.js';
 
 const HIDDEN_CODE_POINTS = new Set([0xfeff, 0xfffe, 0x200b, 0x200c, 0x200d, 0x00ad, 0x2060]);
 function cleanValue(value) {
   return String(value || '').split('').filter((c) => !HIDDEN_CODE_POINTS.has(c.charCodeAt(0))).join('').trim();
+}
+
+const HEADER_SELECT_BY_DOCUMENT_TYPE = {
+  CUSTOMER_DEPOSIT_REQUEST: {
+    table: 'tgd_customer_deposit_requests',
+    docNoField: 'request_no',
+    select: 'id, request_no, customer_id, customer:tgd_customers(customer_code, customer_name, name, address, phone), expected_arrival_date, contact_name, vehicle_registration, note, created_at',
+    linesTable: 'tgd_customer_deposit_request_lines',
+    linesFk: 'deposit_request_id',
+    linesSelect: 'line_no, customer_product_code, internal_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, note, actual_note',
+  },
+  CUSTOMER_WITHDRAWAL_REQUEST: {
+    table: 'tgd_customer_withdrawal_requests',
+    docNoField: 'withdrawal_no',
+    select: 'id, withdrawal_no, customer_id, customer:tgd_customers(customer_code, customer_name, name, address, phone), requested_dispatch_date, destination, vehicle_registration, pickup_contact, note, created_at',
+    linesTable: 'tgd_customer_withdrawal_request_lines',
+    linesFk: 'withdrawal_request_id',
+    linesSelect: 'line_no, customer_product_code, internal_product_code, product_name, lot_no, source_lot_no, tracking_code, mfg_date, exp_date, requested_boxes, requested_weight, picked_boxes, picked_weight, note, admin_note',
+  },
+};
+
+// Builds the deposit/withdrawal report attachment for a queued customer
+// confirmation email. Returns null (never throws) on any failure — a
+// missing/failed attachment must never block the notification itself from
+// being sent, since the confirmation text is the primary thing the
+// customer needs.
+async function buildAttachmentForQueueItem(adminClient, item) {
+  const config = HEADER_SELECT_BY_DOCUMENT_TYPE[item.document_type];
+  if (!config || item.notification_kind !== 'CUSTOMER_CONFIRMATION') return null;
+
+  try {
+    const [{ data: header, error: headerError }, { data: lines, error: linesError }] = await Promise.all([
+      adminClient.from(config.table).select(config.select).eq('id', item.document_id).maybeSingle(),
+      adminClient.from(config.linesTable).select(config.linesSelect).eq(config.linesFk, item.document_id).order('line_no'),
+    ]);
+    if (headerError || linesError || !header) return null;
+
+    const buffer = buildDocumentExcelBuffer(item.document_type, header, lines ?? []);
+    if (!buffer) return null;
+
+    const docNo = header[config.docNoField] ?? item.document_no ?? 'document';
+    return { filename: `${docNo}.xlsx`, content: buffer };
+  } catch (err) {
+    console.error(`Failed to build attachment for email ${item.id}:`, err);
+    return null;
+  }
 }
 
 export default async function handler(req, res) {
@@ -133,11 +180,14 @@ export default async function handler(req, res) {
 </body>
 </html>`;
 
+      const attachment = await buildAttachmentForQueueItem(adminClient, item);
+
       await transporter.sendMail({
         from: `"TG Cold Storage WMS" <${smtpUser}>`,
         to: item.recipient_email,
         subject: item.subject,
         html: emailHtml,
+        attachments: attachment ? [attachment] : undefined,
       });
 
       await adminClient

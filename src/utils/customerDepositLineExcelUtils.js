@@ -1,4 +1,5 @@
-import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
+import * as XLSX from 'xlsx';
+import { downloadExcelRows, downloadExcelWorkbook, readExcelFile } from './excelFileUtils.js';
 
 export const CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS = [
   'customer_product_code',
@@ -139,4 +140,91 @@ export async function parseCustomerDepositLineImportFile(file) {
     rows: rows.map((row, index) => ({ ...row, __row: index + 2 })),
     errors: [],
   };
+}
+
+function fmtExcelDate(v) {
+  if (!v) return '-';
+  const s = String(v).split('T')[0];
+  const parts = s.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
+}
+
+// actual_* is the CONFIRMED received quantity once recorded — falls back to
+// expected_* while still awaiting receiving, same rule
+// CustomerDepositStaffWorkOrderPrint uses, so the exported spreadsheet
+// always matches the printed document's figures.
+function confirmedDepositQty(line) {
+  return {
+    boxes: line.actual_boxes ?? line.expected_boxes ?? null,
+    weight: line.actual_weight ?? line.expected_weight ?? null,
+  };
+}
+
+const DEPOSIT_DOCUMENT_LINE_HEADERS = [
+  '#', 'TRACKING NO', 'LOT NO', 'ITEM CODE', 'CUSTOMER PRODUCT', 'LOCATION',
+  'MFG DATE', 'EXP DATE', 'T.WEIGHT KG', 'BOX', 'REMARK',
+];
+
+// Pure builder (no file I/O) so the row layout can be unit tested, and so
+// it can be reused server-side (api/process-email-queue.js attaches this
+// to the customer confirmation email) without touching XLSX.writeFile,
+// which writes to the filesystem under Node instead of triggering a
+// browser download — mirrors buildCustomerWithdrawalDocumentRows exactly.
+export function buildCustomerDepositDocumentRows(header = {}, lines = []) {
+  const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
+  const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
+  const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
+  const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
+  const docDate = header.expected_arrival_date
+    ? header.expected_arrival_date
+    : header.created_at ? header.created_at.split('T')[0] : '-';
+  const docNo = header.request_no ?? '-';
+
+  const rows = [
+    ['เลขที่เอกสาร', docNo],
+    ['ลูกค้า', customerName],
+    ['ที่อยู่', customerAddress],
+    ['โทร', contactPhone],
+    ['แฟกซ์', contactFax],
+    ['วันที่', fmtExcelDate(docDate)],
+    ['ทะเบียนรถ', header.vehicle_registration ?? '-'],
+    ['ผู้ติดต่อ', header.contact_name ?? '-'],
+    ['หมายเหตุ', header.note ?? '-'],
+    [],
+    DEPOSIT_DOCUMENT_LINE_HEADERS,
+  ];
+
+  let totalBoxes = 0;
+  let totalWeight = 0;
+
+  lines.forEach((line, idx) => {
+    const qty = confirmedDepositQty(line);
+    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
+    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
+    rows.push([
+      idx + 1,
+      line.tracking_code ?? '-',
+      line.lot_no ?? '-',
+      line.customer_product_code ?? line.internal_product_code ?? '-',
+      line.product_name ?? '-',
+      line.location_code ?? line.location ?? '-',
+      fmtExcelDate(line.mfg_date),
+      fmtExcelDate(line.exp_date),
+      qty.weight ?? '-',
+      qty.boxes ?? '-',
+      [line.note, line.actual_note].filter(Boolean).join(' / ') || '-',
+    ]);
+  });
+
+  rows.push(['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', '']);
+
+  return { rows, docNo };
+}
+
+// Exports one deposit request (header + lines) as a single-sheet
+// spreadsheet — mirrors exportCustomerWithdrawalDocumentExcel.
+export function exportCustomerDepositDocumentExcel(header = {}, lines = [], filename) {
+  const { rows, docNo } = buildCustomerDepositDocumentRows(header, lines);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  downloadExcelWorkbook(sheet, filename ?? `${docNo}.xlsx`, 'Deposit');
 }
