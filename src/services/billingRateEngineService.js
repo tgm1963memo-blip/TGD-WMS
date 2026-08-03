@@ -234,7 +234,7 @@ function monthRangeDates(monthsBack) {
 export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
-  const [depositResult, withdrawalResult, ratesResult, catalogResult] = await Promise.all([
+  const [depositResult, withdrawalResult, ratesResult, catalogResult, customersResult] = await Promise.all([
     supabase
       .from('tgd_customer_deposit_requests')
       .select(`
@@ -257,12 +257,18 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
       .eq('status', 'COMPLETED'),
     listAllProductServiceRates({ serviceType: 'STORAGE', isActive: true }),
     listCustomerProducts({}),
+    supabase.from('tgd_customers').select('id, customer_code, customer_name'),
   ]);
 
   if (depositResult.error) return { data: null, error: depositResult.error };
   if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
   if (ratesResult.error) return { data: null, error: ratesResult.error };
   if (catalogResult.error) return { data: null, error: catalogResult.error };
+  if (customersResult.error) return { data: null, error: customersResult.error };
+
+  const customerNameById = new Map(
+    (customersResult.data ?? []).map((c) => [c.id, c.customer_name ?? c.customer_code ?? c.id]),
+  );
 
   // Keyed by customer_id + code (not just code, unlike buildCatalogMaps)
   // -- across different customers the same code string is a coincidence,
@@ -308,7 +314,21 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
   const months = monthRangeDates(monthsBack).map(({ monthKey, periodStart, periodEnd }) => {
     const lines = computeStorageInvoiceLines({ depositLines, rates, periodStart, periodEnd });
     const amount = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
-    return { monthKey, periodStart, periodEnd, amount: Math.round(amount * 100) / 100 };
+
+    const amountByCustomer = new Map();
+    for (const line of lines) {
+      const key = line.customerId ?? 'UNASSIGNED';
+      amountByCustomer.set(key, (amountByCustomer.get(key) ?? 0) + (Number(line.amount) || 0));
+    }
+    const byCustomer = [...amountByCustomer.entries()]
+      .map(([customerId, custAmount]) => ({
+        customerId,
+        customerName: customerNameById.get(customerId) ?? customerId,
+        amount: Math.round(custAmount * 100) / 100,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    return { monthKey, periodStart, periodEnd, amount: Math.round(amount * 100) / 100, byCustomer };
   });
 
   const currentMonth = months[months.length - 1] ?? null;
