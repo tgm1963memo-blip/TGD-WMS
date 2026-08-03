@@ -11,9 +11,24 @@ import {
   getReadOnlyDashboardSummary,
   getPendingAdminDocuments,
 } from '../../services/readOnlyDashboardService.js';
+import { getMonthlyStorageRevenueSummary } from '../../services/billingRateEngineService.js';
 import { summarizeSupabaseReadiness } from '../../services/supabaseConnectionReadinessService.js';
 import { supabase } from '../../services/supabaseClient.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
+
+const REVENUE_VISIBLE_ROLES = ['admin', 'accounting'];
+
+function formatTHB(amount) {
+  return `฿${Number(amount ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function monthKeyLabel(monthKey) {
+  const [y, m] = String(monthKey ?? '').split('-');
+  const names = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const idx = Number(m) - 1;
+  return names[idx] ? `${names[idx]} ${y}` : String(monthKey ?? '-');
+}
 
 const initialState = {
   data: getReadOnlyDashboardEmptySummary(),
@@ -30,7 +45,10 @@ export function DashboardPage() {
   const [state, setState] = useState(initialState);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingDocs, setPendingDocs] = useState({ data: null, loading: true });
+  const [revenue, setRevenue] = useState({ data: null, loading: true, error: null });
   const { session } = useAuth();
+  const { role: userRole } = useUserRole();
+  const canViewRevenue = REVENUE_VISIBLE_ROLES.includes(userRole);
   const { language } = useLanguage();
   const t = useTranslation();
   const goLive = isGoLivePresentationEnabled();
@@ -67,6 +85,22 @@ export function DashboardPage() {
 
     return () => { isMounted = false; };
   }, [session, refreshKey]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!session?.user || !canViewRevenue) {
+      setRevenue({ data: null, loading: false, error: null });
+      return () => { isMounted = false; };
+    }
+
+    setRevenue((current) => ({ ...current, loading: true, error: null }));
+    getMonthlyStorageRevenueSummary({ monthsBack: 6 }).then((result) => {
+      if (!isMounted) return;
+      setRevenue({ data: result.data ?? null, loading: false, error: result.error ?? null });
+    });
+
+    return () => { isMounted = false; };
+  }, [session, canViewRevenue]);
 
   useEffect(() => {
     if (!supabase || !session?.user) return;
@@ -169,6 +203,54 @@ export function DashboardPage() {
           )}
         </div>
       </DashboardSection>
+
+      {canViewRevenue ? (
+        <DashboardSection title={language === 'th' ? 'รายได้จากการให้เช่าคลังสินค้า (ประมาณ)' : 'Storage Rental Revenue (Estimate)'}>
+          {revenue.loading ? (
+            <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading...'}</div>
+          ) : revenue.error ? (
+            <div className="banner banner-danger" role="alert">{revenue.error.message ?? String(revenue.error)}</div>
+          ) : (
+            <>
+              <div className="kpi-grid" style={{ marginBottom: 16 }}>
+                <div className="kpi-card success">
+                  <h3 className="kpi-label">{language === 'th' ? 'รายได้เดือนนี้ (ประมาณ)' : 'This Month (Estimate)'}</h3>
+                  <div className="kpi-value">{formatTHB(revenue.data?.currentMonth?.amount)}</div>
+                  <div className="kpi-helper">{monthKeyLabel(revenue.data?.currentMonth?.monthKey)}</div>
+                </div>
+                <div className="kpi-card info">
+                  <h3 className="kpi-label">{language === 'th' ? `รายได้รวม (${revenue.data?.months?.length ?? 0} เดือน)` : `Total (${revenue.data?.months?.length ?? 0} months)`}</h3>
+                  <div className="kpi-value">{formatTHB(revenue.data?.totalAmount)}</div>
+                  <div className="kpi-helper">{language === 'th' ? 'ค่าเช่าพื้นที่จัดเก็บ (ไม่รวมค่าบริการอื่น)' : 'Storage fee only, excludes other service charges'}</div>
+                </div>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--tgd-border)', textAlign: 'left' }}>
+                      <th style={{ padding: '6px 10px' }}>{language === 'th' ? 'เดือน' : 'Month'}</th>
+                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>{language === 'th' ? 'รายได้ (บาท)' : 'Revenue (THB)'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(revenue.data?.months ?? []).map((m) => (
+                      <tr key={m.monthKey} style={{ borderBottom: '1px solid var(--tgd-border)' }}>
+                        <td style={{ padding: '6px 10px' }}>{monthKeyLabel(m.monthKey)}</td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-success, #16a34a)' }}>{formatTHB(m.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginTop: 8 }}>
+                {language === 'th'
+                  ? '* ประมาณการจากอัตราค่าเช่าที่ตั้งค่าไว้และประวัติการฝาก/เบิกจริง ยังไม่ใช่ยอดจากใบแจ้งหนี้ที่อนุมัติแล้ว'
+                  : '* Estimated from configured storage rates and actual deposit/withdrawal history — not yet reconciled against approved invoices.'}
+              </p>
+            </>
+          )}
+        </DashboardSection>
+      ) : null}
 
       <div className="dashboard-grid-2col">
         <DashboardSection title={language === 'th' ? 'งานวันนี้' : 'Today task list'}>

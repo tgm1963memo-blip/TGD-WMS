@@ -190,6 +190,133 @@ async function fetchRateEngineInputs({ customerId }) {
   };
 }
 
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+// Builds YYYY-MM-DD strings straight from local Date getters (never
+// .toISOString(), which converts to UTC first) — under a positive UTC
+// offset (e.g. Bangkok, UTC+7), midnight local on the 1st is still the
+// previous day in UTC, so an ISO round-trip silently shifted every
+// month's boundaries back by one day.
+function monthRangeDates(monthsBack) {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  const curDay = now.getDate();
+  const ranges = [];
+  for (let i = monthsBack - 1; i >= 0; i -= 1) {
+    const targetIndex = curMonth - i;
+    const y = curYear + Math.floor(targetIndex / 12);
+    const m = ((targetIndex % 12) + 12) % 12;
+    const isCurrentMonth = y === curYear && m === curMonth;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const endDay = isCurrentMonth ? curDay : daysInMonth;
+    ranges.push({
+      monthKey: `${y}-${pad2(m + 1)}`,
+      periodStart: `${y}-${pad2(m + 1)}-01`,
+      periodEnd: `${y}-${pad2(m + 1)}-${pad2(endDay)}`,
+    });
+  }
+  return ranges;
+}
+
+// Dashboard KPI: estimated STORAGE revenue (the customer's rental fee for
+// space in the cold store, distinct from handling/other operation charges)
+// for the current month and each of the last `monthsBack` months. Reuses
+// computeStorageInvoiceLines -- the exact same weight-days proration engine
+// that generates real invoice drafts -- so this is a genuine per-month
+// reconstruction from each lot's actual receipt date and withdrawal
+// history, not a flat "today's stock x days" guess. Still an estimate: it
+// reflects lots/rates as configured *today*, and a lot fully withdrawn
+// before its billing was ever drafted has no persisted record to recompute
+// against for prior months.
+export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const [depositResult, withdrawalResult, ratesResult, catalogResult] = await Promise.all([
+    supabase
+      .from('tgd_customer_deposit_requests')
+      .select(`
+        id, customer_id, expected_arrival_date, last_action_at,
+        tgd_customer_deposit_request_lines(
+          id, customer_product_code, temperature_type, tracking_code, lot_no,
+          actual_boxes, actual_weight, expected_boxes, expected_weight
+        )
+      `)
+      .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED']),
+    supabase
+      .from('tgd_customer_withdrawal_requests')
+      .select(`
+        id, customer_id,
+        tgd_customer_withdrawal_request_lines(
+          source_customer_deposit_request_line_id, tracking_code, customer_product_code,
+          picked_boxes, picked_weight, picked_at
+        )
+      `)
+      .eq('status', 'COMPLETED'),
+    listAllProductServiceRates({ serviceType: 'STORAGE', isActive: true }),
+    listCustomerProducts({}),
+  ]);
+
+  if (depositResult.error) return { data: null, error: depositResult.error };
+  if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
+  if (ratesResult.error) return { data: null, error: ratesResult.error };
+  if (catalogResult.error) return { data: null, error: catalogResult.error };
+
+  // Keyed by customer_id + code (not just code, unlike buildCatalogMaps)
+  // -- across different customers the same code string is a coincidence,
+  // not the same product, so a per-code-only map would cross-contaminate
+  // temperature_type/product_id between two unrelated customers' items.
+  const catalogByKey = new Map();
+  for (const row of catalogResult.data ?? []) {
+    if (!row.customer_product_code) continue;
+    catalogByKey.set(`${row.customer_id}::${row.customer_product_code}`, row);
+  }
+
+  const rawDepositLines = [];
+  for (const req of (depositResult.data ?? [])) {
+    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? String(req.last_action_at).split('T')[0] : null);
+    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
+      rawDepositLines.push({ ...line, customer_id: req.customer_id, receipt_date: receiptDate });
+    }
+  }
+
+  const rawWithdrawalLines = [];
+  for (const req of (withdrawalResult.data ?? [])) {
+    for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
+      rawWithdrawalLines.push({ ...line, customer_id: req.customer_id });
+    }
+  }
+
+  const withdrawalEventsByLine = buildWithdrawalEventsByLine(rawDepositLines, rawWithdrawalLines);
+
+  const depositLines = rawDepositLines.map((line) => {
+    const catalogRow = catalogByKey.get(`${line.customer_id}::${line.customer_product_code}`);
+    return {
+      id: line.id,
+      customer_id: line.customer_id,
+      customer_product_id: catalogRow?.id ?? null,
+      temperature_type: catalogRow?.temperature_type ?? line.temperature_type ?? null,
+      received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
+      receipt_date: line.receipt_date,
+      withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],
+    };
+  });
+
+  const rates = ratesResult.data ?? [];
+  const months = monthRangeDates(monthsBack).map(({ monthKey, periodStart, periodEnd }) => {
+    const lines = computeStorageInvoiceLines({ depositLines, rates, periodStart, periodEnd });
+    const amount = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+    return { monthKey, periodStart, periodEnd, amount: Math.round(amount * 100) / 100 };
+  });
+
+  const currentMonth = months[months.length - 1] ?? null;
+  const totalAmount = Math.round(months.reduce((sum, m) => sum + m.amount, 0) * 100) / 100;
+
+  return { data: { months, currentMonth, totalAmount }, error: null };
+}
+
 // Computes the storage + auxiliary-service invoice lines a customer would
 // be billed for a given period, using the exact same rate configuration
 // admins set up on the Product Service Rates page. Read-only preview —
