@@ -283,7 +283,7 @@ export async function findActiveDuplicateDraftLines(movementIds = []) {
 // other still-active drafts. Without this, nothing stops staff from billing
 // e.g. 1-15 and then again 10-20 for the same customer, double-charging the
 // overlapping days silently.
-export async function findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd, excludeDraftId = null }) {
+export async function findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd, excludeDraftId = null, temperatureType = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
     return { data: [], error: null };
@@ -295,7 +295,7 @@ export async function findOverlappingBillingPeriodDrafts({ customerId, billingPe
   // "is not null" filter.
   let query = supabase
     .from(INVOICE_DRAFT_TABLE)
-    .select('id, draft_no, billing_period_start, billing_period_end, status')
+    .select('id, draft_no, billing_period_start, billing_period_end, status, temperature_type')
     .eq('customer_id', customerId)
     .in('status', ACTIVE_INVOICE_DRAFT_STATUSES)
     .lte('billing_period_start', billingPeriodEnd)
@@ -308,7 +308,16 @@ export async function findOverlappingBillingPeriodDrafts({ customerId, billingPe
     return { data: null, error: normalizeServiceError(result.error) };
   }
 
-  return { data: result.data ?? [], error: null };
+  // A date-range match alone isn't a real overlap once drafts can be scoped
+  // to one storage type: a FROZEN-only draft and a CHILLED-only draft for
+  // the exact same period bill disjoint sets of lots, not the same charge
+  // twice. Only genuinely conflicts when either side is unscoped (covers
+  // every storage type, i.e. temperature_type is null) or both sides share
+  // the same scope.
+  const rows = (result.data ?? []).filter((d) =>
+    !d.temperature_type || !temperatureType || d.temperature_type === temperatureType);
+
+  return { data: rows, error: null };
 }
 
 export async function listBillingInvoiceDrafts(filters = {}) {
@@ -574,7 +583,7 @@ export async function createBillingInvoiceDraftFromMovements({
 // they don't fit that flow. Returns a preview (no rate resolved / nothing
 // to bill is reported via zero lines) so the caller can show it before
 // committing, and a separate confirm step actually inserts it.
-export async function previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd }) {
+export async function previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd, temperatureType = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !billingPeriodStart || !billingPeriodEnd) {
     return { data: null, error: validationError('customerId, billingPeriodStart, and billingPeriodEnd are required.') };
@@ -584,6 +593,7 @@ export async function previewBillingPeriodInvoice({ customerId, billingPeriodSta
     customerId,
     periodStart: billingPeriodStart,
     periodEnd: billingPeriodEnd,
+    temperatureType,
   });
   if (previewResult.error) return { data: null, error: previewResult.error };
 
@@ -604,6 +614,7 @@ export async function createBillingInvoiceDraftForPeriod({
   customerId,
   billingPeriodStart,
   billingPeriodEnd,
+  temperatureType = null,
   note = null,
   internalReference = null,
   createdBy = null,
@@ -613,7 +624,7 @@ export async function createBillingInvoiceDraftForPeriod({
     return { data: null, error: validationError('customerId, billingPeriodStart, and billingPeriodEnd are required.') };
   }
 
-  const overlapResult = await findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd });
+  const overlapResult = await findOverlappingBillingPeriodDrafts({ customerId, billingPeriodStart, billingPeriodEnd, temperatureType });
   if (overlapResult.error) return { data: null, error: overlapResult.error };
 
   if ((overlapResult.data ?? []).length > 0) {
@@ -626,7 +637,7 @@ export async function createBillingInvoiceDraftForPeriod({
     };
   }
 
-  const preview = await previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd });
+  const preview = await previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd, temperatureType });
   if (preview.error) return { data: null, error: preview.error };
 
   if (preview.data.lines.length === 0) {
@@ -643,6 +654,7 @@ export async function createBillingInvoiceDraftForPeriod({
     customer_name: customerName,
     billing_period_start: billingPeriodStart,
     billing_period_end: billingPeriodEnd,
+    temperature_type: temperatureType || null,
     status: INVOICE_DRAFT_STATUS.DRAFT,
     ...preview.data.totals,
     currency: 'THB',
@@ -774,6 +786,7 @@ export async function findOverlappingLotBillingLines(lotCycles = []) {
 export async function createAutoLotBillingDraft({
   customerId,
   billThroughDate,
+  temperatureType = null,
   note = null,
   internalReference = null,
   createdBy = null,
@@ -783,7 +796,7 @@ export async function createAutoLotBillingDraft({
     return { data: null, error: validationError('customerId and billThroughDate are required.') };
   }
 
-  const preview = await getAutoLotBillingPreview({ customerId, billThroughDate });
+  const preview = await getAutoLotBillingPreview({ customerId, billThroughDate, temperatureType });
   if (preview.error) return { data: null, error: preview.error };
 
   const { lots, depositLines } = preview.data;
@@ -832,6 +845,7 @@ export async function createAutoLotBillingDraft({
     customer_name: customerName,
     billing_period_start: periodStarts[0] ?? billThroughDate,
     billing_period_end: periodEnds[periodEnds.length - 1] ?? billThroughDate,
+    temperature_type: temperatureType || null,
     status: INVOICE_DRAFT_STATUS.DRAFT,
     ...totals,
     currency: 'THB',

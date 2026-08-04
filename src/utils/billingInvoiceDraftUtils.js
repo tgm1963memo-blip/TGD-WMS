@@ -71,6 +71,7 @@ export function shapeBillingInvoiceDraftHeader(row = {}) {
     customer_name: row.customer_name ?? null,
     billing_period_start: row.billing_period_start ?? null,
     billing_period_end: row.billing_period_end ?? null,
+    temperature_type: row.temperature_type ?? null,
     status: row.status ?? INVOICE_DRAFT_STATUS.DRAFT,
     total_qty: toNumber(row.total_qty),
     total_net_weight: toNumber(row.total_net_weight),

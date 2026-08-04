@@ -12,6 +12,7 @@ import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { InvoiceDraftBplusReadinessPanel } from '../../components/billing/InvoiceDraftBplusReadinessPanel.jsx';
 import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
@@ -299,6 +300,7 @@ export function InvoiceDraftDetailPage() {
           <div className="section-card"><strong>Customer</strong><div>{draft.customer_name ?? '-'}</div></div>
           <div className="section-card"><strong>Status</strong><div><InvoiceDraftStatusBadge status={draft.status} /></div></div>
           <div className="section-card"><strong>Period</strong><div>{draft.billing_period_start ?? '-'} to {draft.billing_period_end ?? '-'}</div></div>
+          <div className="section-card"><strong>Storage Type</strong><div>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</div></div>
           <div className="section-card"><strong>Total Qty</strong><div>{formatNumber(draft.total_qty)}</div></div>
           <div className="section-card"><strong>Total Chargeable Weight</strong><div>{formatNumber(draft.total_chargeable_weight)}</div></div>
           <div className="section-card"><strong>Total Amount</strong><div>{draft.total_amount == null ? '-' : formatNumber(draft.total_amount)} {draft.currency}</div></div>

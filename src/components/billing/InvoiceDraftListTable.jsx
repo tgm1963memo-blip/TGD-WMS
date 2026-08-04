@@ -3,6 +3,7 @@ import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
 import { canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -53,6 +54,7 @@ export function InvoiceDraftListTable({
             <th>Status</th>
             <th>Period Start</th>
             <th>Period End</th>
+            <th>Storage Type</th>
             <th>Total Qty</th>
             <th>Total Chargeable Weight</th>
             <th>Total Amount</th>
@@ -68,6 +70,7 @@ export function InvoiceDraftListTable({
               <td><InvoiceDraftStatusBadge status={draft.status} /></td>
               <td>{draft.billing_period_start ?? '-'}</td>
               <td>{draft.billing_period_end ?? '-'}</td>
+              <td>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</td>
               <td>{formatNumber(draft.total_qty)}</td>
               <td>{formatFixed2(draft.total_chargeable_weight)}</td>
               <td>{formatFixed2(draft.total_amount)}</td>

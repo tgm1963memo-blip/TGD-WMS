@@ -24,6 +24,7 @@ import {
 } from '../../services/billingInvoiceDraftService.js';
 import { getAutoLotBillingPreview } from '../../services/billingRateEngineService.js';
 import { getCustomers } from '../../services/masterDataService.js';
+import { TEMPERATURE_TYPES } from '../../services/productServiceRatesService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -52,6 +53,7 @@ export function InvoiceDraftListPage() {
   const [storageBillOpen, setStorageBillOpen] = useState(false);
   const [storageBillMode, setStorageBillMode] = useState('manual');
   const [storageBillCustomerId, setStorageBillCustomerId] = useState('');
+  const [storageBillTemperatureType, setStorageBillTemperatureType] = useState('');
   const [storageBillStart, setStorageBillStart] = useState('');
   const [storageBillEnd, setStorageBillEnd] = useState('');
   const [storageBillPreview, setStorageBillPreview] = useState(null);
@@ -154,6 +156,7 @@ export function InvoiceDraftListPage() {
     setStorageBillOpen(true);
     setStorageBillMode('manual');
     setStorageBillCustomerId('');
+    setStorageBillTemperatureType('');
     setStorageBillStart('');
     setStorageBillEnd('');
     setStorageBillPreview(null);
@@ -176,6 +179,7 @@ export function InvoiceDraftListPage() {
       customerId: storageBillCustomerId,
       billingPeriodStart: storageBillStart,
       billingPeriodEnd: storageBillEnd,
+      temperatureType: storageBillTemperatureType || undefined,
     });
     setStorageBillLoading(false);
     if (result.error) {
@@ -193,6 +197,7 @@ export function InvoiceDraftListPage() {
       customerId: storageBillCustomerId,
       billingPeriodStart: storageBillStart,
       billingPeriodEnd: storageBillEnd,
+      temperatureType: storageBillTemperatureType || undefined,
     });
     setStorageBillSaving(false);
     if (result.error) {
@@ -213,6 +218,7 @@ export function InvoiceDraftListPage() {
     const result = await getAutoLotBillingPreview({
       customerId: storageBillCustomerId,
       billThroughDate: autoBillThroughDate,
+      temperatureType: storageBillTemperatureType || undefined,
     });
     setAutoBillLoading(false);
     if (result.error) {
@@ -243,6 +249,7 @@ export function InvoiceDraftListPage() {
     const result = await createAutoLotBillingDraft({
       customerId: storageBillCustomerId,
       billThroughDate: autoBillThroughDate,
+      temperatureType: storageBillTemperatureType || undefined,
     });
     setAutoBillSaving(false);
     if (result.error) {
@@ -446,7 +453,7 @@ export function InvoiceDraftListPage() {
           </div>
 
           {storageBillMode === 'manual' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 600 }}>
               ลูกค้า *
               <select
@@ -458,6 +465,19 @@ export function InvoiceDraftListPage() {
                 <option value="">— เลือกลูกค้า —</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 600 }}>
+              ประเภทสินค้าตามการจัดเก็บ
+              <select
+                className="form-control"
+                value={storageBillTemperatureType}
+                onChange={(e) => { setStorageBillTemperatureType(e.target.value); setStorageBillPreview(null); }}
+                style={{ display: 'block', width: '100%', marginTop: 4 }}
+              >
+                {TEMPERATURE_TYPES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </label>
@@ -483,7 +503,7 @@ export function InvoiceDraftListPage() {
             </label>
           </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600 }}>
                 ลูกค้า *
                 <select
@@ -495,6 +515,19 @@ export function InvoiceDraftListPage() {
                   <option value="">— เลือกลูกค้า —</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>
+                ประเภทสินค้าตามการจัดเก็บ
+                <select
+                  className="form-control"
+                  value={storageBillTemperatureType}
+                  onChange={(e) => { setStorageBillTemperatureType(e.target.value); setAutoBillPreview(null); }}
+                  style={{ display: 'block', width: '100%', marginTop: 4 }}
+                >
+                  {TEMPERATURE_TYPES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </label>

@@ -341,7 +341,7 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
 // be billed for a given period, using the exact same rate configuration
 // admins set up on the Product Service Rates page. Read-only preview —
 // callers decide whether/how to persist these as actual invoice draft lines.
-export async function getBillingPeriodPreview({ customerId, periodStart, periodEnd }) {
+export async function getBillingPeriodPreview({ customerId, periodStart, periodEnd, temperatureType = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !periodStart || !periodEnd) {
     return { data: null, error: new Error('customerId, periodStart, and periodEnd are required.') };
@@ -349,7 +349,18 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   const inputs = await fetchRateEngineInputs({ customerId });
   if (inputs.error) return { data: null, error: inputs.error };
-  const { depositLines, depositRequestIds, rates, requestReceiptDateById, r3FlaggedDocuments } = inputs;
+  const { depositLines: allDepositLines, depositRequestIds, rates, requestReceiptDateById, r3FlaggedDocuments } = inputs;
+
+  // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
+  // method (temperature_type) — scoping to one lets staff bill e.g. only
+  // FROZEN lots for a period, separately from CHILLED, when a customer
+  // wants those split. Auxiliary services and the ร.3 fee below are
+  // recorded per deposit REQUEST rather than per line/product, so they
+  // have no single temperature to scope by and are always included in
+  // full regardless of this filter.
+  const depositLines = temperatureType
+    ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
+    : allDepositLines;
 
   const storageLines = computeStorageInvoiceLines({
     depositLines,
@@ -443,7 +454,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 // can be included, so a lot already billed under the old manual date-range
 // flow (which never tagged deposit_line_id) can't be silently re-billed
 // from its original receipt date.
-export async function getAutoLotBillingPreview({ customerId, billThroughDate }) {
+export async function getAutoLotBillingPreview({ customerId, billThroughDate, temperatureType = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !billThroughDate) {
     return { data: null, error: new Error('customerId and billThroughDate are required.') };
@@ -451,7 +462,11 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate }) 
 
   const inputs = await fetchRateEngineInputs({ customerId });
   if (inputs.error) return { data: null, error: inputs.error };
-  const { depositLines, rates } = inputs;
+  const { depositLines: allDepositLines, rates } = inputs;
+  // Same per-lot storage-method scoping as getBillingPeriodPreview above.
+  const depositLines = temperatureType
+    ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
+    : allDepositLines;
 
   // A lot resolveServiceRate can't match at all (no rate configured for
   // this customer/temperature combination, or a temperature_type that's
