@@ -44,6 +44,17 @@ import { CustomerRequestCustomerPicker } from '../../components/customer/Custome
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
+// Bounds a manually-typed dispatch date to a plausible near-term window — catches
+// a mistyped year (e.g. 2027 instead of 2026) before it saves, since a real
+// dispatch is never planned this far out. See DateInputDMY's BUDDHIST_ERA_OFFSET
+// comment for the sibling class of year-typo it already guards against.
+const MAX_DISPATCH_DATE_DAYS_AHEAD = 180;
+function maxDispatchDateIso() {
+  const d = new Date();
+  d.setDate(d.getDate() + MAX_DISPATCH_DATE_DAYS_AHEAD);
+  return d.toISOString().split('T')[0];
+}
+
 const INITIAL_HEADER = {
   requested_dispatch_date: '',
   delivery_type: 'PICKUP',
@@ -629,7 +640,7 @@ export function CustomerWithdrawalRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_requested_dispatch_date')}</span>
-            <DateInputDMY className="form-control" data-testid="customer-withdrawal-dispatch-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required value={header.requested_dispatch_date} />
+            <DateInputDMY className="form-control" data-testid="customer-withdrawal-dispatch-date" max={maxDispatchDateIso()} min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required value={header.requested_dispatch_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_pickup_contact')}</span>

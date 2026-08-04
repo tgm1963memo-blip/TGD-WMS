@@ -52,6 +52,7 @@ export function DateInputDMY({
   'data-testid': testId,
   disabled,
   id,
+  max,
   min,
   onChange,
   placeholder = 'dd/mm/yyyy',
@@ -80,7 +81,7 @@ export function DateInputDMY({
     // value directly) bypass keystroke masking and land here as a full yyyy-mm-dd string.
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
       setText(isoToDisplay(raw));
-      if (!min || raw >= min) fireChange(raw);
+      if ((!min || raw >= min) && (!max || raw <= max)) fireChange(raw);
       return;
     }
 
@@ -92,7 +93,7 @@ export function DateInputDMY({
     }
     if (masked.length === 10) {
       const iso = displayToIso(masked);
-      if (iso && (!min || iso >= min)) fireChange(iso);
+      if (iso && (!min || iso >= min) && (!max || iso <= max)) fireChange(iso);
     }
   }
 
@@ -103,7 +104,7 @@ export function DateInputDMY({
   function handleBlur() {
     isFocusedRef.current = false;
     const iso = text === '' ? null : displayToIso(text);
-    if (text !== '' && (!iso || (min && iso < min))) {
+    if (text !== '' && (!iso || (min && iso < min) || (max && iso > max))) {
       setText(isoToDisplay(value));
     }
   }
@@ -176,6 +177,7 @@ export function DateInputDMY({
       <input
         aria-hidden="true"
         disabled={disabled}
+        max={max}
         min={min}
         onChange={handleChange}
         ref={nativeDateRef}

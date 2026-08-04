@@ -48,6 +48,17 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
+// Bounds a manually-typed arrival date to a plausible near-term window — catches
+// a mistyped year (e.g. 2027 instead of 2026) before it saves, since a real
+// arrival is never planned this far out. See DateInputDMY's BUDDHIST_ERA_OFFSET
+// comment for the sibling class of year-typo it already guards against.
+const MAX_ARRIVAL_DATE_DAYS_AHEAD = 180;
+function maxArrivalDateIso() {
+  const d = new Date();
+  d.setDate(d.getDate() + MAX_ARRIVAL_DATE_DAYS_AHEAD);
+  return d.toISOString().split('T')[0];
+}
+
 const INITIAL_HEADER = {
   expected_arrival_date: '',
   note: '',
@@ -677,7 +688,7 @@ export function CustomerDepositRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_expected_arrival_date')} <span className="field-required">*</span></span>
-            <DateInputDMY className="form-control" data-testid="customer-deposit-expected-arrival-date" min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required value={header.expected_arrival_date} />
+            <DateInputDMY className="form-control" data-testid="customer-deposit-expected-arrival-date" max={maxArrivalDateIso()} min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('expected_arrival_date', e.target.value)} required value={header.expected_arrival_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_contact_name')} <span className="field-required">*</span></span>
