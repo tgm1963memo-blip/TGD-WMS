@@ -100,6 +100,23 @@ describe('Sprint 6B movement ledger report foundation', () => {
     });
   });
 
+  // Regression coverage: a real product code search that returned nothing
+  // despite the deposit/withdrawal existing, because the "สินค้า" dropdown
+  // only lists products already registered in the internal product master
+  // (tgd_products) - this direct text search bypasses that dependency
+  // entirely, both server-side (movementLedgerReportService.js) and in the
+  // page's own client-side filter.
+  it('supports searching by the row\'s own product code, independent of the product master dropdown', () => {
+    const pageSource = readProjectFile('src/features/reports/MovementLedgerReportPage.jsx');
+    const panelSource = readProjectFile('src/components/reports/ReportFilterPanel.jsx');
+    const serviceSource = readProjectFile(servicePath);
+
+    expect(panelSource).toContain('showProductCode');
+    expect(pageSource).toContain('showProductCode={true}');
+    expect(pageSource).toContain('committedFilters.productCode');
+    expect(serviceSource).toContain('filters.productCode');
+  });
+
   it('keeps report UI free of posting, stock writes, actions, export engine, and disallowed terminology', () => {
     const source = reportUiFiles.map(readProjectFile).join('\n');
 

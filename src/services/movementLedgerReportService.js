@@ -439,7 +439,7 @@ async function getCatalogTemperatureMap(customerIds) {
 export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const hasLineFilter = filters.trackingCode || filters.lotNo;
+  const hasLineFilter = filters.trackingCode || filters.lotNo || filters.productCode;
   const lineRelation = hasLineFilter ? 'tgd_customer_deposit_request_lines!inner' : 'tgd_customer_deposit_request_lines';
   let query = supabase
     .from('tgd_customer_deposit_requests')
@@ -453,13 +453,18 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
     .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED']);
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-  // Note: product filtering happens in JS below (after resolving product_id
+  // Note: productId filtering happens in JS below (after resolving product_id
   // via sku match) because these lines essentially never have product_id set.
+  // productCode filters here instead, directly against the line's own text
+  // field, since that's always present even when no sku match exists.
   if (filters.trackingCode) {
     query = query.ilike('tgd_customer_deposit_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
   }
   if (filters.lotNo) {
     query = query.ilike('tgd_customer_deposit_request_lines.lot_no', `%${filters.lotNo.trim()}%`);
+  }
+  if (filters.productCode) {
+    query = query.ilike('tgd_customer_deposit_request_lines.customer_product_code', `%${filters.productCode.trim()}%`);
   }
   // Not filtered by date here — the row's actual reporting date is
   // last_action_at (falling back to expected_arrival_date) below, which can
@@ -649,7 +654,7 @@ function resolveWithdrawalProductId(line, customerId, inboundIndex, skuMap) {
 export async function getConfirmedWithdrawalRows(filters = {}) {
   if (!supabase) return { data: [], error: null };
 
-  const hasLineFilter = filters.trackingCode || filters.lotNo;
+  const hasLineFilter = filters.trackingCode || filters.lotNo || filters.productCode;
   const lineRelation = hasLineFilter ? 'tgd_customer_withdrawal_request_lines!inner' : 'tgd_customer_withdrawal_request_lines';
   let query = supabase
     .from('tgd_customer_withdrawal_requests')
@@ -666,12 +671,17 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
 
   if (filters.customerId) query = query.eq('customer_id', filters.customerId);
   // Note: We filter productId in JS below because some legacy withdrawal lines might have null product_id
-  // and need to be resolved via the inbound index first.
+  // and need to be resolved via the inbound index first. productCode filters here instead,
+  // directly against the line's own text field, since that's always present even when no
+  // sku match exists (e.g. a product never registered in the internal product master).
   if (filters.trackingCode) {
     query = query.ilike('tgd_customer_withdrawal_request_lines.tracking_code', `%${filters.trackingCode.trim()}%`);
   }
   if (filters.lotNo) {
     query = query.ilike('tgd_customer_withdrawal_request_lines.lot_no', `%${filters.lotNo.trim()}%`);
+  }
+  if (filters.productCode) {
+    query = query.ilike('tgd_customer_withdrawal_request_lines.customer_product_code', `%${filters.productCode.trim()}%`);
   }
   // Not filtered by date here — a line's actual reporting date is
   // picked_at (falling back to the request's last_action_at) below, which

@@ -64,6 +64,7 @@ function canUseAuthoritativeTotals(committedFilters) {
   if (committedFilters.warehouseId || committedFilters.referenceType) return false;
   if (committedFilters.trackingCode && committedFilters.trackingCode.trim()) return false;
   if (committedFilters.lotNo && committedFilters.lotNo.trim()) return false;
+  if (committedFilters.productCode && committedFilters.productCode.trim()) return false;
   if (committedFilters.temperatureType && (Array.isArray(committedFilters.temperatureType) ? committedFilters.temperatureType.length > 0 : true)) return false;
   return true;
 }
@@ -251,6 +252,7 @@ export function MovementLedgerReportPage() {
       referenceType: committedFilters.referenceType || undefined,
       trackingCode: committedFilters.trackingCode || undefined,
       lotNo: committedFilters.lotNo || undefined,
+      productCode: committedFilters.productCode || undefined,
     };
 
     const enrich = (rowsToEnrich) => {
@@ -313,6 +315,18 @@ export function MovementLedgerReportPage() {
       if (committedFilters.lotNo && committedFilters.lotNo.trim()) {
         const query = committedFilters.lotNo.trim().toLowerCase();
         const filterFn = (r) => (r.lot_no || '').toLowerCase().includes(query);
+        rows = rows.filter(filterFn);
+        priorRows = priorRows.filter(filterFn);
+      }
+
+      // Matches each row's own customer_product_code directly, not via the
+      // productId dropdown's internal-master lookup (see ReportFilterPanel's
+      // showProductCode comment) - this is what makes a real deposit/
+      // withdrawal line searchable by its actual product code even when
+      // that code was never added to tgd_products.
+      if (committedFilters.productCode && committedFilters.productCode.trim()) {
+        const query = committedFilters.productCode.trim().toLowerCase();
+        const filterFn = (r) => (r.customer_product_code || '').toLowerCase().includes(query);
         rows = rows.filter(filterFn);
         priorRows = priorRows.filter(filterFn);
       }
@@ -392,6 +406,7 @@ export function MovementLedgerReportPage() {
         multiLocation={true}
         showTrackingCode={true}
         showLotNo={true}
+        showProductCode={true}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (
