@@ -18,6 +18,7 @@ import {
   recallConfirmedDepositRequest,
   updateDepositLineLocation,
   enqueueCustomerDepositNotification,
+  cancelCustomerDepositRequest,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -78,6 +79,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [comment, setComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyNote, setNotifyNote] = useState('');
   const [recountLine, setRecountLine] = useState(null);
@@ -208,7 +211,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     !lines.every((l) => l.actual_boxes != null || l.actual_weight != null)
     ? 'กรุณาบันทึกจำนวนรับจริงทุกรายการก่อนยืนยัน'
     : '';
-  const canReject = header && !['REJECTED', 'COMPLETED', 'RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CANCELLED'].includes(header.status);
+  // Mirrors tgd_review_customer_deposit_request's REJECT transition, which
+  // only accepts it from ADMIN_REVIEWING (DRAFT/SUBMITTED_BY_CUSTOMER are
+  // auto-advanced into REVIEWING first by handleReject, same as
+  // handleOpenWorkOrder already does for ACCEPT) — showing this button for
+  // any later status (e.g. WAREHOUSE_RECEIVING) let staff fill in a reason
+  // and click Reject only to have the RPC always throw "Invalid deposit
+  // review transition". Once accepted into a work order, cancelling is the
+  // correct action instead (see canCancel below).
+  const canReject = header && ['DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(header.status);
+  // Fills the gap Reject leaves once a request is already accepted into a
+  // work order but not yet completed — mirrors tgd_cancel_customer_deposit_
+  // request's admin/accounting status guard (blocked only once terminal).
+  const canCancel = header && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(header.status);
   const canRequestRecount = header && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(header.status);
   // Client-side mirror of tgd_recall_confirmed_deposit_request's 24-hour
   // window check — just for hiding the button once it's obviously too
@@ -315,6 +330,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   async function handleReject() {
     if (!requestId) return;
     setSubmitting(true); setError('');
+    // REJECT is only a valid transition from ADMIN_REVIEWING server-side —
+    // advance through REVIEWING first for an as-yet-unopened request, same
+    // as handleOpenWorkOrder already does before ACCEPT.
+    if (header?.status === 'DRAFT' || header?.status === 'SUBMITTED_BY_CUSTOMER') {
+      const rv = await reviewCustomerDepositRequest(requestId, 'REVIEWING', comment);
+      if (rv.error) { setSubmitting(false); setError(rv.error.message ?? 'Reject failed'); return; }
+    }
     const r = await reviewCustomerDepositRequest(requestId, 'REJECT', rejectReason || comment);
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Reject failed'); return; }
@@ -323,6 +345,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     updateHeaderStatus(newStatus);
     setRejectOpen(false);
     setRejectReason('');
+  }
+
+  async function handleCancel() {
+    if (!requestId) return;
+    setSubmitting(true); setError('');
+    const r = await cancelCustomerDepositRequest(requestId, cancelReason || comment);
+    setSubmitting(false);
+    if (r.error) { setError(r.error.message ?? 'ยกเลิกคำขอไม่สำเร็จ'); return; }
+    const newStatus = r.data?.status ?? 'CANCELLED';
+    setActionMsg(getDepositStatusLabel(newStatus, t) || newStatus);
+    updateHeaderStatus(newStatus);
+    setCancelOpen(false);
+    setCancelReason('');
   }
 
   async function handleNotifyCustomer() {
@@ -845,6 +880,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   {t('admin_reject_request')}
                 </button>
               ) : null}
+              {canCancel ? (
+                <button
+                  className="btn btn-danger"
+                  disabled={submitting}
+                  onClick={() => setCancelOpen(true)}
+                  title="ใช้เมื่อลูกค้าแจ้งให้ยกเลิกคำขอนี้ หลังเปิดใบงานรับเข้าแล้ว"
+                  type="button"
+                >
+                  ยกเลิกคำขอ
+                </button>
+              ) : null}
             </div>
           </>
         )}
@@ -868,6 +914,29 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         <label className="form-field">
           <span>{t('admin_reject_reason_label')}</span>
           <textarea className="form-control" rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder={t('admin_reject_reason_placeholder')} />
+        </label>
+      </Modal>
+
+      {/* Cancel modal — for a request already accepted into a work order
+          (WAREHOUSE_RECEIVING/PALLETIZING/etc.), where REJECT is no longer
+          a valid transition. */}
+      <Modal
+        isOpen={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="ยกเลิกคำขอ"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-danger" disabled={submitting} onClick={handleCancel} type="button">
+              ยกเลิกคำขอ
+            </button>
+            <button className="btn btn-secondary" onClick={() => setCancelOpen(false)} type="button">{t('cancel')}</button>
+          </div>
+        )}
+      >
+        <label className="form-field">
+          <span>เหตุผลการยกเลิก</span>
+          <textarea className="form-control" rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="เช่น ลูกค้าแจ้งให้ยกเลิก" />
         </label>
       </Modal>
 
