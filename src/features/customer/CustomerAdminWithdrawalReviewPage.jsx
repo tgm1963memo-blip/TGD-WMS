@@ -294,7 +294,14 @@ export function CustomerAdminWithdrawalReviewPage() {
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canSendToHandheld = canWrite && selected && selected.status === 'ADMIN_ACCEPTED';
   const canConfirmWithdrawal = canWrite && selected && selected.status === 'WAREHOUSE_PICKING';
-  const canReject = canWrite && selected && !['ADMIN_REJECTED', 'REJECTED', 'COMPLETED', 'DISPATCHED', 'CANCELLED'].includes(selected.status);
+  // Mirrors tgd_review_customer_withdrawal_request's REJECT transition,
+  // which only accepts it from SUBMITTED_BY_CUSTOMER or ADMIN_REVIEWING -
+  // showing this button for any later status (e.g. WAREHOUSE_PICKING) let
+  // staff fill in a reason and click Reject only to have the RPC always
+  // throw "Invalid ... transition" (same bug already fixed on the deposit
+  // side). canCancel already covers every one of those later statuses, so
+  // narrowing this doesn't remove any capability.
+  const canReject = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canCancel = canWrite && selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
 
   async function handleOpenWorkOrder() {
