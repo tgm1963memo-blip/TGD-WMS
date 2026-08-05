@@ -18,13 +18,6 @@ function toDateOnly(value) {
   return s || null;
 }
 
-function diffDaysInclusive(startDate, endDate) {
-  const start = new Date(`${startDate}T00:00:00Z`);
-  const end = new Date(`${endDate}T00:00:00Z`);
-  const ms = end.getTime() - start.getTime();
-  return Math.floor(ms / 86400000) + 1;
-}
-
 function maxDateStr(a, b) {
   if (!a) return b;
   if (!b) return a;
@@ -64,48 +57,30 @@ export function resolveServiceRate(rates = [], { customerId, customerProductId, 
   return allItemsGeneric ?? null;
 }
 
-// Sums the weight actually on hand for each day in [start, end] (both
-// inclusive, YYYY-MM-DD): starts at receivedWeight and steps down by each
-// withdrawal event's weight as of its date (an event dated exactly `start`
-// is already reflected — i.e. withdrawals take effect the day they
-// happened, not the day after). Only exactly-matched withdrawal events
-// should be passed in (see computeExitDates-style matching upstream) —
-// weight this can't attribute to a specific line should NOT appear here, so
-// an unmatched withdrawal biases toward billing more rather than silently
-// under-billing.
-function sumWeightDays(receivedWeight, events, start, end) {
-  const totalDays = diffDaysInclusive(start, end);
-  if (totalDays <= 0) return 0;
-
-  const withdrawnBeforeStart = events
-    .filter((e) => e.date <= start)
-    .reduce((sum, e) => sum + e.weight, 0);
-  const weightAtStart = Math.max(0, receivedWeight - withdrawnBeforeStart);
-
-  let weightDays = weightAtStart * totalDays;
-  for (const e of events) {
-    if (e.date > start && e.date <= end) {
-      weightDays -= e.weight * diffDaysInclusive(e.date, end);
-    }
-  }
-  return Math.max(0, weightDays);
-}
-
 // depositLines: [{ id, customer_id, customer_product_id, temperature_type,
 //   received_weight, receipt_date (YYYY-MM-DD),
 //   withdrawal_events: [{ weight, date (YYYY-MM-DD) }] }]
-// Returns one computed line per deposit line that has a resolvable STORAGE
-// rate and at least one billable day/occurrence within [periodStart, periodEnd].
+// Returns one computed line per FULL storage cycle billed within
+// [periodStart, periodEnd] — a deposit line spanning several cycles in one
+// window (e.g. a manual quarterly run) produces several result rows, one
+// per cycle, each with its own exact weight/period dates; a lot billed via
+// the auto per-lot flow always gets exactly one cycle per call, since that
+// flow already calls this once per generateLotBillingCycles() window.
 //
-// Storage is billed proportionally to weight-days actually on hand within
-// the window (amount = rate x weightDays/period_days), rather than the
-// line's full original weight times a whole-period count. This fixes two
-// compounding bugs the day/whole-period model had: (1) a line only billed
-// its full original weight or 0 ("exited"/not) with no reduction after a
-// PARTIAL withdrawal, even though less was actually in storage from that
-// day on; and (2) periods = ceil(days/period_days) double-billed any window
-// whose day count wasn't an exact multiple of period_days (e.g. a 31-day
-// calendar month against a 30-day rate billed 2 whole periods, not ~1.03).
+// Confirmed billing rule ("คิดเต็มรอบทันที ไม่เฉลี่ยตามวัน"): the moment a
+// new period_days-sized cycle begins — anchored to the LOT'S OWN
+// receipt_date, not to periodStart/periodEnd's calendar boundaries — it is
+// billed in full at that cycle's weight-on-hand, with no day-fraction
+// discount for a cycle still in progress. This is NOT the old ceil(days_
+// in_window / period_days) model this replaced (see git history): that one
+// measured whole periods against the ARBITRARY staff-chosen window length,
+// so a 31-day calendar month against a 30-day rate wrongly counted 2 whole
+// periods just from window length alone, regardless of where the lot's own
+// cycle boundaries actually fell. This instead walks the lot's own fixed
+// cycle grid and only counts a cycle once its own boundary is reached,
+// which is the precise, anchor-correct way to detect "a new round began" —
+// a 31-day window still only advances through the lot's cycles that
+// genuinely started inside it.
 export function computeStorageInvoiceLines({ depositLines = [], rates = [], periodStart, periodEnd }) {
   const results = [];
 
@@ -136,26 +111,39 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
       continue;
     }
 
-    const start = maxDateStr(receiptDate, periodStart);
-    const end = periodEnd;
-    if (!start || start > end) continue;
-
-    const days = diffDaysInclusive(start, end);
-    if (days <= 0) continue;
+    const windowStart = maxDateStr(receiptDate, periodStart);
+    if (!windowStart || windowStart > periodEnd) continue;
 
     const events = (dl.withdrawal_events ?? [])
       .map((e) => ({ weight: toNumber(e.weight), date: toDateOnly(e.date) }))
       .filter((e) => e.date && e.weight > 0);
 
-    const weightDays = sumWeightDays(receivedWeight, events, start, end);
-    if (weightDays <= 0) continue;
+    // Walk the lot's own cycle grid starting from whichever cycle
+    // windowStart falls into (so a cycle already partway elapsed before
+    // this window opened is still billed in full here, not lost), pushing
+    // one result per cycle that has begun by periodEnd.
+    let cycleIndex = Math.floor(daysBetween(receiptDate, windowStart) / rate.period_days);
+    let cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
 
-    const amount = round2((weightDays / rate.period_days) * toNumber(rate.rate));
-    results.push({
-      depositLineId: dl.id, customerId: dl.customer_id, rate,
-      periods: round2(days / rate.period_days),
-      days, weight: round2(weightDays / days), weightDays, amount,
-    });
+    while (cycleStart <= periodEnd) {
+      const withdrawnBeforeCycleStart = events
+        .filter((e) => e.date <= cycleStart)
+        .reduce((sum, e) => sum + e.weight, 0);
+      const weightAtCycleStart = round2(Math.max(0, receivedWeight - withdrawnBeforeCycleStart));
+
+      if (weightAtCycleStart <= 0) break; // fully withdrawn before this cycle even began
+
+      const cycleEnd = addDays(cycleStart, rate.period_days - 1);
+      const amount = round2(weightAtCycleStart * toNumber(rate.rate));
+      results.push({
+        depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
+        days: rate.period_days, weight: weightAtCycleStart, weightDays: null, amount,
+        periodStart: cycleStart, periodEnd: cycleEnd,
+      });
+
+      cycleIndex += 1;
+      cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
+    }
   }
 
   return results;

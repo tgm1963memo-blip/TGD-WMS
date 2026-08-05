@@ -191,12 +191,12 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
     deposit_line_id: storageLine.depositLineId ?? null,
     billing_period_start: storageLine.periodStart ?? null,
     billing_period_end: storageLine.periodEnd ?? null,
-    // storageLine.weight is the weight-day-averaged on-hand weight over the
-    // period, not a single constant — it can differ from the deposit
-    // line's original received weight if a partial withdrawal happened
-    // mid-period, so the note spells that out for whoever reviews the draft.
+    // One result row = exactly one full billed cycle (see
+    // computeStorageInvoiceLines) — storageLine.weight is the weight on
+    // hand right at that cycle's start, charged in full regardless of how
+    // many days of the cycle have actually elapsed ("เต็มรอบทันที").
     line_note: rate.period_days
-      ? `ค่าฝาก ${storageLine.periods} งวด (${storageLine.days} วัน / งวดละ ${rate.period_days} วัน, น้ำหนักเฉลี่ยที่คิดค่าฝาก ${storageLine.weight} กก.)`
+      ? `ค่าฝาก 1 งวด (งวดละ ${rate.period_days} วัน: ${storageLine.periodStart ?? '-'} ถึง ${storageLine.periodEnd ?? '-'}, น้ำหนักที่คิดค่าฝาก ${storageLine.weight} กก.)`
       : 'ค่าฝาก (ครั้งเดียว)',
     duplicate_guard_active: false,
   };

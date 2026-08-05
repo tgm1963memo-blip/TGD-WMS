@@ -9,10 +9,32 @@ const STORAGE_RATE_30D = {
 };
 
 describe('computeStorageInvoiceLines', () => {
-  it('prorates by exact days instead of rounding up whole periods', () => {
-    // 31-day window against a 30-day rate used to bill ceil(31/30)=2 whole
-    // periods (double); it should now bill ~31/30 periods proportionally.
+  it('bills a cycle in full the moment it begins, even with only a few days elapsed so far ("เต็มรอบทันที")', () => {
+    // Confirmed business rule: goods held only 10 of a 30-day cycle's days
+    // (the cycle hasn't completed) still bill the FULL cycle rate — no
+    // day-fraction discount for a cycle still in progress.
     const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [STORAGE_RATE_30D],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10', // only 10 of 30 days in
+    });
+    expect(line.weight).toBe(1000);
+    expect(line.amount).toBe(1000 * 5); // full cycle rate, not (10/30) of it
+    expect(line.periodStart).toBe('2026-01-01');
+    expect(line.periodEnd).toBe('2026-01-30');
+  });
+
+  it('bills each cycle that has genuinely begun within the window as its own line — a 31-day window against a 30-day rate crosses into a real 2nd cycle, one day in', () => {
+    // This looks like the old ceil(days_in_window/period_days) bug this
+    // replaced, but it isn't: that model derived the period count from the
+    // ARBITRARY window's length alone. This one walks the lot's own fixed
+    // cycle grid (anchored to receipt_date) and only counts a cycle once
+    // that grid genuinely reaches it — here cycle 2 truly starts on day 31
+    // and the window includes that day, so per "เต็มรอบทันที" it's billed.
+    const lines = computeStorageInvoiceLines({
       depositLines: [{
         id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
         received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
@@ -20,15 +42,17 @@ describe('computeStorageInvoiceLines', () => {
       rates: [STORAGE_RATE_30D],
       periodStart: '2026-01-01', periodEnd: '2026-01-31',
     });
-    expect(line.days).toBe(31);
-    expect(line.amount).toBeCloseTo(1000 * 5 * (31 / 30), 2);
-    expect(line.amount).toBeLessThan(1000 * 5 * 2);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ periodStart: '2026-01-01', periodEnd: '2026-01-30', weight: 1000, amount: 5000 });
+    expect(lines[1]).toMatchObject({ periodStart: '2026-01-31', periodEnd: '2026-03-01', weight: 1000, amount: 5000 });
   });
 
-  it('reduces the chargeable weight from the date of a partial withdrawal, not just at 100% depletion', () => {
-    // Deposit 1000kg on Jan 1, withdraw 600kg on Jan 16, period Jan 1-31.
-    // Days 1-15 @ 1000kg (15 days) + days 16-31 @ 400kg (16 days).
-    const [line] = computeStorageInvoiceLines({
+  it('a mid-cycle withdrawal does not discount the cycle already in progress, but does reduce the next one', () => {
+    // Deposit 1000kg on Jan 1 (30-day cycle: Jan 1-30), withdraw 600kg on
+    // Jan 16 (still inside cycle 1) — cycle 1 is charged at the FULL 1000kg
+    // it held when the cycle began; cycle 2 (starts Jan 31) reflects the
+    // withdrawal and is charged at the reduced 400kg.
+    const lines = computeStorageInvoiceLines({
       depositLines: [{
         id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
         received_weight: 1000, receipt_date: '2026-01-01',
@@ -37,11 +61,9 @@ describe('computeStorageInvoiceLines', () => {
       rates: [STORAGE_RATE_30D],
       periodStart: '2026-01-01', periodEnd: '2026-01-31',
     });
-    const expectedWeightDays = 1000 * 15 + 400 * 16;
-    expect(line.weightDays).toBeCloseTo(expectedWeightDays, 5);
-    expect(line.amount).toBeCloseTo((expectedWeightDays / 30) * 5, 2);
-    // Sanity: this must be less than billing the full 1000kg the whole period.
-    expect(line.amount).toBeLessThan(1000 * 5 * (31 / 30));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ periodStart: '2026-01-01', periodEnd: '2026-01-30', weight: 1000, amount: 5000 });
+    expect(lines[1]).toMatchObject({ periodStart: '2026-01-31', periodEnd: '2026-03-01', weight: 400, amount: 2000 });
   });
 
   it('produces zero/no line once the full weight has been withdrawn before the period', () => {
@@ -81,7 +103,11 @@ describe('computeStorageInvoiceLines', () => {
       rates: [oddRate],
       periodStart: '2026-01-01', periodEnd: '2026-01-10',
     });
-    expect(Number.isInteger(line.amount * 100)).toBe(true);
+    // 777 * 3.333 = 2589.741, rounded to 2589.74 — asserting against the
+    // exact expected value (not a *100-then-isInteger check) since that
+    // check is itself floating-point-fragile for some otherwise-correctly-
+    // rounded values (e.g. 2589.74 * 100 !== 258974 in IEEE 754).
+    expect(line.amount).toBeCloseTo(2589.74, 2);
   });
 });
 
