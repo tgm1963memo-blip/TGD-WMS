@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
@@ -18,16 +18,17 @@ const TEMPLATE_COLUMNS = [
   'น้ำหนักต่อหน่วย (กก.)',
   'สารก่อภูมิแพ้ (มี/ไม่มี)',
   'รายละเอียดสารก่อภูมิแพ้',
+  'ประเภทสินค้า',
   'หมายเหตุ',
 ];
 
 function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_COLUMNS,
-    ['10001', 'ตัวอย่างสินค้า A', 'กก.', 'FROZEN', '1.500', 'ไม่มี', '', ''],
-    ['10002', 'ตัวอย่างสินค้า B', 'กล่อง', 'CHILLED', '0.500', 'มี', 'Gluten, Dairy', 'หมายเหตุ'],
+    ['10001', 'ตัวอย่างสินค้า A', 'กก.', 'FROZEN', '1.500', 'ไม่มี', '', 'หมู', ''],
+    ['10002', 'ตัวอย่างสินค้า B', 'กล่อง', 'CHILLED', '0.500', 'มี', 'Gluten, Dairy', 'ไก่', 'หมายเหตุ'],
   ]);
-  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 20].map((w) => ({ wch: w }));
+  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 16, 20].map((w) => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template');
   XLSX.writeFile(wb, 'product_catalog_template.xlsx');
@@ -42,10 +43,11 @@ function exportProducts(products) {
     p.pack_weight_kg ?? '',
     p.allergen ? 'มี' : 'ไม่มี',
     p.allergen ?? '',
+    p.product_category ?? '',
     p.note ?? '',
   ]));
   const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLUMNS, ...rows]);
-  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 20].map((w) => ({ wch: w }));
+  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 16, 20].map((w) => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'สินค้า');
   XLSX.writeFile(wb, 'product_catalog_export.xlsx');
@@ -70,7 +72,8 @@ function parseImportFile(file) {
           packWeightKg: r[4] !== '' && !isNaN(Number(r[4])) ? Number(r[4]) : null,
           allergenHas: String(r[5] ?? '').trim() === 'มี',
           allergen: String(r[6] ?? '').trim(),
-          note: String(r[7] ?? '').trim(),
+          productCategory: String(r[7] ?? '').trim(),
+          note: String(r[8] ?? '').trim(),
         })).filter((r) => r.customerProductCode && r.productName);
         resolve(parsed);
       } catch (err) {
@@ -93,6 +96,7 @@ const EMPTY_FORM = {
   temperatureType: 'FROZEN',
   allergenHas: false,
   allergen: '',
+  productCategory: '',
   note: '',
 };
 
@@ -111,7 +115,14 @@ function TempBadge({ type }) {
   );
 }
 
-function ProductFormModal({ form, saving, error, onClose, onSave, onFieldChange }) {
+function ProductFormModal({ form, products, saving, error, onClose, onSave, onFieldChange }) {
+  // Suggests categories already used in this customer's own catalog
+  // (free-text field, no fixed enum) so the same label gets reused
+  // consistently instead of near-duplicates ("หมู" vs "Pork").
+  const categorySuggestions = useMemo(
+    () => [...new Set((products ?? []).map((p) => p.product_category).filter(Boolean))].sort(),
+    [products],
+  );
   const isEdit = !!form.productId;
   // Tracks whether "อื่นๆ (ระบุเอง)" is the active dropdown choice, independent
   // of whether uomCustom has been typed into yet — deriving this from
@@ -279,6 +290,20 @@ function ProductFormModal({ form, saving, error, onClose, onSave, onFieldChange 
             )}
           </div>
 
+          <label className="form-field" style={{ margin: '0 0 12px' }}>
+            <span>ประเภทสินค้า</span>
+            <input
+              className="form-control"
+              list="customer-product-category-suggestions"
+              onChange={(e) => onFieldChange('productCategory', e.target.value)}
+              value={form.productCategory}
+              placeholder="เช่น หมู, ไก่, อาหารทะเล — กำหนดเองตามที่ต้องการจัดกลุ่ม"
+            />
+            <datalist id="customer-product-category-suggestions">
+              {categorySuggestions.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </label>
+
           <label className="form-field" style={{ margin: '0 0 18px' }}>
             <span>หมายเหตุ</span>
             <textarea
@@ -362,6 +387,7 @@ export function CustomerProductCatalogPage() {
       temperatureType: row.temperature_type ?? 'FROZEN',
       allergenHas: !!(row.allergen),
       allergen: row.allergen ?? '',
+      productCategory: row.product_category ?? '',
       note: row.note ?? '',
     });
     setFormError('');
@@ -389,6 +415,7 @@ export function CustomerProductCatalogPage() {
       packWeightKg: form.packWeightKg !== '' ? parseFloat(form.packWeightKg) : null,
       temperatureType: form.temperatureType,
       allergen: form.allergenHas ? form.allergen : '',
+      productCategory: form.productCategory,
       note: form.note,
       isActive: true,
     });
@@ -449,6 +476,7 @@ export function CustomerProductCatalogPage() {
         packWeightKg: row.packWeightKg,
         temperatureType: row.temperatureType,
         allergen: row.allergenHas ? row.allergen : '',
+        productCategory: row.productCategory,
         note: row.note,
         isActive: true,
       });
@@ -643,6 +671,7 @@ export function CustomerProductCatalogPage() {
                   <th>อุณหภูมิ</th>
                   <th>น้ำหนัก/หน่วย</th>
                   <th>Allergen</th>
+                  <th>ประเภทสินค้า</th>
                   <th>สถานะ</th>
                   {canWrite && <th style={{ width: 130 }}>การกระทำ</th>}
                 </tr>
@@ -651,7 +680,7 @@ export function CustomerProductCatalogPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canWrite ? 8 : 7}
+                      colSpan={canWrite ? 9 : 8}
                       style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--tgd-muted-text)' }}
                     >
                       {products.length === 0
@@ -682,6 +711,7 @@ export function CustomerProductCatalogPage() {
                         ? <span style={{ color: '#ef4444', fontWeight: 600 }}>มี</span>
                         : <span style={{ color: 'var(--tgd-muted-text)' }}>-</span>}
                     </td>
+                    <td style={{ fontSize: 12 }}>{row.product_category ?? '-'}</td>
                     <td><StatusBadge value={row.is_active} /></td>
                     {canWrite && (
                       <td>
@@ -717,6 +747,7 @@ export function CustomerProductCatalogPage() {
       {form !== null && (
         <ProductFormModal
           form={form}
+          products={products}
           saving={saving}
           error={formError}
           onClose={() => setForm(null)}
@@ -766,6 +797,7 @@ export function CustomerProductCatalogPage() {
                       <th>อุณหภูมิ</th>
                       <th>น้ำหนัก (กก.)</th>
                       <th>Allergen</th>
+                      <th>ประเภทสินค้า</th>
                       <th>หมายเหตุ</th>
                     </tr>
                   </thead>
@@ -779,6 +811,7 @@ export function CustomerProductCatalogPage() {
                         <td><TempBadge type={row.temperatureType} /></td>
                         <td>{row.packWeightKg ?? '-'}</td>
                         <td>{row.allergenHas ? <span style={{ color: '#ef4444' }}>มี</span> : '-'}</td>
+                        <td>{row.productCategory || '-'}</td>
                         <td style={{ color: 'var(--tgd-muted-text)' }}>{row.note || '-'}</td>
                       </tr>
                     ))}

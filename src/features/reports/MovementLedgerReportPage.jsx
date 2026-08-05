@@ -19,6 +19,7 @@ import {
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
 import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot, movementBalanceKey } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
+import { listCustomerProductCategories } from '../../services/customerProductCatalogService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 
@@ -66,6 +67,7 @@ function canUseAuthoritativeTotals(committedFilters) {
   if (committedFilters.lotNo && committedFilters.lotNo.trim()) return false;
   if (committedFilters.productCode && committedFilters.productCode.trim()) return false;
   if (committedFilters.temperatureType && (Array.isArray(committedFilters.temperatureType) ? committedFilters.temperatureType.length > 0 : true)) return false;
+  if (committedFilters.productCategory && (Array.isArray(committedFilters.productCategory) ? committedFilters.productCategory.length > 0 : true)) return false;
   return true;
 }
 
@@ -204,6 +206,7 @@ export function MovementLedgerReportPage() {
   const [customerOptions, setCustomerOptions] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [locationOptions, setLocationOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   useEffect(() => {
     Promise.all([
@@ -235,6 +238,16 @@ export function MovementLedgerReportPage() {
       })));
     });
   }, []);
+
+  // Free-text catalog field, so options come from whatever's actually in
+  // use rather than a fixed enum — scoped to the selected customer once
+  // one is chosen (categories are only unique per-customer, not global),
+  // covering every customer's categories otherwise.
+  useEffect(() => {
+    listCustomerProductCategories({ customerId: committedFilters?.customerId || undefined }).then((result) => {
+      setCategoryOptions((result.data ?? []).map((c) => ({ value: c, label: c })));
+    });
+  }, [committedFilters?.customerId]);
 
   useEffect(() => {
     if (!committedFilters) return;
@@ -301,6 +314,13 @@ export function MovementLedgerReportPage() {
           return types.includes(t);
         };
 
+        rows = rows.filter(filterFn);
+        priorRows = priorRows.filter(filterFn);
+      }
+
+      if (committedFilters.productCategory && committedFilters.productCategory.length > 0) {
+        const categories = Array.isArray(committedFilters.productCategory) ? committedFilters.productCategory : [committedFilters.productCategory];
+        const filterFn = (r) => categories.includes(r.product_category || '-');
         rows = rows.filter(filterFn);
         priorRows = priorRows.filter(filterFn);
       }
@@ -401,12 +421,14 @@ export function MovementLedgerReportPage() {
         customerOptions={customerOptions}
         productOptions={productOptions}
         locationOptions={locationOptions}
+        categoryOptions={categoryOptions}
         showMovementType={true}
         multiProduct={true}
         multiLocation={true}
         showTrackingCode={true}
         showLotNo={true}
         showProductCode={true}
+        showCategory={true}
       />
 
       {committedFilters && !state.loading && state.rows.length > 0 ? (

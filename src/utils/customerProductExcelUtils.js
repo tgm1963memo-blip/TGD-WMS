@@ -9,6 +9,7 @@ export const CUSTOMER_PRODUCT_EXCEL_HEADERS = [
   'temperature_type',
   'argent_type',
   'storage_charge_basis',
+  'product_category',
   'note',
 ];
 
@@ -38,6 +39,7 @@ export function mapProductToExcelRow(product = {}) {
     temperature_type: product.temperature_type ?? 'FROZEN',
     argent_type: product.argent_type ?? 'NON_ARGENT',
     storage_charge_basis: product.storage_charge_basis ?? 'WEIGHT',
+    product_category: product.product_category ?? '',
     note: product.note ?? '',
   };
 }
@@ -54,6 +56,7 @@ export function downloadCustomerProductTemplate(customer = null, filename = 'cus
         temperature_type: 'FROZEN',
         argent_type: 'NON_ARGENT',
         storage_charge_basis: 'WEIGHT',
+        product_category: '',
         note: '',
       },
     ],
@@ -132,6 +135,7 @@ export async function parseCustomerProductImportFile(file) {
       temperatureType,
       argentType,
       storageChargeBasis: chargeBasis,
+      productCategory: String(row.product_category ?? '').trim(),
       note: String(row.note ?? '').trim(),
     });
   });

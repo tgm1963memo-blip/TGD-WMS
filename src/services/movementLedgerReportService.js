@@ -217,7 +217,7 @@ export async function getStorageOpeningBalanceRows(customerId, asOfDate) {
   // almost never have product_id set directly, so it's matched via sku
   // against the product master, keeping the Product filter usable on
   // opening-balance rows the same way it already works on regular ones.
-  const [skuMap, catalogTempMap] = await Promise.all([
+  const [skuMap, { tempMap: catalogTempMap }] = await Promise.all([
     getProductSkuMap(),
     getCatalogTemperatureMap([customerId]),
   ]);
@@ -414,26 +414,32 @@ function resolveLineProductId(line, skuMap) {
   return skuMap.get(line.internal_product_code) ?? skuMap.get(line.customer_product_code) ?? null;
 }
 
-// Fallback temperature_type source when a deposit/withdrawal line doesn't
-// specify its own: the customer's master item catalog (tgd_customer_products).
-// Keyed by "customerId::customer_product_code" since customer_product_code
-// is only unique within a single customer, not globally.
+// Fallback temperature_type/product_category source when a deposit/
+// withdrawal line doesn't carry its own: the customer's master item
+// catalog (tgd_customer_products). Both maps are keyed by
+// "customerId::customer_product_code" since customer_product_code is only
+// unique within a single customer, not globally. One query serves both —
+// product_category has no per-line snapshot at all (it's catalog-only), so
+// this is its only source for a movement row.
 async function getCatalogTemperatureMap(customerIds) {
-  const map = new Map();
-  if (!supabase || !customerIds || customerIds.length === 0) return map;
+  const tempMap = new Map();
+  const categoryMap = new Map();
+  if (!supabase || !customerIds || customerIds.length === 0) return { tempMap, categoryMap };
 
   const { data, error } = await supabase
     .from('tgd_customer_products')
-    .select('customer_id, customer_product_code, temperature_type')
+    .select('customer_id, customer_product_code, temperature_type, product_category')
     .in('customer_id', customerIds);
 
-  if (error || !data) return map;
+  if (error || !data) return { tempMap, categoryMap };
 
   for (const row of data) {
-    if (!row.customer_product_code || !row.temperature_type) continue;
-    map.set(`${row.customer_id}::${row.customer_product_code}`, row.temperature_type);
+    if (!row.customer_product_code) continue;
+    const key = `${row.customer_id}::${row.customer_product_code}`;
+    if (row.temperature_type) tempMap.set(key, row.temperature_type);
+    if (row.product_category) categoryMap.set(key, row.product_category);
   }
-  return map;
+  return { tempMap, categoryMap };
 }
 
 export async function getConfirmedDepositReceiptRows(filters = {}) {
@@ -480,7 +486,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const [skuMap, catalogTempMap] = await Promise.all([
+  const [skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }] = await Promise.all([
     getProductSkuMap(),
     getCatalogTemperatureMap(customerIds),
   ]);
@@ -532,6 +538,9 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         temperature_type: line.temperature_type
           ?? (line.customer_product_code ? catalogTempMap.get(`${req.customer_id}::${line.customer_product_code}`) : null)
           ?? null,
+        product_category: line.customer_product_code
+          ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
+          : null,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: null,
         to_warehouse_id: 'RECEIVE',
@@ -695,7 +704,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const [inboundIndex, skuMap, catalogTempMap] = await Promise.all([
+  const [inboundIndex, skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }] = await Promise.all([
     getInboundTemperatureIndex(customerIds),
     getProductSkuMap(),
     getCatalogTemperatureMap(customerIds),
@@ -752,6 +761,9 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         temperature_type: resolveWithdrawalTemperature(line, req.customer_id, inboundIndex)
           ?? (line.customer_product_code ? catalogTempMap.get(`${req.customer_id}::${line.customer_product_code}`) : null)
           ?? null,
+        product_category: line.customer_product_code
+          ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
+          : null,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,

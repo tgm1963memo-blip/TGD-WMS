@@ -32,6 +32,7 @@ const EMPTY_FORM = {
   storageChargeBasis: 'WEIGHT',
   allergenHas: false,
   allergen: '',
+  productCategory: '',
   note: '',
 };
 
@@ -48,7 +49,7 @@ function TempBadge({ type }) {
   );
 }
 
-function ProductFormModal({ form, customers, saving, error, onClose, onSave, onFieldChange }) {
+function ProductFormModal({ form, customers, products, saving, error, onClose, onSave, onFieldChange }) {
   const isEdit = !!form.productId;
   // Tracks whether "อื่นๆ (ระบุเอง)" is the active dropdown choice, independent
   // of whether uomCustom has been typed into yet — deriving this from
@@ -58,6 +59,17 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
   // the custom-text input before the admin could type anything into it.
   const [uomIsCustom, setUomIsCustom] = useState(
     () => Boolean(form.uomCustom) || (Boolean(form.uom) && !UOM_PRESETS.includes(form.uom)),
+  );
+  // Suggests categories this same customer already uses (free-text field,
+  // no fixed enum) so staff reuse an existing label instead of creating a
+  // near-duplicate ("หมู" vs "Pork") by typo/inconsistency.
+  const categorySuggestions = useMemo(
+    () => [...new Set(
+      (products ?? [])
+        .filter((p) => p.customer_id === form.customerId && p.product_category)
+        .map((p) => p.product_category),
+    )].sort(),
+    [products, form.customerId],
   );
   return (
     <div
@@ -262,6 +274,20 @@ function ProductFormModal({ form, customers, saving, error, onClose, onSave, onF
             </div>
           </div>
 
+          <label className="form-field" style={{ margin: '0 0 14px' }}>
+            <span>ประเภทสินค้า</span>
+            <input
+              className="form-control"
+              list="product-category-suggestions"
+              onChange={(e) => onFieldChange('productCategory', e.target.value)}
+              value={form.productCategory}
+              placeholder="เช่น หมู, ไก่, อาหารทะเล — กำหนดเองตามที่ลูกค้าต้องการจัดกลุ่ม"
+            />
+            <datalist id="product-category-suggestions">
+              {categorySuggestions.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </label>
+
           <label className="form-field" style={{ margin: '0 0 20px' }}>
             <span>หมายเหตุ</span>
             <textarea className="form-control" onChange={(e) => onFieldChange('note', e.target.value)} rows={2} value={form.note} style={{ resize: 'vertical' }} />
@@ -350,6 +376,7 @@ export function CustomerProductCatalogAdminPage() {
       storageChargeBasis: row.storage_charge_basis ?? 'WEIGHT',
       allergenHas: !!(row.allergen),
       allergen: row.allergen ?? '',
+      productCategory: row.product_category ?? '',
       note: row.note ?? '',
     });
     setFormError('');
@@ -379,6 +406,7 @@ export function CustomerProductCatalogAdminPage() {
       argentType: form.argentType,
       storageChargeBasis: form.storageChargeBasis,
       allergen: form.allergen,
+      productCategory: form.productCategory,
       note: form.note,
       isActive: true,
     });
@@ -435,6 +463,7 @@ export function CustomerProductCatalogAdminPage() {
           temperatureType: row.temperatureType,
           argentType: row.argentType,
           storageChargeBasis: row.storageChargeBasis,
+          productCategory: row.productCategory,
           note: row.note,
           isActive: true,
         });
@@ -571,6 +600,7 @@ export function CustomerProductCatalogAdminPage() {
                   <th>หน่วย</th>
                   <th>อุณหภูมิ</th>
                   <th>ฐานคิดค่าฝาก</th>
+                  <th>ประเภทสินค้า</th>
                   <th>สถานะ</th>
                   <th style={{ width: 120 }}>การกระทำ</th>
                 </tr>
@@ -578,7 +608,7 @@ export function CustomerProductCatalogAdminPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
                       {products.length === 0 ? t('catalog_empty') : 'ไม่พบสินค้าที่ตรงกับเงื่อนไข'}
                     </td>
                   </tr>
@@ -606,6 +636,7 @@ export function CustomerProductCatalogAdminPage() {
                       <td style={{ fontSize: 12 }}>{row.uom ?? '-'}</td>
                       <td><TempBadge type={row.temperature_type} /></td>
                       <td style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{row.storage_charge_basis ?? '-'}</td>
+                      <td style={{ fontSize: 12 }}>{row.product_category ?? '-'}</td>
                       <td><StatusBadge value={row.is_active} /></td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -644,6 +675,7 @@ export function CustomerProductCatalogAdminPage() {
         <ProductFormModal
           form={form}
           customers={customers}
+          products={products}
           saving={saving}
           error={formError}
           onClose={() => setForm(null)}

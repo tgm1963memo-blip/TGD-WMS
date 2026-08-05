@@ -16,6 +16,7 @@ const initialFilters = {
   trackingCode: '',
   lotNo: '',
   productCode: '',
+  productCategory: [],
 };
 
 const temperatureOptions = [
@@ -38,12 +39,14 @@ export function ReportFilterPanel({
   customerOptions = null,
   productOptions = null,
   locationOptions = null,
+  categoryOptions = null,
   showMovementType = true,
   multiProduct = false,
   multiLocation = false,
   showTrackingCode = false,
   showLotNo = false,
   showProductCode = false,
+  showCategory = false,
 }) {
   const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || ''), movementType: Array.isArray(value.movementType) ? value.movementType : (value.movementType ? [value.movementType] : []) });
 
@@ -171,6 +174,24 @@ export function ReportFilterPanel({
             />
           </label>
         </div>
+        {showCategory && (
+          // Free-text catalog field (each customer defines their own
+          // categories), so options come from whatever's actually in use
+          // for the selected customer rather than a hardcoded enum — see
+          // listCustomerProductCategories.
+          <div className="form-group">
+            <label className="form-label">
+              ประเภทสินค้า
+              <MultiSelectDropdown
+                name="productCategory"
+                options={categoryOptions ?? []}
+                value={filters.productCategory}
+                onChange={(val) => setFilters((prev) => ({ ...prev, productCategory: val }))}
+                placeholder="— ทุกประเภท —"
+              />
+            </label>
+          </div>
+        )}
         <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>
         <div className="form-group"><label className="form-label">Reference Type<input className="form-control" name="referenceType" value={filters.referenceType} onChange={updateField} /></label></div>
         {showProductCode && (

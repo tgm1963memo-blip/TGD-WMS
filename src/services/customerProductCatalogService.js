@@ -18,6 +18,7 @@ const CATALOG_SELECT = [
   'storage_charge_basis',
   'pack_weight_kg',
   'allergen',
+  'product_category',
   'is_active',
   'note',
   'created_at',
@@ -60,10 +61,32 @@ export async function upsertCustomerProduct(payload = {}) {
     p_allergen: toNullableText(payload.allergen),
     p_note: toNullableText(payload.note),
     p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
+    p_product_category: toNullableText(payload.productCategory),
   });
 
   if (error) return { data: null, error };
   return { data: normalizeCustomerPortalRpcData(data), error: null };
+}
+
+// Distinct, non-empty product_category values actually in use — powers the
+// category filter dropdown on the Movement Ledger report (free-text field,
+// each customer defines their own categories, so there's no fixed list to
+// hardcode). Scope to a customer once one is selected; unscoped otherwise.
+export async function listCustomerProductCategories(filters = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  let query = supabase
+    .from('tgd_customer_products')
+    .select('product_category')
+    .not('product_category', 'is', null);
+
+  if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+
+  const categories = [...new Set((data ?? []).map((row) => row.product_category).filter(Boolean))].sort();
+  return { data: categories, error: null };
 }
 
 export async function deactivateCustomerProduct(productId) {
