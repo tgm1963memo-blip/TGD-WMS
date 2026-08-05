@@ -26,8 +26,34 @@ import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
+import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
+
+// Mirrors CustomerDepositDetailModal's TIMELINE_ACTION_LABELS — same
+// tgd_customer_document_timeline_events table, document_type
+// CUSTOMER_WITHDRAWAL_REQUEST instead of CUSTOMER_DEPOSIT_REQUEST, with the
+// withdrawal-specific review decisions (SEND_TO_PICKING/CONFIRM_DISPATCH)
+// in place of the deposit flow's own decision set.
+const TIMELINE_ACTION_LABELS = {
+  CREATE_DRAFT: 'สร้างร่างเอกสาร',
+  UPDATE_DRAFT: 'แก้ไขร่างเอกสาร',
+  DELETE_LINE: 'ลบรายการสินค้า',
+  SUBMIT: 'ส่งคำขอ',
+  RECALL: 'เรียกคืนร่างเอกสาร',
+  CANCEL: 'ยกเลิกเอกสาร',
+  REVIEW_REVIEWING: 'เริ่มตรวจสอบ',
+  REVIEW_ACCEPT: 'เปิดใบงาน (อนุมัติ)',
+  REVIEW_REJECT: 'ปฏิเสธคำขอ',
+  REVIEW_SEND_TO_PICKING: 'ส่งไปจัดสินค้า (Handheld)',
+  REVIEW_CONFIRM_DISPATCH: 'ยืนยันจ่ายออก',
+  ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
+  ADMIN_RECALL_COMPLETED: 'เรียกคืนเอกสารที่เสร็จสิ้นแล้ว',
+};
+
+function timelineActionLabel(action) {
+  return TIMELINE_ACTION_LABELS[action] ?? action;
+}
 
 // Requests can only be combined into one printed work order while their
 // work order is still active — same set backing this page's own
@@ -92,6 +118,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   const customerOptions = [...new Map(
     rows
@@ -149,6 +177,13 @@ export function CustomerAdminWithdrawalReviewPage() {
   // reloading the page kept showing the PRE-withdrawal remaining balance on
   // print, since the print trusts lot_remaining_boxes as already-netted
   // once status is COMPLETED, but that field was never refreshed to match.
+  function refreshTimeline(id) {
+    if (!id) { setTimelineEvents([]); return; }
+    listCustomerDocumentTimelineEvents('CUSTOMER_WITHDRAWAL_REQUEST', id).then((result) => {
+      setTimelineEvents(result.data ?? []);
+    });
+  }
+
   async function refreshLines(id) {
     if (!id) { setLines([]); return; }
     const result = await listCustomerWithdrawalRequestLines(id);
@@ -162,11 +197,16 @@ export function CustomerAdminWithdrawalReviewPage() {
     });
     setLineAdminNotes(initNotes);
     setLineTrackingCodes(initTrackingCodes);
+    // Every action handler that calls refreshLines() after mutating this
+    // document also wants its edit/audit log refreshed — folded in here
+    // instead of touching each of those call sites individually.
+    refreshTimeline(id);
   }
 
   useEffect(() => {
     let active = true;
-    if (!selectedId) { setLines([]); return undefined; }
+    setTimelineOpen(false);
+    if (!selectedId) { setLines([]); setTimelineEvents([]); return undefined; }
 
     listCustomerWithdrawalRequestLines(selectedId).then((result) => {
       if (!active) return;
@@ -181,6 +221,7 @@ export function CustomerAdminWithdrawalReviewPage() {
       setLineAdminNotes(initNotes);
       setLineTrackingCodes(initTrackingCodes);
     });
+    refreshTimeline(selectedId);
 
     return () => { active = false; };
   }, [selectedId]);
@@ -781,7 +822,62 @@ export function CustomerAdminWithdrawalReviewPage() {
               >
                 ดาวน์โหลด Excel
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ marginLeft: 8 }}
+                onClick={() => setTimelineOpen((v) => !v)}
+              >
+                📜 {timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}
+              </button>
             </div>
+
+            {/* Edit/audit log — every status transition and admin action
+                recorded against this document (tgd_customer_document_timeline_events) */}
+            {timelineOpen ? (
+              <div className="table-card" style={{ marginBottom: 16, padding: 0 }}>
+                <div className="responsive-table">
+                  <table className="data-table" style={{ fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ whiteSpace: 'nowrap' }}>วันที่/เวลา</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>การทำงาน</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>สถานะ</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>ผู้ทำรายการ</th>
+                        <th>หมายเหตุ / รายละเอียด</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timelineEvents.length ? timelineEvents.map((ev) => (
+                        <tr key={ev.id}>
+                          <td style={{ whiteSpace: 'nowrap' }}>{formatDocumentDate(ev.created_at)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{timelineActionLabel(ev.action)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {ev.from_status && ev.from_status !== ev.to_status
+                              ? `${ev.from_status} → ${ev.to_status}`
+                              : (ev.to_status ?? '-')}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {ev.actor_email ?? '-'}
+                            {ev.actor_role ? <span style={{ color: 'var(--tgd-muted-text)' }}> ({ev.actor_role})</span> : null}
+                          </td>
+                          <td>
+                            {ev.comment ?? ''}
+                            {ev.metadata_json && Object.keys(ev.metadata_json).length ? (
+                              <div style={{ color: 'var(--tgd-muted-text)', fontSize: 11 }}>
+                                {Object.entries(ev.metadata_json).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--tgd-muted-text)' }}>ไม่มีประวัติการแก้ไข</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
 
             {/* Lines table with actual qty column and recount button */}
             <div style={{ marginBottom: 16 }}>
