@@ -280,15 +280,32 @@ function stickerDocumentHtml(pagesHtml, pageCount = 1) {
     background-color: white; overflow: hidden; display: flex; flex-direction: column;
   }
   @media print {
+    /* Centers the rotated .sticker via flexbox on the page, NOT via
+       position:absolute + top/left:50% + translate(-50%,-50%) — that
+       combination is what this replaced, and it broke on every page
+       except the very last one in a multi-sticker job. Confirmed with a
+       real multi-page render (Chromium print/PDF pipeline): each
+       page-break-after:always fragment mis-resolved the absolutely-
+       positioned child's percentage top/left against the wrong
+       containing block, so every page but the last printed with its
+       border cut off, the QR code missing, and overlapping/garbled text
+       — exactly the "last one is fine, the rest bleed outside the form"
+       symptom reported by staff. Flexbox centering has no percentage-
+       offset resolution step to get wrong, so every page (not just the
+       last) renders identically. Do not revert to absolute+top/left
+       centering without re-testing an actual multi-sticker print/PDF, not
+       just a single-sticker or on-screen preview — both of those looked
+       fine even with the old, broken CSS. */
     .sticker-page {
-      width: 100mm; height: 120mm; overflow: hidden; position: relative;
+      width: 100mm; height: 120mm; overflow: hidden;
       margin: 0; page-break-after: always; break-after: page;
       page-break-inside: avoid; break-inside: avoid;
+      display: flex; align-items: center; justify-content: center;
     }
     .sticker-page:last-child { page-break-after: auto; break-after: auto; }
     .sticker {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(${getStickerRotationDeg()}deg);
+      flex: none;
+      transform: rotate(${getStickerRotationDeg()}deg);
       width: 120mm; height: 100mm;
     }
   }
