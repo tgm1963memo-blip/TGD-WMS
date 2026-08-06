@@ -1,6 +1,11 @@
 import * as XLSX from 'xlsx';
 
-export function rowsToSheet(rows = [], headers = []) {
+// columnWidths (optional): character-unit widths (XLSX's !cols wch
+// convention), one per header in order — lets a caller size the sheet to
+// fit its own content instead of every column defaulting to Excel's
+// narrow auto-width, which otherwise leaves wide Thai product/customer
+// names truncated until the reader manually resizes each column.
+export function rowsToSheet(rows = [], headers = [], columnWidths = null) {
   const data = rows.map((row) => {
     const out = {};
     headers.forEach((key) => {
@@ -8,7 +13,11 @@ export function rowsToSheet(rows = [], headers = []) {
     });
     return out;
   });
-  return XLSX.utils.json_to_sheet(data, { header: headers });
+  const sheet = XLSX.utils.json_to_sheet(data, { header: headers });
+  if (Array.isArray(columnWidths) && columnWidths.length > 0) {
+    sheet['!cols'] = columnWidths.map((wch) => ({ wch }));
+  }
+  return sheet;
 }
 
 export function downloadExcelWorkbook(sheet, filename = 'export.xlsx', sheetName = 'Sheet1') {
@@ -17,8 +26,8 @@ export function downloadExcelWorkbook(sheet, filename = 'export.xlsx', sheetName
   XLSX.writeFile(workbook, filename);
 }
 
-export function downloadExcelRows(rows, headers, filename, sheetName = 'Sheet1') {
-  downloadExcelWorkbook(rowsToSheet(rows, headers), filename, sheetName);
+export function downloadExcelRows(rows, headers, filename, sheetName = 'Sheet1', columnWidths = null) {
+  downloadExcelWorkbook(rowsToSheet(rows, headers, columnWidths), filename, sheetName);
 }
 
 export async function readExcelFile(file) {

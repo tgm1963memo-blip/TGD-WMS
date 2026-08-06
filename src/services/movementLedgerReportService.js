@@ -541,6 +541,7 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
         product_category: line.customer_product_code
           ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
           : null,
+        location_id: line.location_id ?? null,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: null,
         to_warehouse_id: 'RECEIVE',
@@ -671,7 +672,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       id, withdrawal_no, customer_id, status, last_action_at, requested_dispatch_date,
       ${lineRelation}(
         id, line_no, customer_product_code, internal_product_code, product_name, lot_no, product_id,
-        source_customer_deposit_request_id, source_lot_no,
+        source_customer_deposit_request_id, source_lot_no, location_id,
         requested_boxes, requested_weight,
         picked_boxes, picked_weight, picked_at, picked_by_email, tracking_code
       )
@@ -764,6 +765,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         product_category: line.customer_product_code
           ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
           : null,
+        location_id: line.location_id ?? null,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,

@@ -272,11 +272,13 @@ export function MovementLedgerReportPage() {
       const productMap = Object.fromEntries(productOptions.map((p) => [p.value, p.label]));
       const productTempMap = Object.fromEntries(productOptions.map((p) => [p.value, p.temperatureType]));
       const customerMap = Object.fromEntries(customerOptions.map((c) => [c.value, c.label]));
+      const locationMap = Object.fromEntries(locationOptions.map((l) => [l.value, l.label]));
       return rowsToEnrich.map((row) => ({
         ...row,
         product_name: row.product_name ?? productMap[row.product_id] ?? row.product_id,
         customer_name: row.customer_name ?? customerMap[row.customer_id] ?? row.customer_id,
         temperature_type: row.temperature_type ?? productTempMap[row.product_id] ?? null,
+        location_name: row.location_id ? (locationMap[row.location_id] ?? row.location_id) : null,
       }));
     };
 

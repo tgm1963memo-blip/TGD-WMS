@@ -3,9 +3,33 @@ import { formatDocumentDate } from './documentDisplayUtils.js';
 import { isInbound, fmtWt } from '../components/reports/MovementLedgerTable.jsx';
 
 const HEADERS = [
-  'วันที่', 'ประเภท', 'รหัสติดตาม', 'สินค้า', 'lot', 'วันผลิต',
+  'วันที่', 'ประเภท', 'ลูกค้า', 'รหัสติดตาม', 'สินค้า', 'ประเภทสินค้า', 'lot', 'วันผลิต',
+  'อุณหภูมิ', 'Location',
   'รับเข้า(กล่อง)', 'รับเข้า(น้ำหนัก)', 'จ่ายออก(กล่อง)', 'จ่ายออก(น้ำหนัก)',
   'คงเหลือ(กล่อง)', 'คงเหลือ(น้ำหนัก)'
+];
+
+// Column widths (character units, matching XLSX's !cols wch convention) so
+// the exported sheet reads well without manual resizing — sized to the
+// widest realistic content per column (Thai product names/customer names
+// need more room than short codes/dates).
+const COLUMN_WIDTHS = [
+  16, // วันที่ (dd/mm/yyyy, HH:mm)
+  14, // ประเภท
+  28, // ลูกค้า
+  14, // รหัสติดตาม
+  42, // สินค้า (code - name, often long in Thai)
+  16, // ประเภทสินค้า
+  10, // lot
+  12, // วันผลิต
+  10, // อุณหภูมิ
+  18, // Location
+  13, // รับเข้า(กล่อง)
+  15, // รับเข้า(น้ำหนัก)
+  13, // จ่ายออก(กล่อง)
+  15, // จ่ายออก(น้ำหนัก)
+  13, // คงเหลือ(กล่อง)
+  15, // คงเหลือ(น้ำหนัก)
 ];
 
 // Product identity for grouping — deliberately NOT product_id, since deposit,
@@ -110,10 +134,14 @@ function openingBalanceExcelRow(meta, opening) {
   return {
     'วันที่': '',
     'ประเภท': 'ยกมา',
+    'ลูกค้า': meta.customer_name || '-',
     'รหัสติดตาม': meta.tracking_code || '-',
     'สินค้า': productDisplay(meta),
+    'ประเภทสินค้า': meta.product_category || '-',
     'lot': meta.lot_no || '-',
     'วันผลิต': meta.mfg_date ? formatDocumentDate(meta.mfg_date, { dateOnly: true }) : '-',
+    'อุณหภูมิ': meta.temperature_type || '-',
+    'Location': meta.location_name || '-',
     'รับเข้า(กล่อง)': '',
     'รับเข้า(น้ำหนัก)': '',
     'จ่ายออก(กล่อง)': '',
@@ -133,10 +161,14 @@ function movementExcelRow(row, balance) {
   return {
     'วันที่': formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false }),
     'ประเภท': row.movement_type ?? '',
+    'ลูกค้า': row.customer_name || '-',
     'รหัสติดตาม': row.tracking_code || '-',
     'สินค้า': productDisplay(row),
+    'ประเภทสินค้า': row.product_category || '-',
     'lot': row.lot_no || '-',
     'วันผลิต': row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-',
+    'อุณหภูมิ': row.temperature_type || '-',
+    'Location': row.location_name || '-',
     'รับเข้า(กล่อง)': inbound ? qty : '',
     'รับเข้า(น้ำหนัก)': inbound ? fmtWt(row.weight) : '',
     'จ่ายออก(กล่อง)': inbound ? '' : qty,
@@ -189,10 +221,14 @@ function totalsExcelRow(totals) {
   return {
     'วันที่': '',
     'ประเภท': 'รวมทั้งหมด',
+    'ลูกค้า': '',
     'รหัสติดตาม': '',
     'สินค้า': '',
+    'ประเภทสินค้า': '',
     'lot': '',
     'วันผลิต': '',
+    'อุณหภูมิ': '',
+    'Location': '',
     'รับเข้า(กล่อง)': totals.receivedQty,
     'รับเข้า(น้ำหนัก)': Number(totals.receivedWeight.toFixed(3)),
     'จ่ายออก(กล่อง)': totals.deliveredQty,
@@ -291,5 +327,5 @@ export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Ma
 export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger', authoritativeTotals = null) {
   const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode, authoritativeTotals);
   const stamp = new Date().toISOString().slice(0, 10);
-  downloadExcelRows(excelRows, HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger');
+  downloadExcelRows(excelRows, HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger', COLUMN_WIDTHS);
 }
