@@ -167,7 +167,13 @@ async function fetchMergedRows(serviceFilters, filterCriteria) {
     return aOut - bOut;
   });
 
-  return { rows, error: result.error ?? null };
+  // A failure in the deposit or withdrawal source (e.g. a DB query error)
+  // used to be silently dropped here — only the stock_movements source's
+  // error ever reached the screen, so a broken deposit/withdrawal query
+  // just rendered as "no data" with no indication anything had failed.
+  const error = result.error ?? depositResult.error ?? withdrawalResult.error ?? null;
+
+  return { rows, error };
 }
 
 export function MovementLedgerReportPage() {

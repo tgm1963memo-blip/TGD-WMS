@@ -570,7 +570,7 @@ async function getInboundTemperatureIndex(customerIds) {
     .select(`
       id, customer_id, status,
       tgd_customer_deposit_request_lines(
-        id, deposit_request_id, lot_no, customer_product_code, product_id, temperature_type
+        id, deposit_request_id, lot_no, customer_product_code, product_id, temperature_type, location_id
       )
     `)
     .in('customer_id', customerIds)
@@ -615,6 +615,37 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
   if (code !== '') {
     const byCode = candidates.find((dl) => dl.customer_product_code === line.customer_product_code);
     if (byCode) return byCode.temperature_type;
+  }
+
+  return null;
+}
+
+// Withdrawal lines have no location_id column of their own (unlike deposit
+// lines) — a picked box leaves whatever location it was stored at, and the
+// line itself never recorded which one. Resolved from the source deposit
+// line instead, via the same A/B/C match as resolveWithdrawalTemperature.
+function resolveWithdrawalLocation(line, customerId, inboundIndex) {
+  const candidates = inboundIndex.get(customerId) ?? [];
+  if (candidates.length === 0) return null;
+
+  if (line.source_customer_deposit_request_id) {
+    const lotHint = line.source_lot_no ?? line.lot_no ?? null;
+    const direct = candidates.find((dl) =>
+      dl.deposit_request_id === line.source_customer_deposit_request_id &&
+      (lotHint == null || dl.lot_no === lotHint));
+    if (direct) return direct.location_id;
+  }
+
+  const lotNo = line.lot_no ?? '';
+  const code = (line.customer_product_code ?? '').trim();
+  const byLot = candidates.find((dl) =>
+    (dl.lot_no ?? '') === lotNo &&
+    (code === '' || dl.customer_product_code === line.customer_product_code));
+  if (byLot) return byLot.location_id;
+
+  if (code !== '') {
+    const byCode = candidates.find((dl) => dl.customer_product_code === line.customer_product_code);
+    if (byCode) return byCode.location_id;
   }
 
   return null;
@@ -672,7 +703,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       id, withdrawal_no, customer_id, status, last_action_at, requested_dispatch_date,
       ${lineRelation}(
         id, line_no, customer_product_code, internal_product_code, product_name, lot_no, product_id,
-        source_customer_deposit_request_id, source_lot_no, location_id,
+        source_customer_deposit_request_id, source_lot_no,
         requested_boxes, requested_weight,
         picked_boxes, picked_weight, picked_at, picked_by_email, tracking_code
       )
@@ -765,7 +796,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         product_category: line.customer_product_code
           ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
           : null,
-        location_id: line.location_id ?? null,
+        location_id: resolveWithdrawalLocation(line, req.customer_id, inboundIndex) ?? null,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,
