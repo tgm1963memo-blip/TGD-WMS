@@ -7,8 +7,10 @@ import { insertSoftBreaks as withSoftBreaks } from './textWrapUtils.js';
 // name/Location/quantity, with the tracking code as the single big, bold
 // focal element at the bottom, and a blank framed box bottom-right for
 // handwritten notes — trimmed down from the earlier 9-field version
-// (product code, lot, storage type, allergen, mfg date still dropped) so
-// the tracking code keeps most of the label's area to itself.
+// (product code, lot, storage type, mfg date still dropped) so the tracking
+// code keeps most of the label's area to itself. Allergen was dropped too,
+// then reinstated as a warning line in the product-name box — food-safety
+// info a handler needs to see, not one to trade away for layout space.
 export function formatStickerDate(iso) {
   if (!iso) return '-';
   const s = String(iso).split('T')[0];
@@ -32,7 +34,7 @@ function splitTrackingCode(code) {
 // page-break-after so a multi-box deposit line prints one sticker per box
 // in a single print job instead of N separate popups).
 function renderStickerPageHtml({
-  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
 }) {
   // The QR encodes just the bare tracking code (no JSON) so scanning it during
   // picking can match a withdrawal line by a simple string lookup.
@@ -82,6 +84,7 @@ function renderStickerPageHtml({
         <td colspan="3" class="bottom-info-row">
           <div class="bottom-info-box">
             <div class="bottom-product-name">${withSoftBreaks(productName) || '-'}</div>
+            ${allergenLabel ? `<div class="bottom-allergen-warning">⚠ สารก่อภูมิแพ้: ${withSoftBreaks(allergenLabel)}</div>` : ''}
             <div class="bottom-product-code">${withSoftBreaks(productCode) || '-'}</div>
           </div>
         </td>
@@ -373,6 +376,13 @@ function stickerDocumentHtml(pagesHtml, pageCount = 1) {
     padding: 1mm 2mm;
   }
   .bottom-product-name { font-size: 15px; font-weight: 700; line-height: 1.15; text-align: center; overflow-wrap: break-word; word-break: break-word; }
+  /* A thermal print is monochrome, so this can't lean on color to stand
+     out the way a food-safety warning normally would — weight, a border,
+     and the ⚠ glyph carry it instead. Only rendered when the product
+     actually has an allergen on file (see buildStickerItem callers), so a
+     non-allergen item's label isn't padded with a redundant "no allergen"
+     line. */
+  .bottom-allergen-warning { font-size: 13px; font-weight: 700; line-height: 1.15; text-align: center; margin-top: 0.5mm; padding: 0.5mm 1mm; border: 1px solid #000; overflow-wrap: break-word; word-break: break-word; }
   .bottom-product-code { font-size: 12px; font-weight: 600; color: #333; line-height: 1.1; margin-top: 0.5mm; text-align: center; overflow-wrap: break-word; word-break: break-word; }
 </style>
 </head>
@@ -426,10 +436,10 @@ function openAndPrintHtml(html, pageCount = 1) {
 }
 
 export function printSticker({
-  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
+  depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
 }) {
   const html = stickerDocumentHtml(renderStickerPageHtml({
-    depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode,
+    depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
   }));
   openAndPrintHtml(html, 1);
 }

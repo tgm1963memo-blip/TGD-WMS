@@ -441,7 +441,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       lotNo: line.lot_no,
       storageLabel: getTemperatureTypeShortLabel(line.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      // The sticker only shows a warning line when this is non-empty — the
+      // actual allergen substance (e.g. "นม, ถั่ว"), not a bare yes/no, is
+      // what a handler actually needs to read on the printed label.
+      allergenLabel: catalogMatch?.allergen || '',
       mfgDate: line.mfg_date,
       locationCode,
       trackingCode: line.tracking_code ?? '-',

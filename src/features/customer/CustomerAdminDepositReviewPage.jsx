@@ -36,6 +36,7 @@ import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/te
 // per-line recount button already uses on this page.
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -62,6 +63,7 @@ export function CustomerAdminDepositReviewPage() {
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [selectedId, setSelectedId] = useState(routeRequestId ?? '');
   const [detailOpen, setDetailOpen] = useState(!!routeRequestId);
   const [comment, setComment] = useState('');
@@ -161,6 +163,20 @@ export function CustomerAdminDepositReviewPage() {
   }
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
+
+  // Sticker printing needs each line's allergen text (looked up by
+  // customer_product_code, same as CustomerDepositDetailModal's catalog
+  // lookup) — deposit request lines don't carry it directly.
+  useEffect(() => {
+    if (!selected?.customer_id) { setCatalogProducts([]); return undefined; }
+    let active = true;
+    listCustomerProducts({ customerId: selected.customer_id }).then((result) => {
+      if (!active) return;
+      setCatalogProducts(result.data ?? []);
+    });
+    return () => { active = false; };
+  }, [selected?.customer_id]);
+
   const branding = getDocumentBrandingConfig();
 
   const bulkEligibleRows = sortedData.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
@@ -442,6 +458,7 @@ export function CustomerAdminDepositReviewPage() {
         const quantityParts = [];
         if (l.actual_boxes != null) quantityParts.push(`${l.actual_boxes} กล่อง`);
         if (l.actual_weight != null) quantityParts.push(`${Number(l.actual_weight).toLocaleString('th-TH')} กก.`);
+        const catalogMatch = catalogProducts.find((p) => p.customer_product_code === l.customer_product_code);
         return {
           depositDate,
           customerName,
@@ -450,6 +467,7 @@ export function CustomerAdminDepositReviewPage() {
           quantityLabel: quantityParts.join(' / ') || '-',
           locationCode: l.location?.location_code ?? '-',
           trackingCode: l.tracking_code ?? '',
+          allergenLabel: catalogMatch?.allergen || '',
         };
       });
     if (!items.length) return;
