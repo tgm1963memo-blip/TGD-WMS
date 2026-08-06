@@ -532,10 +532,8 @@ export function CustomerAdminWithdrawalReviewPage() {
 
       {/* List table */}
       <div className="table-card">
-        <div className="table-card-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-            <h3 style={{ margin: 0 }}>{t('admin_withdrawal_review_table_title')}</h3>
-          </div>
+        <div className="table-card-header" style={{ flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: '8px' }}>
+          <h3 style={{ margin: 0 }}>{t('admin_withdrawal_review_table_title')}</h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 280 }}>
               {'ค้นหา'}
