@@ -75,7 +75,18 @@ export function WarehouseOperationPerformanceReportPage() {
         title="Warehouse Operation Performance Report"
         description="Read-only cold storage warehouse operation workload report for customer-owned inventory and monthly storage billing preparation."
       />
-      <ReportFilterPanel onChange={setFilters} />
+      {/* Only dateFrom/dateTo/customerId/warehouseId actually filter this
+          report (see warehouseOperationPerformanceService.js) — ประเภทเอกสาร,
+          สินค้า, Location, อุณหภูมิ, and Reference Type used to render here
+          anyway and silently do nothing when filled in. */}
+      <ReportFilterPanel
+        onChange={setFilters}
+        showMovementType={false}
+        showProduct={false}
+        showLocation={false}
+        showTemperature={false}
+        showReferenceType={false}
+      />
 
       <DashboardSection title="Warehouse Operation Summary">
         <div className="summary-grid">

@@ -593,7 +593,11 @@ export function CustomerProductCatalogAdminPage() {
             <table className="data-table" data-testid="catalog-admin-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>ลูกค้า</th>
+                  {/* Redundant once already filtered to one customer — every
+                      visible row would repeat the exact same (often long)
+                      customer name for no reason. Only worth a column when
+                      viewing "ทุกลูกค้า", where rows genuinely differ. */}
+                  {!filterCustomerId && <th>ลูกค้า</th>}
                   <th>รหัสสินค้าลูกค้า</th>
                   <th>ชื่อสินค้า</th>
                   <th>รหัสภายใน</th>
@@ -608,7 +612,7 @@ export function CustomerProductCatalogAdminPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
+                    <td colSpan={filterCustomerId ? 9 : 10} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
                       {products.length === 0 ? t('catalog_empty') : 'ไม่พบสินค้าที่ตรงกับเงื่อนไข'}
                     </td>
                   </tr>
@@ -616,14 +620,16 @@ export function CustomerProductCatalogAdminPage() {
                   const cust = customerMap[row.customer_id];
                   return (
                     <tr key={row.id}>
-                      <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                        {cust ? (
-                          <span>
-                            <span style={{ fontWeight: 600 }}>{cust.customer_code}</span>
-                            <span style={{ color: 'var(--tgd-muted-text)', marginLeft: 4 }}>{cust.customer_name}</span>
-                          </span>
-                        ) : (row.customer_id?.slice(0, 8) ?? '-')}
-                      </td>
+                      {!filterCustomerId && (
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {cust ? (
+                            <span>
+                              <span style={{ fontWeight: 600 }}>{cust.customer_code}</span>
+                              <span style={{ color: 'var(--tgd-muted-text)', marginLeft: 4 }}>{cust.customer_name}</span>
+                            </span>
+                          ) : (row.customer_id?.slice(0, 8) ?? '-')}
+                        </td>
+                      )}
                       <td style={{ fontWeight: 700, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {row.customer_product_code}
                       </td>

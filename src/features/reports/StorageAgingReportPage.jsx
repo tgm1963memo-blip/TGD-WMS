@@ -74,7 +74,23 @@ export function StorageAgingReportPage() {
         title="รายงานอายุการจัดเก็บสินค้า (Storage Aging Report)"
         description="รายงานแสดงข้อมูลอายุสินค้า, วันหมดอายุ, และจำนวนวันคิดค่าฝากสำหรับลูกค้าแต่ละราย — คำนวณสดจากยอดฝากที่ยืนยันแล้วหักการเบิกที่เสร็จสมบูรณ์ ตัวเลขเดียวกับหน้ายอดคงเหลือ"
       />
-      <ReportFilterPanel onChange={setFilters} customerOptions={customerOptions} showLotNo />
+      {/* Storage aging is a current-stock snapshot (getAllCustomerStockBalances
+          — no date-range query at all) filtered only by customerId/productId/
+          lotNo (see applyStorageAgingFilters in storageAgingReportService.js).
+          Date range, ประเภทเอกสาร, Location, อุณหภูมิ, Warehouse, and Reference
+          Type used to render here anyway and silently do nothing when filled
+          in. */}
+      <ReportFilterPanel
+        onChange={setFilters}
+        customerOptions={customerOptions}
+        showLotNo
+        showDateRange={false}
+        showMovementType={false}
+        showLocation={false}
+        showTemperature={false}
+        showWarehouse={false}
+        showReferenceType={false}
+      />
 
       <DashboardSection title="สรุปภาพรวม (Overall Summary)">
         <div className="report-summary-grid" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>

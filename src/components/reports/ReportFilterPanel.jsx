@@ -47,6 +47,20 @@ export function ReportFilterPanel({
   showLotNo = false,
   showProductCode = false,
   showCategory = false,
+  // Default true everywhere (unchanged behavior) — a report page whose
+  // service never reads a given filter opts out explicitly instead. Every
+  // field here used to render unconditionally regardless of whether the
+  // page's own service actually consumed it — e.g. Storage Aging showed
+  // Date From/To, Location, อุณหภูมิ, Warehouse, and Reference Type, none
+  // of which storageAgingReportService.js ever reads, so filling them in
+  // silently did nothing. That reads as "this report is broken/ignoring my
+  // filter," not just visual clutter.
+  showDateRange = true,
+  showProduct = true,
+  showLocation = true,
+  showTemperature = true,
+  showWarehouse = true,
+  showReferenceType = true,
 }) {
   const [filters, setFilters] = useState({ ...initialFilters, ...value, productId: multiProduct ? (Array.isArray(value.productId) ? value.productId : []) : (value.productId || ''), locationId: multiLocation ? (Array.isArray(value.locationId) ? value.locationId : []) : (value.locationId || ''), movementType: Array.isArray(value.movementType) ? value.movementType : (value.movementType ? [value.movementType] : []) });
 
@@ -76,8 +90,12 @@ export function ReportFilterPanel({
   return (
     <section className="filter-toolbar" aria-label="Report filters">
       <div className="filter-toolbar-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', width: '100%', flex: 1, alignItems: 'start' }}>
-        <div className="form-group"><label className="form-label">Date From<input className="form-control" name="dateFrom" type="date" value={filters.dateFrom} onChange={updateField} /></label></div>
-        <div className="form-group"><label className="form-label">Date To<input className="form-control" name="dateTo" type="date" value={filters.dateTo} onChange={updateField} /></label></div>
+        {showDateRange && (
+          <>
+            <div className="form-group"><label className="form-label">Date From<input className="form-control" name="dateFrom" type="date" value={filters.dateFrom} onChange={updateField} /></label></div>
+            <div className="form-group"><label className="form-label">Date To<input className="form-control" name="dateTo" type="date" value={filters.dateTo} onChange={updateField} /></label></div>
+          </>
+        )}
         {showMovementType && (
           <div className="form-group">
             <label className="form-label">
@@ -107,6 +125,7 @@ export function ReportFilterPanel({
             )}
           </label>
         </div>
+        {showProduct && (
         <div className="form-group">
           <label className="form-label">
             สินค้า
@@ -137,6 +156,8 @@ export function ReportFilterPanel({
             )}
           </label>
         </div>
+        )}
+        {showLocation && (
         <div className="form-group">
           <label className="form-label">
             Location
@@ -162,6 +183,8 @@ export function ReportFilterPanel({
             )}
           </label>
         </div>
+        )}
+        {showTemperature && (
         <div className="form-group">
           <label className="form-label">
             อุณหภูมิ
@@ -174,6 +197,7 @@ export function ReportFilterPanel({
             />
           </label>
         </div>
+        )}
         {showCategory && (
           // Free-text catalog field (each customer defines their own
           // categories), so options come from whatever's actually in use
@@ -192,8 +216,12 @@ export function ReportFilterPanel({
             </label>
           </div>
         )}
-        <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>
-        <div className="form-group"><label className="form-label">Reference Type<input className="form-control" name="referenceType" value={filters.referenceType} onChange={updateField} /></label></div>
+        {showWarehouse && (
+          <div className="form-group"><label className="form-label">Warehouse<input className="form-control" name="warehouseId" value={filters.warehouseId} onChange={updateField} placeholder="Warehouse ID" /></label></div>
+        )}
+        {showReferenceType && (
+          <div className="form-group"><label className="form-label">Reference Type<input className="form-control" name="referenceType" value={filters.referenceType} onChange={updateField} /></label></div>
+        )}
         {showProductCode && (
           // Text search directly against each row's own customer_product_code,
           // independent of the "สินค้า" dropdown above (which only lists items

@@ -93,7 +93,19 @@ export function CustomerStorageBalanceReportPage() {
         title="Customer Storage Balance Report"
         description="Read-only cold storage report for customer-owned inventory — computed live from confirmed deposits and completed withdrawals, same figures as ยอดคงเหลือ."
       />
-      <ReportFilterPanel onChange={setFilters} showLotNo />
+      {/* Current-stock snapshot filtered only by customerId/temperatureType/
+          productId/lotNo (see customerStorageBalanceReportService.js) —
+          Date range, ประเภทเอกสาร, Location, Warehouse, and Reference Type
+          used to render here anyway and silently do nothing when filled in. */}
+      <ReportFilterPanel
+        onChange={setFilters}
+        showLotNo
+        showDateRange={false}
+        showMovementType={false}
+        showLocation={false}
+        showWarehouse={false}
+        showReferenceType={false}
+      />
 
       <DashboardSection title="Customer-Owned Inventory Summary">
         <div className="summary-grid">
