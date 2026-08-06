@@ -66,6 +66,28 @@ describe('computeStorageInvoiceLines', () => {
     expect(lines[1]).toMatchObject({ periodStart: '2026-01-31', periodEnd: '2026-03-01', weight: 400, amount: 2000 });
   });
 
+  it('still bills the cycle a withdrawal lands exactly on the start of — the goods left sometime during that day, not before it began', () => {
+    // Regression: a real reported mismatch against an independent reference
+    // calculation traced to this exact boundary. Deposit 1000kg Jan 1
+    // (cycle 1: Jan 1-30, cycle 2 starts Jan 31); a withdrawal dated exactly
+    // 2026-01-31 must still count as present for cycle 2 (billed in full),
+    // and only excludes cycle 3 (starts ~Mar 2) onward. The previous <=
+    // comparison treated a same-day withdrawal as "already gone before this
+    // cycle started", silently dropping that cycle's charge entirely.
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01',
+        withdrawal_events: [{ weight: 1000, date: '2026-01-31' }],
+      }],
+      rates: [STORAGE_RATE_30D],
+      periodStart: '2026-01-01', periodEnd: '2026-03-15',
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ periodStart: '2026-01-01', periodEnd: '2026-01-30', weight: 1000, amount: 5000 });
+    expect(lines[1]).toMatchObject({ periodStart: '2026-01-31', periodEnd: '2026-03-01', weight: 1000, amount: 5000 });
+  });
+
   it('produces zero/no line once the full weight has been withdrawn before the period', () => {
     const lines = computeStorageInvoiceLines({
       depositLines: [{

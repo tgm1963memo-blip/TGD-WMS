@@ -126,8 +126,14 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
     let cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
 
     while (cycleStart <= periodEnd) {
+      // Strictly BEFORE cycleStart, not on-or-before: a withdrawal dated
+      // exactly on a cycle's first day still occupied storage for that
+      // cycle (it left sometime during that day, not before it began) -
+      // using <= here undercounted every lot with a withdrawal landing
+      // exactly on a later cycle's boundary, silently dropping that whole
+      // cycle's charge for whatever portion was still present.
       const withdrawnBeforeCycleStart = events
-        .filter((e) => e.date <= cycleStart)
+        .filter((e) => e.date < cycleStart)
         .reduce((sum, e) => sum + e.weight, 0);
       const weightAtCycleStart = round2(Math.max(0, receivedWeight - withdrawnBeforeCycleStart));
 
