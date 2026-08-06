@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerStockBalance } from '../../services/customerDepositRequestService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatFixed2 } from '../../utils/numberFormat.js';
@@ -44,9 +45,15 @@ export function CustomerStockBalancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [asOfDate, setAsOfDate] = useState('');
   const { sortedData, requestSort, getSortIndicator } = useTableSort(lines);
+  // customer_product_code has no per-line category snapshot — only the
+  // catalog (tgd_customer_products) knows it. Single-customer scope here,
+  // so the map is keyed by code alone (no cross-customer collision risk).
+  const [categoryMap, setCategoryMap] = useState(new Map());
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +73,21 @@ export function CustomerStockBalancePage() {
     return () => { active = false; };
   }, [customerId, profileLoading, asOfDate]);
 
+  useEffect(() => {
+    if (!customerId) return;
+    listCustomerProducts({ customerId }).then(({ data }) => {
+      const map = new Map();
+      const categories = new Set();
+      for (const p of (data ?? [])) {
+        if (!p.customer_product_code || !p.product_category) continue;
+        map.set(p.customer_product_code, p.product_category);
+        categories.add(p.product_category);
+      }
+      setCategoryMap(map);
+      setCategoryOptions([...categories].sort());
+    });
+  }, [customerId]);
+
   function toggleKey(key) {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
@@ -75,6 +97,10 @@ export function CustomerStockBalancePage() {
   }
 
   const filtered = lines.filter((l) => {
+    if (selectedCategory) {
+      const category = l.customer_product_code ? categoryMap.get(l.customer_product_code) : null;
+      if (category !== selectedCategory) return false;
+    }
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return (
@@ -100,6 +126,7 @@ export function CustomerStockBalancePage() {
       productCode: first?.customer_product_code ?? '-',
       productName: first?.product_name ?? '-',
       temperatureType: first?.temperature_type,
+      productCategory: first?.customer_product_code ? categoryMap.get(first.customer_product_code) : null,
       totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
       totalWeight: pLines.reduce((s, l) => s + (Number(l.actual_weight) ?? 0), 0),
       lines: pLines,
@@ -166,6 +193,19 @@ export function CustomerStockBalancePage() {
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
               />
+            </label>
+            <label className="form-field" style={{ margin: 0, flex: '0 0 180px' }}>
+              <span>ประเภทสินค้า</span>
+              <select
+                className="form-control"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="">-- ทุกประเภท --</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </label>
             <label className="form-field" style={{ margin: 0, flex: '0 0 180px' }}>
               <span>ณ วันที่ (เว้นว่าง = ปัจจุบัน)</span>
@@ -241,6 +281,11 @@ export function CustomerStockBalancePage() {
                         <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13, marginLeft: 8 }}>{pg.productName}</span>
                       )}
                       {pg.temperatureType && <span style={{ marginLeft: 10 }}><TempBadge type={pg.temperatureType} /></span>}
+                      {pg.productCategory && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--tgd-muted-text)', border: '1px solid var(--tgd-border)', borderRadius: 4, padding: '1px 6px' }}>
+                          {pg.productCategory}
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
                       <div style={{ textAlign: 'right' }}>

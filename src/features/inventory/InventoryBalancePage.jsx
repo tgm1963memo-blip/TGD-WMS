@@ -4,6 +4,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { getAllCustomerStockBalances } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
@@ -74,13 +75,32 @@ export function InventoryBalancePage() {
   const [error, setError] = useState(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedTemperature, setSelectedTemperature] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [searchText, setSearchText] = useState('');
   const [asOfDate, setAsOfDate] = useState('');
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [detailId, setDetailId] = useState(null);
+  // customer_product_code has no per-line category snapshot — only the
+  // catalog (tgd_customer_products) knows it, keyed the same way
+  // movementLedgerReportService.js's catalogCategoryMap already is:
+  // "customerId::customer_product_code" (the code alone isn't unique
+  // across customers).
+  const [categoryMap, setCategoryMap] = useState(new Map());
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   useEffect(() => {
     getCustomers().then(({ data }) => setCustomers(data ?? []));
+    listCustomerProducts().then(({ data }) => {
+      const map = new Map();
+      const categories = new Set();
+      for (const p of (data ?? [])) {
+        if (!p.customer_product_code || !p.product_category) continue;
+        map.set(`${p.customer_id}::${p.customer_product_code}`, p.product_category);
+        categories.add(p.product_category);
+      }
+      setCategoryMap(map);
+      setCategoryOptions([...categories].sort());
+    });
   }, []);
 
   useEffect(() => {
@@ -108,6 +128,11 @@ export function InventoryBalancePage() {
   const filtered = lines.filter((l) => {
     if (selectedCustomerId && l.request?.customer_id !== selectedCustomerId) return false;
     if (selectedTemperature && l.temperature_type !== selectedTemperature) return false;
+    if (selectedCategory) {
+      const cid = l.request?.customer_id;
+      const category = cid && l.customer_product_code ? categoryMap.get(`${cid}::${l.customer_product_code}`) : null;
+      if (category !== selectedCategory) return false;
+    }
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return (
@@ -138,6 +163,7 @@ export function InventoryBalancePage() {
         productCode: first?.customer_product_code ?? '-',
         productName: first?.product_name ?? '-',
         temperatureType: first?.temperature_type,
+        productCategory: first?.customer_product_code ? categoryMap.get(`${cid}::${first.customer_product_code}`) : null,
         totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
         totalWeight: pLines.reduce((s, l) => s + (l.actual_weight ?? 0), 0),
         lines: pLines,
@@ -203,6 +229,19 @@ export function InventoryBalancePage() {
             <option value="AMBIENT">AMBIENT</option>
           </select>
         </label>
+        <label className="form-field" style={{ margin: 0, flex: '0 0 180px' }}>
+          <span>ประเภทสินค้า</span>
+          <select
+            className="form-control"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <option value="">-- ทุกประเภท --</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
         <label className="form-field" style={{ margin: 0, flex: '1 1 220px' }}>
           <span>ค้นหา</span>
           <input
@@ -223,9 +262,9 @@ export function InventoryBalancePage() {
             onChange={(e) => setAsOfDate(e.target.value)}
           />
         </label>
-        {(selectedCustomerId || searchText || selectedTemperature || asOfDate) && (
+        {(selectedCustomerId || searchText || selectedTemperature || selectedCategory || asOfDate) && (
           <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-end' }}
-            onClick={() => { setSelectedCustomerId(''); setSearchText(''); setSelectedTemperature(''); setAsOfDate(''); }}>
+            onClick={() => { setSelectedCustomerId(''); setSearchText(''); setSelectedTemperature(''); setSelectedCategory(''); setAsOfDate(''); }}>
             ล้างตัวกรอง
           </button>
         )}
@@ -312,6 +351,11 @@ export function InventoryBalancePage() {
                           <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{pg.productName}</span>
                         )}
                         {pg.temperatureType && <TempBadge type={pg.temperatureType} />}
+                        {pg.productCategory && (
+                          <span style={{ fontSize: 11, color: 'var(--tgd-muted-text)', border: '1px solid var(--tgd-border)', borderRadius: 4, padding: '1px 6px' }}>
+                            {pg.productCategory}
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
                         <div style={{ textAlign: 'right' }}>
