@@ -62,7 +62,7 @@ const summaryColumns = [
   {
     key: 'created_at',
     header: 'วันที่',
-    width: '7%',
+    width: '130px',
     render: (row) => (
       <span className="table-meta-text">
         {formatDocumentDate(row.movement_date ?? row.created_at, { dateOnly: false })}
@@ -72,20 +72,21 @@ const summaryColumns = [
   {
     key: 'movement_type',
     header: 'ประเภท',
-    width: '9%',
+    width: '130px',
     render: (row) => <StatusBadge value={row.movement_type} />,
+    title: (row) => row.movement_type,
   },
   {
     key: 'tracking_code',
     header: 'รหัสติดตาม',
-    width: '9%',
+    width: '110px',
     render: (row) => <span className="table-meta-text">{row.tracking_code || '-'}</span>,
     title: (row) => row.tracking_code,
   },
   {
     key: 'product_id',
     header: 'สินค้า',
-    width: '22%',
+    width: '380px',
     cellClassName: 'compact-table-cell--wide',
     render: (row) => {
       if (row._showProductCell === false) return null;
@@ -107,13 +108,13 @@ const summaryColumns = [
   {
     key: 'lot_no',
     header: 'lot',
-    width: '6%',
+    width: '80px',
     render: (row) => <span className="table-meta-text">{row.lot_no || '-'}</span>,
   },
   {
     key: 'mfg_date',
     header: 'วันผลิต',
-    width: '7%',
+    width: '90px',
     render: (row) => (
       <span className="table-meta-text">
         {row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-'}
@@ -123,7 +124,7 @@ const summaryColumns = [
   {
     key: 'inbound_qty',
     header: 'รับเข้า(กล่อง)',
-    width: '7%',
+    width: '85px',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
@@ -133,7 +134,7 @@ const summaryColumns = [
   {
     key: 'inbound_weight',
     header: 'รับเข้า(น้ำหนัก)',
-    width: '8%',
+    width: '95px',
     render: (row) => {
       if (!isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-success, #16a34a)' }}>{fmtWt(row.weight)}</span>;
@@ -142,7 +143,7 @@ const summaryColumns = [
   {
     key: 'outbound_qty',
     header: 'จ่ายออก(กล่อง)',
-    width: '7%',
+    width: '85px',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
@@ -152,7 +153,7 @@ const summaryColumns = [
   {
     key: 'outbound_weight',
     header: 'จ่ายออก(น้ำหนัก)',
-    width: '8%',
+    width: '95px',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{fmtWt(row.weight)}</span>;
@@ -161,7 +162,7 @@ const summaryColumns = [
   {
     key: 'balance_qty',
     header: 'คงเหลือ(กล่อง)',
-    width: '6%',
+    width: '85px',
     render: (row) => (
       <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
         {row.balanceQty ?? '-'}
@@ -171,7 +172,7 @@ const summaryColumns = [
   {
     key: 'balance_weight',
     header: 'คงเหลือ(น้ำหนัก)',
-    width: '8%',
+    width: '95px',
     render: (row) => (
       <span className="compact-cell-qty" style={{ fontWeight: 600 }}>
         {row.balanceWeight !== undefined ? fmtWt(row.balanceWeight) : '-'}
@@ -229,6 +230,8 @@ export function MovementLedgerTable({ data = [], loading = false, error = null, 
       emptyMessage="ไม่พบข้อมูลรายการเคลื่อนไหว"
       tableTestId="movement-ledger-table"
       getRowClassName={grouped ? (row) => (row._isLastOfLotGroup ? 'movement-ledger-lot-divider' : undefined) : undefined}
+      fixedLayout
+      minTableWidth="1550px"
     />
   );
 }
