@@ -305,11 +305,19 @@ export async function getDepositInventoryLines(filters = {}) {
     const claimed = claimedByLineId[l.id] ?? { boxes: 0, weight: 0, by: [] };
     const rawBoxes = Number(l.actual_boxes) || 0;
     const rawWeight = Number(l.actual_weight) || 0;
+    const availableBoxes = Math.max(0, rawBoxes - claimed.boxes);
+    // Once every box is already claimed, any leftover weight is drift
+    // between the deposit's own weighing and each claiming withdrawal's
+    // (picked_weight comes from an independent scale reading) — not real
+    // stock still available. Zero it too instead of showing e.g. "0 boxes
+    // but 0.05kg available", the same fix applied to the Movement Ledger's
+    // running balance and the withdrawal print document.
+    const availableWeight = availableBoxes === 0 ? 0 : Math.max(0, rawWeight - claimed.weight);
     return {
       ...l,
       request: headerMap[l.deposit_request_id] ?? null,
-      actual_boxes: Math.max(0, rawBoxes - claimed.boxes),
-      actual_weight: Math.max(0, rawWeight - claimed.weight),
+      actual_boxes: availableBoxes,
+      actual_weight: availableWeight,
       claimed_by: claimed.by,
     };
   });

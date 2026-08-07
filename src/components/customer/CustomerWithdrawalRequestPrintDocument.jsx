@@ -118,10 +118,16 @@ function CustomerWithdrawalRequestPrintDocumentPage({
       return { boxes: null, weight: null };
     }
     const claimed = confirmedQty(line);
-    return {
-      boxes: line.lot_remaining_boxes != null ? Math.max(0, line.lot_remaining_boxes - claimed.boxes) : null,
-      weight: line.lot_remaining_weight != null ? Math.max(0, line.lot_remaining_weight - claimed.weight) : null,
-    };
+    const remainingBoxes = line.lot_remaining_boxes != null ? Math.max(0, line.lot_remaining_boxes - claimed.boxes) : null;
+    // Once this withdrawal's own claim fully depletes the boxes, any
+    // leftover weight is drift between independent scale readings (the
+    // deposit's and this withdrawal's), not real physical stock left in
+    // the lot — zero it too instead of printing a phantom residual (see
+    // the same fix applied to the Movement Ledger's running balance).
+    const remainingWeight = remainingBoxes === 0
+      ? 0
+      : (line.lot_remaining_weight != null ? Math.max(0, line.lot_remaining_weight - claimed.weight) : null);
+    return { boxes: remainingBoxes, weight: remainingWeight };
   }
 
   const docDate = header.requested_dispatch_date

@@ -191,7 +191,18 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
     // total negative here while the balance page clamped it at 0, so the
     // two screens' "remaining" figures could never agree for that lot.
     lotBalances[key].vol = Math.max(0, lotBalances[key].vol + line.receivedVolume - line.deliveryVolume);
-    lotBalances[key].weight = Math.max(0, lotBalances[key].weight + line.receivedWeight - line.deliveryWeight);
+    const nextWeight = lotBalances[key].weight + line.receivedWeight - line.deliveryWeight;
+    // Once volume hits (or drops below) zero, the lot is fully depleted —
+    // any leftover weight is measurement drift between the deposit's and
+    // the withdrawal's independent scale readings, not real physical
+    // stock. A real reported row: 4 boxes delivered against 4 remaining
+    // (volume correctly hits 0, marked CLOSED below) but weight settled at
+    // a phantom 0.10kg instead of 0. Same rule as addMovement in
+    // movementLedgerExcelUtils.js (the Excel export's/on-screen ledger's
+    // balance tracker) — kept as a separate copy here rather than a shared
+    // import because this mapper classifies inbound/outbound with its own
+    // INBOUND_TYPES/OUTBOUND_TYPES lists, not addMovement's isInbound.
+    lotBalances[key].weight = lotBalances[key].vol <= 0 ? 0 : Math.max(0, nextWeight);
 
     line.balanceVolume = lotBalances[key].vol;
     line.balanceWeight = lotBalances[key].weight;
