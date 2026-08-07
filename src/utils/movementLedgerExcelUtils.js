@@ -106,16 +106,29 @@ function zeroBalance() {
   return { qty: 0, weight: 0 };
 }
 
-function addMovement(balance, row) {
+// Exported so every place that tracks a running lot/tracking-code balance
+// (this file's own Excel export, and the on-screen admin ledger table)
+// shares one definition instead of drifting apart.
+export function addMovement(balance, row) {
   const inbound = isInbound(row);
   const qty = Number(row.qty ?? row.quantity ?? 0);
   const weight = Number(row.weight ?? 0);
-  // Floored at 0 to match tgd_get_customer_stock_balance (the stock balance
-  // page's RPC), which never reports a negative remaining balance either.
-  return {
-    qty: Math.max(0, balance.qty + (inbound ? qty : -qty)),
-    weight: Math.max(0, balance.weight + (inbound ? weight : -weight)),
-  };
+  const nextQty = balance.qty + (inbound ? qty : -qty);
+  const nextWeight = balance.weight + (inbound ? weight : -weight);
+  // Once box balance hits (or drops below) zero, the lot is fully
+  // depleted — any leftover weight is measurement/rounding drift across
+  // separate deposit/withdrawal weighings (each box counted individually,
+  // but weight comes from independent scale readings), not real physical
+  // stock. Reported a real case: 32 boxes deposited and 32 withdrawn (box
+  // balance exactly 0) but the deposit's recorded weight and the
+  // withdrawal's recorded weight differed by a few kg, leaving a phantom
+  // "0.01"/"1.00"/"18.69" kg balance forever with 0 boxes to hold it.
+  // Mirrors tgd_get_customer_stock_balance's own WHERE GREATEST(0,
+  // received_boxes - withdrawn_boxes) > 0 guard, which drops a
+  // box-depleted line's weight entirely rather than reporting whatever
+  // arithmetic happens to leave behind.
+  if (nextQty <= 0) return zeroBalance();
+  return { qty: nextQty, weight: Math.max(0, nextWeight) };
 }
 
 // Final balance per customer+lot after every row passed in, for use as the

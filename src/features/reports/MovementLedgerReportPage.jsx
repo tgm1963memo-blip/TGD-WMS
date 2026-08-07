@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
-import { MovementLedgerTable, isInbound } from '../../components/reports/MovementLedgerTable.jsx';
+import { MovementLedgerTable } from '../../components/reports/MovementLedgerTable.jsx';
 import { ReportFilterPanel } from '../../components/reports/ReportFilterPanel.jsx';
 import { InventoryMovementReportTemplate } from '../../components/reports/InventoryMovementReportTemplate.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
@@ -17,7 +17,7 @@ import {
   summarizeMovements,
 } from '../../services/movementLedgerReportService.js';
 import { mapMovementLedgerToInventoryReportData } from '../../services/operationalReportMapper.js';
-import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot, movementBalanceKey } from '../../utils/movementLedgerExcelUtils.js';
+import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductThenLot, movementBalanceKey, addMovement } from '../../utils/movementLedgerExcelUtils.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { listCustomerProductCategories } from '../../services/customerProductCatalogService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
@@ -390,16 +390,7 @@ export function MovementLedgerReportPage() {
         balance = running.get(key) ?? openingBalances.get(key) ?? { qty: 0, weight: 0 };
       }
 
-      const inbound = isInbound(row);
-      const qty = Number(row.qty ?? row.quantity ?? 0);
-      const weight = Number(row.weight ?? 0);
-      // Floored at 0 to match tgd_get_customer_stock_balance (the stock
-      // balance page's RPC), which never reports a negative remaining
-      // balance either.
-      const nextBalance = {
-        qty: Math.max(0, balance.qty + (inbound ? qty : -qty)),
-        weight: Math.max(0, balance.weight + (inbound ? weight : -weight)),
-      };
+      const nextBalance = addMovement(balance, row);
 
       if (isGrouped) {
         balance = nextBalance;
