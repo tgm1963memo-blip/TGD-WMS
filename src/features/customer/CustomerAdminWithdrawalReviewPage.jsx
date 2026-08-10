@@ -334,7 +334,20 @@ export function CustomerAdminWithdrawalReviewPage() {
 
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canSendToHandheld = canWrite && selected && selected.status === 'ADMIN_ACCEPTED';
-  const canConfirmWithdrawal = canWrite && selected && selected.status === 'WAREHOUSE_PICKING';
+  // A line with BOTH picked_boxes and picked_weight still null was never
+  // actually picked/weighed — boxes-only or weight-only is a legitimate
+  // real pick (see the handheld page's own lock-weight-to-boxes toggle),
+  // only "neither" blocks confirming. Mirrors the same guard the RPC
+  // itself now enforces server-side (tgd_review_customer_withdrawal_
+  // request) — this page previously had NO check at all here, unlike the
+  // handheld picking page's own "complete" button (gated on picked_at),
+  // which is how 45 real withdrawal requests reached COMPLETED with every
+  // line's picked_boxes/picked_weight still null.
+  const allLinesHavePickedQty = lines.length > 0 && lines.every((l) => l.picked_boxes != null || l.picked_weight != null);
+  const canConfirmWithdrawal = canWrite && selected && selected.status === 'WAREHOUSE_PICKING' && allLinesHavePickedQty;
+  const confirmWithdrawalBlockedReason = canWrite && selected && selected.status === 'WAREHOUSE_PICKING' && !allLinesHavePickedQty
+    ? 'กรุณายืนยันจำนวนที่เบิกจริงทุกรายการก่อนยืนยันจ่าย'
+    : '';
   // Mirrors tgd_review_customer_withdrawal_request's REJECT transition,
   // which only accepts it from SUBMITTED_BY_CUSTOMER or ADMIN_REVIEWING -
   // showing this button for any later status (e.g. WAREHOUSE_PICKING) let
@@ -726,12 +739,13 @@ export function CustomerAdminWithdrawalReviewPage() {
                 {submitting ? '...' : t('admin_send_to_handheld')}
               </button>
             ) : null}
-            {canConfirmWithdrawal ? (
+            {selected && selected.status === 'WAREHOUSE_PICKING' ? (
               <button
                 className="btn btn-primary"
                 data-testid="btn-confirm-withdrawal"
-                disabled={submitting}
+                disabled={submitting || !canConfirmWithdrawal}
                 onClick={handleConfirmWithdrawal}
+                title={confirmWithdrawalBlockedReason}
                 type="button"
               >
                 {submitting ? '...' : t('admin_confirm_withdrawal')}
@@ -1102,6 +1116,13 @@ export function CustomerAdminWithdrawalReviewPage() {
               <span>{t('admin_review_comment_label')}</span>
               <textarea className="form-control" sortedData={2} value={comment} onChange={(e) => setComment(e.target.value)} />
             </label>
+
+            {/* Warning when confirm dispatch is blocked */}
+            {confirmWithdrawalBlockedReason ? (
+              <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
+                ⚠️ {confirmWithdrawalBlockedReason}
+              </div>
+            ) : null}
           </>
         ) : null}
       </Modal>
