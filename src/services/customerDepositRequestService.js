@@ -197,16 +197,41 @@ export async function getDepositInventoryLines(filters = {}) {
   // confirmed requests) and can silently fail well past typical URL/
   // header size limits, dropping the balance baseline with no error.
   // Chunk it the same way.
-  const lines = [];
-  for (const idChunk of chunkArray(ids, DEPOSIT_REQUEST_ID_CHUNK_SIZE)) {
-    const { data: chunkLines, error: lErr } = await supabase
-      .from('tgd_customer_deposit_request_lines')
-      .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
-      .in('deposit_request_id', idChunk)
-      .order('line_no', { ascending: true });
+  //
+  // Chunking the ids bounds the URL length but NOT the row count: a real
+  // customer with 89 confirmed deposit requests had 1,095 lines total —
+  // one .in() call for all 89 ids (well under the 150-id chunk size) asked
+  // for all of them in a single unpaginated request, which PostgREST
+  // silently caps at 1000 rows with no error. The ~95 lines past that cut
+  // (in whatever order ties on line_no happened to land) simply vanished
+  // from every withdrawal-creation balance/autocomplete lookup — reported
+  // as three specific tracking codes showing "ไม่พบข้อมูล" despite having
+  // a genuine, untouched deposit balance. Paginate within each id chunk
+  // the same way the header loop above does. Keep line_no as the PRIMARY
+  // sort (several callers — getMatchedDepositLine's tie-break,
+  // CustomerWithdrawalLinesTable's dropdown/auto-fill "first match" logic
+  // — depend on this array's order, not just its contents) and add the
+  // line's own unique id only as a secondary tie-breaker so the range
+  // boundary is stable even though line_no resets per deposit request and
+  // ties constantly across a chunk.
+  async function fetchAllLines() {
+    const result = [];
+    for (const idChunk of chunkArray(ids, DEPOSIT_REQUEST_ID_CHUNK_SIZE)) {
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data: chunkLines, error: lErr } = await supabase
+          .from('tgd_customer_deposit_request_lines')
+          .select('id, deposit_request_id, line_no, customer_product_code, product_name, lot_no, tracking_code, mfg_date, exp_date, expected_boxes, expected_weight, actual_boxes, actual_weight, actual_note, uom, temperature_type, weight_per_box')
+          .in('deposit_request_id', idChunk)
+          .order('line_no', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (lErr) return { data: null, error: lErr };
-    lines.push(...(chunkLines ?? []));
+        if (lErr) return { data: null, error: lErr };
+        result.push(...(chunkLines ?? []));
+        if (!chunkLines || chunkLines.length < PAGE_SIZE) break;
+      }
+    }
+    return { data: result, error: null };
   }
 
   // actual_boxes/actual_weight above are the RAW deposited totals, not what's
@@ -229,17 +254,48 @@ export async function getDepositInventoryLines(filters = {}) {
   // .catch()) well past typical URL/header size limits. Scoping by this
   // customer's id via the join instead avoids ever building a filter whose
   // size depends on how much history the customer has.
-  let claimedQuery = supabase
-    .from('tgd_customer_withdrawal_request_lines')
-    .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status, customer_id, withdrawal_no)')
-    .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED');
+  function buildClaimedQuery() {
+    let q = supabase
+      .from('tgd_customer_withdrawal_request_lines')
+      .select('source_customer_deposit_request_line_id, tracking_code, requested_boxes, requested_weight, picked_boxes, picked_weight, withdrawal_request_id, tgd_customer_withdrawal_requests!inner(status, customer_id, withdrawal_no)')
+      .neq('tgd_customer_withdrawal_requests.status', 'CANCELLED')
+      .order('id', { ascending: true });
 
-  if (filters.customerId) {
-    claimedQuery = claimedQuery.eq('tgd_customer_withdrawal_requests.customer_id', filters.customerId);
+    if (filters.customerId) {
+      q = q.eq('tgd_customer_withdrawal_requests.customer_id', filters.customerId);
+    }
+    if (filters.excludeWithdrawalRequestId) {
+      q = q.neq('withdrawal_request_id', filters.excludeWithdrawalRequestId);
+    }
+    return q;
   }
-  if (filters.excludeWithdrawalRequestId) {
-    claimedQuery = claimedQuery.neq('withdrawal_request_id', filters.excludeWithdrawalRequestId);
+
+  // Same unpaginated-1000-row cap as the deposit lines fetch above — a
+  // busy customer's non-cancelled withdrawal line count grows every day
+  // and will silently cross this cap too (already at 979 for the customer
+  // who hit the deposit-lines version of this bug). Paginate it the same
+  // way, ordered by id for a stable range boundary (this query had no
+  // prior order to preserve, unlike the deposit lines fetch above).
+  async function fetchAllClaimedLines() {
+    const result = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data: page, error: cErr } = await buildClaimedQuery().range(from, from + PAGE_SIZE - 1);
+      if (cErr) return { data: null, error: cErr };
+      result.push(...(page ?? []));
+      if (!page || page.length < PAGE_SIZE) break;
+    }
+    return { data: result, error: null };
   }
+
+  // Neither fetch depends on the other's data (only the matching loop
+  // below does), so run them concurrently — the pagination this diff adds
+  // to both means either can now take several round trips, and awaiting
+  // them sequentially would sum instead of overlap that latency.
+  const [linesResult, claimedResult] = await Promise.all([fetchAllLines(), fetchAllClaimedLines()]);
+  if (linesResult.error) return { data: null, error: linesResult.error };
+  if (claimedResult.error) return { data: null, error: claimedResult.error };
+  const lines = linesResult.data;
+  const claimedLines = claimedResult.data;
 
   // Real incident this guards against: a deposit line with 417 boxes had a
   // MIX of withdrawal claims against it — some rows carried this line's id
@@ -267,8 +323,6 @@ export async function getDepositInventoryLines(filters = {}) {
 
   const claimedByLineId = {};
   {
-    const { data: claimedLines, error: cErr } = await claimedQuery;
-    if (cErr) return { data: null, error: cErr };
     for (const cl of claimedLines ?? []) {
       // picked_boxes/weight is the CONFIRMED amount once recorded (a
       // recount/pick can find fewer than originally requested — e.g. a real
