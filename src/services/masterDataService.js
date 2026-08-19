@@ -14,7 +14,7 @@ export async function getCustomers(filters = {}) {
 
   let query = supabase
     .from('tgd_customers')
-    .select('id, customer_code, customer_name, customer_type, tax_id, contact_name, phone, email, address, is_active, created_at')
+    .select('id, customer_code, customer_name, customer_type, tax_id, contact_name, phone, email, address, is_active, created_at, notify_deposit_confirmed, notify_withdrawal_completed, notify_invoice_approved')
     .order('customer_code', { ascending: true });
 
   if (filters.isActive !== undefined) query = query.eq('is_active', filters.isActive);
@@ -39,6 +39,9 @@ export async function upsertCustomer(form = {}) {
     email: form.email?.trim() || null,
     address: form.address?.trim() || null,
     is_active: form.isActive ?? true,
+    notify_deposit_confirmed: form.notifyDepositConfirmed ?? true,
+    notify_withdrawal_completed: form.notifyWithdrawalCompleted ?? true,
+    notify_invoice_approved: form.notifyInvoiceApproved ?? true,
   };
 
   if (form.id) {

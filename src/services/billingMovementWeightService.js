@@ -52,7 +52,7 @@ export function shapeBillingMovementWeightRow(row = {}) {
     // customer_product_code, not the master product_id/product_code above —
     // carried through here so a rate can be resolved per row (customer
     // service rates are scoped by customer_product_id, reached via this
-    // code) when building an invoice draft line from a movement.
+    // code) when building a billing draft line from a movement.
     customer_product_code: row.customer_product_code ?? null,
 
     product_name: row.product_name ?? null,
@@ -118,7 +118,7 @@ export function shapeBillingMovementWeightRow(row = {}) {
 // is_billable/billing_status computed as real columns. shapeBillingMovementWeightRow
 // alone left those fields at 0/false/null for this source, which both hid
 // the weight in the report table and made every row fail the "is this
-// selectable for an invoice draft" check (getMovementDraftSelectionState).
+// selectable for a billing draft" check (getMovementDraftSelectionState).
 //
 // This report merges rows from BOTH sources in one list, so the fallback
 // below only applies when a field is genuinely absent (`== null`) — an

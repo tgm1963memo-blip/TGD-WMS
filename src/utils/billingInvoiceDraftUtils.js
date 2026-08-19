@@ -36,6 +36,7 @@ export const APPROVABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
 // tool instead of removing the record outright.
 export const DELETABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
   INVOICE_DRAFT_STATUS.DRAFT,
+  INVOICE_DRAFT_STATUS.CANCELLED,
 ]);
 
 export const BILLABLE_SOURCE_BILLING_STATUSES = Object.freeze([
@@ -119,6 +120,11 @@ export function shapeBillingInvoiceDraftLine(row = {}) {
     deposit_line_id: row.deposit_line_id ?? null,
     billing_period_start: row.billing_period_start ?? null,
     billing_period_end: row.billing_period_end ?? null,
+    discount_amount: row.discount_amount == null ? null : toNumber(row.discount_amount),
+    min_charge_applied: row.min_charge_applied ?? false,
+    min_charge_topup_amount: row.min_charge_topup_amount == null ? null : toNumber(row.min_charge_topup_amount),
+    free_period_applied: row.free_period_applied ?? false,
+    adjustment_note: row.adjustment_note ?? null,
     line_note: row.line_note ?? null,
     duplicate_guard_active: row.duplicate_guard_active !== false,
     created_at: row.created_at ?? null,
@@ -191,15 +197,76 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
     deposit_line_id: storageLine.depositLineId ?? null,
     billing_period_start: storageLine.periodStart ?? null,
     billing_period_end: storageLine.periodEnd ?? null,
+    // Contract-term adjustments (see billingRateCalc.js) — undefined on any
+    // line whose rate has none of these terms set, so an ordinary rate
+    // without contract fields inserts the exact same row shape as before.
+    discount_amount: storageLine.discountAmount ?? null,
+    min_charge_applied: storageLine.minChargeApplied ?? false,
+    min_charge_topup_amount: storageLine.minChargeTopupAmount ?? null,
+    free_period_applied: storageLine.freePeriodApplied ?? false,
+    adjustment_note: storageLine.adjustmentNote ?? null,
     // One result row = exactly one full billed cycle (see
     // computeStorageInvoiceLines) — storageLine.weight is the weight on
     // hand right at that cycle's start, charged in full regardless of how
     // many days of the cycle have actually elapsed ("เต็มรอบทันที").
-    line_note: rate.period_days
-      ? `ค่าฝาก 1 งวด (งวดละ ${rate.period_days} วัน: ${storageLine.periodStart ?? '-'} ถึง ${storageLine.periodEnd ?? '-'}, น้ำหนักที่คิดค่าฝาก ${storageLine.weight} กก.)`
-      : 'ค่าฝาก (ครั้งเดียว)',
+    line_note: [
+      rate.period_days
+        ? `ค่าฝาก 1 งวด (งวดละ ${rate.period_days} วัน: ${storageLine.periodStart ?? '-'} ถึง ${storageLine.periodEnd ?? '-'}, น้ำหนักที่คิดค่าฝาก ${storageLine.weight} กก.)`
+        : 'ค่าฝาก (ครั้งเดียว)',
+      storageLine.adjustmentNote,
+    ].filter(Boolean).join(' — '),
     duplicate_guard_active: false,
   };
+}
+
+// HANDLING_IN (ค่าบริการจัดการแรกเข้า) lines have no single source movement
+// either — same reasoning as storage/auxiliary lines above — and, unlike
+// storage, are always a one-time charge (no period_days/storage_days).
+export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine = {}) {
+  const rate = handlingLine.rate ?? {};
+  return {
+    invoice_draft_id: null,
+    source_movement_id: null,
+    source_document_no: null,
+    source_document_type: 'HANDLING_IN',
+    customer_id: handlingLine.customerId,
+    product_id: null,
+    product_code: depositLine.customer_product_code ?? null,
+    product_name: depositLine.customer_product_code ?? null,
+    lot_no: depositLine.lot_no ?? null,
+    pallet_no: null,
+    movement_type: 'HANDLING_IN',
+    movement_date: handlingLine.receiptDate ?? null,
+    qty: 0,
+    uom: 'กก.',
+    net_weight: handlingLine.weight,
+    gross_weight: handlingLine.weight,
+    chargeable_weight: handlingLine.weight,
+    billing_status: 'READY',
+    rate: rate.rate != null ? toNumber(rate.rate) : null,
+    amount: handlingLine.amount,
+    service_rate_id: rate.id ?? null,
+    period_days: null,
+    storage_days: null,
+    deposit_line_id: handlingLine.depositLineId ?? null,
+    billing_period_start: null,
+    billing_period_end: null,
+    line_note: `ค่าบริการจัดการแรกเข้า (รับเข้า ${handlingLine.receiptDate ?? '-'}, น้ำหนัก ${handlingLine.weight} กก.)`,
+    duplicate_guard_active: false,
+  };
+}
+
+// Subtotal-by-service-type breakdown for display/report purposes only —
+// deliberately NOT part of calculateInvoiceDraftTotals below, whose output
+// is spread directly into the tgd_billing_invoice_drafts insert row (i.e.
+// its keys are real DB columns). This is fully re-derivable from `lines`
+// at any time, so it's computed fresh wherever needed instead of persisted.
+export function groupInvoiceDraftLinesByType(lines = []) {
+  return lines.reduce((acc, line) => {
+    const key = line.source_document_type ?? 'OTHER';
+    acc[key] = (acc[key] ?? 0) + (Number(line.amount) || 0);
+    return acc;
+  }, {});
 }
 
 export function buildInvoiceDraftLineFromAuxiliaryLine(auxLine) {

@@ -127,6 +127,13 @@ vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
   listCustomerWithdrawalRequests: vi.fn(async () => ({ data: [], error: null })),
   listCustomerWithdrawalRequestLines: vi.fn(async () => ({ data: [], error: null })),
   reviewCustomerWithdrawalRequest: vi.fn(async () => ({ data: { status: 'ADMIN_REVIEWING' }, error: null })),
+  listCustomerWithdrawalRequestServices: vi.fn(async () => ({ data: [], error: null })),
+  upsertCustomerWithdrawalRequestService: vi.fn(async () => ({ data: { id: 'wd-svc-1' }, error: null })),
+  deleteCustomerWithdrawalRequestService: vi.fn(async () => ({ data: true, error: null })),
+}));
+
+vi.mock('../../src/services/productServiceRatesService.js', () => ({
+  listAllProductServiceRates: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 vi.mock('../../src/services/customerStorageBalanceReportService.js', () => ({

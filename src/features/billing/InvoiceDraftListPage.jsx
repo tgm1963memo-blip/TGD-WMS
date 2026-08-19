@@ -30,6 +30,19 @@ import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../..
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
+
+const UNRATED_REASON_LABELS = {
+  NO_RATE_CONFIGURED: 'ไม่มีอัตราค่าฝากที่ตั้งค่าไว้',
+  CONTRACT_NOT_STARTED: 'สัญญายังไม่เริ่ม ณ วันที่รับฝาก',
+  CONTRACT_EXPIRED: 'สัญญาหมดอายุแล้ว ณ วันที่รับฝาก',
+};
+
+const SOURCE_DOCUMENT_TYPE_LABELS = {
+  STORAGE: 'ค่าฝากสินค้า',
+  HANDLING_IN: 'ค่าบริการจัดการแรกเข้า',
+  SERVICE: 'ค่าบริการเสริม',
+};
 
 export function InvoiceDraftListPage() {
   const { language } = useLanguage();
@@ -190,6 +203,71 @@ export function InvoiceDraftListPage() {
     setStorageBillPreview(result.data);
   }
 
+  // Two review files per the billing SOP: one workbook with every matched
+  // invoice line (traceable back to customer/lot/rate), one with unmatched
+  // deposit lines + the anomaly flag — both available BEFORE committing,
+  // so accounting can review offline instead of only in-browser.
+  //
+  // The short delay between the two downloadExcelWorkbookMultiSheet calls
+  // is required, not cosmetic: Chrome (and other Chromium browsers) treats
+  // two script-triggered file downloads fired back-to-back in the same
+  // synchronous call stack as a "multiple automatic downloads" attempt and
+  // silently blocks the second one — confirmed by an E2E test that only
+  // ever saw the first file land. Yielding a macrotask between them keeps
+  // each download tied to its own turn of the event loop, which Chrome
+  // treats as distinct user-triggered downloads instead of a batch.
+  async function handleDownloadPreviewReports() {
+    if (!storageBillPreview) return;
+    const stamp = `${storageBillCustomerId}_${storageBillStart}_${storageBillEnd}`;
+
+    const summaryRows = [
+      ...Object.entries(storageBillPreview.totalsByType ?? {}).map(([type, amount]) => ({
+        รายการ: SOURCE_DOCUMENT_TYPE_LABELS[type] ?? type,
+        จำนวนเงิน: amount,
+      })),
+      { รายการ: 'รวมทั้งสิ้น', จำนวนเงิน: storageBillPreview.totals?.total_amount ?? 0 },
+    ];
+    const lineRows = (storageBillPreview.lines ?? []).map((l) => ({
+      ประเภท: SOURCE_DOCUMENT_TYPE_LABELS[l.source_document_type] ?? l.source_document_type,
+      รหัสสินค้า: l.product_code ?? '-',
+      lot: l.lot_no ?? '-',
+      น้ำหนัก_จำนวน: l.chargeable_weight ?? l.qty ?? '-',
+      งวด_วัน: l.storage_days ?? '-',
+      อัตรา: l.rate ?? '-',
+      จำนวนเงิน: l.amount ?? 0,
+      หมายเหตุ_การปรับยอด: l.adjustment_note ?? '-',
+    }));
+    downloadExcelWorkbookMultiSheet(
+      [
+        { name: 'สรุป', rows: summaryRows, headers: ['รายการ', 'จำนวนเงิน'] },
+        { name: 'รายการ', rows: lineRows, headers: ['ประเภท', 'รหัสสินค้า', 'lot', 'น้ำหนัก_จำนวน', 'งวด_วัน', 'อัตรา', 'จำนวนเงิน', 'หมายเหตุ_การปรับยอด'] },
+      ],
+      `invoice-preview-summary_${stamp}.xlsx`,
+    );
+
+    await new Promise((resolve) => { setTimeout(resolve, 400); });
+
+    const unmatchedRows = (storageBillPreview.unratedDepositLines ?? []).map((u) => ({
+      lot: u.lotNo ?? '-',
+      รหัสสินค้า: u.customerProductCode ?? '-',
+      วิธีจัดเก็บ: u.temperatureType ?? '-',
+      เหตุผล: UNRATED_REASON_LABELS[u.reason] ?? u.reason ?? '-',
+    }));
+    const anomalyRows = storageBillPreview.anomaly ? [{
+      งวดก่อนหน้า: storageBillPreview.anomaly.previousDraftNo ?? '-',
+      ยอดงวดก่อนหน้า: storageBillPreview.anomaly.previousTotal,
+      ยอดงวดนี้: storageBillPreview.anomaly.currentTotal,
+      เปลี่ยนแปลง_เปอร์เซ็นต์: storageBillPreview.anomaly.percentChange,
+    }] : [];
+    downloadExcelWorkbookMultiSheet(
+      [
+        { name: 'unmatched', rows: unmatchedRows, headers: ['lot', 'รหัสสินค้า', 'วิธีจัดเก็บ', 'เหตุผล'] },
+        { name: 'anomaly', rows: anomalyRows, headers: ['งวดก่อนหน้า', 'ยอดงวดก่อนหน้า', 'ยอดงวดนี้', 'เปลี่ยนแปลง_เปอร์เซ็นต์'] },
+      ],
+      `invoice-preview-unmatched-anomaly_${stamp}.xlsx`,
+    );
+  }
+
   async function handleStorageBillConfirm() {
     setStorageBillSaving(true);
     setStorageBillError(null);
@@ -323,7 +401,7 @@ export function InvoiceDraftListPage() {
 
       {canWrite ? (
         <div style={{ marginBottom: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={openStorageBillModal}>
+          <button type="button" className="btn btn-primary" data-testid="open-storage-bill-modal-button" onClick={openStorageBillModal}>
             + สร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา
           </button>
         </div>
@@ -458,6 +536,7 @@ export function InvoiceDraftListPage() {
               ลูกค้า *
               <select
                 className="form-control"
+                data-testid="storage-bill-customer-select"
                 value={storageBillCustomerId}
                 onChange={(e) => { setStorageBillCustomerId(e.target.value); setStorageBillPreview(null); }}
                 style={{ display: 'block', width: '100%', marginTop: 4 }}
@@ -486,6 +565,7 @@ export function InvoiceDraftListPage() {
               <input
                 type="date"
                 className="form-control"
+                data-testid="storage-bill-start-date-input"
                 value={storageBillStart}
                 onChange={(e) => { setStorageBillStart(e.target.value); setStorageBillPreview(null); }}
                 style={{ display: 'block', width: '100%', marginTop: 4 }}
@@ -496,6 +576,7 @@ export function InvoiceDraftListPage() {
               <input
                 type="date"
                 className="form-control"
+                data-testid="storage-bill-end-date-input"
                 value={storageBillEnd}
                 onChange={(e) => { setStorageBillEnd(e.target.value); setStorageBillPreview(null); }}
                 style={{ display: 'block', width: '100%', marginTop: 4 }}
@@ -553,7 +634,7 @@ export function InvoiceDraftListPage() {
 
           {storageBillMode === 'manual' ? (
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button type="button" className="btn btn-secondary" onClick={handleStorageBillPreview} disabled={storageBillLoading}>
+            <button type="button" className="btn btn-secondary" data-testid="storage-bill-preview-button" onClick={handleStorageBillPreview} disabled={storageBillLoading}>
               {storageBillLoading ? 'กำลังคำนวณ...' : 'ดูตัวอย่างก่อนสร้าง'}
             </button>
           </div>
@@ -671,8 +752,11 @@ export function InvoiceDraftListPage() {
                   <tbody>
                     {storageBillPreview.lines.length ? storageBillPreview.lines.map((line, idx) => (
                       <tr key={idx}>
-                        <td>{line.product_name ?? line.product_code ?? '-'}<div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div></td>
-                        <td>{line.source_document_type}</td>
+                        <td>
+                          {line.product_name ?? line.product_code ?? '-'}
+                          <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div>
+                        </td>
+                        <td>{SOURCE_DOCUMENT_TYPE_LABELS[line.source_document_type] ?? line.source_document_type}</td>
                         <td style={{ textAlign: 'right' }}>{line.chargeable_weight ?? line.qty ?? '-'}</td>
                         <td style={{ textAlign: 'center' }}>{line.storage_days != null ? `${line.storage_days} วัน` : '-'}</td>
                         <td style={{ textAlign: 'right' }}>{line.rate ?? '-'}</td>
@@ -684,10 +768,59 @@ export function InvoiceDraftListPage() {
                   </tbody>
                 </table>
               </div>
+
+              {storageBillPreview.unratedDepositLines?.length > 0 ? (
+                <div className="banner banner-warning" style={{ marginBottom: 12 }} data-testid="storage-bill-unmatched-section">
+                  <strong>รายการที่ไม่มีสัญญา/อัตรารองรับ ({storageBillPreview.unratedDepositLines.length} รายการ)</strong> — ไม่ถูกนำมาคำนวณในบิลนี้
+                  <div className="responsive-table" style={{ marginTop: 8 }}>
+                    <table className="data-table" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th>Lot</th>
+                          <th>รหัสสินค้า</th>
+                          <th>วิธีจัดเก็บ</th>
+                          <th>เหตุผล</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storageBillPreview.unratedDepositLines.map((u, idx) => (
+                          <tr key={idx}>
+                            <td>{u.lotNo ?? '-'}</td>
+                            <td>{u.customerProductCode ?? '-'}</td>
+                            <td>{u.temperatureType ?? '-'}</td>
+                            <td>{UNRATED_REASON_LABELS[u.reason] ?? u.reason ?? '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
+              {storageBillPreview.anomaly ? (
+                <div className="banner banner-warning" style={{ marginBottom: 12 }} data-testid="storage-bill-anomaly-banner">
+                  <strong>ยอดผิดปกติ:</strong> งวดนี้ {storageBillPreview.anomaly.currentTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
+                  {' '}เทียบกับงวดก่อนหน้า ({storageBillPreview.anomaly.previousDraftNo ?? '-'}) {storageBillPreview.anomaly.previousTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
+                  {' '}เปลี่ยนแปลง {storageBillPreview.anomaly.percentChange > 0 ? '+' : ''}{storageBillPreview.anomaly.percentChange}% (เกิน 30%) กรุณาตรวจสอบก่อนยืนยัน
+                </div>
+              ) : null}
+
+              {storageBillPreview.totalsByType && Object.keys(storageBillPreview.totalsByType).length > 0 ? (
+                <div style={{ textAlign: 'right', fontSize: 12, color: '#475569', marginBottom: 4 }} data-testid="storage-bill-totals-by-type">
+                  {Object.entries(storageBillPreview.totalsByType).map(([type, amount]) => (
+                    <span key={type} style={{ marginLeft: 16 }}>
+                      {SOURCE_DOCUMENT_TYPE_LABELS[type] ?? type}: {amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <div style={{ textAlign: 'right', fontWeight: 700, marginBottom: 16 }}>
                 รวมทั้งสิ้น: {storageBillPreview.totals.total_amount != null ? storageBillPreview.totals.total_amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'} บาท
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" className="btn btn-outline" data-testid="storage-bill-download-reports-button" onClick={handleDownloadPreviewReports}>
+                  ดาวน์โหลดรายงานตรวจทาน
+                </button>
                 <button type="button" className="btn btn-secondary" onClick={() => setStorageBillOpen(false)}>ยกเลิก</button>
                 <button
                   type="button"

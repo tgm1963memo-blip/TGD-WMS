@@ -40,12 +40,23 @@ function daysBetween(startDate, endDate) {
 // type. Precedence: an exact product-specific rate first, then a
 // customer-wide "all items" rate scoped to the same temperature_type, then
 // a customer-wide rate with no temperature restriction at all.
-export function resolveServiceRate(rates = [], { customerId, customerProductId, temperatureType, serviceType, unitBasis = null }) {
+//
+// asOfDate (optional, default null): when provided, also requires the
+// candidate's contract_start_date/contract_end_date (if set) to cover this
+// date — a rate configured with a contract window is only resolvable for
+// cycles/receipts that actually fall inside it. Left null, every existing
+// call site behaves exactly as before contract fields existed (rates with
+// no contract window set are unaffected either way, since the check is a
+// no-op when both bounds are null).
+export function resolveServiceRate(rates = [], { customerId, customerProductId, temperatureType, serviceType, unitBasis = null, asOfDate = null }) {
   const candidates = rates.filter((r) =>
     r.is_active !== false
     && r.service_type === serviceType
     && (!unitBasis || r.unit_basis === unitBasis)
-    && (r.customer_id === customerId || (customerProductId && r.customer_product_id === customerProductId)));
+    && (r.customer_id === customerId || (customerProductId && r.customer_product_id === customerProductId))
+    && (asOfDate == null
+      || ((!r.contract_start_date || asOfDate >= r.contract_start_date)
+        && (!r.contract_end_date || asOfDate <= r.contract_end_date))));
 
   const productSpecific = candidates.find((r) => r.customer_product_id && r.customer_product_id === customerProductId);
   if (productSpecific) return productSpecific;
@@ -81,20 +92,67 @@ export function resolveServiceRate(rates = [], { customerId, customerProductId, 
 // which is the precise, anchor-correct way to detect "a new round began" —
 // a 31-day window still only advances through the lot's cycles that
 // genuinely started inside it.
+// Applies a rate's free-period/discount/min-charge contract terms to a
+// raw computed amount. Returns the adjusted amount plus the individual
+// adjustment fields so callers can show/persist exactly why the final
+// amount differs from weight x rate x periods — every one of these fields
+// is optional/additive on the result row; a rate with none of these terms
+// set produces the exact same amount as before they existed.
+// free_days is handled by the caller BEFORE this function is invoked (a
+// cycle/receipt wholly inside the free window is zeroed out there and never
+// reaches this function) — this function only ever sees an amount that's
+// already past the free-period check, so it only applies discount/min-charge.
+function applyContractAdjustments(rawAmount, rate) {
+  const notes = [];
+  let amount = rawAmount;
+  let discountAmount = 0;
+  if (rate.discount_percent != null && rate.discount_percent > 0) {
+    discountAmount = round2(amount * (toNumber(rate.discount_percent) / 100));
+    amount = round2(amount - discountAmount);
+    notes.push(`ส่วนลด ${rate.discount_percent}% (-${discountAmount})`);
+  }
+
+  let minChargeApplied = false;
+  let minChargeTopupAmount = 0;
+  if (rate.min_charge_amount != null && amount < rate.min_charge_amount) {
+    minChargeTopupAmount = round2(rate.min_charge_amount - amount);
+    amount = round2(rate.min_charge_amount);
+    minChargeApplied = true;
+    notes.push(`ปรับเป็นค่าฝากขั้นต่ำ ${rate.min_charge_amount} บาท (+${minChargeTopupAmount})`);
+  }
+
+  return {
+    amount,
+    discountAmount: discountAmount > 0 ? discountAmount : undefined,
+    minChargeApplied: minChargeApplied || undefined,
+    minChargeTopupAmount: minChargeApplied ? minChargeTopupAmount : undefined,
+    adjustmentNote: notes.length ? notes.join(', ') : undefined,
+  };
+}
+
 export function computeStorageInvoiceLines({ depositLines = [], rates = [], periodStart, periodEnd }) {
   const results = [];
 
   for (const dl of depositLines) {
+    const receiptDate = toDateOnly(dl.receipt_date);
+    if (!receiptDate || receiptDate > periodEnd) continue;
+
+    // asOfDate anchors the contract-window check to the lot's own receipt
+    // date — a rate whose contract_start_date/contract_end_date doesn't
+    // cover the date this lot actually arrived isn't usable for it at all,
+    // for the whole time it's billed under this rate row. (A rate renewal
+    // mid-way through a long-stored lot's life — i.e. a contract expiring
+    // while a lot is still on cycle 4 of 6 — isn't modeled here; that would
+    // need per-cycle re-resolution, which isn't built yet since there's no
+    // confirmed need for it.)
     const rate = resolveServiceRate(rates, {
       customerId: dl.customer_id,
       customerProductId: dl.customer_product_id,
       temperatureType: dl.temperature_type,
       serviceType: 'STORAGE',
+      asOfDate: receiptDate,
     });
     if (!rate) continue;
-
-    const receiptDate = toDateOnly(dl.receipt_date);
-    if (!receiptDate || receiptDate > periodEnd) continue;
 
     const receivedWeight = toNumber(dl.received_weight);
 
@@ -103,10 +161,19 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
       // this is a one-time deposit/handling-style fee, not a recurring
       // storage charge, so it isn't affected by later withdrawals.
       if (receiptDate < periodStart || receiptDate > periodEnd) continue;
-      const amount = round2(receivedWeight * toNumber(rate.rate));
+      if (rate.free_days != null && rate.free_days > 0) {
+        results.push({
+          depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
+          days: null, weight: receivedWeight, amount: 0,
+          freePeriodApplied: true, adjustmentNote: 'อยู่ในช่วงฟรีค่าฝาก (free_days)',
+        });
+        continue;
+      }
+      const rawAmount = round2(receivedWeight * toNumber(rate.rate));
+      const adjusted = applyContractAdjustments(rawAmount, rate);
       results.push({
         depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
-        days: null, weight: receivedWeight, amount,
+        days: null, weight: receivedWeight, ...adjusted,
       });
       continue;
     }
@@ -140,12 +207,26 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
       if (weightAtCycleStart <= 0) break; // fully withdrawn before this cycle even began
 
       const cycleEnd = addDays(cycleStart, rate.period_days - 1);
-      const amount = round2(weightAtCycleStart * toNumber(rate.rate));
-      results.push({
-        depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
-        days: rate.period_days, weight: weightAtCycleStart, weightDays: null, amount,
-        periodStart: cycleStart, periodEnd: cycleEnd,
-      });
+
+      // A cycle that starts before the lot's free-day window has elapsed is
+      // billed as fully free — not skipped, so the report still shows one
+      // traceable row per cycle with amount 0 and the reason why.
+      if (rate.free_days != null && rate.free_days > 0 && cycleStart < addDays(receiptDate, rate.free_days)) {
+        results.push({
+          depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
+          days: rate.period_days, weight: weightAtCycleStart, weightDays: null, amount: 0,
+          periodStart: cycleStart, periodEnd: cycleEnd,
+          freePeriodApplied: true, adjustmentNote: 'อยู่ในช่วงฟรีค่าฝาก (free_days)',
+        });
+      } else {
+        const rawAmount = round2(weightAtCycleStart * toNumber(rate.rate));
+        const adjusted = applyContractAdjustments(rawAmount, rate);
+        results.push({
+          depositLineId: dl.id, customerId: dl.customer_id, rate, periods: 1,
+          days: rate.period_days, weight: weightAtCycleStart, weightDays: null,
+          periodStart: cycleStart, periodEnd: cycleEnd, ...adjusted,
+        });
+      }
 
       cycleIndex += 1;
       cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
@@ -199,11 +280,14 @@ export function generateLotBillingCycles({ receiptDate, periodDays, billedThroug
 }
 
 // Turns a customer's selected per-request auxiliary services (container
-// reefer plug-in, overnight flat fee, etc. — see
-// tgd_customer_deposit_request_services) into billed amounts. Not
-// weight-based: amount = rate x quantity, capped at the rate's
-// max_quantity if one is configured (e.g. reefer plug-in billed by the
-// hour, capped at 12 hours per occurrence).
+// reefer plug-in, overnight labor, etc. — see
+// tgd_customer_deposit_request_services / tgd_customer_withdrawal_request_services)
+// into billed amounts. Not weight-based: amount = rate x quantity, capped at
+// the rate's max_quantity if one is configured (e.g. reefer plug-in billed
+// by the hour, capped at 12 hours per occurrence). sourceRequestId is either
+// a deposit or withdrawal request id — this function is request-type
+// agnostic, it's purely a traceability pass-through, never matched against
+// either table here.
 export function computeAuxiliaryServiceLines({ selections = [] }) {
   return selections.map((sel) => {
     const rate = sel.rate ?? {};
@@ -211,11 +295,52 @@ export function computeAuxiliaryServiceLines({ selections = [] }) {
     const quantity = cap != null ? Math.min(toNumber(sel.quantity, 1), cap) : toNumber(sel.quantity, 1);
     const amount = round2(quantity * toNumber(rate.rate));
     return {
-      depositRequestId: sel.depositRequestId,
+      sourceRequestId: sel.sourceRequestId,
       customerId: sel.customerId,
       rate,
       quantity,
       amount,
     };
   });
+}
+
+// One-time, weight-based fee charged only when a lot is FIRST received —
+// e.g. HANDLING_IN (ค่าบริการจัดการแรกเข้า), confirmed against a real
+// customer's accounting spreadsheet to be weight x a flat per-kg rate,
+// billed once in whichever period contains the lot's own receipt_date and
+// never again afterward (a lot still in storage next month has no new
+// receipt_date, so it simply isn't considered here again). Mirrors the
+// one-time-fee branch of computeStorageInvoiceLines, but for a different
+// service_type and independent of any STORAGE rate configuration.
+//
+// A deposit line with no matching rate for this serviceType is silently
+// skipped (not surfaced as "unmatched") — unlike STORAGE, most customers
+// legitimately have no HANDLING_IN (or other one-time service) rate
+// configured at all, so treating its absence as an error would be noisy;
+// only STORAGE's absence indicates a genuine billing gap.
+export function computeHandlingFeeLines({ depositLines = [], rates = [], periodStart, periodEnd, serviceType = 'HANDLING_IN' }) {
+  const results = [];
+
+  for (const dl of depositLines) {
+    const receiptDate = toDateOnly(dl.receipt_date);
+    if (!receiptDate || receiptDate < periodStart || receiptDate > periodEnd) continue;
+
+    const rate = resolveServiceRate(rates, {
+      customerId: dl.customer_id,
+      customerProductId: dl.customer_product_id,
+      temperatureType: dl.temperature_type,
+      serviceType,
+      asOfDate: receiptDate,
+    });
+    if (!rate) continue;
+
+    const receivedWeight = toNumber(dl.received_weight);
+    const amount = round2(receivedWeight * toNumber(rate.rate));
+    results.push({
+      depositLineId: dl.id, customerId: dl.customer_id, rate,
+      weight: receivedWeight, amount, receiptDate,
+    });
+  }
+
+  return results;
 }

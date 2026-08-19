@@ -44,6 +44,12 @@ const EMPTY_FORM = {
   note: '',
   periodDays: '',
   maxQuantity: '',
+  minChargeAmount: '',
+  contractStartDate: '',
+  contractEndDate: '',
+  freeDays: '',
+  discountPercent: '',
+  contractNote: '',
 };
 
 const SERVICE_COLORS = {
@@ -205,6 +211,12 @@ export function CustomerProductServiceRatesPage() {
       note:        row.note ?? '',
       periodDays:  row.period_days != null ? String(row.period_days) : '',
       maxQuantity: row.max_quantity != null ? String(row.max_quantity) : '',
+      minChargeAmount:   row.min_charge_amount != null ? String(row.min_charge_amount) : '',
+      contractStartDate: row.contract_start_date ?? '',
+      contractEndDate:   row.contract_end_date ?? '',
+      freeDays:          row.free_days != null ? String(row.free_days) : '',
+      discountPercent:   row.discount_percent != null ? String(row.discount_percent) : '',
+      contractNote:      row.contract_note ?? '',
     });
     setFormProducts([]);
     setError('');
@@ -251,6 +263,12 @@ export function CustomerProductServiceRatesPage() {
       periodDays:        form.periodDays,
       temperatureType:   isAllItems ? (categoryTemperature || null) : null,
       maxQuantity:       form.maxQuantity,
+      minChargeAmount:   form.minChargeAmount,
+      contractStartDate: form.contractStartDate || null,
+      contractEndDate:   form.contractEndDate || null,
+      freeDays:          form.freeDays,
+      discountPercent:   form.discountPercent,
+      contractNote:      form.contractNote || null,
     });
     setSaving(false);
     if (result.error) {
@@ -329,7 +347,7 @@ export function CustomerProductServiceRatesPage() {
   }, [distinctServiceTypes]);
 
   return (
-    <section className={getPageShellClassName()}>
+    <section className={getPageShellClassName()} data-testid="product-service-rates-page">
       <PageHeader
         title="อัตราค่าบริการตามสินค้า"
         description="กำหนดอัตราค่าบริการแต่ละประเภทตามรายการสินค้าของลูกค้า"
@@ -428,7 +446,7 @@ export function CustomerProductServiceRatesPage() {
       )}
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
+        <button type="button" className="btn btn-primary" data-testid="add-service-rate-button" onClick={openCreate}>
           + เพิ่มอัตราค่าบริการ
         </button>
         <ExcelImportExportToolbar
@@ -517,8 +535,19 @@ export function CustomerProductServiceRatesPage() {
                     {ub?.label ?? row.unit_basis}
                     {row.period_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ทุก {row.period_days} วัน</div> : null}
                     {row.max_quantity ? <div style={{ fontSize: 11, color: '#94a3b8' }}>สูงสุด {row.max_quantity}</div> : null}
+                    {row.min_charge_amount ? <div style={{ fontSize: 11, color: '#b45309' }}>ขั้นต่ำ {row.min_charge_amount} ฿</div> : null}
+                    {row.free_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ฟรี {row.free_days} วันแรก</div> : null}
+                    {row.discount_percent ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ส่วนลด {row.discount_percent}%</div> : null}
+                    {(row.contract_start_date || row.contract_end_date) ? (
+                      <div style={{ fontSize: 11, color: '#7c3aed' }}>
+                        สัญญา: {row.contract_start_date ?? '…'} ถึง {row.contract_end_date ?? '…'}
+                      </div>
+                    ) : null}
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>{row.note ?? '-'}</td>
+                  <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>
+                    {row.note ?? '-'}
+                    {row.contract_note ? <div style={{ fontStyle: 'italic', marginTop: 2 }}>{row.contract_note}</div> : null}
+                  </td>
                   <td style={{ padding: '10px 14px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
@@ -568,6 +597,7 @@ export function CustomerProductServiceRatesPage() {
                     ลูกค้า *
                     <select
                       className="form-control"
+                      data-testid="rate-form-customer-select"
                       value={form.customerId}
                       onChange={(e) => handleFormCustomerChange(e.target.value)}
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
@@ -582,6 +612,7 @@ export function CustomerProductServiceRatesPage() {
                     {form.serviceType === 'STORAGE' ? 'วิธีการจัดเก็บ *' : 'สินค้า *'}
                     <select
                       className="form-control"
+                      data-testid="rate-form-product-select"
                       value={form.productId}
                       onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))}
                       disabled={!form.customerId}
@@ -615,6 +646,7 @@ export function CustomerProductServiceRatesPage() {
                 </label>
                 <input
                   list="service-types-list"
+                  data-testid="rate-form-service-type-input"
                   className="form-control"
                   value={form.serviceType}
                   onChange={(e) => handleServiceTypeChange(e.target.value)}
@@ -643,6 +675,7 @@ export function CustomerProductServiceRatesPage() {
                   อัตรา (฿) *
                   <input
                     className="form-control"
+                    data-testid="rate-form-rate-input"
                     type="number"
                     min="0"
                     step="0.0001"
@@ -656,6 +689,7 @@ export function CustomerProductServiceRatesPage() {
                   หน่วยคิด *
                   <select
                     className="form-control"
+                    data-testid="rate-form-unit-basis-select"
                     value={form.unitBasis}
                     onChange={(e) => setForm((f) => ({ ...f, unitBasis: e.target.value }))}
                     style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
@@ -709,11 +743,102 @@ export function CustomerProductServiceRatesPage() {
                 />
               </label>
 
+              <div style={{ borderTop: '1px dashed #e5e7eb', margin: '4px 0 14px', paddingTop: 14 }} data-testid="rate-contract-terms-section">
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 10px' }}>
+                  เงื่อนไขสัญญา (ไม่บังคับ)
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    วันเริ่มสัญญา
+                    <input
+                      className="form-control"
+                      type="date"
+                      data-testid="rate-contract-start-date-input"
+                      value={form.contractStartDate}
+                      onChange={(e) => setForm((f) => ({ ...f, contractStartDate: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    วันสิ้นสุดสัญญา
+                    <input
+                      className="form-control"
+                      type="date"
+                      data-testid="rate-contract-end-date-input"
+                      value={form.contractEndDate}
+                      onChange={(e) => setForm((f) => ({ ...f, contractEndDate: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>เว้นว่างทั้งคู่ = ใช้ได้ตลอดไป ไม่มีวันหมดอายุ</span>
+                  </label>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    ค่าฝากขั้นต่ำ (฿)
+                    <input
+                      className="form-control"
+                      data-testid="rate-min-charge-amount-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="เว้นว่าง = ไม่มี"
+                      value={form.minChargeAmount}
+                      onChange={(e) => setForm((f) => ({ ...f, minChargeAmount: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    ฟรีค่าฝาก (วัน)
+                    <input
+                      className="form-control"
+                      data-testid="rate-free-days-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="เว้นว่าง = ไม่มี"
+                      value={form.freeDays}
+                      onChange={(e) => setForm((f) => ({ ...f, freeDays: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    ส่วนลด (%)
+                    <input
+                      className="form-control"
+                      data-testid="rate-discount-percent-input"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      placeholder="เว้นว่าง = ไม่มี"
+                      value={form.discountPercent}
+                      onChange={(e) => setForm((f) => ({ ...f, discountPercent: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block' }}>
+                  หมายเหตุเงื่อนไขสัญญา
+                  <textarea
+                    className="form-control"
+                    data-testid="rate-contract-note-input"
+                    rows={2}
+                    value={form.contractNote}
+                    onChange={(e) => setForm((f) => ({ ...f, contractNote: e.target.value }))}
+                    placeholder="เหตุผลของเงื่อนไขพิเศษนี้ เช่น โปรโมชั่นลูกค้าใหม่, สัญญาปีที่ 2 ปรับราคาลด 10%"
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box', resize: 'vertical' }}
+                  />
+                </label>
+              </div>
+
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setForm(null)} disabled={saving}>
+                <button type="button" className="btn btn-secondary" data-testid="rate-form-cancel-button" onClick={() => setForm(null)} disabled={saving}>
                   ยกเลิก
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+                <button type="submit" className="btn btn-primary" data-testid="rate-form-save-button" disabled={saving}>
                   {saving ? 'กำลังบันทึก...' : 'บันทึก'}
                 </button>
               </div>

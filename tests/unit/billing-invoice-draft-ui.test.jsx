@@ -19,6 +19,7 @@ const {
   getConfirmedWithdrawalRowsMock,
   getCustomersMock,
   getProductsMock,
+  listAllProductServiceRatesMock,
 } = vi.hoisted(() => ({
   listBillingInvoiceDraftsMock: vi.fn(),
   getBillingInvoiceDraftByIdMock: vi.fn(),
@@ -33,6 +34,7 @@ const {
   getConfirmedWithdrawalRowsMock: vi.fn(),
   getCustomersMock: vi.fn(),
   getProductsMock: vi.fn(),
+  listAllProductServiceRatesMock: vi.fn(),
 }));
 
 vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
@@ -48,6 +50,7 @@ vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
 vi.mock('../../src/services/billingMovementWeightService.js', () => ({
   getBillingMovementWeightRows: getBillingMovementWeightRowsMock,
   shapeBillingMovementWeightRow: (row) => row,
+  enrichClientMergedBillingMovementWeightRow: (row) => row,
   BILLING_MOVEMENT_WEIGHT_VIEW_NAME: 'tgd_billing_movement_weight_v',
 }));
 
@@ -60,6 +63,10 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
 vi.mock('../../src/services/masterDataService.js', () => ({
   getCustomers: getCustomersMock,
   getProducts: getProductsMock,
+}));
+
+vi.mock('../../src/services/productServiceRatesService.js', () => ({
+  listAllProductServiceRates: listAllProductServiceRatesMock,
 }));
 
 vi.mock('../../src/i18n/languageProvider.jsx', () => ({
@@ -131,6 +138,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     getConfirmedWithdrawalRowsMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
+    listAllProductServiceRatesMock.mockReset();
 
     getMovementLedgerRowsMock.mockResolvedValue({ data: [], error: null });
     getConfirmedDepositReceiptRowsMock.mockResolvedValue({ data: [], error: null });
@@ -174,6 +182,10 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
 
     getCustomersMock.mockResolvedValue({ data: [{ id: 'cust-1', name: 'Alpha' }], error: null });
     getProductsMock.mockResolvedValue({ data: [], error: null });
+    listAllProductServiceRatesMock.mockResolvedValue({
+      data: [{ id: 'rate-handling-1', service_type: 'HANDLING_IN', is_active: true }],
+      error: null,
+    });
     getBillingMovementWeightRowsMock.mockResolvedValue({
       data: [validMovement, blockedMovement],
       error: null,
@@ -612,6 +624,7 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
     findActiveDuplicateDraftLinesMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
+    listAllProductServiceRatesMock.mockReset();
 
     getMovementLedgerRowsMock.mockResolvedValue({ data: [], error: null });
     getConfirmedDepositReceiptRowsMock.mockResolvedValue({ data: [], error: null });
@@ -635,6 +648,10 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
     });
     getCustomersMock.mockResolvedValue({ data: [], error: null });
     getProductsMock.mockResolvedValue({ data: [], error: null });
+    listAllProductServiceRatesMock.mockResolvedValue({
+      data: [{ id: 'rate-handling-1', service_type: 'HANDLING_IN', is_active: true }],
+      error: null,
+    });
     getBillingMovementWeightRowsMock.mockResolvedValue({
       data: [validMovement],
       error: null,

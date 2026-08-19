@@ -350,6 +350,37 @@ export async function deleteCustomerWithdrawalRequestLine(requestId, lineId) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Auxiliary per-request services (plug-in/OT/etc. — see
+// tgd_customer_withdrawal_request_services) not tied to any single
+// product's weight. Exact mirror of the deposit-side equivalent in
+// customerDepositRequestService.js (listCustomerDepositRequestServices /
+// upsertCustomerDepositRequestService / deleteCustomerDepositRequestService).
+export async function listCustomerWithdrawalRequestServices(requestId) {
+  if (!supabase) return missingSupabaseClientResult();
+  return supabase
+    .from('tgd_customer_withdrawal_request_services')
+    .select('id, withdrawal_request_id, service_rate_id, quantity, note')
+    .eq('withdrawal_request_id', requestId);
+}
+
+export async function upsertCustomerWithdrawalRequestService(requestId, { id = null, serviceRateId, quantity = 1, note = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_upsert_customer_withdrawal_request_service', {
+    p_withdrawal_request_id: requestId,
+    p_service_rate_id: serviceRateId,
+    p_quantity: toNullableNumber(quantity) ?? 1,
+    p_note: toNullableText(note),
+    p_id: id,
+  });
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+export async function deleteCustomerWithdrawalRequestService(id) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_delete_customer_withdrawal_request_service', { p_id: id });
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 export async function submitCustomerWithdrawalRequest(requestId, comment = null) {
   if (!supabase) return missingSupabaseClientResult();
 

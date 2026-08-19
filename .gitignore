@@ -6,6 +6,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.local.testing
 
 # Supabase CLI temp cache
 supabase/.temp/

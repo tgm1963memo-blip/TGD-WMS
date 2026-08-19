@@ -16,8 +16,11 @@ import {
   updateCustomerWithdrawalRequestDraft,
   deleteCustomerWithdrawalRequestLine,
   submitCustomerWithdrawalRequest,
+  listCustomerWithdrawalRequestServices,
+  upsertCustomerWithdrawalRequestService,
 } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import {
   getDepositInventoryLines,
 } from '../../services/customerDepositRequestService.js';
@@ -81,6 +84,11 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [depositLinesMap, setDepositLinesMap] = useState({});
   const [catalogProducts, setCatalogProducts] = useState([]);
+  // Auxiliary per-request services (plug-in/OT/etc.) not tied to any single
+  // product's weight — see tgd_customer_withdrawal_request_services /
+  // billingRateCalc.js. Mirrors the deposit create page's equivalent.
+  const [auxServiceOptions, setAuxServiceOptions] = useState([]);
+  const [selectedAuxServices, setSelectedAuxServices] = useState({}); // rateId -> { checked, quantity, id }
   const [submitError, setSubmitError] = useState('');
   const [importNotice, setImportNotice] = useState('');
   const [importing, setImporting] = useState(false);
@@ -283,6 +291,40 @@ export function CustomerWithdrawalRequestCreatePage() {
 
     return () => { active = false; };
   }, [effectiveCustomerId, copyFromId, editId]);
+
+  // Aux service rates (PLUG_IN/OVERTIME/etc.) are unit_basis PER_HOUR/FLAT —
+  // the same filter the deposit create page uses, since this is a generic,
+  // service-type-agnostic mechanism (see billingRateCalc.js's
+  // computeAuxiliaryServiceLines). Storage/HANDLING_IN/OUT rates never match
+  // this filter, so they're never offered here — they're billed automatically
+  // from received/withdrawn weight, not selected manually.
+  useEffect(() => {
+    if (!effectiveCustomerId) {
+      setAuxServiceOptions([]);
+      return undefined;
+    }
+    let active = true;
+    listAllProductServiceRates({ customerId: effectiveCustomerId, isActive: true }).then((result) => {
+      if (!active) return;
+      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR');
+      setAuxServiceOptions(options);
+    });
+    return () => { active = false; };
+  }, [effectiveCustomerId]);
+
+  useEffect(() => {
+    if (!editId) return undefined;
+    let active = true;
+    listCustomerWithdrawalRequestServices(editId).then((result) => {
+      if (!active || result.error) return;
+      const selections = {};
+      for (const row of (result.data ?? [])) {
+        selections[row.service_rate_id] = { checked: true, quantity: row.quantity, id: row.id };
+      }
+      setSelectedAuxServices(selections);
+    });
+    return () => { active = false; };
+  }, [editId]);
 
   // Auto-fill pickup_contact with logged-in user's name on new forms
   useEffect(() => {
@@ -529,6 +571,19 @@ export function CustomerWithdrawalRequestCreatePage() {
         }
       }
 
+      for (const [rateId, selection] of Object.entries(selectedAuxServices)) {
+        if (!selection?.checked) continue;
+        const serviceResult = await upsertCustomerWithdrawalRequestService(requestId, {
+          id: selection.id ?? null,
+          serviceRateId: rateId,
+          quantity: selection.quantity ?? 1,
+        });
+        if (serviceResult.error) {
+          setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
+      }
+
       if (!shouldSubmit) {
         navigate(`/customer/withdrawal-request/new?editId=${requestId}`, { replace: true });
         return;
@@ -636,6 +691,48 @@ export function CustomerWithdrawalRequestCreatePage() {
             onRemoveLine={removeLine}
           />
         </div>
+
+        {auxServiceOptions.length > 0 && (
+          <div className="form-section" style={{ marginBottom: 16 }} data-testid="customer-withdrawal-aux-services-section">
+            <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>บริการเสริม (ไม่ผูกกับน้ำหนักสินค้า)</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {auxServiceOptions.map((opt) => {
+                const sel = selectedAuxServices[opt.id] ?? { checked: false, quantity: 1 };
+                return (
+                  <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: sel.checked ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={sel.checked}
+                      onChange={(e) => setSelectedAuxServices((prev) => ({
+                        ...prev,
+                        [opt.id]: { ...sel, checked: e.target.checked, quantity: sel.quantity ?? 1 },
+                      }))}
+                    />
+                    <span style={{ flex: 1, fontSize: 13 }}>
+                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}
+                      {opt.max_quantity ? ` (สูงสุด ${opt.max_quantity}${opt.unit_basis === 'PER_HOUR' ? ' ชม.' : ''})` : ''}
+                    </span>
+                    {opt.unit_basis === 'PER_HOUR' && sel.checked && (
+                      <input
+                        type="number"
+                        min="0"
+                        max={opt.max_quantity || undefined}
+                        step="0.5"
+                        placeholder="ชม."
+                        value={sel.quantity ?? 1}
+                        onChange={(e) => setSelectedAuxServices((prev) => ({
+                          ...prev,
+                          [opt.id]: { ...sel, quantity: e.target.value },
+                        }))}
+                        style={{ width: 80, padding: '4px 8px', fontSize: 12 }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="form-grid">
           <label className="form-field">

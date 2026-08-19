@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, resolveServiceRate, generateLotBillingCycles,
+  computeHandlingFeeLines,
 } from '../../src/utils/billingRateCalc.js';
 
 const STORAGE_RATE_30D = {
@@ -131,13 +132,156 @@ describe('computeStorageInvoiceLines', () => {
     // rounded values (e.g. 2589.74 * 100 !== 258974 in IEEE 754).
     expect(line.amount).toBeCloseTo(2589.74, 2);
   });
+
+  it('zeroes out a cycle that starts within the contract free_days window, tagging it as free rather than skipping it', () => {
+    const freeRate = { ...STORAGE_RATE_30D, free_days: 10 };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [freeRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ amount: 0, freePeriodApplied: true, weight: 1000 });
+  });
+
+  it('bills full cycles again once a later cycle starts after the free_days window has passed', () => {
+    const freeRate = { ...STORAGE_RATE_30D, free_days: 10 };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [freeRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-31', // 2nd cycle starts Jan 31, past day 10
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ amount: 0, freePeriodApplied: true });
+    expect(lines[1].amount).toBe(5000);
+    expect(lines[1].freePeriodApplied).toBeFalsy();
+  });
+
+  it('applies discount_percent to the computed amount and records the discount', () => {
+    const discountRate = { ...STORAGE_RATE_30D, discount_percent: 10 };
+    const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [discountRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    // raw 1000 * 5 = 5000, less 10% = 4500
+    expect(line.amount).toBe(4500);
+    expect(line.discountAmount).toBe(500);
+    expect(line.adjustmentNote).toContain('ส่วนลด');
+  });
+
+  it('tops up to min_charge_amount when the computed amount falls below the floor', () => {
+    const minChargeRate = { ...STORAGE_RATE_30D, rate: 0.01, min_charge_amount: 500 };
+    const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 10, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [minChargeRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    // raw 10 * 0.01 = 0.1, well under the 500 floor
+    expect(line.amount).toBe(500);
+    expect(line.minChargeApplied).toBe(true);
+    expect(line.minChargeTopupAmount).toBe(499.9);
+  });
+
+  it('does not resolve a rate whose contract window has not started yet as of the receipt date, leaving the deposit line unrated', () => {
+    const futureRate = { ...STORAGE_RATE_30D, contract_start_date: '2026-02-01' };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [futureRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-31',
+    });
+    expect(lines).toHaveLength(0);
+  });
+
+  it('does not resolve a rate whose contract window already expired as of the receipt date', () => {
+    const expiredRate = { ...STORAGE_RATE_30D, contract_end_date: '2025-12-31' };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [expiredRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-31',
+    });
+    expect(lines).toHaveLength(0);
+  });
+
+  it('still resolves a rate with no contract window set at all, exactly as before contract fields existed', () => {
+    const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [STORAGE_RATE_30D],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    expect(line.amount).toBe(5000);
+  });
+});
+
+describe('computeHandlingFeeLines', () => {
+  const HANDLING_IN_RATE = {
+    id: 'rate-hi', service_type: 'HANDLING_IN', unit_basis: 'PER_KG',
+    rate: 0.17, period_days: null, is_active: true, customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+  };
+
+  it('charges once, on the received weight, only in the period containing the receipt date', () => {
+    const [line] = computeHandlingFeeLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-07-15',
+      }],
+      rates: [HANDLING_IN_RATE],
+      periodStart: '2026-07-01', periodEnd: '2026-07-31',
+    });
+    expect(line.amount).toBeCloseTo(170, 2);
+  });
+
+  it('does not charge again in a later period for a lot received in an earlier one ("first entry only")', () => {
+    const lines = computeHandlingFeeLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-06-30',
+      }],
+      rates: [HANDLING_IN_RATE],
+      periodStart: '2026-07-01', periodEnd: '2026-07-31',
+    });
+    expect(lines).toHaveLength(0);
+  });
+
+  it('silently skips (not an error) a deposit line whose customer has no HANDLING_IN rate configured', () => {
+    const lines = computeHandlingFeeLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-07-15',
+      }],
+      rates: [], // no rates configured at all for this customer
+      periodStart: '2026-07-01', periodEnd: '2026-07-31',
+    });
+    expect(lines).toHaveLength(0);
+  });
 });
 
 describe('computeAuxiliaryServiceLines', () => {
   it('caps quantity at max_quantity and rounds the amount', () => {
     const [line] = computeAuxiliaryServiceLines({
       selections: [{
-        depositRequestId: 'req-1', customerId: 'cust-1',
+        sourceRequestId: 'req-1', customerId: 'cust-1',
         rate: { rate: 3.333, max_quantity: 5 },
         quantity: 12,
       }],
@@ -219,5 +363,20 @@ describe('resolveServiceRate', () => {
       customerId: 'cust-1', customerProductId: 'prod-1', temperatureType: null, serviceType: 'STORAGE',
     });
     expect(rate.id).toBe('specific');
+  });
+
+  it('ignores contract_start_date/contract_end_date entirely when asOfDate is omitted (default-null path unchanged)', () => {
+    const rate = resolveServiceRate([{ ...STORAGE_RATE_30D, contract_start_date: '2099-01-01' }], {
+      customerId: 'cust-1', customerProductId: null, temperatureType: null, serviceType: 'STORAGE',
+    });
+    expect(rate).not.toBeNull();
+  });
+
+  it('rejects a candidate whose contract window does not cover asOfDate when asOfDate is provided', () => {
+    const rate = resolveServiceRate([{ ...STORAGE_RATE_30D, contract_start_date: '2099-01-01' }], {
+      customerId: 'cust-1', customerProductId: null, temperatureType: null, serviceType: 'STORAGE',
+      asOfDate: '2026-01-01',
+    });
+    expect(rate).toBeNull();
   });
 });

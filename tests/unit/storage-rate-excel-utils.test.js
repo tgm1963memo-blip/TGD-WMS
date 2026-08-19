@@ -38,6 +38,12 @@ describe('mapRateRowToExcelRow', () => {
       currency: 'THB',
       note: 'test',
       is_active: 'FALSE',
+      min_charge_amount: '',
+      contract_start_date: '',
+      contract_end_date: '',
+      free_days: '',
+      discount_percent: '',
+      contract_note: '',
     });
   });
 });
@@ -78,7 +84,37 @@ describe('parseStorageRateImportFile', () => {
       currency: 'THB',
       note: 'x',
       isActive: true,
+      minChargeAmount: null,
+      contractStartDate: null,
+      contractEndDate: null,
+      freeDays: null,
+      discountPercent: null,
+      contractNote: null,
     }]);
+  });
+
+  it('parses the new optional contract-term columns when present', async () => {
+    const fullHeaders = [...headers, 'min_charge_amount', 'contract_start_date', 'contract_end_date', 'free_days', 'discount_percent', 'contract_note'];
+    const file = await excelFileFromRows([
+      {
+        customer_code: 'CUST-001', customer_product_code: 'SKU-1', service_type: 'STORAGE', rate: '2.5', unit_basis: 'PER_KG',
+        min_charge_amount: '500', contract_start_date: '2026-01-01', contract_end_date: '2026-12-31',
+        free_days: '7', discount_percent: '10', contract_note: 'ลูกค้าใหม่',
+      },
+    ], fullHeaders);
+    const lookupMap = new Map([['CUST-001::SKU-1', { id: 'cp-1' }]]);
+
+    const { rows, errors } = await parseStorageRateImportFile(file, lookupMap);
+
+    expect(errors).toEqual([]);
+    expect(rows[0]).toMatchObject({
+      minChargeAmount: 500,
+      contractStartDate: '2026-01-01',
+      contractEndDate: '2026-12-31',
+      freeDays: 7,
+      discountPercent: 10,
+      contractNote: 'ลูกค้าใหม่',
+    });
   });
 
   it('reports an error when the customer/product pair is not found', async () => {

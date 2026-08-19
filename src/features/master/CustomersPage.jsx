@@ -20,6 +20,9 @@ const EMPTY_FORM = {
   email: '',
   address: '',
   isActive: true,
+  notifyDepositConfirmed: true,
+  notifyWithdrawalCompleted: true,
+  notifyInvoiceApproved: true,
 };
 
 function generateCode(existingCustomers) {
@@ -235,6 +238,53 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
             </div>
           )}
 
+          <div style={{ borderTop: '1px dashed #e5e7eb', margin: '4px 0 14px', paddingTop: 14 }} data-testid="customer-notification-settings-section">
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 10px' }}>
+              การแจ้งเตือนทางอีเมล
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  data-testid="customer-notify-deposit-confirmed-checkbox"
+                  checked={form.notifyDepositConfirmed}
+                  onChange={(e) => set('notifyDepositConfirmed', e.target.checked)}
+                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                  ยืนยันรับสินค้าเข้าคลัง
+                  <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อรับฝากสินค้าเข้าคลังยืนยันแล้ว</span>
+                </span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  data-testid="customer-notify-withdrawal-completed-checkbox"
+                  checked={form.notifyWithdrawalCompleted}
+                  onChange={(e) => set('notifyWithdrawalCompleted', e.target.checked)}
+                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                  เบิกสินค้า/จัดส่งสำเร็จ
+                  <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อคำขอเบิกสินค้าถูกส่งออกจากคลังแล้ว</span>
+                </span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  data-testid="customer-notify-invoice-approved-checkbox"
+                  checked={form.notifyInvoiceApproved}
+                  onChange={(e) => set('notifyInvoiceApproved', e.target.checked)}
+                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                  ใบแจ้งหนี้พร้อมแล้ว
+                  <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อใบแจ้งหนี้ได้รับการอนุมัติแล้ว</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>ยกเลิก</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -299,6 +349,9 @@ export function CustomersPage() {
       email: customer.email ?? '',
       address: customer.address ?? '',
       isActive: customer.is_active ?? true,
+      notifyDepositConfirmed: customer.notify_deposit_confirmed ?? true,
+      notifyWithdrawalCompleted: customer.notify_withdrawal_completed ?? true,
+      notifyInvoiceApproved: customer.notify_invoice_approved ?? true,
     });
   }
 

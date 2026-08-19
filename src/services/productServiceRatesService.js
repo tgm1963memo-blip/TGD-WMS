@@ -11,6 +11,13 @@ export const SERVICE_TYPES = [
   { value: 'LABEL',        label: 'ค่าติดฉลาก',         labelEn: 'Labeling' },
   { value: 'FREEZING',     label: 'ค่าแช่แข็ง',         labelEn: 'Freezing' },
   { value: 'R3_DOCUMENT',  label: 'ค่าบริการดำเนินการเอกสาร ร.3', labelEn: 'ร.3 Document Fee' },
+  // PLUG_IN/OVERTIME are auxiliary per-request services (see
+  // tgd_customer_deposit_request_services / tgd_customer_withdrawal_request_services
+  // + computeAuxiliaryServiceLines) — configure with unit_basis PER_HOUR (and
+  // an optional max_quantity cap) so they show up as selectable checkboxes on
+  // the deposit/withdrawal request create pages, same as any other FLAT/PER_HOUR rate.
+  { value: 'PLUG_IN',      label: 'ค่าเสียบปลั๊ก',       labelEn: 'Reefer Plug-in' },
+  { value: 'OVERTIME',     label: 'ค่าล่วงเวลา (OT)',    labelEn: 'Overtime' },
   { value: 'OTHER',        label: 'ค่าบริการอื่นๆ',     labelEn: 'Other' },
 ];
 
@@ -85,6 +92,12 @@ function shapeProductServiceRateRow(row = {}) {
     period_days: row.period_days ?? null,
     temperature_type: row.temperature_type ?? null,
     max_quantity: row.max_quantity ?? null,
+    min_charge_amount: row.min_charge_amount ?? null,
+    contract_start_date: row.contract_start_date ?? null,
+    contract_end_date: row.contract_end_date ?? null,
+    free_days: row.free_days ?? null,
+    discount_percent: row.discount_percent ?? null,
+    contract_note: row.contract_note ?? null,
     currency: row.currency,
     note: row.note,
     is_active: row.is_active,
@@ -114,7 +127,9 @@ export async function listAllProductServiceRates(filters = {}) {
     .from('tgd_customer_product_service_rates')
     .select(`
       id, customer_product_id, customer_id, service_type, rate, unit_basis,
-      period_days, temperature_type, max_quantity, currency, note, is_active, created_at,
+      period_days, temperature_type, max_quantity,
+      min_charge_amount, contract_start_date, contract_end_date, free_days, discount_percent, contract_note,
+      currency, note, is_active, created_at,
       tgd_customer_products(
         id, customer_product_code, product_name, customer_id,
         tgd_customers(id, customer_code, customer_name)
@@ -196,6 +211,12 @@ export async function upsertProductServiceRate(payload = {}) {
     p_period_days:         payload.periodDays != null && payload.periodDays !== '' ? Number(payload.periodDays) : null,
     p_temperature_type:    payload.temperatureType || null,
     p_max_quantity:        payload.maxQuantity != null && payload.maxQuantity !== '' ? Number(payload.maxQuantity) : null,
+    p_min_charge_amount:   payload.minChargeAmount != null && payload.minChargeAmount !== '' ? Number(payload.minChargeAmount) : null,
+    p_contract_start_date: payload.contractStartDate || null,
+    p_contract_end_date:   payload.contractEndDate || null,
+    p_free_days:           payload.freeDays != null && payload.freeDays !== '' ? Number(payload.freeDays) : null,
+    p_discount_percent:    payload.discountPercent != null && payload.discountPercent !== '' ? Number(payload.discountPercent) : null,
+    p_contract_note:       payload.contractNote ?? null,
   });
   return { data, error };
 }

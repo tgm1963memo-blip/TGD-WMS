@@ -459,7 +459,37 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(result.data).toEqual({ draftId: 'draft-1' });
   });
 
-  it('delete draft is rejected once the draft is past plain DRAFT status', async () => {
+  it('delete draft also removes a CANCELLED-status draft (extended per accounting request)', async () => {
+    const draft = {
+      id: 'draft-1',
+      draft_no: 'BID-20260608-0001',
+      status: 'CANCELLED',
+      customer_id: 'cust-1',
+    };
+
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        return createTableChain(tableName, {
+          maybeSingle: async () => ({ data: draft, error: null }),
+          afterDelete: () => ({ data: null, error: null }),
+        });
+      }
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        return createTableChain(tableName, {
+          order: async () => ({ data: [], error: null }),
+          afterDelete: () => ({ data: null, error: null }),
+        });
+      }
+      return createTableChain(tableName);
+    });
+
+    const result = await deleteBillingInvoiceDraft({ draftId: 'draft-1' });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ draftId: 'draft-1' });
+  });
+
+  it('delete draft is rejected for statuses outside DRAFT/CANCELLED (e.g. READY_TO_REVIEW)', async () => {
     const draft = {
       id: 'draft-1',
       draft_no: 'BID-20260608-0001',

@@ -30,6 +30,20 @@ export function downloadExcelRows(rows, headers, filename, sheetName = 'Sheet1',
   downloadExcelWorkbook(rowsToSheet(rows, headers, columnWidths), filename, sheetName);
 }
 
+// Multi-sheet variant of downloadExcelRows/downloadExcelWorkbook — for a
+// single downloadable file that needs more than one tab (e.g. a summary tab
+// plus a line-detail tab), instead of forcing the caller to produce several
+// separate single-sheet files for what's conceptually one report.
+export function downloadExcelWorkbookMultiSheet(sheets = [], filename = 'export.xlsx') {
+  const workbook = XLSX.utils.book_new();
+  sheets.forEach(({ name, rows, headers, columnWidths }) => {
+    const sheet = rowsToSheet(rows, headers, columnWidths);
+    // Excel sheet names are capped at 31 characters and can't be blank.
+    XLSX.utils.book_append_sheet(workbook, sheet, String(name || 'Sheet').slice(0, 31));
+  });
+  XLSX.writeFile(workbook, filename);
+}
+
 export async function readExcelFile(file) {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });

@@ -670,6 +670,7 @@ export async function enqueueCustomerDepositNotification(requestId, customerId, 
     p_customer_id: customerId,
     p_document_no: documentNo,
     p_submitter_email: submitterEmail ?? null,
+    p_notification_event: 'DEPOSIT_CONFIRMED',
   });
 
   return { data, error };

@@ -3,6 +3,7 @@ import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
+  computeHandlingFeeLines,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
 
@@ -14,6 +15,30 @@ function missingSupabaseClientResult() {
     data: null,
     error: new Error('Supabase client is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
   };
+}
+
+// Classifies WHY a deposit line has no usable STORAGE rate as of asOfDate,
+// for the "unratedDepositLines"/"unratedLots" visibility list — distinct
+// from resolveServiceRate's own contract-window filtering (see
+// billingRateCalc.js), which just returns null either way. Resolving once
+// WITHOUT asOfDate first tells us whether a candidate rate exists at all
+// (ignoring its contract window) so we can tell "no rate configured" apart
+// from "a rate exists but this date falls outside its contract window" —
+// the latter needs the customer told which side of the window it's on
+// (not started yet vs. already expired) instead of just "missing."
+function classifyUnratedReason(rates, { customerId, customerProductId, temperatureType, asOfDate }) {
+  const dateUnfilteredCandidate = resolveServiceRate(rates, {
+    customerId, customerProductId, temperatureType, serviceType: 'STORAGE',
+  });
+  if (!dateUnfilteredCandidate) return 'NO_RATE_CONFIGURED';
+  if (!asOfDate) return 'NO_RATE_CONFIGURED';
+  if (dateUnfilteredCandidate.contract_start_date && asOfDate < dateUnfilteredCandidate.contract_start_date) {
+    return 'CONTRACT_NOT_STARTED';
+  }
+  if (dateUnfilteredCandidate.contract_end_date && asOfDate > dateUnfilteredCandidate.contract_end_date) {
+    return 'CONTRACT_EXPIRED';
+  }
+  return 'NO_RATE_CONFIGURED';
 }
 
 export function chunkArray(items, size) {
@@ -140,7 +165,9 @@ async function fetchRateEngineInputs({ customerId }) {
   }
 
   const rawWithdrawalLines = [];
+  const withdrawalRequestIds = [];
   for (const req of (withdrawalResult.data ?? [])) {
+    withdrawalRequestIds.push(req.id);
     for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
       rawWithdrawalLines.push({ ...line, customer_id: req.customer_id });
     }
@@ -169,6 +196,10 @@ async function fetchRateEngineInputs({ customerId }) {
     ]),
   );
 
+  const requestDispatchDateById = new Map(
+    (withdrawalResult.data ?? []).map((req) => [req.id, req.requested_dispatch_date ?? null]),
+  );
+
   // Deposit/withdrawal requests flagged as needing ร.3 processing — each
   // bills a flat, one-time fee once the underlying document is confirmed
   // (deposit: RECEIVED_CONFIRMED/CUSTOMER_NOTIFIED, matching the status
@@ -185,8 +216,8 @@ async function fetchRateEngineInputs({ customerId }) {
   ];
 
   return {
-    depositLines, depositRequestIds, rates: ratesResult.data ?? [], requestReceiptDateById,
-    r3FlaggedDocuments, error: null,
+    depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, error: null,
   };
 }
 
@@ -349,7 +380,10 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   const inputs = await fetchRateEngineInputs({ customerId });
   if (inputs.error) return { data: null, error: inputs.error };
-  const { depositLines: allDepositLines, depositRequestIds, rates, requestReceiptDateById, r3FlaggedDocuments } = inputs;
+  const {
+    depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments,
+  } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
   // method (temperature_type) — scoping to one lets staff bill e.g. only
@@ -374,38 +408,87 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // gap tracked as unratedLots in getAutoLotBillingPreview below) -- redo
   // just the rate-resolution half of its check here so a lot with no
   // configured/matching rate is visible in the preview instead of simply
-  // being absent from storageLines with no explanation.
+  // being absent from storageLines with no explanation. asOfDate uses each
+  // line's own receipt_date, matching exactly what computeStorageInvoiceLines
+  // itself now checks internally (see billingRateCalc.js), so a line that's
+  // unrated because its contract window doesn't cover its receipt date shows
+  // up here with the correct reason instead of silently vanishing.
   const unratedDepositLines = depositLines
     .filter((dl) => !resolveServiceRate(rates, {
       customerId: dl.customer_id,
       customerProductId: dl.customer_product_id,
       temperatureType: dl.temperature_type,
       serviceType: 'STORAGE',
+      asOfDate: dl.receipt_date,
     }))
     .map((dl) => ({
       depositLineId: dl.id,
       lotNo: dl.lot_no,
       customerProductCode: dl.customer_product_code,
       temperatureType: dl.temperature_type,
+      reason: classifyUnratedReason(rates, {
+        customerId: dl.customer_id,
+        customerProductId: dl.customer_product_id,
+        temperatureType: dl.temperature_type,
+        asOfDate: dl.receipt_date,
+      }),
     }));
 
+  // HANDLING_IN (ค่าบริการจัดการแรกเข้า): one-time, weight-based fee charged
+  // only when a lot is first received (see computeHandlingFeeLines) —
+  // confirmed against a real customer's accounting spreadsheet as a
+  // material fee component that was previously invisible to this preview
+  // entirely. Silently produces nothing for a customer with no HANDLING_IN
+  // rate configured, same as any other optional service type.
+  const handlingLines = computeHandlingFeeLines({
+    depositLines, rates, periodStart, periodEnd, serviceType: 'HANDLING_IN',
+  });
+
+  // Scope the aux-service lookup to requests whose receipt/dispatch date
+  // actually falls in this billing period *before* querying, not after.
+  // depositRequestIds/withdrawalRequestIds cover a customer's entire
+  // history (fetchRateEngineInputs deliberately doesn't date-filter, since
+  // storage-cycle tracking needs full history) — querying with the full
+  // list as a `.in(...)` filter builds a GET URL whose length scales with
+  // total lifetime request count. For a customer with enough volume (seen
+  // with a real customer at 388 withdrawal requests) that URL exceeds
+  // Kong/nginx's ~8KB request-line limit and the request is rejected with
+  // a raw 414 before it ever reaches PostgREST — surfacing to the browser
+  // as an unhelpful "TypeError: Failed to fetch" instead of any usable
+  // error. Pre-filtering to just this period's request IDs keeps the
+  // query small regardless of how much history a customer accumulates.
+  const periodDepositRequestIds = depositRequestIds.filter((id) => {
+    const date = requestReceiptDateById.get(id);
+    return date && date >= periodStart && date <= periodEnd;
+  });
+  const periodWithdrawalRequestIds = withdrawalRequestIds.filter((id) => {
+    const date = requestDispatchDateById.get(id);
+    return date && date >= periodStart && date <= periodEnd;
+  });
+
+  // Belt-and-braces on top of the period pre-filter above: even one
+  // period's worth of requests could exceed a safe URL length for a very
+  // high-volume customer, so chunk the same way the lot-cycle lookup below
+  // already does (REQUEST_ID_CHUNK_SIZE mirrors that file's LOT_ID_CHUNK_SIZE).
+  const REQUEST_ID_CHUNK_SIZE = 150;
+
   let auxLines = [];
-  if (depositRequestIds.length > 0) {
-    const auxResult = await supabase
-      .from('tgd_customer_deposit_request_services')
-      .select('id, deposit_request_id, service_rate_id, quantity, note')
-      .in('deposit_request_id', depositRequestIds);
-    if (auxResult.error) return { data: null, error: auxResult.error };
-
+  if (periodDepositRequestIds.length > 0) {
     const rateById = new Map(rates.map((r) => [r.id, r]));
+    const auxRows = [];
+    for (const chunk of chunkArray(periodDepositRequestIds, REQUEST_ID_CHUNK_SIZE)) {
+      // eslint-disable-next-line no-await-in-loop
+      const auxResult = await supabase
+        .from('tgd_customer_deposit_request_services')
+        .select('id, deposit_request_id, service_rate_id, quantity, note')
+        .in('deposit_request_id', chunk);
+      if (auxResult.error) return { data: null, error: auxResult.error };
+      auxRows.push(...(auxResult.data ?? []));
+    }
 
-    const selections = (auxResult.data ?? [])
-      .filter((row) => {
-        const date = requestReceiptDateById.get(row.deposit_request_id);
-        return date && date >= periodStart && date <= periodEnd;
-      })
+    const selections = auxRows
       .map((row) => ({
-        depositRequestId: row.deposit_request_id,
+        sourceRequestId: row.deposit_request_id,
         customerId,
         rate: rateById.get(row.service_rate_id),
         quantity: row.quantity,
@@ -415,6 +498,38 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
       .filter((sel) => sel.rate);
 
     auxLines = computeAuxiliaryServiceLines({ selections });
+  }
+
+  // Withdrawal-side auxiliary services (plug-in/OT/etc. selected against a
+  // withdrawal request rather than a deposit — see
+  // tgd_customer_withdrawal_request_services) — exact mirror of the
+  // deposit-side block above, feeding into the same auxLines array so both
+  // sides get identical invoice-draft-line/report treatment downstream.
+  if (periodWithdrawalRequestIds.length > 0) {
+    const rateById = new Map(rates.map((r) => [r.id, r]));
+    const withdrawalAuxRows = [];
+    for (const chunk of chunkArray(periodWithdrawalRequestIds, REQUEST_ID_CHUNK_SIZE)) {
+      // eslint-disable-next-line no-await-in-loop
+      const withdrawalAuxResult = await supabase
+        .from('tgd_customer_withdrawal_request_services')
+        .select('id, withdrawal_request_id, service_rate_id, quantity, note')
+        .in('withdrawal_request_id', chunk);
+      if (withdrawalAuxResult.error) return { data: null, error: withdrawalAuxResult.error };
+      withdrawalAuxRows.push(...(withdrawalAuxResult.data ?? []));
+    }
+
+    const withdrawalSelections = withdrawalAuxRows
+      .map((row) => ({
+        sourceRequestId: row.withdrawal_request_id,
+        customerId,
+        rate: rateById.get(row.service_rate_id),
+        quantity: row.quantity,
+        note: row.note,
+        selectionId: row.id,
+      }))
+      .filter((sel) => sel.rate);
+
+    auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: withdrawalSelections })];
   }
 
   // ร.3 document fee: one flat line per flagged deposit/withdrawal request
@@ -428,7 +543,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     const r3Selections = (r3FlaggedDocuments ?? [])
       .filter((doc) => doc.date && doc.date >= periodStart && doc.date <= periodEnd)
       .map((doc) => ({
-        depositRequestId: doc.id,
+        sourceRequestId: doc.id,
         customerId,
         rate: r3Rate,
         quantity: 1,
@@ -436,7 +551,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: r3Selections })];
   }
 
-  return { data: { storageLines, auxLines, depositLines, unratedDepositLines }, error: null };
+  return { data: { storageLines, auxLines, handlingLines, depositLines, unratedDepositLines }, error: null };
 }
 
 // Auto per-lot billing preview: instead of one staff-typed date range
@@ -485,6 +600,7 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
       customerProductId: dl.customer_product_id,
       temperatureType: dl.temperature_type,
       serviceType: 'STORAGE',
+      asOfDate: billThroughDate,
     });
     if (rate && rate.period_days != null) {
       recurringLots.push({ depositLine: dl, rate });
@@ -494,6 +610,12 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
         lotNo: dl.lot_no,
         customerProductCode: dl.customer_product_code,
         temperatureType: dl.temperature_type,
+        reason: classifyUnratedReason(rates, {
+          customerId: dl.customer_id,
+          customerProductId: dl.customer_product_id,
+          temperatureType: dl.temperature_type,
+          asOfDate: billThroughDate,
+        }),
       });
     }
   }

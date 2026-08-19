@@ -100,7 +100,7 @@ describe('getBillingPeriodPreview — ร.3 document fee', () => {
 
     const r3Lines = data.auxLines.filter((l) => l.rate?.service_type === 'R3_DOCUMENT');
     expect(r3Lines).toHaveLength(2);
-    expect(r3Lines.map((l) => l.depositRequestId).sort()).toEqual(['dep-in-period', 'wd-in-period']);
+    expect(r3Lines.map((l) => l.sourceRequestId).sort()).toEqual(['dep-in-period', 'wd-in-period']);
     for (const line of r3Lines) {
       expect(line.quantity).toBe(1);
       expect(line.amount).toBe(30);

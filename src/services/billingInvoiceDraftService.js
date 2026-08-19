@@ -20,6 +20,8 @@ import {
   buildInvoiceDraftCreatePayload,
   buildInvoiceDraftLineFromStorageLine,
   buildInvoiceDraftLineFromAuxiliaryLine,
+  buildInvoiceDraftLineFromHandlingLine,
+  groupInvoiceDraftLinesByType,
   calculateInvoiceDraftTotals,
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
@@ -576,10 +578,43 @@ export async function createBillingInvoiceDraftFromMovements({
   };
 }
 
-// Generates a draft's storage + auxiliary-service lines from the rate
-// engine (see billingRateEngineService.js) for one customer over one
-// billing period, instead of the manual "pick movement rows" flow above —
-// storage charges span the whole period rather than a single movement, so
+// Compares this preview's total against the customer's most recent
+// non-cancelled prior-period draft and flags a >30% swing — informational
+// only (per the billing SOP: flag anomalies, don't block on them). Any
+// error here is swallowed and treated as "nothing to flag" rather than
+// failing the whole preview, since this is a secondary signal, not the
+// preview's core purpose.
+async function detectBillingPeriodAnomaly({ customerId, billingPeriodStart, currentTotal }) {
+  if (!supabase || currentTotal == null) return null;
+  const prevResult = await supabase
+    .from(INVOICE_DRAFT_TABLE)
+    .select('draft_no, total_amount, billing_period_end')
+    .eq('customer_id', customerId)
+    .neq('status', INVOICE_DRAFT_STATUS.CANCELLED)
+    .lt('billing_period_end', billingPeriodStart)
+    .order('billing_period_end', { ascending: false })
+    .limit(1);
+  if (prevResult.error || !prevResult.data?.length) return null;
+
+  const previous = prevResult.data[0];
+  const previousTotal = Number(previous.total_amount);
+  if (!previousTotal) return null;
+
+  const percentChange = (currentTotal - previousTotal) / previousTotal;
+  if (Math.abs(percentChange) <= 0.30) return null;
+
+  return {
+    previousTotal,
+    currentTotal,
+    percentChange: Math.round(percentChange * 10000) / 100, // e.g. 42.5 means +42.5%
+    previousDraftNo: previous.draft_no,
+  };
+}
+
+// Generates a draft's storage + handling-in + auxiliary-service lines from
+// the rate engine (see billingRateEngineService.js) for one customer over
+// one billing period, instead of the manual "pick movement rows" flow above
+// — storage charges span the whole period rather than a single movement, so
 // they don't fit that flow. Returns a preview (no rate resolved / nothing
 // to bill is reported via zero lines) so the caller can show it before
 // committing, and a separate confirm step actually inserts it.
@@ -597,17 +632,22 @@ export async function previewBillingPeriodInvoice({ customerId, billingPeriodSta
   });
   if (previewResult.error) return { data: null, error: previewResult.error };
 
-  const { storageLines, auxLines, depositLines } = previewResult.data;
+  const { storageLines, auxLines, handlingLines, depositLines, unratedDepositLines } = previewResult.data;
   const depositLineById = new Map(depositLines.map((dl) => [dl.id, dl]));
 
   const lines = [
     ...storageLines.map((sl) => buildInvoiceDraftLineFromStorageLine(sl, depositLineById.get(sl.depositLineId) ?? {})),
+    ...(handlingLines ?? []).map((hl) => buildInvoiceDraftLineFromHandlingLine(hl, depositLineById.get(hl.depositLineId) ?? {})),
     ...auxLines.map((al) => buildInvoiceDraftLineFromAuxiliaryLine(al)),
   ];
 
   const totals = calculateInvoiceDraftTotals(lines);
+  const totalsByType = groupInvoiceDraftLinesByType(lines);
+  const anomaly = await detectBillingPeriodAnomaly({
+    customerId, billingPeriodStart, currentTotal: totals.total_amount,
+  });
 
-  return { data: { lines, totals }, error: null };
+  return { data: { lines, totals, totalsByType, unratedDepositLines: unratedDepositLines ?? [], anomaly }, error: null };
 }
 
 export async function createBillingInvoiceDraftForPeriod({
@@ -991,6 +1031,23 @@ export async function deleteBillingInvoiceDraft({ draftId } = {}) {
   return { data: { draftId }, error: null };
 }
 
+// Notifies the customer their invoice draft is ready, once approved — a
+// brand-new hook point (billing had no notification wiring at all before
+// this). Mirrors the shape of enqueueCustomerDepositNotification/
+// enqueueCustomerWithdrawalNotification, reusing the same RPC/queue/SMTP
+// pipeline; the RPC itself checks the customer's notify_invoice_approved
+// preference before inserting a customer-facing row.
+async function enqueueCustomerInvoiceApprovedNotification(draftId, customerId, draftNo) {
+  if (!supabase || !customerId) return { data: null, error: null };
+  return supabase.rpc('tgd_enqueue_customer_request_notifications', {
+    p_document_type: 'INVOICE_DRAFT',
+    p_document_id: draftId,
+    p_customer_id: customerId,
+    p_document_no: draftNo,
+    p_notification_event: 'INVOICE_APPROVED',
+  });
+}
+
 export async function approveBillingInvoiceDraft({
   draftId,
 } = {}) {
@@ -1027,6 +1084,11 @@ export async function approveBillingInvoiceDraft({
   if (result.error) {
     return { data: null, error: normalizeServiceError(result.error) };
   }
+
+  // Best-effort: the draft is already approved at this point, so a failure
+  // enqueueing the notification must not undo/fail the approval itself —
+  // it's a side effect, not a precondition.
+  await enqueueCustomerInvoiceApprovedNotification(draftId, result.data.customer_id, result.data.draft_no).catch(() => {});
 
   return {
     data: shapeBillingInvoiceDraftHeader(result.data),

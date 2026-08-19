@@ -10,10 +10,20 @@ export const STORAGE_RATE_EXCEL_HEADERS = [
   'currency',
   'note',
   'is_active',
+  'min_charge_amount',
+  'contract_start_date',
+  'contract_end_date',
+  'free_days',
+  'discount_percent',
+  'contract_note',
 ];
 
-const SERVICE_TYPE_VALUES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'OTHER']);
-const UNIT_BASIS_VALUES = new Set(['PER_KG', 'PER_UNIT', 'PER_PALLET', 'PER_TRIP', 'PER_DAY', 'FLAT']);
+// Kept in sync with SERVICE_TYPES/UNIT_BASIS in productServiceRatesService.js
+// — R3_DOCUMENT/PER_HOUR were already valid single-row form options but
+// missing here, which would have rejected a bulk-import row for a type the
+// UI itself could already create; PLUG_IN/OVERTIME added alongside them.
+const SERVICE_TYPE_VALUES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'R3_DOCUMENT', 'PLUG_IN', 'OVERTIME', 'OTHER']);
+const UNIT_BASIS_VALUES = new Set(['PER_KG', 'PER_UNIT', 'PER_PALLET', 'PER_TRIP', 'PER_DAY', 'PER_HOUR', 'FLAT']);
 
 export function mapRateRowToExcelRow(row = {}) {
   return {
@@ -26,6 +36,12 @@ export function mapRateRowToExcelRow(row = {}) {
     currency: row.currency ?? 'THB',
     note: row.note ?? '',
     is_active: row.is_active === false ? 'FALSE' : 'TRUE',
+    min_charge_amount: row.min_charge_amount ?? '',
+    contract_start_date: row.contract_start_date ?? '',
+    contract_end_date: row.contract_end_date ?? '',
+    free_days: row.free_days ?? '',
+    discount_percent: row.discount_percent ?? '',
+    contract_note: row.contract_note ?? '',
   };
 }
 
@@ -41,6 +57,12 @@ export function downloadStorageRateTemplate(filename = 'storage-rate-template.xl
       currency: 'THB',
       note: '',
       is_active: 'TRUE',
+      min_charge_amount: '',
+      contract_start_date: '',
+      contract_end_date: '',
+      free_days: '',
+      discount_percent: '',
+      contract_note: '',
     }],
     STORAGE_RATE_EXCEL_HEADERS,
     filename,
@@ -112,6 +134,10 @@ export async function parseStorageRateImportFile(file, lookupMap = new Map()) {
     const isActiveRaw = String(row.is_active ?? 'TRUE').trim().toUpperCase();
     const isActive = !['FALSE', '0', 'NO'].includes(isActiveRaw);
 
+    const minChargeAmountRaw = String(row.min_charge_amount ?? '').trim();
+    const freeDaysRaw = String(row.free_days ?? '').trim();
+    const discountPercentRaw = String(row.discount_percent ?? '').trim();
+
     parsed.push({
       customerProductId: match.id,
       serviceType,
@@ -120,6 +146,12 @@ export async function parseStorageRateImportFile(file, lookupMap = new Map()) {
       currency: String(row.currency ?? 'THB').trim() || 'THB',
       note: String(row.note ?? '').trim() || null,
       isActive,
+      minChargeAmount: minChargeAmountRaw !== '' ? Number(minChargeAmountRaw) : null,
+      contractStartDate: String(row.contract_start_date ?? '').trim() || null,
+      contractEndDate: String(row.contract_end_date ?? '').trim() || null,
+      freeDays: freeDaysRaw !== '' ? Number(freeDaysRaw) : null,
+      discountPercent: discountPercentRaw !== '' ? Number(discountPercentRaw) : null,
+      contractNote: String(row.contract_note ?? '').trim() || null,
     });
   });
 
