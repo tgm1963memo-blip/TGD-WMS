@@ -156,6 +156,27 @@ export async function getAllCustomerStockBalances(asOfDate = null) {
   return { data: rows, error: null };
 }
 
+// Per-product totals for deposit lines not yet counted in the stock balance
+// (status before RECEIVED_CONFIRMED/CUSTOMER_NOTIFIED) — powers the "รอรับ"
+// tile on the stock balance pages. See migration
+// 20260820100000_pending_deposit_withdrawal_totals.sql.
+export async function getPendingDepositTotals(customerId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId) return { data: [], error: null };
+
+  const { data, error } = await supabase.rpc('tgd_get_customer_pending_deposit_totals', {
+    p_customer_id: customerId,
+  });
+  return { data: error ? null : (data ?? []), error };
+}
+
+export async function getAllPendingDepositTotals() {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_get_all_customer_pending_deposit_totals');
+  return { data: error ? null : (data ?? []), error };
+}
+
 export async function getDepositInventoryLines(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
 

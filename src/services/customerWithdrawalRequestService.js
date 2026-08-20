@@ -381,6 +381,27 @@ export async function deleteCustomerWithdrawalRequestService(id) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Per-product totals for withdrawal lines already subtracted from the live
+// stock balance but not yet COMPLETED — powers the "รอเบิก" tile on the
+// stock balance pages. See migration
+// 20260820100000_pending_deposit_withdrawal_totals.sql.
+export async function getPendingWithdrawalTotals(customerId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!customerId) return { data: [], error: null };
+
+  const { data, error } = await supabase.rpc('tgd_get_customer_pending_withdrawal_totals', {
+    p_customer_id: customerId,
+  });
+  return { data: error ? null : (data ?? []), error };
+}
+
+export async function getAllPendingWithdrawalTotals() {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_get_all_customer_pending_withdrawal_totals');
+  return { data: error ? null : (data ?? []), error };
+}
+
 export async function submitCustomerWithdrawalRequest(requestId, comment = null) {
   if (!supabase) return missingSupabaseClientResult();
 

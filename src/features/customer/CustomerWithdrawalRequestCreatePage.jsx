@@ -18,7 +18,9 @@ import {
   submitCustomerWithdrawalRequest,
   listCustomerWithdrawalRequestServices,
   upsertCustomerWithdrawalRequestService,
+  deleteCustomerWithdrawalRequestService,
 } from '../../services/customerWithdrawalRequestService.js';
+import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import {
@@ -572,15 +574,25 @@ export function CustomerWithdrawalRequestCreatePage() {
       }
 
       for (const [rateId, selection] of Object.entries(selectedAuxServices)) {
-        if (!selection?.checked) continue;
-        const serviceResult = await upsertCustomerWithdrawalRequestService(requestId, {
-          id: selection.id ?? null,
-          serviceRateId: rateId,
-          quantity: selection.quantity ?? 1,
-        });
-        if (serviceResult.error) {
-          setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
-          return;
+        if (selection?.checked) {
+          const serviceResult = await upsertCustomerWithdrawalRequestService(requestId, {
+            id: selection.id ?? null,
+            serviceRateId: rateId,
+            quantity: selection.quantity ?? 1,
+          });
+          if (serviceResult.error) {
+            setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
+            return;
+          }
+        } else if (selection?.id) {
+          // Previously saved (has a real id) but unchecked since — remove it,
+          // otherwise it keeps existing (and being billed) despite the UI
+          // showing it unchecked.
+          const deleteResult = await deleteCustomerWithdrawalRequestService(selection.id);
+          if (deleteResult.error) {
+            setSubmitError(deleteResult.error.message ?? t('customer_portal_load_error'));
+            return;
+          }
         }
       }
 
@@ -692,7 +704,7 @@ export function CustomerWithdrawalRequestCreatePage() {
           />
         </div>
 
-        {auxServiceOptions.length > 0 && (
+        {canWriteCustomerRequestServices(profile?.role) && auxServiceOptions.length > 0 && (
           <div className="form-section" style={{ marginBottom: 16 }} data-testid="customer-withdrawal-aux-services-section">
             <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>บริการเสริม (ไม่ผูกกับน้ำหนักสินค้า)</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

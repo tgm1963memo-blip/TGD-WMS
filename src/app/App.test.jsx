@@ -62,6 +62,14 @@ vi.mock('../lib/supabaseClient.js', () => ({
 vi.mock('../services/customerDepositRequestService.js', () => ({
   listCustomerDepositRequests: vi.fn(async () => ({ data: [], error: null })),
   getAllCustomerStockBalances: vi.fn(async () => ({ data: [], error: null })),
+  getAllPendingDepositTotals: vi.fn(async () => ({ data: [], error: null })),
+  getPendingDepositTotals: vi.fn(async () => ({ data: [], error: null })),
+}));
+
+vi.mock('../services/customerWithdrawalRequestService.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getAllPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
+  getPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 vi.mock('../services/receivingService.js', () => ({

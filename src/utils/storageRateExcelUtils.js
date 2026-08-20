@@ -1,4 +1,4 @@
-import { downloadExcelRows, readExcelFile } from './excelFileUtils.js';
+import { downloadExcelRows, readExcelFile, formatExcelDate } from './excelFileUtils.js';
 
 export const STORAGE_RATE_EXCEL_HEADERS = [
   'customer_code',
@@ -147,8 +147,8 @@ export async function parseStorageRateImportFile(file, lookupMap = new Map()) {
       note: String(row.note ?? '').trim() || null,
       isActive,
       minChargeAmount: minChargeAmountRaw !== '' ? Number(minChargeAmountRaw) : null,
-      contractStartDate: String(row.contract_start_date ?? '').trim() || null,
-      contractEndDate: String(row.contract_end_date ?? '').trim() || null,
+      contractStartDate: formatExcelDate(row.contract_start_date) || null,
+      contractEndDate: formatExcelDate(row.contract_end_date) || null,
       freeDays: freeDaysRaw !== '' ? Number(freeDaysRaw) : null,
       discountPercent: discountPercentRaw !== '' ? Number(discountPercentRaw) : null,
       contractNote: String(row.contract_note ?? '').trim() || null,

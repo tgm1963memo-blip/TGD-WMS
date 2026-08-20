@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
-import { getAllCustomerStockBalances } from '../../services/customerDepositRequestService.js';
+import { getAllCustomerStockBalances, getAllPendingDepositTotals } from '../../services/customerDepositRequestService.js';
+import { getAllPendingWithdrawalTotals } from '../../services/customerWithdrawalRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
@@ -87,6 +88,13 @@ export function InventoryBalancePage() {
   // across customers).
   const [categoryMap, setCategoryMap] = useState(new Map());
   const [categoryOptions, setCategoryOptions] = useState([]);
+  // "รอรับ"/"รอเบิก" — deposit/withdrawal requests still in progress, keyed
+  // customerId::customer_product_code so they can be filtered the same way
+  // categoryMap already is. See migration
+  // 20260820100000_pending_deposit_withdrawal_totals.sql for exactly which
+  // statuses count as "pending" on each side.
+  const [pendingDeposits, setPendingDeposits] = useState([]);
+  const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
 
   useEffect(() => {
     getCustomers().then(({ data }) => setCustomers(data ?? []));
@@ -101,6 +109,8 @@ export function InventoryBalancePage() {
       setCategoryMap(map);
       setCategoryOptions([...categories].sort());
     });
+    getAllPendingDepositTotals().then(({ data }) => setPendingDeposits(data ?? []));
+    getAllPendingWithdrawalTotals().then(({ data }) => setPendingWithdrawals(data ?? []));
   }, []);
 
   useEffect(() => {
@@ -182,6 +192,25 @@ export function InventoryBalancePage() {
   const grandTotalWeight = customerGroups.reduce((s, g) => s + g.totalWeight, 0);
   const uniqueProducts = new Set(filtered.map((l) => l.customer_product_code ?? l.product_name)).size;
 
+  // Same customer/category filters as `filtered` above, applied to the
+  // pending totals — temperature is deliberately not applied here since a
+  // pending deposit line doesn't reliably have a confirmed temperature yet.
+  function filterPendingRows(rows) {
+    return rows.filter((r) => {
+      if (selectedCustomerId && r.customer_id !== selectedCustomerId) return false;
+      if (selectedCategory) {
+        const category = r.customer_product_code ? categoryMap.get(`${r.customer_id}::${r.customer_product_code}`) : null;
+        if (category !== selectedCategory) return false;
+      }
+      return true;
+    });
+  }
+
+  const pendingDepositBoxes = filterPendingRows(pendingDeposits).reduce((s, r) => s + Number(r.pending_boxes ?? 0), 0);
+  const pendingDepositWeight = filterPendingRows(pendingDeposits).reduce((s, r) => s + Number(r.pending_weight ?? 0), 0);
+  const pendingWithdrawalBoxes = filterPendingRows(pendingWithdrawals).reduce((s, r) => s + Number(r.pending_boxes ?? 0), 0);
+  const pendingWithdrawalWeight = filterPendingRows(pendingWithdrawals).reduce((s, r) => s + Number(r.pending_weight ?? 0), 0);
+
   function handleExportExcel() {
     const rows = filtered.map((line) => {
       const customer = customers.find((c) => c.id === line.request?.customer_id);
@@ -198,7 +227,7 @@ export function InventoryBalancePage() {
         title="ยอดคงเหลือสินค้า"
         description={asOfDate
           ? `ยอดคงเหลือ ณ วันที่ ${formatDate(asOfDate)} — สินค้าที่รับเข้าคลังและยืนยันแล้วภายในวันดังกล่าว หักการเบิกที่เสร็จสิ้นแล้วภายในวันดังกล่าว`
-          : 'สินค้าที่รับเข้าคลังแล้ว หักการเบิกที่ยืนยันแล้ว (เฉพาะรายการที่มียอดคงเหลือ)'}
+          : 'สินค้าที่รับเข้าคลังแล้ว หักคำขอเบิกที่ยังไม่ถูกยกเลิกทั้งหมดแล้ว (ไม่ใช่แค่ที่เบิกสำเร็จ — ดูคำอธิบายด้านล่างตาราง)'}
       />
 
       {/* Filters */}
@@ -291,6 +320,22 @@ export function InventoryBalancePage() {
           <StatCard label="ประเภทสินค้า" value={uniqueProducts} unit="รายการ" color="#8b5cf6" />
           <StatCard label="กล่องคงเหลือรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" color="#22c55e" />
           <StatCard label="น้ำหนักคงเหลือรวม" value={formatFixed2(grandTotalWeight)} unit="กก." color="#f59e0b" />
+          {!asOfDate && (
+            <>
+              <StatCard
+                label="รอรับเข้า"
+                value={pendingDepositBoxes.toLocaleString()}
+                unit={`กล่อง · ${formatFixed2(pendingDepositWeight)} กก.`}
+                color="#06b6d4"
+              />
+              <StatCard
+                label="รอเบิก (รวมอยู่ในยอดคงเหลือแล้ว)"
+                value={pendingWithdrawalBoxes.toLocaleString()}
+                unit={`กล่อง · ${formatFixed2(pendingWithdrawalWeight)} กก.`}
+                color="#ef4444"
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -449,9 +494,26 @@ export function InventoryBalancePage() {
             </div>
           ))}
 
-          <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
-            แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ — หักการเบิกสินค้าที่ยืนยันแล้ว)
-          </p>
+          <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px', lineHeight: 1.7 }}>
+            <p style={{ margin: 0 }}>แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ)</p>
+            {!asOfDate && (
+              <>
+                <p style={{ margin: 0 }}>
+                  ยอดคงเหลือด้านบนหักลบคำขอเบิกที่ยังไม่ถูกยกเลิกทั้งหมดแล้ว ไม่ใช่เฉพาะรายการที่เบิกสำเร็จ —
+                  รวมถึงคำขอที่ยังรออนุมัติ/กำลังจัดเตรียมด้วย เพื่อป้องกันการจัดสรรสินค้าเดียวกันซ้ำระหว่างที่มีคำขอเบิกพร้อมกันหลายใบ
+                </p>
+                <p style={{ margin: 0 }}>
+                  ตัวเลข "รอเบิก" ที่แสดงด้านบนคือส่วนหนึ่งของยอดคงเหลือนี้ที่ถูกจองไว้แล้ว ไม่ใช่ยอดที่จะถูกหักเพิ่มอีก
+                </p>
+                <p style={{ margin: 0 }}>
+                  ตัวเลข "รอรับเข้า" คือสินค้าที่แจ้งฝากแล้วแต่ยังไม่ยืนยันรับเข้าคลัง จึงยังไม่รวมอยู่ในยอดคงเหลือนี้
+                </p>
+                <p style={{ margin: 0 }}>
+                  ด้วยเหตุนี้ ตัวเลขหน้านี้จึงต่างจากรายงาน "การเคลื่อนไหว" ซึ่งนับเฉพาะรายการที่เสร็จสิ้น/ยืนยันแล้วเท่านั้น
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
 

@@ -116,6 +116,8 @@ vi.mock('../../src/services/customerDepositRequestService.js', () => ({
   })),
   listCustomerDepositRequestLines: vi.fn(async () => ({ data: [], error: null })),
   reviewCustomerDepositRequest: vi.fn(async () => ({ data: { status: 'ADMIN_REVIEWING' }, error: null })),
+  getPendingDepositTotals: vi.fn(async () => ({ data: [], error: null })),
+  getAllPendingDepositTotals: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
@@ -130,6 +132,8 @@ vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
   listCustomerWithdrawalRequestServices: vi.fn(async () => ({ data: [], error: null })),
   upsertCustomerWithdrawalRequestService: vi.fn(async () => ({ data: { id: 'wd-svc-1' }, error: null })),
   deleteCustomerWithdrawalRequestService: vi.fn(async () => ({ data: true, error: null })),
+  getPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
+  getAllPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 vi.mock('../../src/services/productServiceRatesService.js', () => ({

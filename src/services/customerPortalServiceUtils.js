@@ -35,3 +35,20 @@ export const CUSTOMER_REQUEST_PROXY_ROLES = Object.freeze([
 export function isCustomerRequestProxyRole(role) {
   return CUSTOMER_REQUEST_PROXY_ROLES.includes(String(role ?? '').trim().toLowerCase());
 }
+
+// Matches the RLS write-allow list on tgd_customer_deposit_request_services /
+// tgd_customer_withdrawal_request_services exactly (see
+// supabase/migrations/20260819080000_withdrawal_request_services.sql) --
+// deliberately NOT the same set as CUSTOMER_REQUEST_PROXY_ROLES, which
+// includes warehouse_staff (not allowed to write these) and excludes
+// accounting (which is allowed).
+export const CUSTOMER_REQUEST_SERVICE_WRITE_ROLES = Object.freeze([
+  'admin',
+  'accounting',
+  'warehouse_admin',
+  'warehouse_manager',
+]);
+
+export function canWriteCustomerRequestServices(role) {
+  return CUSTOMER_REQUEST_SERVICE_WRITE_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}

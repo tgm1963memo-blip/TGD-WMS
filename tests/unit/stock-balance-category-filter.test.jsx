@@ -14,6 +14,13 @@ const listCustomerProductsMock = vi.fn();
 vi.mock('../../src/services/customerDepositRequestService.js', () => ({
   getAllCustomerStockBalances: getAllCustomerStockBalancesMock,
   getCustomerStockBalance: getCustomerStockBalanceMock,
+  getAllPendingDepositTotals: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getPendingDepositTotals: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
+
+vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
+  getAllPendingWithdrawalTotals: vi.fn().mockResolvedValue({ data: [], error: null }),
+  getPendingWithdrawalTotals: vi.fn().mockResolvedValue({ data: [], error: null }),
 }));
 
 vi.mock('../../src/services/masterDataService.js', () => ({

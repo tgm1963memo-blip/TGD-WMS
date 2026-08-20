@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
-import { getCustomerStockBalance } from '../../services/customerDepositRequestService.js';
+import { getCustomerStockBalance, getPendingDepositTotals } from '../../services/customerDepositRequestService.js';
+import { getPendingWithdrawalTotals } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -54,6 +55,8 @@ export function CustomerStockBalancePage() {
   // so the map is keyed by code alone (no cross-customer collision risk).
   const [categoryMap, setCategoryMap] = useState(new Map());
   const [categoryOptions, setCategoryOptions] = useState([]);
+  const [pendingDeposits, setPendingDeposits] = useState([]);
+  const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +75,24 @@ export function CustomerStockBalancePage() {
 
     return () => { active = false; };
   }, [customerId, profileLoading, asOfDate]);
+
+  // "รอรับ"/"รอเบิก" — see migration
+  // 20260820100000_pending_deposit_withdrawal_totals.sql. Only meaningful
+  // for the live view (asOfDate handled by not calling this on that branch
+  // in the render below), so no need to re-fetch when asOfDate changes.
+  useEffect(() => {
+    if (!customerId) return undefined;
+    let active = true;
+    Promise.all([
+      getPendingDepositTotals(customerId),
+      getPendingWithdrawalTotals(customerId),
+    ]).then(([depositResult, withdrawalResult]) => {
+      if (!active) return;
+      setPendingDeposits(depositResult.data ?? []);
+      setPendingWithdrawals(withdrawalResult.data ?? []);
+    });
+    return () => { active = false; };
+  }, [customerId]);
 
   useEffect(() => {
     if (!customerId) return;
@@ -136,6 +157,17 @@ export function CustomerStockBalancePage() {
   const grandBoxes = productGroups.reduce((s, g) => s + g.totalBoxes, 0);
   const grandWeight = productGroups.reduce((s, g) => s + g.totalWeight, 0);
 
+  // Same category filter as `filtered` above — temperature isn't part of
+  // this page's filters at all, so no equivalent skip needed here.
+  function filterPendingRows(rows) {
+    if (!selectedCategory) return rows;
+    return rows.filter((r) => categoryMap.get(r.customer_product_code) === selectedCategory);
+  }
+  const pendingDepositBoxes = filterPendingRows(pendingDeposits).reduce((s, r) => s + Number(r.pending_boxes ?? 0), 0);
+  const pendingDepositWeight = filterPendingRows(pendingDeposits).reduce((s, r) => s + Number(r.pending_weight ?? 0), 0);
+  const pendingWithdrawalBoxes = filterPendingRows(pendingWithdrawals).reduce((s, r) => s + Number(r.pending_boxes ?? 0), 0);
+  const pendingWithdrawalWeight = filterPendingRows(pendingWithdrawals).reduce((s, r) => s + Number(r.pending_weight ?? 0), 0);
+
   if (profileLoading || loading) {
     return (
       <section className="page-shell customer-portal-page" data-testid="customer-stock-balance-page">
@@ -180,6 +212,18 @@ export function CustomerStockBalancePage() {
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>น้ำหนักคงเหลือรวม</div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{formatFixed2(grandWeight)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กก.</span></div>
             </div>
+            {!asOfDate && (
+              <>
+                <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #06b6d4' }}>
+                  <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>รอรับเข้า</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>{pendingDepositBoxes.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กล่อง · {formatFixed2(pendingDepositWeight)} กก.</span></div>
+                </div>
+                <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #ef4444' }}>
+                  <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>รอเบิก (รวมอยู่ในยอดคงเหลือแล้ว)</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>{pendingWithdrawalBoxes.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กล่อง · {formatFixed2(pendingWithdrawalWeight)} กก.</span></div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Search + expand */}
@@ -379,9 +423,26 @@ export function CustomerStockBalancePage() {
             })}
 
             {productGroups.length > 0 && (
-              <p style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px' }}>
-                แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ — หักการเบิกสินค้าแล้ว)
-              </p>
+              <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px', lineHeight: 1.7 }}>
+                <p style={{ margin: 0 }}>แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ)</p>
+                {!asOfDate && (
+                  <>
+                    <p style={{ margin: 0 }}>
+                      ยอดคงเหลือด้านบนหักลบคำขอเบิกที่ยังไม่ถูกยกเลิกทั้งหมดแล้ว ไม่ใช่เฉพาะรายการที่เบิกสำเร็จ —
+                      รวมถึงคำขอที่ยังรออนุมัติ/กำลังจัดเตรียมด้วย เพื่อป้องกันการจัดสรรสินค้าเดียวกันซ้ำระหว่างที่มีคำขอเบิกพร้อมกันหลายใบ
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      ตัวเลข "รอเบิก" ที่แสดงด้านบนคือส่วนหนึ่งของยอดคงเหลือนี้ที่ถูกจองไว้แล้ว ไม่ใช่ยอดที่จะถูกหักเพิ่มอีก
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      ตัวเลข "รอรับเข้า" คือสินค้าที่แจ้งฝากแล้วแต่ยังไม่ยืนยันรับเข้าคลัง จึงยังไม่รวมอยู่ในยอดคงเหลือนี้
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      ด้วยเหตุนี้ ตัวเลขหน้านี้จึงต่างจากรายงาน "การเคลื่อนไหว" ซึ่งนับเฉพาะรายการที่เสร็จสิ้น/ยืนยันแล้วเท่านั้น
+                    </p>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </>

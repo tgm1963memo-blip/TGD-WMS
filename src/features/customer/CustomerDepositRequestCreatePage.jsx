@@ -21,9 +21,11 @@ import {
   deleteCustomerDepositRequestLine,
   listCustomerDepositRequestServices,
   upsertCustomerDepositRequestService,
+  deleteCustomerDepositRequestService,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
+import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
 import {
   downloadCustomerDepositLineTemplate,
   exportCustomerDepositLinesExcel,
@@ -515,16 +517,27 @@ export function CustomerDepositRequestCreatePage() {
     }
 
     for (const [rateId, selection] of Object.entries(selectedAuxServices)) {
-      if (!selection?.checked) continue;
-      const serviceResult = await upsertCustomerDepositRequestService(requestId, {
-        id: selection.id ?? null,
-        serviceRateId: rateId,
-        quantity: selection.quantity ?? 1,
-      });
-      if (serviceResult.error) {
-        setSubmitting(false);
-        setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
-        return;
+      if (selection?.checked) {
+        const serviceResult = await upsertCustomerDepositRequestService(requestId, {
+          id: selection.id ?? null,
+          serviceRateId: rateId,
+          quantity: selection.quantity ?? 1,
+        });
+        if (serviceResult.error) {
+          setSubmitting(false);
+          setSubmitError(serviceResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
+      } else if (selection?.id) {
+        // Previously saved (has a real id) but unchecked since — remove it,
+        // otherwise it keeps existing (and being billed) despite the UI
+        // showing it unchecked.
+        const deleteResult = await deleteCustomerDepositRequestService(selection.id);
+        if (deleteResult.error) {
+          setSubmitting(false);
+          setSubmitError(deleteResult.error.message ?? t('customer_portal_load_error'));
+          return;
+        }
       }
     }
 
@@ -643,7 +656,7 @@ export function CustomerDepositRequestCreatePage() {
           />
         </div>
 
-        {auxServiceOptions.length > 0 && (
+        {canWriteCustomerRequestServices(profile?.role) && auxServiceOptions.length > 0 && (
           <div className="form-section" style={{ marginBottom: 16 }}>
             <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>บริการเสริม (ไม่ผูกกับน้ำหนักสินค้า)</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
