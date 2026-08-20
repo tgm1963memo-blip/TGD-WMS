@@ -14,10 +14,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 // making the movement ledger report overstate remaining stock relative to
 // "ยอดคงเหลือ" for the exact same data.
 
-const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
 vi.mock('../../src/services/supabaseClient.js', () => ({
-  supabase: { from: fromMock },
+  supabase: { from: fromMock, rpc: rpcMock },
 }));
 
 const {
@@ -73,16 +73,26 @@ describe('movement ledger report falls back to requested_boxes/requested_weight 
     fromMock.mockReset();
   });
 
-  it('getAuthoritativeBalanceTotals nets the requested_* fallback against the deposit line', async () => {
-    mockFromFor();
+  // getAuthoritativeBalanceTotals now calls the stock balance RPC directly
+  // instead of reimplementing its picked_*/requested_* fallback in JS — the
+  // RPC itself already applies that fallback server-side (see
+  // supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql).
+  // This test feeds a row already shaped the way that RPC would return it
+  // (received 100, balance 60 after the requested_* fallback withdrew 40)
+  // and asserts the "delivered" figure is correctly derived as
+  // received - remaining, not re-summed independently.
+  it('getAuthoritativeBalanceTotals derives delivered as received - remaining from the RPC row', async () => {
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({
+      data: [{ deposit_line_id: 'dl-1', lot_no: 'L1', tracking_code: 'TRK-1', customer_product_code: 'P1', temperature_type: 'FROZEN', received_boxes: 100, received_weight: 1000, balance_boxes: 60, balance_weight: 600 }],
+      error: null,
+    });
+
     const { data, error } = await getAuthoritativeBalanceTotals('cust-1');
 
     expect(error).toBeNull();
-    // received 100 - withdrawn 40 (from requested_boxes fallback) = 60
     expect(data.totalBoxes).toBe(60);
     expect(data.totalWeight).toBe(600);
-    // "delivered" is derived as received - remaining, so it reflects the
-    // requested_* fallback too, not zero.
     expect(data.totalDeliveredBoxes).toBe(40);
     expect(data.totalDeliveredWeight).toBe(400);
   });
@@ -166,27 +176,18 @@ describe('movement ledger report drops a box-depleted line entirely, matching th
     }],
   };
 
-  it('getAuthoritativeBalanceTotals excludes this line entirely once its box balance is 0', async () => {
-    fromMock.mockImplementation((name) => {
-      const chain = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        ilike: vi.fn(() => chain),
-        then: (resolve) => {
-          if (name === 'tgd_customer_deposit_requests') return resolve({ data: [zeroBoxDepositRow], error: null });
-          if (name === 'tgd_customer_withdrawal_requests') return resolve({ data: [fullyPickedWithdrawalRow], error: null });
-          return resolve({ data: [], error: null });
-        },
-      };
-      return chain;
-    });
+  // The RPC's own `WHERE GREATEST(0, received_boxes - withdrawn_boxes) > 0`
+  // clause (see the migration referenced above) already drops a box-depleted
+  // line from its result set entirely, weight included — this function never
+  // sees such a row at all, so it can't leak its leftover weight balance
+  // into the total the way the old JS reimplementation once did.
+  it('getAuthoritativeBalanceTotals totals 0 when the RPC has already excluded a box-depleted line', async () => {
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({ data: [], error: null });
 
     const { data, error } = await getAuthoritativeBalanceTotals('cust-1');
 
     expect(error).toBeNull();
-    // Box balance = 10 - 10 = 0 -> the whole line is excluded, so its
-    // leftover 40kg (100 - 60) weight balance must NOT leak into the total.
     expect(data.totalBoxes).toBe(0);
     expect(data.totalWeight).toBe(0);
   });

@@ -16,10 +16,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 // on a 2026-08-18 comparison). resolveDocumentConfirmedDates fixes this by
 // giving the ledger the exact same date-resolution priority as the RPC.
 
-const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
 vi.mock('../../src/services/supabaseClient.js', () => ({
-  supabase: { from: fromMock },
+  supabase: { from: fromMock, rpc: rpcMock },
 }));
 
 const {
@@ -206,47 +206,94 @@ describe('getConfirmedWithdrawalRows uses the actual completion date, not the pl
   });
 });
 
-describe('getAuthoritativeBalanceTotals(customerId, asOfDate) point-in-time snapshot', () => {
+// getAuthoritativeBalanceTotals now calls the real stock-balance RPC
+// directly (tgd_get_customer_stock_balance / tgd_get_all_customer_stock_
+// balances) instead of reimplementing the FIFO/exact-match algorithm a
+// second time in JS from raw deposit/withdrawal rows — that reimplementation
+// could only ever produce one customer-wide, all-temperature/all-product
+// total, which is why the report used to disable it (falling back to a
+// lot_no-grouped approximation) whenever any filter was active. That
+// fallback is PROVABLY WRONG whenever a lot spans multiple deposit lines/
+// tracking codes — confirmed real gap: OVO/FROZEN on 2026-08-20 showed
+// 34,172 boxes via the lot_no fallback vs. the RPC's correct 33,872. These
+// tests mock supabase.rpc(...) directly and assert rowFilters narrows the
+// RPC's own rows client-side, matching the balance page's own filtering.
+describe('getAuthoritativeBalanceTotals(customerId, asOfDate, rowFilters) — calls the real RPC directly', () => {
+  const RPC_ROWS = [
+    { deposit_line_id: 'dl-a', lot_no: 'LOT-1', tracking_code: 'TRK-A', customer_product_code: 'P1', temperature_type: 'FROZEN', received_boxes: 100, received_weight: 1000, balance_boxes: 40, balance_weight: 400 },
+    // Same lot_no as dl-a but a DIFFERENT tracking code/deposit line — the
+    // exact real-world case a lot_no-only grouping can't replicate, but the
+    // RPC (and therefore this filter) handles correctly per deposit line.
+    { deposit_line_id: 'dl-b', lot_no: 'LOT-1', tracking_code: 'TRK-B', customer_product_code: 'P1', temperature_type: 'FROZEN', received_boxes: 50, received_weight: 500, balance_boxes: 20, balance_weight: 200 },
+    { deposit_line_id: 'dl-c', lot_no: 'LOT-2', tracking_code: 'TRK-C', customer_product_code: 'P2', temperature_type: 'CHILLED', received_boxes: 30, received_weight: 300, balance_boxes: 30, balance_weight: 300 },
+  ];
+
   beforeEach(() => {
-    fromMock.mockReset();
+    rpcMock.mockReset();
   });
 
-  it('excludes a deposit confirmed after asOfDate', async () => {
-    mockFromWithTimeline({
-      depositRows: [LATE_CONFIRMED_DEPOSIT],
-      timelineEvents: [{ document_id: 'dep-late-1', created_at: '2026-08-19T09:00:00Z' }],
-    });
+  it('calls tgd_get_customer_stock_balance with customerId + asOfDate and sums all rows when no filter is given', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
 
-    const { data, error } = await getAuthoritativeBalanceTotals('cust-1', CUTOFF);
+    const { data, error } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20');
 
+    expect(rpcMock).toHaveBeenCalledWith('tgd_get_customer_stock_balance', { p_customer_id: 'cust-1', p_as_of_date: '2026-08-20' });
     expect(error).toBeNull();
-    expect(data.totalBoxes).toBe(0);
-    expect(data.totalWeight).toBe(0);
+    expect(data.totalBoxes).toBe(90);
+    expect(data.totalWeight).toBe(900);
   });
 
-  it('still includes it when asOfDate is omitted (live/all-time path unchanged)', async () => {
-    mockFromWithTimeline({
-      depositRows: [LATE_CONFIRMED_DEPOSIT],
-      timelineEvents: [{ document_id: 'dep-late-1', created_at: '2026-08-19T09:00:00Z' }],
-    });
+  it('calls tgd_get_all_customer_stock_balances when customerId is omitted', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
 
-    const { data, error } = await getAuthoritativeBalanceTotals('cust-1');
+    await getAuthoritativeBalanceTotals(null, '2026-08-20');
 
-    expect(error).toBeNull();
-    expect(data.totalBoxes).toBe(50);
-    expect(data.totalWeight).toBe(500);
+    expect(rpcMock).toHaveBeenCalledWith('tgd_get_all_customer_stock_balances', { p_as_of_date: '2026-08-20' });
   });
 
-  it('includes it once asOfDate reaches the real confirmation date', async () => {
-    mockFromWithTimeline({
-      depositRows: [LATE_CONFIRMED_DEPOSIT],
-      timelineEvents: [{ document_id: 'dep-late-1', created_at: '2026-08-19T09:00:00Z' }],
-    });
+  it('filters by temperatureType — the exact OVO/FROZEN/2026-08-20 scenario, matches the balance page even though a lot spans multiple tracking codes', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
 
-    const { data, error } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-19');
+    const { data, error } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { temperatureType: 'FROZEN' });
 
     expect(error).toBeNull();
-    expect(data.totalBoxes).toBe(50);
-    expect(data.totalWeight).toBe(500);
+    expect(data.totalBoxes).toBe(60); // dl-a (40) + dl-b (20), NOT the wrong lot_no-fallback total
+    expect(data.totalWeight).toBe(600);
+  });
+
+  it('filters by lotNo, summing across every deposit line/tracking code that shares the lot', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+
+    const { data } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { lotNo: 'LOT-1' });
+
+    expect(data.totalBoxes).toBe(60);
+    expect(data.totalWeight).toBe(600);
+  });
+
+  it('filters by trackingCode down to a single deposit line', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+
+    const { data } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { trackingCode: 'TRK-B' });
+
+    expect(data.totalBoxes).toBe(20);
+    expect(data.totalWeight).toBe(200);
+  });
+
+  it('filters by customerProductCode', async () => {
+    rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+
+    const { data } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { customerProductCode: 'P2' });
+
+    expect(data.totalBoxes).toBe(30);
+    expect(data.totalWeight).toBe(300);
+  });
+
+  it('propagates an RPC error instead of returning a fabricated total', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: new Error('rpc failed') });
+
+    const { data, error } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20');
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
   });
 });

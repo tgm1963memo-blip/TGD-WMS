@@ -40,12 +40,14 @@ function dayBefore(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
-// getAuthoritativeBalanceTotals now accepts an asOfDate and applies the same
-// timeline-event-gated point-in-time logic as the stock balance page's RPC,
-// so it's a valid stand-in for "this report's remaining total" at ANY
-// dateTo (including the past), as long as no product/lot/tracking-code/
-// location filter narrows the rows to a subset the all-time-per-customer
-// total wouldn't match.
+// getAuthoritativeBalanceTotals now accepts an asOfDate AND per-row filters
+// (temperatureType/customerProductCode/lotNo/trackingCode — all present on
+// every row the underlying RPC returns), so it stays a valid stand-in for
+// "this report's remaining total" even when those filters narrow the view.
+// Only filters that can't be expressed against the RPC's row shape (an
+// internal numeric product/location id, a warehouse/reference-type field the
+// RPC doesn't return, or a product-category that needs a separate catalog
+// join) still fall back to the old row-derived total.
 function canUseAuthoritativeTotals(committedFilters) {
   if (!committedFilters) return false;
   const hasProductFilter = Array.isArray(committedFilters.productId)
@@ -56,10 +58,6 @@ function canUseAuthoritativeTotals(committedFilters) {
     : Boolean(committedFilters.locationId);
   if (hasProductFilter || hasLocationFilter) return false;
   if (committedFilters.warehouseId || committedFilters.referenceType) return false;
-  if (committedFilters.trackingCode && committedFilters.trackingCode.trim()) return false;
-  if (committedFilters.lotNo && committedFilters.lotNo.trim()) return false;
-  if (committedFilters.productCode && committedFilters.productCode.trim()) return false;
-  if (committedFilters.temperatureType && (Array.isArray(committedFilters.temperatureType) ? committedFilters.temperatureType.length > 0 : true)) return false;
   if (committedFilters.productCategory && (Array.isArray(committedFilters.productCategory) ? committedFilters.productCategory.length > 0 : true)) return false;
   return true;
 }
@@ -292,7 +290,12 @@ export function MovementLedgerReportPage() {
       : Promise.resolve({ rows: [], error: null });
 
     const authoritativeFetch = canUseAuthoritativeTotals(committedFilters)
-      ? getAuthoritativeBalanceTotals(committedFilters.customerId || null, committedFilters.dateTo || null)
+      ? getAuthoritativeBalanceTotals(committedFilters.customerId || null, committedFilters.dateTo || null, {
+          temperatureType: committedFilters.temperatureType,
+          customerProductCode: committedFilters.productCode,
+          lotNo: committedFilters.lotNo,
+          trackingCode: committedFilters.trackingCode,
+        })
       : Promise.resolve({ data: null, error: null });
 
     Promise.all([

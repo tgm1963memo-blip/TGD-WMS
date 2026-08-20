@@ -68,155 +68,66 @@ export async function resolveDocumentConfirmedDates(documents, documentType, toS
   return result;
 }
 
-// The stock balance page's "remaining" figure (tgd_get_customer_stock_balance)
-// is an all-time snapshot — total ever received minus total ever withdrawn,
-// with no date scoping at all. For the movement ledger report's grand TOTAL
-// to agree with it exactly, the total has to be computed the same way: the
-// same per-deposit-line exact/tracking-code match plus FIFO lot-pool
-// distribution (see stockBalanceCalc.js), not re-derived from date-filtered
-// movement rows grouped by lot_no, which is a different (and looser)
-// approximation. customerId is optional — omit it for the all-customers
-// admin report.
-export async function getAuthoritativeBalanceTotals(customerId = null, asOfDate = null) {
+// The stock balance page's "remaining" figure is computed server-side by
+// tgd_get_customer_stock_balance / tgd_get_all_customer_stock_balances (the
+// same RPCs InventoryBalancePage.jsx and CustomerStockBalancePage.jsx call
+// directly) using a per-deposit-line exact/tracking-code match plus FIFO
+// lot-pool distribution. This function used to reimplement that same
+// algorithm a second time in JS from raw deposit/withdrawal rows — real
+// risk of drift, and it could only ever produce ONE customer-wide,
+// all-temperature/all-product total, which is why the report disabled it
+// entirely (falling back to a cruder lot_no-grouped approximation) the
+// moment ANY narrowing filter was active. Confirmed real gap: OVO/FROZEN on
+// 2026-08-20 showed 34,172 boxes via the lot_no fallback vs the RPC's
+// correct 33,872 — a lot spanning multiple tracking codes (deposit lines)
+// is exactly the case lot_no-only grouping can't replicate (see
+// stockBalanceCalc.js's FIFO pool logic for why).
+//
+// Calling the real RPC directly and filtering ITS rows client-side (same
+// fields InventoryBalancePage.jsx already filters by: temperature_type,
+// customer_product_code, lot_no, tracking_code) is both simpler and
+// strictly more correct than re-deriving the balance a second way — it's
+// the exact same numbers the balance page itself would show with the same
+// filters applied. customerId is optional — omit it for the all-customers
+// admin report. rowFilters narrows which of the RPC's per-lot rows count
+// toward the total, matching whichever of the report's own filters can be
+// expressed against that row shape.
+export async function getAuthoritativeBalanceTotals(customerId = null, asOfDate = null, rowFilters = {}) {
   if (!supabase) return { data: { totalBoxes: 0, totalWeight: 0 }, error: null };
 
-  let depositQuery = supabase
-    .from('tgd_customer_deposit_requests')
-    .select(`
-      id, customer_id, last_action_at, expected_arrival_date,
-      tgd_customer_deposit_request_lines(
-        id, line_no, lot_no, customer_product_code, tracking_code,
-        actual_boxes, actual_weight, expected_boxes, expected_weight
-      )
-    `)
-    .in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED']);
-  if (customerId) depositQuery = depositQuery.eq('customer_id', customerId);
+  const { data, error } = customerId
+    ? await supabase.rpc('tgd_get_customer_stock_balance', { p_customer_id: customerId, p_as_of_date: asOfDate || null })
+    : await supabase.rpc('tgd_get_all_customer_stock_balances', { p_as_of_date: asOfDate || null });
+  if (error) return { data: null, error };
 
-  let withdrawalQuery = supabase
-    .from('tgd_customer_withdrawal_requests')
-    .select(`
-      id, customer_id, last_action_at,
-      tgd_customer_withdrawal_request_lines(
-        source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
-        customer_product_code, picked_boxes, picked_weight, requested_boxes, requested_weight
-      )
-    `)
-    .eq('status', 'COMPLETED');
-  if (customerId) withdrawalQuery = withdrawalQuery.eq('customer_id', customerId);
-
-  const [depositResult, withdrawalResult] = await Promise.all([depositQuery, withdrawalQuery]);
-  if (depositResult.error) return { data: null, error: depositResult.error };
-  if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
-
-  // Point-in-time snapshot: exclude any request whose actual confirmed/
-  // completed date (per resolveDocumentConfirmedDates — timeline event
-  // first, last_action_at/expected_arrival_date fallback) falls after
-  // asOfDate, mirroring exactly what the stock balance RPC's as-of-date
-  // branch does. When asOfDate is null (the default, used everywhere this
-  // function was already called), this is a no-op and behavior is
-  // byte-for-byte unchanged from before.
-  let qualifyingDepositRequests = depositResult.data ?? [];
-  let qualifyingWithdrawalRequests = withdrawalResult.data ?? [];
-  if (asOfDate) {
-    const depositDocs = qualifyingDepositRequests.map((req) => ({
-      id: req.id,
-      fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : (req.expected_arrival_date ?? null),
-    }));
-    const withdrawalDocs = qualifyingWithdrawalRequests.map((req) => ({
-      id: req.id,
-      fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : null,
-    }));
-    const [confirmedDepositDateByReqId, confirmedWithdrawalDateByReqId] = await Promise.all([
-      resolveDocumentConfirmedDates(depositDocs, 'CUSTOMER_DEPOSIT_REQUEST', 'RECEIVED_CONFIRMED'),
-      resolveDocumentConfirmedDates(withdrawalDocs, 'CUSTOMER_WITHDRAWAL_REQUEST', 'COMPLETED'),
-    ]);
-    qualifyingDepositRequests = qualifyingDepositRequests.filter((req) => {
-      const d = confirmedDepositDateByReqId.get(req.id);
-      return d && d <= asOfDate;
-    });
-    qualifyingWithdrawalRequests = qualifyingWithdrawalRequests.filter((req) => {
-      const d = confirmedWithdrawalDateByReqId.get(req.id);
-      return d && d <= asOfDate;
-    });
+  let rows = data ?? [];
+  if (rowFilters.temperatureType) {
+    const wanted = Array.isArray(rowFilters.temperatureType) ? rowFilters.temperatureType : [rowFilters.temperatureType];
+    if (wanted.length > 0) rows = rows.filter((r) => wanted.includes(r.temperature_type));
+  }
+  if (rowFilters.customerProductCode) {
+    const needle = rowFilters.customerProductCode.trim().toLowerCase();
+    if (needle) rows = rows.filter((r) => (r.customer_product_code ?? '').toLowerCase().includes(needle));
+  }
+  if (rowFilters.lotNo) {
+    const needle = rowFilters.lotNo.trim().toLowerCase();
+    if (needle) rows = rows.filter((r) => (r.lot_no ?? '').toLowerCase().includes(needle));
+  }
+  if (rowFilters.trackingCode) {
+    const needle = rowFilters.trackingCode.trim().toLowerCase();
+    if (needle) rows = rows.filter((r) => (r.tracking_code ?? '').toLowerCase().includes(needle));
   }
 
-  const depositLines = [];
-  for (const req of qualifyingDepositRequests) {
-    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
-      depositLines.push({
-        id: line.id,
-        customer_id: req.customer_id,
-        lot_no: line.lot_no ?? '',
-        customer_product_code: line.customer_product_code ?? '',
-        line_no: line.line_no ?? 0,
-        tracking_code: line.tracking_code ?? null,
-        received_boxes: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
-        received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
-      });
-    }
-  }
-
-  const withdrawalLines = [];
-  for (const req of qualifyingWithdrawalRequests) {
-    for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
-      withdrawalLines.push({
-        customer_id: req.customer_id,
-        source_customer_deposit_request_line_id: line.source_customer_deposit_request_line_id ?? null,
-        tracking_code: line.tracking_code ?? null,
-        lot_no: line.lot_no ?? '',
-        source_lot_no: line.source_lot_no ?? null,
-        customer_product_code: line.customer_product_code ?? '',
-        // COMPLETED withdrawal lines can have only requested_* recorded (the
-        // handheld pick step allows a boxes-only or weight-only entry, and
-        // some are completed with neither ever filled in) — the RPC this
-        // must agree with falls back to requested_* for exactly this reason
-        // (supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql).
-        // Summing bare picked_boxes/picked_weight here undercounted what was
-        // actually withdrawn, making this total overstate remaining stock
-        // relative to the stock balance page.
-        picked_boxes: Number(line.picked_boxes ?? line.requested_boxes ?? 0),
-        picked_weight: Number(line.picked_weight ?? line.requested_weight ?? 0),
-      });
-    }
-  }
-
-  const balances = computeDepositLineBalances(depositLines, withdrawalLines);
-
-  // Mirrors the RPC's own WHERE clause exactly (both
-  // tgd_get_customer_stock_balance and tgd_get_all_customer_stock_balances,
-  // supabase/migrations/20260715090000_stock_balance_coalesce_picked_requested.sql):
-  // `WHERE GREATEST(0, received_boxes - withdrawn_boxes) > 0` — a deposit
-  // line whose box balance has hit exactly 0 is dropped from the RPC
-  // entirely, box AND weight both, even if that line's weight balance is
-  // still positive (e.g. picked_weight under-recorded for a withdrawal that
-  // otherwise fully covered the boxes). Summing every line's weight
-  // unconditionally here — while boxes already only ever add 0 for such a
-  // line — silently inflated this total's weight above the balance page's,
-  // with box counts matching exactly the whole time (that's what made this
-  // one hard to spot: only weight was ever wrong).
-  let totalBoxes = 0;
-  let totalWeight = 0;
-  for (const balance of balances.values()) {
-    if (balance.boxes <= 0) continue;
-    totalBoxes += balance.boxes;
-    totalWeight += balance.weight;
-  }
-
-  // Total ever received, over the same deposit lines the balance above was
-  // computed from. Defining "delivered" as receivedX - totalX (below) rather
-  // than as an independent sum of picked_boxes/picked_weight guarantees
-  // received - delivered == balance by construction, for any combination of
-  // exact/pool-matched withdrawals — including the edge case where a lot's
-  // recorded withdrawals exceed what it actually received (the balance
-  // floors at 0 for that lot, so the "delivered" side must likewise cap at
-  // what was received, not count the data-entry excess as a real delivery).
-  let totalReceivedBoxes = 0;
-  let totalReceivedWeight = 0;
-  for (const dl of depositLines) {
-    totalReceivedBoxes += dl.received_boxes;
-    totalReceivedWeight += dl.received_weight;
-  }
-
+  const totalBoxes = rows.reduce((s, r) => s + Number(r.balance_boxes ?? 0), 0);
+  const totalWeight = rows.reduce((s, r) => s + Number(r.balance_weight ?? 0), 0);
+  const totalReceivedBoxes = rows.reduce((s, r) => s + Number(r.received_boxes ?? 0), 0);
+  const totalReceivedWeight = rows.reduce((s, r) => s + Number(r.received_weight ?? 0), 0);
+  // Derived as received - balance (not summed from the RPC's own
+  // withdrawn_boxes/withdrawn_weight columns) so it stays consistent with
+  // balance_boxes/balance_weight, which the RPC already floors at 0 per lot
+  // — matching how a lot's leftover "phantom" withdrawal excess (recorded
+  // withdrawals exceeding what was received) must not read as a real
+  // delivery, the same principle the old JS reimplementation used.
   const totalDeliveredBoxes = totalReceivedBoxes - totalBoxes;
   const totalDeliveredWeight = totalReceivedWeight - totalWeight;
 

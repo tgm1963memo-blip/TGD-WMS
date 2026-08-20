@@ -55,7 +55,14 @@ describe('Sprint 6B movement ledger report foundation', () => {
     expect(source).toContain('unifiedMovementReadService.js');
     expect(source).toContain('getUnifiedMovementRows');
     expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
-    expect(source).not.toContain('.rpc(');
+    // getAuthoritativeBalanceTotals calls tgd_get_customer_stock_balance /
+    // tgd_get_all_customer_stock_balances directly — the same `stable`,
+    // read-only RPCs the stock balance page itself calls
+    // (InventoryBalancePage.jsx) — instead of reimplementing their FIFO/
+    // exact-match algorithm a second time in JS, so a bare `.rpc(` ban is no
+    // longer the right guard; forbiddenPostingTerms below still catches any
+    // actual posting/mutation RPC.
+    expect(source).not.toMatch(/\.rpc\(\s*['"]tgd_post_|\.rpc\(\s*['"]tgd_confirm_|\.rpc\(\s*['"]tgd_complete_|\.rpc\(\s*['"]tgd_create_adjustment/);
 
     forbiddenPostingTerms.forEach((term) => {
       expect(source).not.toContain(term);
