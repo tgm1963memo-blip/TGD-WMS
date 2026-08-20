@@ -340,8 +340,8 @@ export function InventoryMovementReportTemplate({
                       <td style={{ ...CELL, textAlign: 'right',  background: '#e8f5e9', fontSize: 8 }}>{fmtNum(data?.totalReceivedWeight ?? subTotalReceivedWt)}</td>
                       <td style={{ ...CELL, textAlign: 'center', background: '#fce4ec', fontSize: 8 }}>{fmtQty(data?.totalDelivery ?? subTotalDeliveryVol)}</td>
                       <td style={{ ...CELL, textAlign: 'right',  background: '#fce4ec', fontSize: 8 }}>{fmtNum(data?.totalDeliveryWeight ?? subTotalDeliveryWt)}</td>
-                      <td style={{ ...CELL, textAlign: 'center', background: '#fff9e6', fontSize: 8 }}>{fmtQty(data?.totalBalanceVolume)}</td>
-                      <td style={{ ...CELL, textAlign: 'right',  background: '#fff9e6', fontSize: 8 }}>{fmtNum(data?.totalBalanceWeight)}</td>
+                      <td data-testid="movement-ledger-total-balance-boxes" style={{ ...CELL, textAlign: 'center', background: '#fff9e6', fontSize: 8 }}>{fmtQty(data?.totalBalanceVolume)}</td>
+                      <td data-testid="movement-ledger-total-balance-weight" style={{ ...CELL, textAlign: 'right',  background: '#fff9e6', fontSize: 8 }}>{fmtNum(data?.totalBalanceWeight)}</td>
                       <td colSpan={2} style={CELL} />
                     </tr>
                     <tr>

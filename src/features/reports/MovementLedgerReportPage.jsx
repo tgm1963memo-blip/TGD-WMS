@@ -40,21 +40,14 @@ function dayBefore(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
-// The authoritative total is an all-time snapshot (same as the stock
-// balance page's RPC — it has no date parameter at all), and only scoped
-// by customer in getAuthoritativeBalanceTotals. It's only a valid stand-in
-// for "this report's remaining total" when:
-//  - the report's date range extends to today or has no upper bound (a
-//    report frozen at some point in the past has a genuinely different,
-//    smaller "remaining" than the current all-time balance), and
-//  - no product/lot/tracking-code/location filter narrows the rows to a
-//    subset the all-time-per-customer total wouldn't match.
+// getAuthoritativeBalanceTotals now accepts an asOfDate and applies the same
+// timeline-event-gated point-in-time logic as the stock balance page's RPC,
+// so it's a valid stand-in for "this report's remaining total" at ANY
+// dateTo (including the past), as long as no product/lot/tracking-code/
+// location filter narrows the rows to a subset the all-time-per-customer
+// total wouldn't match.
 function canUseAuthoritativeTotals(committedFilters) {
   if (!committedFilters) return false;
-  if (committedFilters.dateTo) {
-    const today = new Date().toISOString().slice(0, 10);
-    if (committedFilters.dateTo < today) return false;
-  }
   const hasProductFilter = Array.isArray(committedFilters.productId)
     ? committedFilters.productId.length > 0
     : Boolean(committedFilters.productId);
@@ -299,7 +292,7 @@ export function MovementLedgerReportPage() {
       : Promise.resolve({ rows: [], error: null });
 
     const authoritativeFetch = canUseAuthoritativeTotals(committedFilters)
-      ? getAuthoritativeBalanceTotals(committedFilters.customerId || null)
+      ? getAuthoritativeBalanceTotals(committedFilters.customerId || null, committedFilters.dateTo || null)
       : Promise.resolve({ data: null, error: null });
 
     Promise.all([
@@ -515,7 +508,9 @@ export function MovementLedgerReportPage() {
         {!committedFilters ? (
           <EmptyState message="รอการค้นหา" description="กรุณาเลือกช่วงเวลาและกด Search เพื่อดูข้อมูลรายการเคลื่อนไหว" />
         ) : (
-          <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} grouped={isGrouped} groupBy={groupBy} />
+          <div data-testid="movement-ledger-table">
+            <MovementLedgerTable data={displayRows} loading={state.loading} error={state.error} grouped={isGrouped} groupBy={groupBy} />
+          </div>
         )}
       </DashboardSection>
 

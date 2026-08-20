@@ -42,6 +42,7 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
   getMovementTypeBreakdown: (...args) => ledgerMocks.getMovementTypeBreakdown(...args),
   getConfirmedDepositReceiptRows: vi.fn(async () => ({ data: [], error: null })),
   getConfirmedWithdrawalRows: vi.fn(async () => ({ data: [], error: null })),
+  getAuthoritativeBalanceTotals: vi.fn(async () => ({ data: null, error: null })),
   summarizeMovements: (rows) => ({
     totalMovementRows: rows.length,
     totalInboundQty: 0,

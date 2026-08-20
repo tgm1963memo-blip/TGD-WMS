@@ -53,7 +53,11 @@ async function openLedgerWithBroadFilter(page, baseUrl) {
     await searchBtn.click();
   }
 
-  await page.waitForTimeout(3000);
+  // Wait for the actual loading state to clear rather than a fixed sleep —
+  // a broad date range now resolves each row's real confirmation date via
+  // tgd_customer_document_timeline_events (chunked queries), which can take
+  // longer than a fixed 3s wait for a window with many documents.
+  await page.getByText('Loading data...').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

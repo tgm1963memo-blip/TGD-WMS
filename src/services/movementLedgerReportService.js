@@ -9,6 +9,65 @@ function missingSupabaseClientResult() {
   };
 }
 
+// The stock balance RPC (tgd_get_customer_stock_balance /
+// tgd_get_all_customer_stock_balances) judges "received/withdrawn by date X"
+// using the document's actual status-transition timestamp from
+// tgd_customer_document_timeline_events, falling back to
+// last_action_at/expected_arrival_date ONLY when no such event exists at
+// all — never a customer-supplied planning date first. This report used to
+// classify rows by expected_arrival_date/requested_dispatch_date instead,
+// which let a document dated on/before a cutoff but not actually confirmed
+// until after it get counted on the wrong side of a past as-of-date/dateTo
+// comparison (confirmed real-world gap: +1,176 boxes / +10,868.67 kg on a
+// 2026-08-18 comparison against the balance page). This helper reproduces
+// the RPC's exact date-resolution priority so both the per-row functions
+// below and getAuthoritativeBalanceTotals agree with it.
+//
+// documents: [{ id, fallbackDate: string|null }]. Chunked the same way
+// billingRateEngineService.js's aux-service lookup is (a plain
+// `.in('document_id', [...hundreds of ids])` GET can exceed Kong/nginx's
+// ~8KB request-line limit and fail with a raw 414 — see that file's fix for
+// the same class of bug).
+const TIMELINE_EVENT_ID_CHUNK_SIZE = 150;
+
+export async function resolveDocumentConfirmedDates(documents, documentType, toStatus) {
+  const result = new Map();
+  if (!supabase || !documents || documents.length === 0) return result;
+
+  const ids = documents.map((d) => d.id).filter(Boolean);
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += TIMELINE_EVENT_ID_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + TIMELINE_EVENT_ID_CHUNK_SIZE));
+  }
+  // Chunks are independent reads — run them concurrently (capped at a fixed
+  // 150-id URL size each, same as before) rather than one-by-one, since a
+  // broad date range's document count can require several chunks and
+  // sequential round trips were adding real, noticeable latency to this
+  // report's load time.
+  const chunkResults = await Promise.all(chunks.map((chunk) => supabase
+    .from('tgd_customer_document_timeline_events')
+    .select('document_id, created_at')
+    .eq('document_type', documentType)
+    .eq('to_status', toStatus)
+    .in('document_id', chunk)));
+
+  const earliestEventDateByDocId = new Map();
+  for (const { data, error } of chunkResults) {
+    if (error) continue; // best-effort — affected docs fall through to fallbackDate below
+    for (const ev of (data ?? [])) {
+      const evDate = (ev.created_at ?? '').split('T')[0] || null;
+      if (!evDate) continue;
+      const existing = earliestEventDateByDocId.get(ev.document_id);
+      if (!existing || evDate < existing) earliestEventDateByDocId.set(ev.document_id, evDate);
+    }
+  }
+
+  for (const doc of documents) {
+    result.set(doc.id, earliestEventDateByDocId.get(doc.id) ?? doc.fallbackDate ?? null);
+  }
+  return result;
+}
+
 // The stock balance page's "remaining" figure (tgd_get_customer_stock_balance)
 // is an all-time snapshot — total ever received minus total ever withdrawn,
 // with no date scoping at all. For the movement ledger report's grand TOTAL
@@ -18,13 +77,13 @@ function missingSupabaseClientResult() {
 // movement rows grouped by lot_no, which is a different (and looser)
 // approximation. customerId is optional — omit it for the all-customers
 // admin report.
-export async function getAuthoritativeBalanceTotals(customerId = null) {
+export async function getAuthoritativeBalanceTotals(customerId = null, asOfDate = null) {
   if (!supabase) return { data: { totalBoxes: 0, totalWeight: 0 }, error: null };
 
   let depositQuery = supabase
     .from('tgd_customer_deposit_requests')
     .select(`
-      customer_id,
+      id, customer_id, last_action_at, expected_arrival_date,
       tgd_customer_deposit_request_lines(
         id, line_no, lot_no, customer_product_code, tracking_code,
         actual_boxes, actual_weight, expected_boxes, expected_weight
@@ -36,7 +95,7 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
   let withdrawalQuery = supabase
     .from('tgd_customer_withdrawal_requests')
     .select(`
-      customer_id,
+      id, customer_id, last_action_at,
       tgd_customer_withdrawal_request_lines(
         source_customer_deposit_request_line_id, tracking_code, lot_no, source_lot_no,
         customer_product_code, picked_boxes, picked_weight, requested_boxes, requested_weight
@@ -49,8 +108,40 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
   if (depositResult.error) return { data: null, error: depositResult.error };
   if (withdrawalResult.error) return { data: null, error: withdrawalResult.error };
 
+  // Point-in-time snapshot: exclude any request whose actual confirmed/
+  // completed date (per resolveDocumentConfirmedDates — timeline event
+  // first, last_action_at/expected_arrival_date fallback) falls after
+  // asOfDate, mirroring exactly what the stock balance RPC's as-of-date
+  // branch does. When asOfDate is null (the default, used everywhere this
+  // function was already called), this is a no-op and behavior is
+  // byte-for-byte unchanged from before.
+  let qualifyingDepositRequests = depositResult.data ?? [];
+  let qualifyingWithdrawalRequests = withdrawalResult.data ?? [];
+  if (asOfDate) {
+    const depositDocs = qualifyingDepositRequests.map((req) => ({
+      id: req.id,
+      fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : (req.expected_arrival_date ?? null),
+    }));
+    const withdrawalDocs = qualifyingWithdrawalRequests.map((req) => ({
+      id: req.id,
+      fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : null,
+    }));
+    const [confirmedDepositDateByReqId, confirmedWithdrawalDateByReqId] = await Promise.all([
+      resolveDocumentConfirmedDates(depositDocs, 'CUSTOMER_DEPOSIT_REQUEST', 'RECEIVED_CONFIRMED'),
+      resolveDocumentConfirmedDates(withdrawalDocs, 'CUSTOMER_WITHDRAWAL_REQUEST', 'COMPLETED'),
+    ]);
+    qualifyingDepositRequests = qualifyingDepositRequests.filter((req) => {
+      const d = confirmedDepositDateByReqId.get(req.id);
+      return d && d <= asOfDate;
+    });
+    qualifyingWithdrawalRequests = qualifyingWithdrawalRequests.filter((req) => {
+      const d = confirmedWithdrawalDateByReqId.get(req.id);
+      return d && d <= asOfDate;
+    });
+  }
+
   const depositLines = [];
-  for (const req of (depositResult.data ?? [])) {
+  for (const req of qualifyingDepositRequests) {
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
       depositLines.push({
         id: line.id,
@@ -66,7 +157,7 @@ export async function getAuthoritativeBalanceTotals(customerId = null) {
   }
 
   const withdrawalLines = [];
-  for (const req of (withdrawalResult.data ?? [])) {
+  for (const req of qualifyingWithdrawalRequests) {
     for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
       withdrawalLines.push({
         customer_id: req.customer_id,
@@ -486,16 +577,29 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const [skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }] = await Promise.all([
+  const [skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }, confirmedDateByReqId] = await Promise.all([
     getProductSkuMap(),
     getCatalogTemperatureMap(customerIds),
+    resolveDocumentConfirmedDates(
+      (data ?? []).map((req) => ({
+        id: req.id,
+        fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : (req.expected_arrival_date ?? null),
+      })),
+      'CUSTOMER_DEPOSIT_REQUEST',
+      'RECEIVED_CONFIRMED',
+    ),
   ]);
 
   const rows = [];
   for (const req of (data ?? [])) {
-    // Use expected_arrival_date (the document date) as the movement date,
-    // falling back to last_action_at if not available.
-    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? req.last_action_at.split('T')[0] : null);
+    // The document's actual RECEIVED_CONFIRMED transition date (from
+    // tgd_customer_document_timeline_events), falling back to
+    // last_action_at/expected_arrival_date only when no such event exists —
+    // matching the stock balance RPC's as-of-date logic exactly, NOT the
+    // customer's planning date (expected_arrival_date), which can predate
+    // the actual confirmation by days and previously let this report
+    // wrongly include a receipt as "by date X" before it truly happened.
+    const receiptDate = confirmedDateByReqId.get(req.id) ?? null;
 
     if (filters.dateFrom && receiptDate && receiptDate < filters.dateFrom) continue;
     if (filters.dateTo && receiptDate && receiptDate > filters.dateTo) continue;
@@ -736,14 +840,33 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const [inboundIndex, skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }] = await Promise.all([
+  const [inboundIndex, skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }, confirmedDateByReqId] = await Promise.all([
     getInboundTemperatureIndex(customerIds),
     getProductSkuMap(),
     getCatalogTemperatureMap(customerIds),
+    resolveDocumentConfirmedDates(
+      (data ?? []).map((req) => ({
+        id: req.id,
+        fallbackDate: req.last_action_at ? req.last_action_at.split('T')[0] : null,
+      })),
+      'CUSTOMER_WITHDRAWAL_REQUEST',
+      'COMPLETED',
+    ),
   ]);
 
   const rows = [];
   for (const req of (data ?? [])) {
+    // The document's actual COMPLETED transition date (from
+    // tgd_customer_document_timeline_events), falling back to
+    // last_action_at only when no such event exists — matching the stock
+    // balance RPC's as-of-date logic exactly (which falls back to
+    // wr.last_action_at at the request level, not a per-line picked_at, and
+    // never to requested_dispatch_date, a customer planning date that can
+    // predate actual completion by days).
+    const movementDate = confirmedDateByReqId.get(req.id) ?? null;
+    if (filters.dateFrom && movementDate && movementDate < filters.dateFrom) continue;
+    if (filters.dateTo && movementDate && movementDate > filters.dateTo) continue;
+
     // A COMPLETED withdrawal line can have only requested_boxes/
     // requested_weight recorded (the handheld pick step allows a boxes-only
     // or weight-only entry, and some lines are completed with neither
@@ -757,10 +880,6 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       .filter((l) => Number(l.picked_boxes ?? l.requested_boxes ?? 0) > 0 || Number(l.picked_weight ?? l.requested_weight ?? 0) > 0);
 
     for (const line of lines) {
-      const movementDate = req.requested_dispatch_date ?? ((line.picked_at ?? req.last_action_at ?? '').split('T')[0] || null);
-      if (filters.dateFrom && movementDate && movementDate < filters.dateFrom) continue;
-      if (filters.dateTo && movementDate && movementDate > filters.dateTo) continue;
-
       const boxes = Number(line.picked_boxes ?? line.requested_boxes ?? 0);
       const weight = Number(line.picked_weight ?? line.requested_weight ?? 0);
 
@@ -779,7 +898,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         movement_type: 'DISPATCH',
         movement_type_raw: 'CUSTOMER_WITHDRAWAL',
         movement_type_canonical: 'DISPATCH',
-        movement_date: req.requested_dispatch_date ?? line.picked_at ?? req.last_action_at,
+        movement_date: movementDate,
         customer_id: req.customer_id,
         product_id: resolvedProductId,
         lot_id: null,
