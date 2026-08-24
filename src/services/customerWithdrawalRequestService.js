@@ -55,6 +55,8 @@ const WITHDRAWAL_LINE_SELECT = [
   'note',
   'admin_note',
   'pack_entry_mode',
+  'entry_unit_code',
+  'entry_unit_qty',
   'picked_boxes',
   'picked_weight',
   'picked_at',
@@ -334,6 +336,8 @@ export async function upsertCustomerWithdrawalRequestLine(requestId, line = {}) 
     p_picking_rule: toNullableText(line.pickingRule) ?? 'FEFO',
     p_note: toNullableText(line.note),
     p_pack_entry_mode: toNullableText(line.packEntryMode),
+    p_entry_unit_code: toNullableText(line.entryUnitCode),
+    p_entry_unit_qty: toNullableNumber(line.entryUnitQty),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

@@ -2,9 +2,14 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import {
   applyPackFieldChange,
+  buildEntryUnitOptions,
   calcTotalWeightFromBoxes,
+  canDeriveUnitBoxes,
+  canDeriveUnitWeight,
+  convertUnitQtyToBoxesAndWeight,
   hasUnitWeight,
   PACK_ENTRY_MODES,
+  unitQtyRoundsToFractionalBoxes,
 } from '../../utils/customerDepositPackCalcUtils.js';
 
 export function CustomerDepositLinesTable({
@@ -30,6 +35,27 @@ export function CustomerDepositLinesTable({
       expectedWeight: line.expected_weight,
     });
     updateLine(line.key, patch);
+  }
+
+  // The mode dropdown's value can be BOXES, WEIGHT, or one of the product's
+  // own packaging units (e.g. CASE). Switching TO a unit clears whatever
+  // was previously in the box/weight fields (they become fully derived);
+  // switching AWAY from one clears the now-irrelevant unit qty.
+  function updateEntryUnitMode(line, mode) {
+    if (mode === PACK_ENTRY_MODES.BOXES || mode === PACK_ENTRY_MODES.WEIGHT) {
+      updateLine(line.key, { pack_entry_mode: mode, entry_unit_code: '', entry_unit_qty: '' });
+      return;
+    }
+    updateLine(line.key, { pack_entry_mode: mode, entry_unit_qty: '' });
+  }
+
+  function updateEntryUnitQty(line, unit, value) {
+    const { boxes, weight } = convertUnitQtyToBoxesAndWeight(value, unit, line.weight_per_box);
+    updateLine(line.key, {
+      entry_unit_qty: value,
+      expected_boxes: boxes,
+      expected_weight: weight,
+    });
   }
 
   function selectCatalogProduct(line, productId) {
@@ -63,6 +89,12 @@ export function CustomerDepositLinesTable({
       weight_per_box: weightPerBox,
       weight_from_master: hasPackWeight,
       expected_weight: expectedWeight,
+      // A different product may not offer the same packaging unit that was
+      // selected for the previous one -- fall back to plain BOXES entry
+      // rather than leaving a now-invalid unit code selected.
+      pack_entry_mode: PACK_ENTRY_MODES.BOXES,
+      entry_unit_code: '',
+      entry_unit_qty: '',
     });
   }
 
@@ -76,6 +108,7 @@ export function CustomerDepositLinesTable({
             <th>{t('customer_col_weight_per_box')} <span className="field-required">*</span></th>
             <th>การจัดเก็บ <span className="field-required">*</span></th>
             <th>{t('customer_col_pack_entry_mode')}</th>
+            <th>จำนวน (หน่วยที่เลือก)</th>
             <th>{t('customer_col_total_deposit_weight')} <span className="field-required">*</span></th>
             <th>{t('customer_col_box_count')} <span className="field-required">*</span></th>
             <th>เลข LOT</th>
@@ -93,6 +126,12 @@ export function CustomerDepositLinesTable({
             // and box count, so both fields must stay editable at the same time instead
             // of one being locked as the "derived" value.
             const canDeriveFromUnitWeight = hasUnitWeight(line.weight_per_box);
+            const selectedProduct = catalogProducts.find((p) => p.id === line.catalog_product_id);
+            const unitOptions = buildEntryUnitOptions(selectedProduct, line.weight_per_box);
+            const customUnits = unitOptions.filter((u) => u.unit_code !== 'BOXES');
+            const isCustomUnitMode = packMode !== PACK_ENTRY_MODES.BOXES && packMode !== PACK_ENTRY_MODES.WEIGHT;
+            const selectedUnit = isCustomUnitMode ? unitOptions.find((u) => u.unit_code === packMode) : null;
+            const fractionalBoxWarning = selectedUnit && unitQtyRoundsToFractionalBoxes(line.entry_unit_qty, selectedUnit);
             return (
               <tr data-testid={rowTestId} key={line.key}>
                 <td>{index + 1}</td>
@@ -142,18 +181,54 @@ export function CustomerDepositLinesTable({
                   <select
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-pack-entry-mode' : `${rowTestId}-pack-entry-mode`}
-                    onChange={(event) => updateLine(line.key, { pack_entry_mode: event.target.value })}
+                    onChange={(event) => updateEntryUnitMode(line, event.target.value)}
                     value={packMode}
                   >
                     <option value={PACK_ENTRY_MODES.BOXES}>{t('customer_pack_mode_boxes')}</option>
                     <option value={PACK_ENTRY_MODES.WEIGHT}>{t('customer_pack_mode_weight')}</option>
+                    {customUnits.map((u) => (
+                      <option key={u.unit_code} value={u.unit_code}>{u.unit_label}</option>
+                    ))}
                   </select>
+                </td>
+                <td>
+                  {isCustomUnitMode ? (
+                    <>
+                      <input
+                        className="form-control form-control-table"
+                        data-testid={index === 0 ? 'customer-deposit-entry-unit-qty' : `${rowTestId}-entry-unit-qty`}
+                        min="0"
+                        onChange={(event) => updateEntryUnitQty(line, selectedUnit, event.target.value)}
+                        placeholder={selectedUnit?.unit_label}
+                        step="0.01"
+                        type="number"
+                        value={line.entry_unit_qty ?? ''}
+                      />
+                      {fractionalBoxWarning && (
+                        <div style={{ color: 'var(--tgd-danger, #c0392b)', fontSize: 11, marginTop: 2 }}>
+                          จำนวนกล่องที่คำนวณได้ไม่ใช่จำนวนเต็ม กรุณาตรวจสอบ
+                        </div>
+                      )}
+                      {isCustomUnitMode && !canDeriveUnitWeight(selectedUnit, line.weight_per_box) && (
+                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
+                        </div>
+                      )}
+                      {isCustomUnitMode && !canDeriveUnitBoxes(selectedUnit, line.weight_per_box) && (
+                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="table-meta-text">-</span>
+                  )}
                 </td>
                 <td>
                   <input
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-total-weight' : `${rowTestId}-total-weight`}
-                    disabled={canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.BOXES}
+                    disabled={isCustomUnitMode ? canDeriveUnitWeight(selectedUnit, line.weight_per_box) : (canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.BOXES)}
                     min="0"
                     onChange={(event) => updatePackField(line, 'expected_weight', event.target.value)}
                     step="0.01"
@@ -165,7 +240,7 @@ export function CustomerDepositLinesTable({
                   <input
                     className="form-control form-control-table"
                     data-testid={index === 0 ? 'customer-deposit-box-count' : `${rowTestId}-box-count`}
-                    disabled={canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.WEIGHT}
+                    disabled={isCustomUnitMode ? canDeriveUnitBoxes(selectedUnit, line.weight_per_box) : (canDeriveFromUnitWeight && packMode === PACK_ENTRY_MODES.WEIGHT)}
                     min="1"
                     onChange={(event) => updatePackField(line, 'expected_boxes', event.target.value)}
                     type="number"

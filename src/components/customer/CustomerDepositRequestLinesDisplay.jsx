@@ -48,7 +48,14 @@ export function CustomerDepositRequestLinesDisplay({
               <td>{line.product_name ?? '-'}</td>
               <td>{formatRequestWeight(line.weight_per_box)}</td>
               <td>{formatRequestWeight(line.expected_weight)}</td>
-              <td>{line.expected_boxes ?? '-'}</td>
+              <td>
+                {line.expected_boxes ?? '-'}
+                {line.entry_unit_code && line.entry_unit_qty != null && (
+                  <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>
+                    ({line.entry_unit_qty} {line.entry_unit_code})
+                  </div>
+                )}
+              </td>
               {hasLot && <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.lot_no || '-'}</td>}
               <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
               {hasLot && <td style={{ whiteSpace: 'nowrap' }}>{formatDate(line.mfg_date)}</td>}

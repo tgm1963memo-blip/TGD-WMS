@@ -5,6 +5,15 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import { SearchableSelect } from '../common/SearchableSelect.jsx';
 import {
+  buildEntryUnitOptions,
+  calcBoxesFromTotalWeight,
+  calcTotalWeightFromBoxes,
+  canDeriveUnitBoxes,
+  canDeriveUnitWeight,
+  convertUnitQtyToBoxesAndWeight,
+  unitQtyRoundsToFractionalBoxes,
+} from '../../utils/customerDepositPackCalcUtils.js';
+import {
   NULL_LOT_SENTINEL,
   WITHDRAWAL_IDENTIFIER_TYPES,
   WITHDRAWAL_QTY_MODES,
@@ -86,6 +95,9 @@ export function CustomerWithdrawalLinesTable({
         exp_date: '',
         source_deposit_request_id: '',
         source_deposit_request_line_id: '',
+        withdrawal_qty_mode: WITHDRAWAL_QTY_MODES.WEIGHT,
+        entry_unit_code: '',
+        entry_unit_qty: '',
       });
       return;
     }
@@ -105,6 +117,28 @@ export function CustomerWithdrawalLinesTable({
       // Changing product invalidates any previously-pinned tracking code source.
       source_deposit_request_id: '',
       source_deposit_request_line_id: '',
+      // A different product may not offer the same packaging unit that was
+      // selected for the previous one -- fall back to plain WEIGHT entry.
+      withdrawal_qty_mode: WITHDRAWAL_QTY_MODES.WEIGHT,
+      entry_unit_code: '',
+      entry_unit_qty: '',
+    });
+  }
+
+  function updateEntryUnitMode(line, mode) {
+    if (mode === WITHDRAWAL_QTY_MODES.BOXES || mode === WITHDRAWAL_QTY_MODES.WEIGHT) {
+      updateLine(line.key, { withdrawal_qty_mode: mode, entry_unit_code: '', entry_unit_qty: '' });
+      return;
+    }
+    updateLine(line.key, { withdrawal_qty_mode: mode, entry_unit_qty: '' });
+  }
+
+  function updateEntryUnitQty(line, unit, weightPerBox, value) {
+    const { boxes, weight } = convertUnitQtyToBoxesAndWeight(value, unit, weightPerBox);
+    updateLine(line.key, {
+      entry_unit_qty: value,
+      requested_boxes: boxes,
+      requested_weight: weight,
     });
   }
 
@@ -265,6 +299,7 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 130, whiteSpace: 'nowrap' }}>วันผลิต</th>
             <th style={{ minWidth: 130, whiteSpace: 'nowrap' }}>วันหมดอายุ</th>
             <th style={{ minWidth: 110, whiteSpace: 'nowrap' }}>ระบุเป็น</th>
+            <th style={{ minWidth: 90, whiteSpace: 'nowrap' }}>จำนวน (หน่วยที่เลือก)</th>
             <th style={{ minWidth: 80, whiteSpace: 'nowrap' }}>กล่อง <span className="field-required">*</span></th>
             <th style={{ minWidth: 100, whiteSpace: 'nowrap' }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
             <th style={{ minWidth: 150 }}>หมายเหตุ</th>
@@ -330,8 +365,18 @@ export function CustomerWithdrawalLinesTable({
             const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, sourceDepositLines, lines);
 
             const qtyMode = line.withdrawal_qty_mode || WITHDRAWAL_QTY_MODES.WEIGHT;
-            const boxesDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.WEIGHT;
-            const weightDisabled = Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.BOXES;
+            const selectedProduct = catalogProducts.find((p) => p.id === line.catalog_product_id);
+            const unitOptions = buildEntryUnitOptions(selectedProduct, weightPerBox);
+            const customUnits = unitOptions.filter((u) => u.unit_code !== 'BOXES');
+            const isCustomUnitMode = qtyMode !== WITHDRAWAL_QTY_MODES.BOXES && qtyMode !== WITHDRAWAL_QTY_MODES.WEIGHT;
+            const selectedUnit = isCustomUnitMode ? unitOptions.find((u) => u.unit_code === qtyMode) : null;
+            const fractionalBoxWarning = selectedUnit && unitQtyRoundsToFractionalBoxes(line.entry_unit_qty, selectedUnit);
+            const boxesDisabled = isCustomUnitMode
+              ? canDeriveUnitBoxes(selectedUnit, weightPerBox)
+              : (Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.WEIGHT);
+            const weightDisabled = isCustomUnitMode
+              ? canDeriveUnitWeight(selectedUnit, weightPerBox)
+              : (Boolean(weightPerBox) && qtyMode === WITHDRAWAL_QTY_MODES.BOXES);
 
             return (
               <tr data-testid={rowTestId} key={line.key}>
@@ -449,11 +494,14 @@ export function CustomerWithdrawalLinesTable({
                   <select
                     className="form-control form-control-table"
                     data-testid={`${rowTestId}-qty-mode`}
-                    onChange={(e) => updateLine(line.key, { withdrawal_qty_mode: e.target.value })}
+                    onChange={(e) => updateEntryUnitMode(line, e.target.value)}
                     value={qtyMode}
                   >
                     <option value={WITHDRAWAL_QTY_MODES.WEIGHT}>ระบุน้ำหนัก</option>
                     <option value={WITHDRAWAL_QTY_MODES.BOXES}>ระบุกล่อง</option>
+                    {customUnits.map((u) => (
+                      <option key={u.unit_code} value={u.unit_code}>{u.unit_label}</option>
+                    ))}
                   </select>
                   {!weightPerBox && (
                     <div
@@ -462,6 +510,42 @@ export function CustomerWithdrawalLinesTable({
                     >
                       ⚠ ระบุทั้งสองค่า
                     </div>
+                  )}
+                </td>
+
+                {/* Packaging-unit quantity (e.g. "ลัง") -- only meaningful
+                    when a product-defined unit is the selected qty mode */}
+                <td>
+                  {isCustomUnitMode ? (
+                    <>
+                      <input
+                        className="form-control form-control-table"
+                        data-testid={`${rowTestId}-entry-unit-qty`}
+                        min="0"
+                        step="0.01"
+                        type="number"
+                        placeholder={selectedUnit?.unit_label}
+                        value={line.entry_unit_qty ?? ''}
+                        onChange={(e) => updateEntryUnitQty(line, selectedUnit, weightPerBox, e.target.value)}
+                      />
+                      {fractionalBoxWarning && (
+                        <div style={{ color: 'var(--tgd-danger, #c0392b)', fontSize: 11, marginTop: 2 }}>
+                          จำนวนกล่องที่คำนวณได้ไม่ใช่จำนวนเต็ม กรุณาตรวจสอบ
+                        </div>
+                      )}
+                      {!canDeriveUnitWeight(selectedUnit, weightPerBox) && (
+                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
+                        </div>
+                      )}
+                      {!canDeriveUnitBoxes(selectedUnit, weightPerBox) && (
+                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="table-meta-text">-</span>
                   )}
                 </td>
 
@@ -477,7 +561,7 @@ export function CustomerWithdrawalLinesTable({
                     value={line.requested_boxes}
                     onChange={(e) => {
                       const boxes = e.target.value;
-                      const weight = weightPerBox && boxes !== '' ? (Number(boxes) * weightPerBox).toFixed(2) : line.requested_weight;
+                      const weight = boxes !== '' ? calcTotalWeightFromBoxes(boxes, weightPerBox) || line.requested_weight : line.requested_weight;
                       updateLine(line.key, { requested_boxes: boxes, requested_weight: weight });
                     }}
                   />
@@ -501,7 +585,7 @@ export function CustomerWithdrawalLinesTable({
                     value={line.requested_weight}
                     onChange={(e) => {
                       const weight = e.target.value;
-                      const boxes = weightPerBox && weight !== '' ? Math.round(Number(weight) / weightPerBox).toString() : line.requested_boxes;
+                      const boxes = weight !== '' ? calcBoxesFromTotalWeight(weight, weightPerBox) || line.requested_boxes : line.requested_boxes;
                       updateLine(line.key, { requested_weight: weight, requested_boxes: boxes });
                     }}
                   />

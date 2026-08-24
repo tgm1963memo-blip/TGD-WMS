@@ -11,6 +11,7 @@ import {
   CUSTOMER_DEPOSIT_STATUSES,
   getDepositStatusLabel,
 } from '../../utils/customerDepositStatusLabels.js';
+import { PACK_ENTRY_MODES } from '../../utils/customerDepositPackCalcUtils.js';
 import {
   createCustomerDepositRequest,
   getCustomerDepositRequest,
@@ -223,7 +224,14 @@ export function CustomerDepositRequestCreatePage() {
             weight_from_master: weightFromMaster,
             expected_boxes: String(line.expected_boxes ?? ''),
             expected_weight: String(line.expected_weight ?? ''),
-            pack_entry_mode: line.pack_entry_mode ?? 'BOXES',
+            // The dropdown's "mode" is the packaging unit code when the
+            // line was originally entered that way (entry_unit_code), not
+            // just the raw BOXES/WEIGHT column -- restores what the
+            // customer actually picked instead of always falling back to
+            // BOXES on reload.
+            pack_entry_mode: line.entry_unit_code || line.pack_entry_mode || 'BOXES',
+            entry_unit_code: line.entry_unit_code ?? '',
+            entry_unit_qty: line.entry_unit_qty != null ? String(line.entry_unit_qty) : '',
             line_note: line.note ?? '',
             lot_no: line.lot_no ?? '',
             mfg_date: line.mfg_date ?? '',
@@ -480,6 +488,12 @@ export function CustomerDepositRequestCreatePage() {
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
+      // line.pack_entry_mode drives the dropdown UI and can hold a
+      // packaging-unit code (e.g. CASE) as well as BOXES/WEIGHT -- but the
+      // DB column only ever accepts BOXES/WEIGHT, so a unit-code selection
+      // is sent as BOXES (the precisely-known derived value) plus the
+      // actual unit + qty in the separate entry_unit_* columns for audit.
+      const isCustomUnitMode = line.pack_entry_mode !== PACK_ENTRY_MODES.BOXES && line.pack_entry_mode !== PACK_ENTRY_MODES.WEIGHT;
       const lineResult = await upsertCustomerDepositRequestLine(requestId, {
         lineId: line.lineId ?? null,
         lineNo: index + 1,
@@ -496,7 +510,9 @@ export function CustomerDepositRequestCreatePage() {
         mfgDate: line.mfg_date || null,
         expDate: line.exp_date || null,
         note: line.line_note,
-        packEntryMode: line.pack_entry_mode,
+        packEntryMode: isCustomUnitMode ? PACK_ENTRY_MODES.BOXES : line.pack_entry_mode,
+        entryUnitCode: isCustomUnitMode ? line.pack_entry_mode : null,
+        entryUnitQty: isCustomUnitMode ? line.entry_unit_qty : null,
       });
 
       if (lineResult.error) {

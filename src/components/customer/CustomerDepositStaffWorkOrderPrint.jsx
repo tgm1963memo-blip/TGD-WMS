@@ -292,7 +292,10 @@ function CustomerDepositStaffWorkOrderPrintPage({
                 </td>
                 <td style={TD_WRAP}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
                 {hasLocation && <td style={{ ...TD_WRAP, fontFamily: 'monospace' }}>{fmt(line.location?.location_code)}</td>}
-                <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtNum(line.expected_boxes)}</td>
+                <td style={{ ...TD_WRAP, textAlign: 'right' }}>
+                  {fmtNum(line.expected_boxes)}
+                  {line.entry_unit_code && line.entry_unit_qty != null ? ` (${line.entry_unit_qty} ${line.entry_unit_code})` : ''}
+                </td>
                 <td style={{ ...TD_WRAP, textAlign: 'right' }}>{fmtWeight(line.expected_weight)}</td>
                 {hasActual && (
                   <td style={{ ...TD_WRAP, textAlign: 'right', fontWeight: isModified ? 700 : 400, color: isModified ? '#b45309' : 'inherit' }}>

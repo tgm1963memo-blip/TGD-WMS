@@ -70,7 +70,9 @@ export function mapDepositLinesForCopy(sourceLines = [], catalogProducts = []) {
     weight_per_box: toFormValue(line.weight_per_box),
     expected_boxes: toFormValue(line.expected_boxes),
     expected_weight: toFormValue(line.expected_weight),
-    pack_entry_mode: line.pack_entry_mode ?? 'BOXES',
+    pack_entry_mode: line.entry_unit_code || line.pack_entry_mode || 'BOXES',
+    entry_unit_code: line.entry_unit_code ?? '',
+    entry_unit_qty: toFormValue(line.entry_unit_qty),
     line_note: line.note ?? '',
   }));
 
@@ -113,7 +115,9 @@ export function mapWithdrawalLinesForCopy(sourceLines = [], catalogProducts = []
     lot_no: line.source_lot_no ?? line.lot_no ?? '',
     mfg_date: line.mfg_date ?? '',
     exp_date: line.exp_date ?? '',
-    withdrawal_qty_mode: line.pack_entry_mode ?? (String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT'),
+    withdrawal_qty_mode: line.entry_unit_code || line.pack_entry_mode || (String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT'),
+    entry_unit_code: line.entry_unit_code ?? '',
+    entry_unit_qty: toFormValue(line.entry_unit_qty),
     requested_qty: toFormValue(line.requested_qty),
     requested_boxes: toFormValue(line.requested_boxes),
     requested_weight: toFormValue(line.requested_weight),

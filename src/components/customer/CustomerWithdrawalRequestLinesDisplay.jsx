@@ -42,7 +42,14 @@ export function CustomerWithdrawalRequestLinesDisplay({
               <td>{line.customer_product_code ?? '-'}</td>
               <td>{line.product_name ?? '-'}</td>
               <td>{line.requested_qty ?? '-'}</td>
-              <td>{line.requested_boxes ?? '-'}</td>
+              <td>
+                {line.requested_boxes ?? '-'}
+                {line.entry_unit_code && line.entry_unit_qty != null && (
+                  <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>
+                    ({line.entry_unit_qty} {line.entry_unit_code})
+                  </div>
+                )}
+              </td>
               <td>{formatRequestWeight(line.requested_weight)}</td>
               <td>{hasConfirmedBoxes ? line.picked_boxes : '-'}</td>
               <td>{hasConfirmedWeight ? formatRequestWeight(line.picked_weight) : '-'}</td>

@@ -13,6 +13,8 @@ export function createEmptyDepositLine(lineKey = 1) {
     expected_boxes: '',
     expected_weight: '',
     pack_entry_mode: PACK_ENTRY_MODES.BOXES,
+    entry_unit_code: '',
+    entry_unit_qty: '',
     line_note: '',
     temperature_type: 'FROZEN',
     lot_no: '',

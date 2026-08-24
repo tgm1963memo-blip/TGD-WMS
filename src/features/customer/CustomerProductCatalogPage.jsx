@@ -8,6 +8,11 @@ import {
   listCustomerProducts,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import {
+  deleteCustomerProductUnit,
+  upsertCustomerProductUnit,
+} from '../../services/customerProductUnitService.js';
+import { ProductUnitsEditor, saveProductUnits, unitsFromCatalogRow } from '../../components/customer/ProductUnitsEditor.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 
 const TEMPLATE_COLUMNS = [
@@ -98,6 +103,8 @@ const EMPTY_FORM = {
   allergen: '',
   productCategory: '',
   note: '',
+  units: [],
+  originalUnits: [],
 };
 
 const UOM_PRESETS = ['กก.', 'กล่อง', 'ถุง', 'ชิ้น', 'แพ็ค', 'โหล', 'ลัง'];
@@ -290,6 +297,12 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
             )}
           </div>
 
+          <ProductUnitsEditor
+            units={form.units}
+            onUnitsChange={(units) => onFieldChange('units', units)}
+            disabled={saving}
+          />
+
           <label className="form-field" style={{ margin: '0 0 12px' }}>
             <span>ประเภทสินค้า</span>
             <input
@@ -389,6 +402,8 @@ export function CustomerProductCatalogPage() {
       allergen: row.allergen ?? '',
       productCategory: row.product_category ?? '',
       note: row.note ?? '',
+      units: unitsFromCatalogRow(row),
+      originalUnits: row.units ?? [],
     });
     setFormError('');
     setSuccess('');
@@ -420,14 +435,24 @@ export function CustomerProductCatalogPage() {
       isActive: true,
     });
 
-    setSaving(false);
-
     if (result.error) {
+      setSaving(false);
       setFormError(result.error.message ?? 'บันทึกไม่สำเร็จ');
       return;
     }
 
-    setSuccess(form.productId ? 'แก้ไขสินค้าเรียบร้อย' : 'เพิ่มสินค้าเรียบร้อยแล้ว');
+    const productId = result.data?.id ?? form.productId;
+    const unitWarnings = await saveProductUnits({
+      units: form.units,
+      originalUnits: form.originalUnits,
+      productId,
+      upsertCustomerProductUnit,
+      deleteCustomerProductUnit,
+    });
+
+    setSaving(false);
+    const baseMessage = form.productId ? 'แก้ไขสินค้าเรียบร้อย' : 'เพิ่มสินค้าเรียบร้อยแล้ว';
+    setSuccess(unitWarnings.length ? `${baseMessage} (${unitWarnings.join(' | ')})` : baseMessage);
     setForm(null);
     await loadProducts();
   }

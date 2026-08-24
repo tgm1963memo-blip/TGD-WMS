@@ -231,7 +231,10 @@ export function CustomerDepositRequestPrintDocument({
               <td style={TD_SAFE}>{fmtWrap(line.product_name, 10)}</td>
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.weight_per_box ?? '-'}</td>
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
-              <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.expected_boxes ?? '-'}</td>
+              <td style={{ ...TD_SAFE, textAlign: 'center' }}>
+                {line.expected_boxes ?? '-'}
+                {line.entry_unit_code && line.entry_unit_qty != null ? ` (${line.entry_unit_qty} ${line.entry_unit_code})` : ''}
+              </td>
               <td style={TD_SAFE}>{getTemperatureTypeShortLabel(line.temperature_type)}</td>
               {hasLocation && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{fmtWrap(line.location?.location_code)}</td>}
               {hasLot && <td style={{ ...TD_SAFE, fontFamily: 'monospace' }}>{fmtWrap(line.lot_no)}</td>}

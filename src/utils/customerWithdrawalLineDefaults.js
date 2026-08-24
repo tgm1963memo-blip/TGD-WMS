@@ -24,6 +24,8 @@ export function createEmptyWithdrawalLine(lineKey = 1) {
     source_deposit_request_id: '',
     source_deposit_request_line_id: '',
     withdrawal_qty_mode: WITHDRAWAL_QTY_MODES.WEIGHT,
+    entry_unit_code: '',
+    entry_unit_qty: '',
     requested_qty: '',
     requested_boxes: '',
     requested_weight: '',

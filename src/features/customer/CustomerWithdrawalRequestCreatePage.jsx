@@ -219,7 +219,12 @@ export function CustomerWithdrawalRequestCreatePage() {
           lot_no: line.source_lot_no ?? line.lot_no ?? '',
           mfg_date: line.mfg_date ?? '',
           exp_date: line.exp_date ?? '',
-          withdrawal_qty_mode: line.pack_entry_mode ?? (String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT'),
+          // Restores the packaging-unit code (e.g. CASE) as the dropdown's
+          // mode when the line was originally entered that way, not just
+          // the raw BOXES/WEIGHT column -- same fix as the deposit page.
+          withdrawal_qty_mode: line.entry_unit_code || line.pack_entry_mode || (String(line.requested_boxes ?? '').trim() !== '' ? 'BOXES' : 'WEIGHT'),
+          entry_unit_code: line.entry_unit_code ?? '',
+          entry_unit_qty: line.entry_unit_qty != null ? String(line.entry_unit_qty) : '',
           requested_qty: String(line.requested_qty ?? ''),
           requested_boxes: String(line.requested_boxes ?? ''),
           requested_weight: String(line.requested_weight ?? ''),
@@ -538,6 +543,12 @@ export function CustomerWithdrawalRequestCreatePage() {
         const line = activeLines[index];
         const normalizedLot = normalizeLotNo(line.lot_no);
         const matchedDepositLine = getMatchedDepositLine(line, allDepositLines);
+        // line.withdrawal_qty_mode drives the dropdown UI and can hold a
+        // packaging-unit code (e.g. CASE) as well as BOXES/WEIGHT -- but the
+        // DB column only ever accepts BOXES/WEIGHT, so a unit-code
+        // selection is sent as WEIGHT (both values are already fully
+        // derived by then) plus the actual unit + qty separately for audit.
+        const isCustomUnitMode = line.withdrawal_qty_mode !== 'BOXES' && line.withdrawal_qty_mode !== 'WEIGHT';
         const lineResult = await upsertCustomerWithdrawalRequestLine(requestId, {
           lineId: isEditMode ? (line.lineId ?? null) : null,
           lineNo: index + 1,
@@ -556,7 +567,9 @@ export function CustomerWithdrawalRequestCreatePage() {
           requestedWeight: line.requested_weight,
           pickingRule: line.picking_rule,
           note: line.note,
-          packEntryMode: line.withdrawal_qty_mode,
+          packEntryMode: isCustomUnitMode ? 'WEIGHT' : line.withdrawal_qty_mode,
+          entryUnitCode: isCustomUnitMode ? line.withdrawal_qty_mode : null,
+          entryUnitQty: isCustomUnitMode ? line.entry_unit_qty : null,
         });
 
         if (lineResult.error) {

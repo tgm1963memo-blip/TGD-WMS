@@ -23,7 +23,19 @@ const CATALOG_SELECT = [
   'note',
   'created_at',
   'updated_at',
+  'tgd_customer_product_units(id, unit_code, unit_label, weight_per_unit_kg, boxes_per_unit, display_order, is_active, note)',
 ].join(', ');
+
+// Flattens the embedded tgd_customer_product_units join into a clean
+// `units` array (active-only, ordered) so callers never need to know about
+// the underlying join shape or table name.
+function shapeCatalogRow(row) {
+  const { tgd_customer_product_units: rawUnits, ...rest } = row;
+  const units = (rawUnits ?? [])
+    .filter((u) => u.is_active)
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+  return { ...rest, units };
+}
 
 export async function listCustomerProducts(filters = {}) {
   if (!supabase) return missingSupabaseClientResult();
@@ -40,7 +52,9 @@ export async function listCustomerProducts(filters = {}) {
     query = query.or(`customer_product_code.ilike.${term},product_name.ilike.${term}`);
   }
 
-  return query;
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+  return { data: (data ?? []).map(shapeCatalogRow), error: null };
 }
 
 export async function upsertCustomerProduct(payload = {}) {

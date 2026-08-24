@@ -10,6 +10,11 @@ import {
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
 import {
+  deleteCustomerProductUnit,
+  upsertCustomerProductUnit,
+} from '../../services/customerProductUnitService.js';
+import { ProductUnitsEditor, saveProductUnits, unitsFromCatalogRow } from '../../components/customer/ProductUnitsEditor.jsx';
+import {
   downloadCustomerProductTemplate,
   exportCustomerProductsExcel,
   parseCustomerProductImportFile,
@@ -34,6 +39,8 @@ const EMPTY_FORM = {
   allergen: '',
   productCategory: '',
   note: '',
+  units: [],
+  originalUnits: [],
 };
 
 const UOM_PRESETS = ['กก.', 'กล่อง', 'ถุง', 'ชิ้น', 'แพ็ค', 'โหล', 'ลัง'];
@@ -274,6 +281,12 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
             </div>
           </div>
 
+          <ProductUnitsEditor
+            units={form.units}
+            onUnitsChange={(units) => onFieldChange('units', units)}
+            disabled={saving}
+          />
+
           <label className="form-field" style={{ margin: '0 0 14px' }}>
             <span>ประเภทสินค้า</span>
             <input
@@ -378,6 +391,8 @@ export function CustomerProductCatalogAdminPage() {
       allergen: row.allergen ?? '',
       productCategory: row.product_category ?? '',
       note: row.note ?? '',
+      units: unitsFromCatalogRow(row),
+      originalUnits: row.units ?? [],
     });
     setFormError('');
     setSuccess('');
@@ -411,14 +426,23 @@ export function CustomerProductCatalogAdminPage() {
       isActive: true,
     });
 
-    setSaving(false);
-
     if (result.error) {
+      setSaving(false);
       setFormError(result.error.message ?? t('catalog_save_error'));
       return;
     }
 
-    setSuccess(t('catalog_save_success'));
+    const productId = result.data?.id ?? form.productId;
+    const unitWarnings = await saveProductUnits({
+      units: form.units,
+      originalUnits: form.originalUnits,
+      productId,
+      upsertCustomerProductUnit,
+      deleteCustomerProductUnit,
+    });
+
+    setSaving(false);
+    setSuccess(unitWarnings.length ? `${t('catalog_save_success')} (${unitWarnings.join(' | ')})` : t('catalog_save_success'));
     setForm(null);
     await loadProducts();
   }
