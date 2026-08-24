@@ -453,7 +453,7 @@ export function CustomerProductCatalogAdminPage() {
       let imported = 0;
       const rowErrors = [];
       for (const row of rows) {
-        const result = await upsertCustomerProduct({
+        const payload = {
           customerId: filterCustomerId,
           customerProductCode: row.customerProductCode,
           productName: row.productName,
@@ -466,7 +466,19 @@ export function CustomerProductCatalogAdminPage() {
           productCategory: row.productCategory,
           note: row.note,
           isActive: true,
-        });
+        };
+
+        // A large file means a long sequential run of RPC calls; a single
+        // transient network/timeout hiccup on one row used to silently leave
+        // that row's data stale (with everything else importing fine),
+        // easy to miss in a long combined error string. Retry a couple of
+        // times before giving up on a row.
+        let result = await upsertCustomerProduct(payload);
+        for (let attempt = 0; result.error && attempt < 2; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+          result = await upsertCustomerProduct(payload);
+        }
+
         if (result.error) {
           rowErrors.push(`${row.customerProductCode ?? '?'}: ${result.error.message ?? t('catalog_save_error')}`);
           continue;
@@ -475,7 +487,9 @@ export function CustomerProductCatalogAdminPage() {
       }
 
       if (imported) setSuccess(`${imported} ${t('excel_import_success')}`);
-      if (rowErrors.length) setError(rowErrors.join(' | '));
+      if (rowErrors.length) {
+        setError(`${rowErrors.length} ${t('catalog_import_row_failures')}: ${rowErrors.join(' | ')}`);
+      }
       await loadProducts();
     } catch (importError) {
       setError(importError.message ?? t('excel_import_error'));

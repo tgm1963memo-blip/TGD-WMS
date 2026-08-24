@@ -804,6 +804,7 @@ Object.assign(TRANSLATION_CATALOG, {
   catalog_col_charge_basis: { th: 'ฐานคิดค่าฝาก', en: 'Storage Charge Basis' },
   catalog_excel_tools: { th: 'นำเข้า/ส่งออก Excel', en: 'Excel import/export' },
   catalog_import_customer_required: { th: 'กรุณาเลือกลูกค้าก่อนนำเข้า Excel', en: 'Select a customer filter before importing Excel.' },
+  catalog_import_row_failures: { th: 'รายการนำเข้าไม่สำเร็จ (ลองใหม่อัตโนมัติแล้วยังไม่ผ่าน กรุณาตรวจสอบและนำเข้าไฟล์นี้ซ้ำอีกครั้ง)', en: 'rows failed to import (auto-retried but still failed — please review and re-import this file)' },
   excel_download_template: { th: 'ดาวน์โหลด Template', en: 'Download Template' },
   excel_export: { th: 'Export Excel', en: 'Export Excel' },
   excel_import: { th: 'Import Excel', en: 'Import Excel' },
