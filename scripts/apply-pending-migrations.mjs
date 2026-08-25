@@ -5,11 +5,21 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 
-// Previously applied: 053–089 (applied via earlier runs of this script)
-const MIGRATIONS = [
-  '090_fix_review_deposit_restore_behaviors.sql',
-  '091_add_admin_note_to_withdrawal_lines.sql',
-];
+// Previously applied: 053–091 (applied via earlier runs of this script).
+//
+// WARNING: 090_fix_review_deposit_restore_behaviors.sql recreates
+// tgd_review_customer_deposit_request from a snapshot that predates the
+// configurable-permission upgrade in supabase/migrations/
+// 20260708100008_tgd_wms_warehouse_admin_approval_permissions.sql (and the
+// unconfirmed-qty-guard / tracking-code-assignment additions in
+// supabase/migrations/20260810090000_require_confirmed_qty_before_completing_documents.sql).
+// Re-running it silently regresses all of that -- confirmed live on
+// 2026-08-24 (warehouse_admin lost the ability to review deposit requests
+// despite having the role permission configured) and corrected by
+// re-applying 20260810090000. Never add 090 back to this list; if this
+// script needs to run again, add ONLY genuinely new database/migrations/*.sql
+// files that don't shadow anything already superseded under supabase/migrations/.
+const MIGRATIONS = [];
 
 function runSql(sql, label) {
   const dir = mkdtempSync(path.join(tmpdir(), 'tgd-migration-'));
