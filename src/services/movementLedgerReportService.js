@@ -68,6 +68,38 @@ export async function resolveDocumentConfirmedDates(documents, documentType, toS
   return result;
 }
 
+// Resolves each RPC row's deposit_line_id down to that line's own
+// location_id/product_id (the real FK columns on
+// tgd_customer_deposit_request_lines — NOT tgd_customer_products'
+// internal_product_id, which the raw-row fallback filter never used either,
+// see the productCode/productId comment in MovementLedgerReportPage.jsx).
+// Chunked the same way resolveDocumentConfirmedDates is, for the same
+// URL-length reason.
+const DEPOSIT_LINE_ID_CHUNK_SIZE = 150;
+
+async function resolveDepositLineFields(depositLineIds) {
+  const result = new Map();
+  const ids = [...new Set((depositLineIds ?? []).filter(Boolean))];
+  if (!supabase || ids.length === 0) return result;
+
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += DEPOSIT_LINE_ID_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + DEPOSIT_LINE_ID_CHUNK_SIZE));
+  }
+  const chunkResults = await Promise.all(chunks.map((chunk) => supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, location_id, product_id')
+    .in('id', chunk)));
+
+  for (const { data, error } of chunkResults) {
+    if (error) continue; // best-effort — affected rows just won't match a location/product filter
+    for (const line of (data ?? [])) {
+      result.set(line.id, { locationId: line.location_id, productId: line.product_id });
+    }
+  }
+  return result;
+}
+
 // The stock balance page's "remaining" figure is computed server-side by
 // tgd_get_customer_stock_balance / tgd_get_all_customer_stock_balances (the
 // same RPCs InventoryBalancePage.jsx and CustomerStockBalancePage.jsx call
@@ -85,13 +117,16 @@ export async function resolveDocumentConfirmedDates(documents, documentType, toS
 //
 // Calling the real RPC directly and filtering ITS rows client-side (same
 // fields InventoryBalancePage.jsx already filters by: temperature_type,
-// customer_product_code, lot_no, tracking_code) is both simpler and
-// strictly more correct than re-deriving the balance a second way — it's
-// the exact same numbers the balance page itself would show with the same
-// filters applied. customerId is optional — omit it for the all-customers
-// admin report. rowFilters narrows which of the RPC's per-lot rows count
-// toward the total, matching whichever of the report's own filters can be
-// expressed against that row shape.
+// customer_product_code, lot_no, tracking_code — plus product_category via
+// the catalog and location_id/product_id via each row's own deposit line,
+// resolved below) is both simpler and strictly more correct than
+// re-deriving the balance a second way — it's the exact same numbers the
+// balance page itself would show with the same filters applied. customerId
+// is optional — omit it for the all-customers admin report. rowFilters
+// narrows which of the RPC's per-lot rows count toward the total, matching
+// whichever of the report's own filters can be expressed against this row
+// shape (warehouseId/referenceType still can't be — see
+// canUseAuthoritativeTotals in MovementLedgerReportPage.jsx for why).
 export async function getAuthoritativeBalanceTotals(customerId = null, asOfDate = null, rowFilters = {}) {
   if (!supabase) return { data: { totalBoxes: 0, totalWeight: 0 }, error: null };
 
@@ -116,6 +151,44 @@ export async function getAuthoritativeBalanceTotals(customerId = null, asOfDate 
   if (rowFilters.trackingCode) {
     const needle = rowFilters.trackingCode.trim().toLowerCase();
     if (needle) rows = rows.filter((r) => (r.tracking_code ?? '').toLowerCase().includes(needle));
+  }
+
+  // product_category lives on the catalog (tgd_customer_products), not on
+  // the RPC row itself — resolve via the same customerId::customer_product_code
+  // map InventoryBalancePage.jsx and getConfirmedDepositReceiptRows already
+  // build from that table, so this always agrees with what the balance page
+  // itself would show for the same category filter.
+  const wantedCategories = rowFilters.productCategory
+    ? (Array.isArray(rowFilters.productCategory) ? rowFilters.productCategory : [rowFilters.productCategory])
+    : [];
+  if (wantedCategories.length > 0) {
+    const customerIds = customerId ? [customerId] : [...new Set(rows.map((r) => r.customer_id).filter(Boolean))];
+    const { categoryMap } = await getCatalogTemperatureMap(customerIds);
+    rows = rows.filter((r) => {
+      const key = `${customerId ?? r.customer_id}::${r.customer_product_code}`;
+      return wantedCategories.includes(categoryMap.get(key) ?? '-');
+    });
+  }
+
+  // location_id/product_id live on the deposit line itself, not the RPC
+  // row — resolve via deposit_line_id (present on every RPC row) the same
+  // way the raw-row fallback filter matches a movement row's own
+  // location_id/product_id (not tgd_customer_products.internal_product_id,
+  // which the fallback never used either).
+  const wantedProductIds = rowFilters.productId
+    ? (Array.isArray(rowFilters.productId) ? rowFilters.productId : [rowFilters.productId])
+    : [];
+  const wantedLocationIds = rowFilters.locationId
+    ? (Array.isArray(rowFilters.locationId) ? rowFilters.locationId : [rowFilters.locationId])
+    : [];
+  if (wantedProductIds.length > 0 || wantedLocationIds.length > 0) {
+    const lineFieldsByDepositLineId = await resolveDepositLineFields(rows.map((r) => r.deposit_line_id));
+    if (wantedProductIds.length > 0) {
+      rows = rows.filter((r) => wantedProductIds.includes(lineFieldsByDepositLineId.get(r.deposit_line_id)?.productId));
+    }
+    if (wantedLocationIds.length > 0) {
+      rows = rows.filter((r) => wantedLocationIds.includes(lineFieldsByDepositLineId.get(r.deposit_line_id)?.locationId));
+    }
   }
 
   const totalBoxes = rows.reduce((s, r) => s + Number(r.balance_boxes ?? 0), 0);

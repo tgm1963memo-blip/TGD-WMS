@@ -296,4 +296,119 @@ describe('getAuthoritativeBalanceTotals(customerId, asOfDate, rowFilters) — ca
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(Error);
   });
+
+  // Real reported gap: TGM's balance page and movement ledger disagreed as
+  // of 2026-08-31 whenever a product_category filter (FG/RM) was active,
+  // because canUseAuthoritativeTotals used to bail out to the same wrong
+  // lot_no-grouped fallback for ANY of productCategory/productId/locationId
+  // — not just temperature/lot/tracking-code. These three fields aren't on
+  // the RPC row itself, so they're resolved via one extra lookup each
+  // (product_category from tgd_customer_products; product_id/location_id
+  // from each row's own tgd_customer_deposit_request_lines row, via
+  // deposit_line_id) before filtering.
+  describe('resolves productCategory/productId/locationId via one extra lookup each, then filters the same RPC rows', () => {
+    beforeEach(() => {
+      rpcMock.mockReset();
+      fromMock.mockReset();
+    });
+
+    it('filters by productCategory, matching the balance page even though a lot spans multiple deposit lines', async () => {
+      rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+      fromMock.mockImplementation((name) => {
+        if (name === 'tgd_customer_products') {
+          return makeChain({
+            result: {
+              data: [
+                { customer_id: 'cust-1', customer_product_code: 'P1', product_category: 'FG' },
+                { customer_id: 'cust-1', customer_product_code: 'P2', product_category: 'RM' },
+              ],
+              error: null,
+            },
+          });
+        }
+        return makeChain({ result: { data: [], error: null } });
+      });
+
+      const { data, error } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { productCategory: 'FG' });
+
+      expect(error).toBeNull();
+      expect(data.totalBoxes).toBe(60); // dl-a (40) + dl-b (20), both P1/FG — NOT dl-c (P2/RM)
+      expect(data.totalWeight).toBe(600);
+    });
+
+    it('filters by locationId, resolved from each row\'s own deposit line', async () => {
+      rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+      fromMock.mockImplementation((name) => {
+        if (name === 'tgd_customer_deposit_request_lines') {
+          return makeChain({
+            result: {
+              data: [
+                { id: 'dl-a', location_id: 'loc-1', product_id: 'prod-1' },
+                { id: 'dl-b', location_id: 'loc-2', product_id: 'prod-1' },
+                { id: 'dl-c', location_id: 'loc-1', product_id: 'prod-2' },
+              ],
+              error: null,
+            },
+          });
+        }
+        return makeChain({ result: { data: [], error: null } });
+      });
+
+      const { data } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { locationId: 'loc-1' });
+
+      expect(data.totalBoxes).toBe(70); // dl-a (40) + dl-c (30), NOT dl-b (loc-2)
+      expect(data.totalWeight).toBe(700);
+    });
+
+    it('filters by productId, resolved from each row\'s own deposit line', async () => {
+      rpcMock.mockResolvedValue({ data: RPC_ROWS, error: null });
+      fromMock.mockImplementation((name) => {
+        if (name === 'tgd_customer_deposit_request_lines') {
+          return makeChain({
+            result: {
+              data: [
+                { id: 'dl-a', location_id: 'loc-1', product_id: 'prod-1' },
+                { id: 'dl-b', location_id: 'loc-2', product_id: 'prod-1' },
+                { id: 'dl-c', location_id: 'loc-1', product_id: 'prod-2' },
+              ],
+              error: null,
+            },
+          });
+        }
+        return makeChain({ result: { data: [], error: null } });
+      });
+
+      const { data } = await getAuthoritativeBalanceTotals('cust-1', '2026-08-20', { productId: 'prod-1' });
+
+      expect(data.totalBoxes).toBe(60); // dl-a (40) + dl-b (20), NOT dl-c (prod-2)
+      expect(data.totalWeight).toBe(600);
+    });
+
+    it('combines productCategory with the all-customers path (customerId omitted), keyed per-row via r.customer_id', async () => {
+      const rowsAcrossCustomers = [
+        { deposit_line_id: 'dl-x', customer_id: 'cust-1', lot_no: 'L1', tracking_code: 'T1', customer_product_code: 'P1', balance_boxes: 10, balance_weight: 100 },
+        { deposit_line_id: 'dl-y', customer_id: 'cust-2', lot_no: 'L2', tracking_code: 'T2', customer_product_code: 'P1', balance_boxes: 20, balance_weight: 200 },
+      ];
+      rpcMock.mockResolvedValue({ data: rowsAcrossCustomers, error: null });
+      fromMock.mockImplementation((name) => {
+        if (name === 'tgd_customer_products') {
+          return makeChain({
+            result: {
+              data: [
+                { customer_id: 'cust-1', customer_product_code: 'P1', product_category: 'FG' },
+                { customer_id: 'cust-2', customer_product_code: 'P1', product_category: 'RM' },
+              ],
+              error: null,
+            },
+          });
+        }
+        return makeChain({ result: { data: [], error: null } });
+      });
+
+      const { data } = await getAuthoritativeBalanceTotals(null, '2026-08-20', { productCategory: 'FG' });
+
+      expect(data.totalBoxes).toBe(10); // only cust-1's row is FG
+      expect(data.totalWeight).toBe(100);
+    });
+  });
 });

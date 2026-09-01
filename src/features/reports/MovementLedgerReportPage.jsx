@@ -40,25 +40,21 @@ function dayBefore(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
-// getAuthoritativeBalanceTotals now accepts an asOfDate AND per-row filters
-// (temperatureType/customerProductCode/lotNo/trackingCode — all present on
-// every row the underlying RPC returns), so it stays a valid stand-in for
-// "this report's remaining total" even when those filters narrow the view.
-// Only filters that can't be expressed against the RPC's row shape (an
-// internal numeric product/location id, a warehouse/reference-type field the
-// RPC doesn't return, or a product-category that needs a separate catalog
-// join) still fall back to the old row-derived total.
+// getAuthoritativeBalanceTotals accepts an asOfDate AND per-row filters
+// (temperatureType/customerProductCode/lotNo/trackingCode/productCategory/
+// productId/locationId), resolving whichever of these aren't directly on
+// the RPC's own row shape via one extra lookup each (product_category via
+// the catalog; product_id/location_id via each row's own deposit line) — so
+// it stays a valid stand-in for "this report's remaining total" for every
+// filter except the two below, which the RPC's row shape has no way to
+// answer at all:
+//   - warehouseId: the RPC has no warehouse dimension in its balance rows
+//     (this is a single-deposit-line, not a per-warehouse, aggregation).
+//   - referenceType: a property of individual movement transactions, not
+//     meaningful against a point-in-time remaining-balance row.
 function canUseAuthoritativeTotals(committedFilters) {
   if (!committedFilters) return false;
-  const hasProductFilter = Array.isArray(committedFilters.productId)
-    ? committedFilters.productId.length > 0
-    : Boolean(committedFilters.productId);
-  const hasLocationFilter = Array.isArray(committedFilters.locationId)
-    ? committedFilters.locationId.length > 0
-    : Boolean(committedFilters.locationId);
-  if (hasProductFilter || hasLocationFilter) return false;
   if (committedFilters.warehouseId || committedFilters.referenceType) return false;
-  if (committedFilters.productCategory && (Array.isArray(committedFilters.productCategory) ? committedFilters.productCategory.length > 0 : true)) return false;
   return true;
 }
 
@@ -295,6 +291,9 @@ export function MovementLedgerReportPage() {
           customerProductCode: committedFilters.productCode,
           lotNo: committedFilters.lotNo,
           trackingCode: committedFilters.trackingCode,
+          productCategory: committedFilters.productCategory,
+          productId: committedFilters.productId,
+          locationId: committedFilters.locationId,
         })
       : Promise.resolve({ data: null, error: null });
 
