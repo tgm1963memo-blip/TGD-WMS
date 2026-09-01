@@ -445,10 +445,18 @@ export function printSticker({
 }
 
 // items: [{ depositDate, productName, quantityLabel, locationCode, trackingCode }]
-// Prints every item as its own page in ONE print job/popup, in the order
-// given — used for "print stickers for selected lines" bulk actions.
+// Prints every item as its own page in ONE print job/popup. Sorted by
+// trackingCode (e.g. "FR260815038", "FF260901002") before printing so
+// stickers group by their temperature-type prefix (FF, FR, FZ, CH, AM —
+// see tgd_generate_deposit_line_tracking_code) instead of interleaving in
+// whatever order the source table's rows happened to be in — otherwise a
+// deposit with rows added in mixed temperature order prints an alternating
+// stack that's tedious to sort/stack by hand afterward.
 export function printStickers(items = []) {
   if (!items.length) return;
-  const html = stickerDocumentHtml(items.map((item) => renderStickerPageHtml(item)).join('\n'), items.length);
-  openAndPrintHtml(html, items.length);
+  const sorted = [...items].sort((a, b) =>
+    String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')),
+  );
+  const html = stickerDocumentHtml(sorted.map((item) => renderStickerPageHtml(item)).join('\n'), sorted.length);
+  openAndPrintHtml(html, sorted.length);
 }
