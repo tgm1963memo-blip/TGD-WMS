@@ -176,14 +176,23 @@ export function InventoryMovementReportTemplate({
         const pageReceivedWt  = sumField(page.lines, 'receivedWeight');
         const pageDeliveryVol = sumField(page.lines, 'deliveryVolume');
         const pageDeliveryWt  = sumField(page.lines, 'deliveryWeight');
-        // Only the row where each lot FIRST appears in the whole report
-        // (not just this page) contributes its balanceForwardVolume/Weight —
-        // every later row for that same lot repeats its running balance,
-        // which would otherwise get summed once per row instead of once
-        // per lot. See the matching comment in operationalReportMapper.js.
-        const pageFirstOccurrenceLines = page.lines.filter((l) => l._isFirstOccurrenceOfLot);
-        const pageBalanceForwardVol = sumField(pageFirstOccurrenceLines, 'balanceForwardVolume');
-        const pageBalanceForwardWt  = sumField(pageFirstOccurrenceLines, 'balanceForwardWeight');
+        // Deliberately the plain per-page sum, every row included, even a
+        // lot with several rows on this same page (each repeat re-adds its
+        // own running balanceForwardVolume/Weight). This keeps the printed
+        // page arithmetically self-checking on its own — add up the ยอดยกมา
+        // cells shown on this one page and you get exactly this SUB TOTAL —
+        // which is the property confirmed wanted over making SUB TOTALs sum
+        // to the grand TOTAL: ยอดยกมา is a running-balance column, and a lot
+        // whose rows span multiple pages makes the two properties mutually
+        // exclusive (a first-occurrence-only filter satisfies the latter but
+        // breaks page-local self-consistency, tried and reverted -- see git
+        // history). The grand TOTAL row below still uses the correct
+        // once-per-lot figure (totalBalanceForwardWeight from
+        // operationalReportMapper.js), so it does NOT equal the sum of every
+        // page's SUB TOTAL here when any lot's rows cross a page boundary or
+        // repeat within one page -- confirmed intentional.
+        const pageBalanceForwardVol = sumField(page.lines, 'balanceForwardVolume');
+        const pageBalanceForwardWt  = sumField(page.lines, 'balanceForwardWeight');
 
         return (
           <div

@@ -92,8 +92,6 @@ describe('รับเข้า/จ่ายออก stay period-scoped even wh
     expect(pdf.totalReceivedWeight).toBe(500);
     expect(pdf.totalDeliveryWeight).toBe(1200);
     expect(pdf.totalBalanceWeight).toBe(300);
-    // The core identity this bug broke: opening + received - delivered = closing.
-    expect(pdf.totalBalanceForwardWeight + pdf.totalReceivedWeight - pdf.totalDeliveryWeight).toBe(pdf.totalBalanceWeight);
 
     const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, 'productLot', authoritativeTotals);
     const totalRow = excelRows[excelRows.length - 1];
@@ -103,24 +101,57 @@ describe('รับเข้า/จ่ายออก stay period-scoped even wh
   });
 });
 
-// Second real gap found while fixing the one above: after routing รับเข้า/
-// จ่ายออก back to period-scoped sums, ยอดยกมา was STILL wrong on a real
-// report -- undercounted by the exact weight of every lot that had an
-// opening balance but ZERO movement rows within the period (received
-// earlier, never touched again this month, just sitting in storage). Such
-// a lot never gets a lotBalances entry (built only by walking this
-// period's own mappedLines), so totalBalanceForwardVol/Wt's
-// `Object.keys(lotBalances)`-scoped sum silently dropped its
-// openingBalances contribution -- while คงเหลือ (via authoritativeTotals,
-// which scans every lot's current balance regardless of activity) still
-// included it, breaking ยอดยกมา+รับเข้า-จ่ายออก=คงเหลือ all over again from a
-// different column.
-describe('ยอดยกมา includes a lot with an opening balance but zero movement this period', () => {
-  it('counts an untouched lot in ยอดยกมา, not just lots that also moved this period', () => {
+// ยอดยกมา's TOTAL is deliberately the plain sum of every printed row's own
+// balanceForwardVolume/Weight -- NOT each distinct lot's true opening
+// balance counted once. Confirmed wanted this way (reversing an earlier
+// attempt at this session that counted each lot once): the printed report's
+// per-page SUB TOTAL ยอดยกมา is itself a plain per-page row sum (so it's
+// verifiable by adding up exactly what's printed on that one page), and the
+// grand TOTAL must equal the sum of every page's own SUB TOTAL exactly.
+// Both properties hold together only because pagination is a pure partition
+// of the same rows with nothing dropped or duplicated -- so summing every
+// row once here is mathematically identical to summing every page's own
+// row-sum. The trade-off, confirmed accepted: a lot with more than one row
+// in the period contributes its running balance once per row (not once
+// total), so ยอดยกมา no longer represents true non-duplicated opening stock,
+// and it will NOT generally satisfy ยอดยกมา+รับเข้า-จ่ายออก=คงเหลือ once any
+// lot has repeat rows -- same reason a lot with ZERO rows in the period
+// (sitting untouched, never printed at all) can no longer contribute to
+// ยอดยกมา either, since it's not part of any page's row sum.
+describe('ยอดยกมา TOTAL is the plain sum of every printed row, matching what page SUB TOTALs would sum to', () => {
+  it('counts a lot with several rows once per row, not once per lot', () => {
     const openingBalances = new Map([
-      // LOTA: carried in from before this period and moved (dispatched) during it.
+      ['|P1|lot:LOTA', { qty: 20, weight: 200 }],
+    ]);
+    const rows = [
+      // LOTA: carried in, then drawn down over three separate dispatch events
+      // -- each row repeats LOTA's own running balanceForwardWeight.
+      { id: 'a1', movement_type: 'DISPATCH', movement_date: '2026-08-05', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
+      { id: 'a2', movement_type: 'DISPATCH', movement_date: '2026-08-10', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
+      { id: 'a3', movement_type: 'DISPATCH', movement_date: '2026-08-15', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
+    ];
+
+    const pdf = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot', openingBalances });
+
+    // Row 1: balance forward 200 (LOTA's opening). Row 2: 150 (200-50).
+    // Row 3: 100 (150-50). Summed once per row: 200+150+100 = 450 -- NOT
+    // LOTA's true 200kg opening balance counted once.
+    expect(pdf.lines.map((l) => l.balanceForwardWeight)).toEqual([200, 150, 100]);
+    expect(pdf.totalBalanceForwardWeight).toBe(450);
+    // Exactly the plain sum of every printed row -- what summing every
+    // page's own SUB TOTAL would also produce, since pages only partition
+    // these same rows.
+    expect(pdf.totalBalanceForwardWeight).toBe(
+      pdf.lines.reduce((sum, l) => sum + l.balanceForwardWeight, 0),
+    );
+  });
+
+  it('excludes a lot with zero rows in the period entirely, even though it has an opening balance', () => {
+    const openingBalances = new Map([
       ['|P1|lot:LOTA', { qty: 10, weight: 100 }],
-      // LOTB: carried in from before this period, sitting untouched all through it.
+      // LOTB: carried in from before this period, sitting untouched the
+      // whole time -- never appears as a printed row, so it can't
+      // contribute to any page's SUB TOTAL, and therefore not to TOTAL either.
       ['|P1|lot:LOTB', { qty: 20, weight: 200 }],
     ]);
     const rows = [
@@ -129,55 +160,6 @@ describe('ยอดยกมา includes a lot with an opening balance but zero 
 
     const pdf = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot', openingBalances });
 
-    // Both lots' opening weight must be counted, not just LOTA's (the only
-    // one with a row this period).
-    expect(pdf.totalBalanceForwardWeight).toBe(300);
-    // LOTA closes to 0, LOTB's balance is untouched -- closing total is LOTB alone.
-    expect(pdf.totalBalanceWeight).toBe(200);
-    expect(pdf.totalDeliveryWeight).toBe(100);
-    expect(pdf.totalReceivedWeight).toBe(0);
-    expect(pdf.totalBalanceForwardWeight + pdf.totalReceivedWeight - pdf.totalDeliveryWeight).toBe(pdf.totalBalanceWeight);
-  });
-});
-
-// Third real gap, found immediately after fixing the two above: a printed
-// page's own SUB TOTAL ยอดยกมา matched exactly when checked against just
-// that page's rows in isolation (each page's own lots each appear once
-// there) -- but summing every page's SUB TOTAL ยอดยกมา across an entire real
-// report came to 435,800 กก. against a true grand total of 159,080 กก. A
-// lot with several movements in the period (received once, dispatched down
-// over several rows) repeats its running balanceForwardWeight on every row
-// it touches -- correct for that row's own "what was on hand right before
-// this event" display, but summing that column blindly counts the same
-// underlying stock once per row, not once per lot.
-describe('a lot with several rows only contributes its opening balance once to a page/document total', () => {
-  it('flags exactly the first row of each lot as _isFirstOccurrenceOfLot', () => {
-    const openingBalances = new Map([
-      ['|P1|lot:LOTA', { qty: 20, weight: 200 }],
-    ]);
-    const rows = [
-      // LOTA: carried in, then drawn down over three separate dispatch events.
-      { id: 'a1', movement_type: 'DISPATCH', movement_date: '2026-08-05', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
-      { id: 'a2', movement_type: 'DISPATCH', movement_date: '2026-08-10', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
-      { id: 'a3', movement_type: 'DISPATCH', movement_date: '2026-08-15', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 5, weight: 50 },
-      // LOTB: a single, unrelated lot for comparison.
-      { id: 'b1', movement_type: 'RECEIVE_CONFIRM', movement_date: '2026-08-01', lot_no: 'LOTB', tracking_code: 'FR260801001', product_code: 'P1', qty: 10, weight: 100 },
-    ];
-
-    const pdf = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot', openingBalances });
-    const flaggedLines = pdf.lines.filter((l) => l._isFirstOccurrenceOfLot);
-
-    // Exactly one row per distinct lot is flagged (2 lots -> 2 flagged rows),
-    // not one per row (4 rows total).
-    expect(flaggedLines).toHaveLength(2);
-
-    // Summing balanceForwardWeight over ONLY the flagged rows gives the true
-    // opening total; summing it over every row would triple-count LOTA's
-    // 200kg opening balance (it appears on 3 rows) and wildly overstate it.
-    const sumOverFlaggedOnly = flaggedLines.reduce((s, l) => s + l.balanceForwardWeight, 0);
-    const sumOverEveryRow = pdf.lines.reduce((s, l) => s + l.balanceForwardWeight, 0);
-    expect(sumOverFlaggedOnly).toBe(200); // LOTA's true opening weight, counted once.
-    expect(sumOverFlaggedOnly).toBe(pdf.totalBalanceForwardWeight);
-    expect(sumOverEveryRow).toBeGreaterThan(sumOverFlaggedOnly); // the naive per-row sum overcounts.
+    expect(pdf.totalBalanceForwardWeight).toBe(100); // LOTA only -- LOTB's 200kg is not printed anywhere.
   });
 });

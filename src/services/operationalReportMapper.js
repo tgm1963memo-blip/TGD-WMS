@@ -175,22 +175,6 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const lotBalances = {}; // lotKey → { vol, weight }
   mappedLines.forEach((line) => {
     const key = line._balanceKey;
-    // True only for the one row where this lot first shows up in the WHOLE
-    // report (across every page) -- see its use in InventoryMovementReportTemplate's
-    // per-page SUB TOTAL below. A lot with several movements in the period
-    // (e.g. received once, dispatched down over several rows) repeats its
-    // running balanceForwardWeight on every one of those rows -- correct
-    // for that row's own "what was on hand right before this event" display,
-    // but summing that column across a whole printed page counts the SAME
-    // underlying stock once per row it happens to touch, not once. Real
-    // reported gap: an 18-row page's own SUB TOTAL ยอดยกมา matched exactly
-    // when checked against just that page (each of ITS lots only appears
-    // once there), but summed across all 11 pages of a real August report
-    // it came to 435,800 กก. against a true grand total of 159,080 กก. --
-    // lots whose movements happened to straddle a page boundary (or that
-    // had several dispatch events within one page after a lot with heavy
-    // reuse elsewhere) got recounted well beyond their own true weight.
-    line._isFirstOccurrenceOfLot = !lotBalances[key];
     if (!lotBalances[key]) {
       const opening = openingBalances.get(key) ?? { qty: 0, weight: 0 };
       lotBalances[key] = { vol: opening.qty, weight: opening.weight };
@@ -230,28 +214,26 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const subtotalDeliveryVol = mappedLines.reduce((s, l) => s + (Number(l.deliveryVolume) || 0), 0);
   const subtotalDeliveryWt = mappedLines.reduce((s, l) => s + (Number(l.deliveryWeight) || 0), 0);
 
-  // Sum EVERY lot's opening balance, not just the ones that also happen to
-  // have a movement row inside this period. A lot fully untouched during
-  // the period (received earlier, not dispatched again, just sitting in
-  // storage the whole time) never appears in lotBalances (built by walking
-  // mappedLines, this period's own rows only) -- but it's still legitimately
-  // part of "stock on hand right before this period started." Restricting
-  // to Object.keys(lotBalances) silently dropped every such lot's opening
-  // weight from ยอดยกมา, while คงเหลือ (via authoritativeTotals below) still
-  // includes it -- since that RPC scans current balance for every lot
-  // regardless of activity. openingBalances itself is already scoped
-  // correctly (priorFetch in MovementLedgerReportPage.jsx applies the exact
-  // same customer/product/location/temperature filters as the main period
-  // query, just with dateTo = the day before periodStart), so summing it in
-  // full is exactly "opening balance for every lot this report is scoped
-  // to," not "opening balance for lots this period also moved." Confirmed
-  // real gap: a real August report's ยอดยกมา was short by ~396,126 กก. --
-  // exactly the untouched-lot total -- which then looked like จ่ายออก was
-  // still wrong after the earlier fix, when the real gap had moved here.
-  const totalBalanceForwardVol = Array.from(openingBalances.values())
-    .reduce((sum, b) => sum + (Number(b?.qty) || 0), 0);
-  const totalBalanceForwardWt = Array.from(openingBalances.values())
-    .reduce((sum, b) => sum + (Number(b?.weight) || 0), 0);
+  // Deliberately the plain sum of every row's own balanceForwardVolume/
+  // Weight -- NOT each distinct lot's true opening balance counted once.
+  // This is intentional: the printed report's per-page SUB TOTAL ยอดยกมา
+  // (see InventoryMovementReportTemplate.jsx) is itself a plain per-page
+  // row sum, so a lot with several rows on one page re-adds its running
+  // balance once per row there too. Confirmed wanted over the alternative
+  // (each lot counted once, which makes ยอดยกมา satisfy
+  // ยอดยกมา+รับเข้า-จ่ายออก=คงเหลือ but no longer equals the sum of what's
+  // printed on each page): TOTAL must equal the sum of every page's own
+  // SUB TOTAL exactly, and each SUB TOTAL must equal the sum of its own
+  // visible rows exactly -- both hold here because `pages` is just a
+  // partition of `mappedLines` with no rows dropped or duplicated, so
+  // summing every row directly here is mathematically identical to
+  // summing every page's own row-sum. The trade-off: this ยอดยกมา figure
+  // no longer represents true non-duplicated opening stock, and the
+  // accounting identity above will generally NOT hold at the TOTAL row
+  // once any lot has more than one row in the period -- confirmed
+  // accepted in exchange for a self-checking printed document.
+  const totalBalanceForwardVol = mappedLines.reduce((sum, l) => sum + (Number(l.balanceForwardVolume) || 0), 0);
+  const totalBalanceForwardWt = mappedLines.reduce((sum, l) => sum + (Number(l.balanceForwardWeight) || 0), 0);
 
   // Grand total is the sum of each lot's own final balance (lotBalances,
   // already floored at 0 per lot above) — NOT forward + received - delivered
