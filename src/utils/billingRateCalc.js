@@ -187,7 +187,7 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
 
     // Walk the lot's own cycle grid starting from the first cycle that
     // GENUINELY BEGINS on/after periodStart -- not "whichever cycle
-    // windowStart falls into" (the previous version of this line picked up
+    // windowStart falls into" (an earlier version of this line picked up
     // a cycle that started in an EARLIER period but was still in progress
     // when this period opened). "เต็มรอบทันที" (bill a cycle in full the
     // moment it begins, confirmed business rule -- see the first test in
@@ -199,7 +199,19 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
     // it starts in -- still in full the instant it begins, and still able
     // to extend past periodEnd if that's where its period_days grid cell
     // naturally lands (เต็มรอบทันที itself is unchanged).
-    let cycleIndex = Math.ceil(daysBetween(receiptDate, periodStart) / rate.period_days);
+    //
+    // Clamped at 0: when the lot's own receipt date falls ON or AFTER
+    // periodStart (the ordinary case -- most lots are received during the
+    // very month being billed), daysBetween(receiptDate, periodStart) is
+    // negative, and an unclamped Math.ceil() of a negative number rounds
+    // toward zero -- landing on -1 rather than 0 -- which walked the cycle
+    // grid one full period_days BACKWARD from receiptDate, billing a
+    // phantom cycle that started before the goods physically arrived.
+    // Confirmed real gap: OVO/FROZEN lots received mid-August (e.g.
+    // tracking FR260820050, received 2026-08-20) were billed exactly 2x
+    // -- once for a phantom cycle starting 2026-08-05, a receipt date that
+    // never happened, plus once for the real cycle starting 2026-08-20.
+    let cycleIndex = Math.max(0, Math.ceil(daysBetween(receiptDate, periodStart) / rate.period_days));
     let cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
 
     while (cycleStart <= periodEnd) {

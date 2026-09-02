@@ -277,6 +277,27 @@ describe('computeStorageInvoiceLines', () => {
     expect(straddling).toMatchObject({ periodEnd: '2026-08-14', weight: 1000, amount: 5000 });
   });
 
+  // Real reported gap (found while reconciling the OVO/FROZEN fix above
+  // against the customer's own Excel figures): a lot received DURING the
+  // period being billed -- the ordinary case, e.g. receipt 2026-08-20 for
+  // an August draft -- was billed twice: once for a phantom cycle starting
+  // 2026-08-05 (a date before the goods physically arrived) plus once for
+  // the real cycle starting 2026-08-20. Caused by an unclamped
+  // Math.ceil() of a negative day-count landing on cycleIndex -1 instead
+  // of 0 whenever receiptDate falls after periodStart.
+  it('does not invent a cycle starting before the lot was actually received, when the lot arrives during the billed period', () => {
+    const rate15d = { ...STORAGE_RATE_30D, period_days: 15 };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 7270, receipt_date: '2026-08-20', withdrawal_events: [],
+      }],
+      rates: [rate15d], periodStart: '2026-08-01', periodEnd: '2026-08-31',
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ periodStart: '2026-08-20', periodEnd: '2026-09-03', weight: 7270 });
+  });
+
   it('still resolves a rate with no contract window set at all, exactly as before contract fields existed', () => {
     const [line] = computeStorageInvoiceLines({
       depositLines: [{
