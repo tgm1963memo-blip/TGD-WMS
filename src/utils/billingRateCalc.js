@@ -185,11 +185,21 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
       .map((e) => ({ weight: toNumber(e.weight), date: toDateOnly(e.date) }))
       .filter((e) => e.date && e.weight > 0);
 
-    // Walk the lot's own cycle grid starting from whichever cycle
-    // windowStart falls into (so a cycle already partway elapsed before
-    // this window opened is still billed in full here, not lost), pushing
-    // one result per cycle that has begun by periodEnd.
-    let cycleIndex = Math.floor(daysBetween(receiptDate, windowStart) / rate.period_days);
+    // Walk the lot's own cycle grid starting from the first cycle that
+    // GENUINELY BEGINS on/after periodStart -- not "whichever cycle
+    // windowStart falls into" (the previous version of this line picked up
+    // a cycle that started in an EARLIER period but was still in progress
+    // when this period opened). "เต็มรอบทันที" (bill a cycle in full the
+    // moment it begins, confirmed business rule -- see the first test in
+    // billing-rate-calc.test.js) already means that earlier period's own
+    // draft billed this same cycle in full too, so re-including it here
+    // double-charges it. Confirmed real gap: OVO/FROZEN had 124 storage
+    // cycles counted in BOTH the July and August 2026 drafts, ~94,665.93
+    // THB billed twice. Each cycle is now billed by exactly the one period
+    // it starts in -- still in full the instant it begins, and still able
+    // to extend past periodEnd if that's where its period_days grid cell
+    // naturally lands (เต็มรอบทันที itself is unchanged).
+    let cycleIndex = Math.ceil(daysBetween(receiptDate, periodStart) / rate.period_days);
     let cycleStart = addDays(receiptDate, cycleIndex * rate.period_days);
 
     while (cycleStart <= periodEnd) {

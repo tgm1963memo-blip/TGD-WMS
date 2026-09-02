@@ -221,6 +221,62 @@ describe('computeStorageInvoiceLines', () => {
     expect(lines).toHaveLength(0);
   });
 
+  // Real reported gap: OVO/FROZEN had 124 storage cycles counted in BOTH
+  // the July 2026 and August 2026 invoice drafts (each draft created
+  // independently, one calendar month at a time) -- a cycle straddling
+  // the month boundary (e.g. starts 2026-07-31, a 15-day rate ends
+  // 2026-08-14) was "still in progress" when August's periodStart opened,
+  // so it got billed again there on top of July's own draft already
+  // having billed it in full. ~94,665.93 THB counted twice. Fixed by
+  // attributing each cycle to exactly the one period it STARTS in.
+  it('does not re-bill a cycle that already started in an earlier period, even though that cycle is still open when this period begins', () => {
+    const rate15d = { ...STORAGE_RATE_30D, period_days: 15 };
+    const depositLines = [{
+      id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+      received_weight: 1000, receipt_date: '2026-07-01', withdrawal_events: [],
+    }];
+
+    // July's own draft: periodStart=periodEnd of the same month, receipt_date
+    // aligns with periodStart so cycle 0 (Jul1-15), cycle 1 (Jul16-30), and
+    // cycle 2 (Jul31-Aug14, straddling into August) all start on/before Jul31.
+    const julyLines = computeStorageInvoiceLines({
+      depositLines, rates: [rate15d], periodStart: '2026-07-01', periodEnd: '2026-07-31',
+    });
+    expect(julyLines.map((l) => l.periodStart)).toEqual(['2026-07-01', '2026-07-16', '2026-07-31']);
+    expect(julyLines[2]).toMatchObject({ periodStart: '2026-07-31', periodEnd: '2026-08-14', amount: 5000 });
+
+    // August's own draft must NOT re-include the 2026-07-31 cycle July
+    // already billed -- its first line should start with the next cycle
+    // that genuinely begins on/after 2026-08-01.
+    const augustLines = computeStorageInvoiceLines({
+      depositLines, rates: [rate15d], periodStart: '2026-08-01', periodEnd: '2026-08-31',
+    });
+    expect(augustLines.map((l) => l.periodStart)).not.toContain('2026-07-31');
+    expect(augustLines[0]).toMatchObject({ periodStart: '2026-08-15', periodEnd: '2026-08-29' });
+
+    // No cycle appears in both months' output.
+    const julyStarts = new Set(julyLines.map((l) => l.periodStart));
+    const augustStarts = new Set(augustLines.map((l) => l.periodStart));
+    const overlap = [...julyStarts].filter((s) => augustStarts.has(s));
+    expect(overlap).toEqual([]);
+  });
+
+  it('still bills a cycle in full the moment it begins, even when the period boundary lands mid-cycle ("เต็มรอบทันที" preserved)', () => {
+    // Same straddling cycle as above (Jul31-Aug14) -- confirms it's still
+    // billed in FULL by whichever period it starts in, not skipped/dropped
+    // and not prorated, only ever counted once.
+    const rate15d = { ...STORAGE_RATE_30D, period_days: 15 };
+    const julyLines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
+        received_weight: 1000, receipt_date: '2026-07-01', withdrawal_events: [],
+      }],
+      rates: [rate15d], periodStart: '2026-07-01', periodEnd: '2026-07-31',
+    });
+    const straddling = julyLines.find((l) => l.periodStart === '2026-07-31');
+    expect(straddling).toMatchObject({ periodEnd: '2026-08-14', weight: 1000, amount: 5000 });
+  });
+
   it('still resolves a rate with no contract window set at all, exactly as before contract fields existed', () => {
     const [line] = computeStorageInvoiceLines({
       depositLines: [{
