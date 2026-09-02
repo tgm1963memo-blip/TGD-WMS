@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
-import { canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
+import { canApproveBillingInvoiceDraft, canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
@@ -22,6 +22,8 @@ export function InvoiceDraftListTable({
   error = null,
   onView = null,
   onDelete = null,
+  onApprove = null,
+  approvingId = null,
   onRecalculate = null,
   recalculatingId = null,
   canWrite = false,
@@ -81,6 +83,17 @@ export function InvoiceDraftListTable({
                 ) : (
                   <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
                 )}
+                {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={approvingId === draft.id}
+                    data-testid={`invoice-draft-approve-button-${draft.id}`}
+                    onClick={() => onApprove(draft)}
+                  >
+                    {approvingId === draft.id ? '⏳ Approving...' : 'Approve'}
+                  </button>
+                ) : null}
                 {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
                   <button
                     className="btn btn-outline"

@@ -16,6 +16,7 @@ import {
   listBillingInvoiceDrafts,
   getBillingInvoiceDraftById,
   deleteBillingInvoiceDraft,
+  approveBillingInvoiceDraft,
   previewBillingPeriodInvoice,
   createBillingInvoiceDraftForPeriod,
   recalculateInvoiceDraftLineRates,
@@ -28,7 +29,7 @@ import { TEMPERATURE_TYPES } from '../../services/productServiceRatesService.js'
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
-import { formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
+import { canApproveBillingInvoiceDraft, formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 
@@ -60,6 +61,8 @@ export function InvoiceDraftListPage() {
   const [printOpen, setPrintOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
+  const [approveError, setApproveError] = useState(null);
   const [recalculatingId, setRecalculatingId] = useState(null);
   const [recalculateError, setRecalculateError] = useState(null);
   const [recalculateMsg, setRecalculateMsg] = useState('');
@@ -141,6 +144,28 @@ export function InvoiceDraftListPage() {
       return;
     }
 
+    reloadDrafts();
+  }
+
+  async function handleApprove(draft) {
+    if (!draft?.id || !canApproveBillingInvoiceDraft(draft)) return;
+    const confirmed = window.confirm(`Approve invoice draft ${draft.draft_no ?? ''}?`);
+    if (!confirmed) return;
+
+    setApprovingId(draft.id);
+    setApproveError(null);
+    const result = await approveBillingInvoiceDraft({ draftId: draft.id });
+    setApprovingId(null);
+
+    if (result.error) {
+      setApproveError(result.error);
+      return;
+    }
+
+    // Keep the open "View" modal in sync so its status badge reflects the
+    // approval right away, instead of still showing the stale DRAFT status
+    // until the modal is closed and reopened.
+    setViewDraft((prev) => (prev && prev.id === draft.id ? { ...prev, status: 'APPROVED' } : prev));
     reloadDrafts();
   }
 
@@ -413,6 +438,12 @@ export function InvoiceDraftListPage() {
         </div>
       ) : null}
 
+      {approveError ? (
+        <div className="section-card" role="alert" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-danger)', background: '#fff5f5' }}>
+          {formatInvoiceDraftError(approveError)}
+        </div>
+      ) : null}
+
       {recalculateError ? (
         <div className="section-card" role="alert" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-danger)', background: '#fff5f5' }}>
           {formatInvoiceDraftError(recalculateError)}
@@ -432,6 +463,8 @@ export function InvoiceDraftListPage() {
           error={error}
           onView={handleView}
           onDelete={handleDelete}
+          onApprove={handleApprove}
+          approvingId={approvingId}
           onRecalculate={handleRecalculate}
           recalculatingId={recalculatingId}
           canWrite={canWrite}
@@ -503,6 +536,19 @@ export function InvoiceDraftListPage() {
               </table>
             </div>
           )}
+          {canWrite && canApproveBillingInvoiceDraft(viewDraft) ? (
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                data-testid={`invoice-draft-view-approve-button-${viewDraft.id}`}
+                onClick={() => handleApprove(viewDraft)}
+                disabled={approvingId === viewDraft.id}
+              >
+                {approvingId === viewDraft.id ? 'Approving...' : 'Approve Draft'}
+              </button>
+            </div>
+          ) : null}
         </Modal>
       ) : null}
 
