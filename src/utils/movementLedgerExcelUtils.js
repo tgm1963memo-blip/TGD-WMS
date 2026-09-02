@@ -304,21 +304,31 @@ function computeGrandTotals(rows, openingBalances, authoritativeTotals = null, g
   });
 
   // authoritativeTotals (same source as the stock balance page's RPC —
-  // see getAuthoritativeBalanceTotals) overrides the locally-replayed sum
-  // when supplied, so the exported grand total matches that page exactly.
+  // see getAuthoritativeBalanceTotals) overrides the locally-replayed
+  // BALANCE when supplied, so the exported grand total's คงเหลือ matches
+  // that page exactly.
   //
-  // received/delivered get overridden too, not just the balance — they must
-  // come from the same all-time, floor-aware computation the balance did,
-  // or receivedQty - deliveredQty (this period's raw sums only) won't equal
-  // balanceQty (all-time). Defining delivered as received - balance
-  // guarantees the three figures reconcile exactly.
+  // received/delivered must NOT be overridden the same way -- they stay the
+  // plain period-scoped sums computed above. getAuthoritativeBalanceTotals
+  // is built on the stock-balance RPC's base_lines CTE, whose final SELECT
+  // filters `WHERE balance > 0` (see tgd_get_customer_stock_balance /
+  // tgd_get_all_customer_stock_balances) -- correct for its real purpose
+  // (current stock on hand), but it means any lot that reached a zero
+  // balance by asOfDate is excluded from the result set ENTIRELY, taking
+  // its whole received_weight/withdrawn_weight with it. A lot carried in
+  // from before this period and fully dispatched during it (every "CLOSED"
+  // withdrawal does this) vanished from authoritativeTotals.totalDeliveredWeight
+  // completely, even though its movements are still correctly present in
+  // `rows`. Confirmed real gap: a real OVO August export undercounted
+  // จ่ายออก by ~135,840 กก. -- almost exactly ยอดยกมา, i.e. nearly every
+  // closed-out lot's delivery vanished from this total while still counted
+  // in the opening/closing balance, breaking receivedQty - deliveredQty ==
+  // balanceQty - openingQty. Only balanceQty/balanceWeight legitimately
+  // come from authoritativeTotals -- a zero-balance lot contributes 0
+  // there either way, so that override is harmless.
   if (authoritativeTotals) {
-    receivedQty = authoritativeTotals.totalReceivedBoxes ?? receivedQty;
-    receivedWeight = authoritativeTotals.totalReceivedWeight ?? receivedWeight;
     balanceQty = authoritativeTotals.totalBoxes;
     balanceWeight = authoritativeTotals.totalWeight;
-    deliveredQty = authoritativeTotals.totalDeliveredBoxes ?? (receivedQty - balanceQty);
-    deliveredWeight = authoritativeTotals.totalDeliveredWeight ?? (receivedWeight - balanceWeight);
   }
 
   return { receivedQty, receivedWeight, deliveredQty, deliveredWeight, balanceQty, balanceWeight };

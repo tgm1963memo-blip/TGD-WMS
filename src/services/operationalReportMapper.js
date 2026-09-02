@@ -238,18 +238,32 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const totalBalanceVol = authoritativeTotals?.totalBoxes ?? Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
   const totalBalanceWt = authoritativeTotals?.totalWeight ?? Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
 
-  // When authoritativeTotals is available, the grand-total row's received
-  // and delivered figures must come from that same all-time, floor-aware
-  // computation too — not from subtotalReceived/subtotalDelivery, which are
-  // plain sums over just this report's date-filtered rows. Mixing a
-  // date-scoped received/delivered with an all-time balance is exactly what
-  // made รับเข้า - จ่ายออก disagree with คงเหลือ on the printed total: the two
-  // pairs were answering different questions (this period's movements vs.
-  // the true all-time remaining stock).
-  const totalReceivedVol = authoritativeTotals?.totalReceivedBoxes ?? (summary?.totalInboundQty ?? subtotalReceivedVol);
-  const totalReceivedWt = authoritativeTotals?.totalReceivedWeight ?? subtotalReceivedWt;
-  const totalDeliveryVol = authoritativeTotals?.totalDeliveredBoxes ?? (summary?.totalOutboundQty ?? subtotalDeliveryVol);
-  const totalDeliveryWt = authoritativeTotals?.totalDeliveredWeight ?? subtotalDeliveryWt;
+  // received/delivered must stay period-scoped plain sums over this report's
+  // date-filtered rows — NOT authoritativeTotals.totalReceivedBoxes/Weight
+  // or totalDeliveredBoxes/Weight. Those come from getAuthoritativeBalanceTotals,
+  // which is built on the stock-balance RPC's own base_lines CTE, and that
+  // RPC's final SELECT filters `WHERE balance > 0` (see
+  // tgd_get_customer_stock_balance/tgd_get_all_customer_stock_balances) —
+  // correct for its actual purpose (current stock on hand), but it means
+  // ANY lot that reached a zero balance by asOfDate is excluded from the
+  // result set ENTIRELY, taking its whole received_weight/withdrawn_weight
+  // with it. A lot carried in from before this period and fully dispatched
+  // during it (very ordinary — every "CLOSED" withdrawal does this) vanishes
+  // from the authoritative total's รับเข้า/จ่ายออก contribution completely,
+  // even though its movements are still correctly present in this report's
+  // own rows. Confirmed real gap: a real OVO August report showed จ่ายออก
+  // undercounted by ~135,840 กก. — almost exactly equal to ยอดยกมา, i.e.
+  // nearly every closed-out lot's delivery was dropped from this total
+  // while still counted in ยอดยกมา/คงเหลือ, breaking ยอดยกมา+รับเข้า-จ่ายออก=คงเหลือ.
+  // Only totalBalanceVol/totalBalanceWt above may still come from
+  // authoritativeTotals -- a zero-balance lot legitimately contributes 0
+  // there either way, so that override is harmless (and is what keeps this
+  // report's คงเหลือ matching the stock balance page exactly, its original
+  // intent).
+  const totalReceivedVol = summary?.totalInboundQty ?? subtotalReceivedVol;
+  const totalReceivedWt = subtotalReceivedWt;
+  const totalDeliveryVol = summary?.totalOutboundQty ?? subtotalDeliveryVol;
+  const totalDeliveryWt = subtotalDeliveryWt;
 
   return {
     customer: filters.customer_name ?? filters.customer_id ?? summary?.customerName ?? '-',

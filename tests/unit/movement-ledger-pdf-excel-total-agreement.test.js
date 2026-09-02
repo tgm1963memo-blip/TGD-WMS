@@ -48,3 +48,57 @@ describe('PDF report and Excel export agree on the grand total', () => {
     expect(pdf.totalBalanceWeight).toBe(300);
   });
 });
+
+// Real reported gap: getAuthoritativeBalanceTotals is built on the stock
+// balance RPC's own base_lines CTE, whose final SELECT filters
+// `WHERE balance > 0` (tgd_get_customer_stock_balance /
+// tgd_get_all_customer_stock_balances) -- correct for its real purpose
+// (current stock on hand), but it means a lot that reached zero balance by
+// asOfDate is excluded from the RPC's result set ENTIRELY, taking its whole
+// received/delivered contribution with it. A previous fix mistakenly routed
+// รับเข้า/จ่ายออก through this same "current balance only" source (to make
+// them agree with the balance-only คงเหลือ), which broke them instead: a
+// lot carried in from before the report period and fully dispatched during
+// it (any "CLOSED" withdrawal) vanished from both totals, even though its
+// movements are still correctly present in the period's own rows. Confirmed
+// against a real OVO August report: จ่ายออก undercounted by ~135,840 กก.,
+// almost exactly equal to ยอดยกมา -- nearly every closed-out lot's delivery
+// dropped out while still counted in the opening/closing balance.
+describe('รับเข้า/จ่ายออก stay period-scoped even when authoritativeTotals omits a now-closed lot', () => {
+  it('keeps a fully-dispatched-within-period lot in both totals, not just the still-open lot', () => {
+    // Key format matches movementBalanceKey(row, 'lot'): `${customer_id ?? ''}|${product}|lot:${lot_no}`.
+    const openingBalances = new Map([
+      ['|P1|lot:LOTX', { qty: 100, weight: 1000 }],
+    ]);
+    const rows = [
+      // Lot X: carried in from before this period (no receive row here),
+      // fully dispatched during it -- closes to zero balance.
+      { id: 'x1', movement_type: 'DISPATCH', movement_date: '2026-08-05', lot_no: 'LOTX', tracking_code: 'FR260701001', product_code: 'P1', qty: 100, weight: 1000 },
+      // Lot Y: received and partially dispatched during this period, still open at period end.
+      { id: 'y1', movement_type: 'RECEIVE_CONFIRM', movement_date: '2026-08-10', lot_no: 'LOTY', tracking_code: 'FR260810001', product_code: 'P1', qty: 50, weight: 500 },
+      { id: 'y2', movement_type: 'DISPATCH', movement_date: '2026-08-20', lot_no: 'LOTY', tracking_code: 'FR260810001', product_code: 'P1', qty: 20, weight: 200 },
+    ];
+
+    // Simulates what the real RPC actually returns: LOTX has 0 balance by
+    // report end, so it's silently absent from every one of these figures.
+    const authoritativeTotals = {
+      totalBoxes: 30, totalWeight: 300,
+      totalReceivedBoxes: 50, totalReceivedWeight: 500,
+      totalDeliveredBoxes: 20, totalDeliveredWeight: 200,
+    };
+
+    const pdf = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot', openingBalances, authoritativeTotals });
+
+    expect(pdf.totalReceivedWeight).toBe(500);
+    expect(pdf.totalDeliveryWeight).toBe(1200);
+    expect(pdf.totalBalanceWeight).toBe(300);
+    // The core identity this bug broke: opening + received - delivered = closing.
+    expect(pdf.totalBalanceForwardWeight + pdf.totalReceivedWeight - pdf.totalDeliveryWeight).toBe(pdf.totalBalanceWeight);
+
+    const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, 'productLot', authoritativeTotals);
+    const totalRow = excelRows[excelRows.length - 1];
+    expect(totalRow['รับเข้า(น้ำหนัก)']).toBe(500);
+    expect(totalRow['จ่ายออก(น้ำหนัก)']).toBe(1200);
+    expect(totalRow['คงเหลือ(น้ำหนัก)']).toBe(300);
+  });
+});
