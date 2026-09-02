@@ -176,8 +176,14 @@ export function InventoryMovementReportTemplate({
         const pageReceivedWt  = sumField(page.lines, 'receivedWeight');
         const pageDeliveryVol = sumField(page.lines, 'deliveryVolume');
         const pageDeliveryWt  = sumField(page.lines, 'deliveryWeight');
-        const pageBalanceForwardVol = sumField(page.lines, 'balanceForwardVolume');
-        const pageBalanceForwardWt  = sumField(page.lines, 'balanceForwardWeight');
+        // Only the row where each lot FIRST appears in the whole report
+        // (not just this page) contributes its balanceForwardVolume/Weight —
+        // every later row for that same lot repeats its running balance,
+        // which would otherwise get summed once per row instead of once
+        // per lot. See the matching comment in operationalReportMapper.js.
+        const pageFirstOccurrenceLines = page.lines.filter((l) => l._isFirstOccurrenceOfLot);
+        const pageBalanceForwardVol = sumField(pageFirstOccurrenceLines, 'balanceForwardVolume');
+        const pageBalanceForwardWt  = sumField(pageFirstOccurrenceLines, 'balanceForwardWeight');
 
         return (
           <div

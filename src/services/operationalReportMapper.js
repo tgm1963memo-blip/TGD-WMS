@@ -175,6 +175,22 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const lotBalances = {}; // lotKey → { vol, weight }
   mappedLines.forEach((line) => {
     const key = line._balanceKey;
+    // True only for the one row where this lot first shows up in the WHOLE
+    // report (across every page) -- see its use in InventoryMovementReportTemplate's
+    // per-page SUB TOTAL below. A lot with several movements in the period
+    // (e.g. received once, dispatched down over several rows) repeats its
+    // running balanceForwardWeight on every one of those rows -- correct
+    // for that row's own "what was on hand right before this event" display,
+    // but summing that column across a whole printed page counts the SAME
+    // underlying stock once per row it happens to touch, not once. Real
+    // reported gap: an 18-row page's own SUB TOTAL ยอดยกมา matched exactly
+    // when checked against just that page (each of ITS lots only appears
+    // once there), but summed across all 11 pages of a real August report
+    // it came to 435,800 กก. against a true grand total of 159,080 กก. --
+    // lots whose movements happened to straddle a page boundary (or that
+    // had several dispatch events within one page after a lot with heavy
+    // reuse elsewhere) got recounted well beyond their own true weight.
+    line._isFirstOccurrenceOfLot = !lotBalances[key];
     if (!lotBalances[key]) {
       const opening = openingBalances.get(key) ?? { qty: 0, weight: 0 };
       lotBalances[key] = { vol: opening.qty, weight: opening.weight };
