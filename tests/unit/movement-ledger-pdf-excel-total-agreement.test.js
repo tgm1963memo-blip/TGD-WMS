@@ -102,3 +102,40 @@ describe('รับเข้า/จ่ายออก stay period-scoped even wh
     expect(totalRow['คงเหลือ(น้ำหนัก)']).toBe(300);
   });
 });
+
+// Second real gap found while fixing the one above: after routing รับเข้า/
+// จ่ายออก back to period-scoped sums, ยอดยกมา was STILL wrong on a real
+// report -- undercounted by the exact weight of every lot that had an
+// opening balance but ZERO movement rows within the period (received
+// earlier, never touched again this month, just sitting in storage). Such
+// a lot never gets a lotBalances entry (built only by walking this
+// period's own mappedLines), so totalBalanceForwardVol/Wt's
+// `Object.keys(lotBalances)`-scoped sum silently dropped its
+// openingBalances contribution -- while คงเหลือ (via authoritativeTotals,
+// which scans every lot's current balance regardless of activity) still
+// included it, breaking ยอดยกมา+รับเข้า-จ่ายออก=คงเหลือ all over again from a
+// different column.
+describe('ยอดยกมา includes a lot with an opening balance but zero movement this period', () => {
+  it('counts an untouched lot in ยอดยกมา, not just lots that also moved this period', () => {
+    const openingBalances = new Map([
+      // LOTA: carried in from before this period and moved (dispatched) during it.
+      ['|P1|lot:LOTA', { qty: 10, weight: 100 }],
+      // LOTB: carried in from before this period, sitting untouched all through it.
+      ['|P1|lot:LOTB', { qty: 20, weight: 200 }],
+    ]);
+    const rows = [
+      { id: 'a1', movement_type: 'DISPATCH', movement_date: '2026-08-05', lot_no: 'LOTA', tracking_code: 'FR260701001', product_code: 'P1', qty: 10, weight: 100 },
+    ];
+
+    const pdf = mapMovementLedgerToInventoryReportData({ rows, sortMode: 'productLot', openingBalances });
+
+    // Both lots' opening weight must be counted, not just LOTA's (the only
+    // one with a row this period).
+    expect(pdf.totalBalanceForwardWeight).toBe(300);
+    // LOTA closes to 0, LOTB's balance is untouched -- closing total is LOTB alone.
+    expect(pdf.totalBalanceWeight).toBe(200);
+    expect(pdf.totalDeliveryWeight).toBe(100);
+    expect(pdf.totalReceivedWeight).toBe(0);
+    expect(pdf.totalBalanceForwardWeight + pdf.totalReceivedWeight - pdf.totalDeliveryWeight).toBe(pdf.totalBalanceWeight);
+  });
+});

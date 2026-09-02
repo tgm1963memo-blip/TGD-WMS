@@ -214,11 +214,28 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   const subtotalDeliveryVol = mappedLines.reduce((s, l) => s + (Number(l.deliveryVolume) || 0), 0);
   const subtotalDeliveryWt = mappedLines.reduce((s, l) => s + (Number(l.deliveryWeight) || 0), 0);
 
-  // Sum each distinct lot's opening balance once (not once per row in that lot)
-  const totalBalanceForwardVol = Object.keys(lotBalances).reduce(
-    (sum, key) => sum + (openingBalances.get(key)?.qty ?? 0), 0);
-  const totalBalanceForwardWt = Object.keys(lotBalances).reduce(
-    (sum, key) => sum + (openingBalances.get(key)?.weight ?? 0), 0);
+  // Sum EVERY lot's opening balance, not just the ones that also happen to
+  // have a movement row inside this period. A lot fully untouched during
+  // the period (received earlier, not dispatched again, just sitting in
+  // storage the whole time) never appears in lotBalances (built by walking
+  // mappedLines, this period's own rows only) -- but it's still legitimately
+  // part of "stock on hand right before this period started." Restricting
+  // to Object.keys(lotBalances) silently dropped every such lot's opening
+  // weight from ยอดยกมา, while คงเหลือ (via authoritativeTotals below) still
+  // includes it -- since that RPC scans current balance for every lot
+  // regardless of activity. openingBalances itself is already scoped
+  // correctly (priorFetch in MovementLedgerReportPage.jsx applies the exact
+  // same customer/product/location/temperature filters as the main period
+  // query, just with dateTo = the day before periodStart), so summing it in
+  // full is exactly "opening balance for every lot this report is scoped
+  // to," not "opening balance for lots this period also moved." Confirmed
+  // real gap: a real August report's ยอดยกมา was short by ~396,126 กก. --
+  // exactly the untouched-lot total -- which then looked like จ่ายออก was
+  // still wrong after the earlier fix, when the real gap had moved here.
+  const totalBalanceForwardVol = Array.from(openingBalances.values())
+    .reduce((sum, b) => sum + (Number(b?.qty) || 0), 0);
+  const totalBalanceForwardWt = Array.from(openingBalances.values())
+    .reduce((sum, b) => sum + (Number(b?.weight) || 0), 0);
 
   // Grand total is the sum of each lot's own final balance (lotBalances,
   // already floored at 0 per lot above) — NOT forward + received - delivered
@@ -235,8 +252,26 @@ export function mapMovementLedgerToInventoryReportData({ rows = [], filters = {}
   // the two group withdrawn quantity differently whenever a LOT spans
   // multiple deposit lines (tracking codes), which lot_no-only grouping
   // can't fully replicate.
-  const totalBalanceVol = authoritativeTotals?.totalBoxes ?? Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0);
-  const totalBalanceWt = authoritativeTotals?.totalWeight ?? Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0);
+  // The lotBalances-only fallback (used when authoritativeTotals isn't
+  // supplied) has the same untouched-lot gap as ยอดยกมา above: a lot with
+  // no movement row this period never gets a lotBalances entry, so its
+  // carried-forward balance would otherwise silently drop out of the
+  // fallback closing total too. Add it back in for every openingBalances
+  // entry lotBalances doesn't already cover -- mirrors the equivalent fix
+  // already in place for the Excel export's own balance total (see
+  // computeGrandTotals in movementLedgerExcelUtils.js).
+  let untouchedLotVol = 0;
+  let untouchedLotWt = 0;
+  openingBalances.forEach((opening, key) => {
+    if (!lotBalances[key]) {
+      untouchedLotVol += Number(opening?.qty) || 0;
+      untouchedLotWt += Number(opening?.weight) || 0;
+    }
+  });
+  const totalBalanceVol = authoritativeTotals?.totalBoxes
+    ?? (Object.values(lotBalances).reduce((sum, b) => sum + b.vol, 0) + untouchedLotVol);
+  const totalBalanceWt = authoritativeTotals?.totalWeight
+    ?? (Object.values(lotBalances).reduce((sum, b) => sum + b.weight, 0) + untouchedLotWt);
 
   // received/delivered must stay period-scoped plain sums over this report's
   // date-filtered rows — NOT authoritativeTotals.totalReceivedBoxes/Weight
