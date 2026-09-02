@@ -77,45 +77,50 @@ export function InvoiceDraftListTable({
               <td>{formatFixed2(draft.total_chargeable_weight)}</td>
               <td>{formatFixed2(draft.total_amount)}</td>
               <td>{formatDate(draft.created_at)}</td>
-              <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {onView ? (
-                  <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
-                ) : (
-                  <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
-                )}
-                {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
-                  <button
-                    className="btn btn-primary"
-                    type="button"
-                    disabled={approvingId === draft.id}
-                    data-testid={`invoice-draft-approve-button-${draft.id}`}
-                    onClick={() => onApprove(draft)}
-                  >
-                    {approvingId === draft.id ? '⏳ Approving...' : 'Approve'}
-                  </button>
-                ) : null}
-                {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
-                  <button
-                    className="btn btn-outline"
-                    type="button"
-                    disabled={recalculatingId === draft.id}
-                    data-testid={`invoice-draft-recalculate-button-${draft.id}`}
-                    onClick={() => onRecalculate(draft)}
-                    title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
-                  >
-                    {recalculatingId === draft.id ? '⏳ กำลังคำนวณ...' : 'คำนวณอัตราใหม่'}
-                  </button>
-                ) : null}
-                {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
-                  <button
-                    className="btn btn-danger"
-                    type="button"
-                    data-testid={`invoice-draft-delete-button-${draft.id}`}
-                    onClick={() => onDelete(draft)}
-                  >
-                    Delete
-                  </button>
-                ) : null}
+              <td style={{ minWidth: 130 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'stretch' }}>
+                  {onView ? (
+                    <button className="btn btn-outline" type="button" style={{ width: '100%' }} onClick={() => onView(draft)}>View</button>
+                  ) : (
+                    <Link className="btn btn-outline" style={{ width: '100%', textAlign: 'center' }} to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
+                  )}
+                  {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      style={{ width: '100%' }}
+                      disabled={approvingId === draft.id}
+                      data-testid={`invoice-draft-approve-button-${draft.id}`}
+                      onClick={() => onApprove(draft)}
+                    >
+                      {approvingId === draft.id ? '⏳ Approving...' : 'Approve'}
+                    </button>
+                  ) : null}
+                  {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
+                    <button
+                      className="btn btn-outline"
+                      type="button"
+                      style={{ width: '100%' }}
+                      disabled={recalculatingId === draft.id}
+                      data-testid={`invoice-draft-recalculate-button-${draft.id}`}
+                      onClick={() => onRecalculate(draft)}
+                      title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
+                    >
+                      {recalculatingId === draft.id ? '⏳ กำลังคำนวณ...' : 'คำนวณอัตราใหม่'}
+                    </button>
+                  ) : null}
+                  {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
+                    <button
+                      className="btn btn-danger"
+                      type="button"
+                      style={{ width: '100%' }}
+                      data-testid={`invoice-draft-delete-button-${draft.id}`}
+                      onClick={() => onDelete(draft)}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}
