@@ -160,6 +160,11 @@ export function buildInvoiceDraftLineFromMovement(movement = {}, invoiceDraftId 
     service_rate_id: movement.service_rate_id ?? null,
     line_note: movement.line_note ?? null,
     duplicate_guard_active: true,
+    // See the identical comment in buildInvoiceDraftLineFromHandlingLine --
+    // same NOT NULL / heterogeneous-batch hazard if a movement-based line
+    // is ever inserted in the same batch as a contract-adjusted line.
+    min_charge_applied: false,
+    free_period_applied: false,
   };
 }
 
@@ -253,6 +258,21 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
     billing_period_end: null,
     line_note: `ค่าบริการจัดการแรกเข้า (รับเข้า ${handlingLine.receiptDate ?? '-'}, น้ำหนัก ${handlingLine.weight} กก.)`,
     duplicate_guard_active: false,
+    // Explicit false, not omitted: min_charge_applied/free_period_applied
+    // are NOT NULL DEFAULT false columns, which covers a plain single-type
+    // insert fine -- but createBillingInvoiceDraftForPeriod inserts every
+    // period's lines (storage + handling + auxiliary) in ONE batch, and
+    // PostgREST's bulk insert builds its column list from the union of
+    // keys across the whole array; a row that omits a key present on ANY
+    // other row in that same batch gets an explicit SQL NULL for it, not
+    // the column's DEFAULT. Confirmed real gap: any customer with a
+    // configured HANDLING_IN rate (e.g. real customer C002/บริษัท ไทย -
+    // เยอรมัน มีท โปรดักท์) had EVERY period-based draft creation fail
+    // outright with "null value in column min_charge_applied violates
+    // not-null constraint" the moment a HANDLING_IN line shared a batch
+    // with a STORAGE line (which already set this field).
+    min_charge_applied: false,
+    free_period_applied: false,
   };
 }
 
@@ -297,6 +317,11 @@ export function buildInvoiceDraftLineFromAuxiliaryLine(auxLine) {
     storage_days: null,
     line_note: auxLine.note ?? null,
     duplicate_guard_active: false,
+    // See the identical comment in buildInvoiceDraftLineFromHandlingLine --
+    // same NOT NULL / heterogeneous-batch hazard applies to a SERVICE line
+    // sharing a batch with a STORAGE line.
+    min_charge_applied: false,
+    free_period_applied: false,
   };
 }
 

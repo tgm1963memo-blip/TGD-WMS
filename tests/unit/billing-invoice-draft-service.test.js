@@ -7,6 +7,9 @@ import {
   INVOICE_DRAFT_STATUS,
   buildInvoiceDraftCreatePayload,
   buildInvoiceDraftLineFromMovement,
+  buildInvoiceDraftLineFromStorageLine,
+  buildInvoiceDraftLineFromHandlingLine,
+  buildInvoiceDraftLineFromAuxiliaryLine,
   calculateInvoiceDraftTotals,
   applyActiveDuplicateDraftGuards,
   canApproveBillingInvoiceDraft,
@@ -311,6 +314,40 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
       total_chargeable_weight: 150,
       total_amount: null,
     });
+  });
+
+  // Real reported gap: createBillingInvoiceDraftForPeriod inserts one
+  // period's storage + handling + auxiliary lines in a SINGLE batch insert.
+  // min_charge_applied/free_period_applied are NOT NULL DEFAULT false
+  // columns -- fine for an all-storage batch (storage lines always set
+  // both), but PostgREST's bulk insert derives its column list from the
+  // union of keys across the whole array: a row that omits a key another
+  // row in the same batch provides gets an explicit SQL NULL, not the
+  // column's DEFAULT. A HANDLING_IN or SERVICE line that didn't set these
+  // two fields made the WHOLE insert fail with a not-null violation the
+  // moment it shared a batch with a STORAGE line. Confirmed against real
+  // customer C002 (บริษัท ไทย - เยอรมัน มีท โปรดักท์), whose configured
+  // HANDLING_IN rate broke every one of their period-based draft creations.
+  it('every line-builder function always sets min_charge_applied/free_period_applied, never omits them', () => {
+    const storageLine = buildInvoiceDraftLineFromStorageLine(
+      { customerId: 'cust-1', depositLineId: 'dl-1', weight: 100, amount: 50, rate: { rate: 0.5 } },
+      { lot_no: 'LOT-1' },
+    );
+    const handlingLine = buildInvoiceDraftLineFromHandlingLine(
+      { customerId: 'cust-1', depositLineId: 'dl-1', weight: 100, amount: 20, receiptDate: '2026-09-01', rate: { rate: 0.2 } },
+      { lot_no: 'LOT-1' },
+    );
+    const auxLine = buildInvoiceDraftLineFromAuxiliaryLine(
+      { customerId: 'cust-1', sourceRequestId: 'req-1', quantity: 1, amount: 100, rate: { rate: 100, unit_basis: 'FLAT' } },
+    );
+    const movementLine = buildInvoiceDraftLineFromMovement(validMovement);
+
+    for (const line of [storageLine, handlingLine, auxLine, movementLine]) {
+      expect(line).toHaveProperty('min_charge_applied');
+      expect(line).toHaveProperty('free_period_applied');
+      expect(line.min_charge_applied).not.toBeUndefined();
+      expect(line.free_period_applied).not.toBeUndefined();
+    }
   });
 
   it('allows cancel only for DRAFT or READY_TO_REVIEW', () => {
