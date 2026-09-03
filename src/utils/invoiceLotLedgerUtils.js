@@ -47,10 +47,33 @@ export function buildInvoiceLotLedger(lines = []) {
     const openingLine = eventLines.find((l) => l.movement_type === 'STORAGE_OPENING_BALANCE');
     const movementLines = eventLines.filter((l) => l !== openingLine);
 
+    // A lot billed entirely through the period-based STORAGE flow (no
+    // separate RECEIVE_CONFIRM/DISPATCH movement lines at all -- the normal
+    // case for a manual period draft) has no movement_date anywhere to pull
+    // from; every STORAGE line only carries billing_period_start/end (the
+    // CYCLE's own dates, not a movement event). The lot's earliest cycle's
+    // billing_period_start is receiptDate exactly when that first-ever
+    // cycle is included in this draft (see computeStorageInvoiceLines --
+    // cycleIndex 0 starts exactly at receiptDate), and still a reasonable
+    // "received" reference otherwise (the start of what this draft covers
+    // for the lot). The latest cycle's billing_period_end is shown as
+    // DELIVERY DATE for the same lots -- it's the end of the last billed
+    // cycle, not necessarily a real physical withdrawal event, since a
+    // storage cycle billed in full the moment it starts ("เต็มรอบทันที")
+    // doesn't require the goods to actually leave by its own end date.
+    const sortedStorageLines = storageLines
+      .slice()
+      .sort((a, b) => new Date(a.billing_period_start ?? 0) - new Date(b.billing_period_start ?? 0));
+
     const receivedDate = openingLine?.movement_date
       ?? movementLines.find((l) => isInboundType(l.movement_type))?.movement_date
       ?? first.movement_date
+      ?? sortedStorageLines[0]?.billing_period_start
       ?? null;
+
+    const storageCycleEndDate = movementLines.length === 0
+      ? sortedStorageLines[sortedStorageLines.length - 1]?.billing_period_end ?? null
+      : null;
 
     const weightPerUnitSource = groupLines.find((l) => toNum(l.qty) > 0);
     const weightPerUnit = weightPerUnitSource
@@ -120,7 +143,7 @@ export function buildInvoiceLotLedger(lines = []) {
     }
 
     if (rows.length === 0) {
-      pushRow({ deliveryDate: null, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
+      pushRow({ deliveryDate: storageCycleEndDate, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
     }
 
     const totalStorageCharge = round2(storageLines.reduce((s, l) => s + toNum(l.amount), 0));

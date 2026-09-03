@@ -82,6 +82,38 @@ describe('buildInvoiceLotLedger', () => {
     });
   });
 
+  // Real reported gap: a draft created through the period-based STORAGE
+  // flow (createBillingInvoiceDraftForPeriod, e.g. every OVO/TGM manual
+  // draft this session worked with) has ONLY movement_type: 'STORAGE'
+  // lines for a lot -- no separate RECEIVE_CONFIRM/DISPATCH movement lines
+  // at all. Those lines carry no movement_date (only billing_period_start/
+  // end, the cycle's own dates), so RECEIVED DATE/DELIVERY DATE printed
+  // blank on the invoice for every such lot, even though the underlying
+  // cycles do carry real dates.
+  it('derives RECEIVED/DELIVERY dates from STORAGE cycle dates when a lot has no movement-type lines at all', () => {
+    const lines = [
+      {
+        lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20,
+        billing_period_start: '2026-08-03', billing_period_end: '2026-08-17',
+      },
+      {
+        lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20,
+        billing_period_start: '2026-08-18', billing_period_end: '2026-09-01',
+      },
+    ];
+
+    const { lots } = buildInvoiceLotLedger(lines);
+    expect(lots).toHaveLength(1);
+    expect(lots[0].rows).toHaveLength(1);
+    // Earliest cycle's start (the true receipt date when the first-ever
+    // cycle is included) and latest cycle's end.
+    expect(lots[0].rows[0].receivedDate).toBe('2026-08-03');
+    expect(lots[0].rows[0].deliveryDate).toBe('2026-09-01');
+    expect(lots[0].rows[0].coldStorageCharge).toBe(708.40);
+  });
+
   it('groups multiple lots independently and sums a grand total across them', () => {
     const lines = [
       { lot_no: 'L1', product_code: 'P1', movement_type: 'STORAGE_OPENING_BALANCE', qty: 10, chargeable_weight: 100 },

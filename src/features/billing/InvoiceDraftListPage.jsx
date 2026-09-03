@@ -31,6 +31,7 @@ import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { canApproveBillingInvoiceDraft, formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
+import { formatFixed2 } from '../../utils/numberFormat.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 
@@ -583,9 +584,9 @@ export function InvoiceDraftListPage() {
             <div><strong>วันที่สร้าง:</strong> {formatDocumentDate(viewDraft.created_at)}</div>
             <div><strong>ช่วงเวลา (เริ่ม):</strong> {viewDraft.billing_period_start ?? '-'}</div>
             <div><strong>ช่วงเวลา (สิ้นสุด):</strong> {viewDraft.billing_period_end ?? '-'}</div>
-            <div><strong>จำนวนรวม:</strong> {viewDraft.total_qty ?? '-'}</div>
-            <div><strong>น้ำหนักรวม:</strong> {viewDraft.total_chargeable_weight ?? '-'}</div>
-            <div><strong>มูลค่ารวม:</strong> {viewDraft.total_amount ?? '-'}</div>
+            <div><strong>จำนวนรวม:</strong> {formatFixed2(viewDraft.total_qty)}</div>
+            <div><strong>น้ำหนักรวม:</strong> {formatFixed2(viewDraft.total_chargeable_weight)}</div>
+            <div><strong>มูลค่ารวม:</strong> {formatFixed2(viewDraft.total_amount)}</div>
           </div>
           <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>รายละเอียด</h4>
           {viewLoading ? <LoadingState /> : (
@@ -611,11 +612,11 @@ export function InvoiceDraftListPage() {
                       <td>{line.product_name ?? line.product_code ?? '-'}{line.line_note ? <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div> : null}</td>
                       <td>{line.movement_type ?? '-'}</td>
                       <td>{formatDocumentDate(line.movement_date, { dateOnly: true })}</td>
-                      <td style={{ textAlign: 'right' }}>{line.qty ?? '-'}</td>
-                      <td style={{ textAlign: 'right' }}>{line.chargeable_weight ?? '-'}</td>
+                      <td style={{ textAlign: 'right' }}>{formatFixed2(line.qty)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatFixed2(line.chargeable_weight)}</td>
                       <td style={{ textAlign: 'center' }}>{line.storage_days != null ? `${line.storage_days} วัน` : '-'}</td>
                       <td style={{ textAlign: 'right' }}>{line.rate ?? '-'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{line.amount != null ? line.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatFixed2(line.amount)}</td>
                     </tr>
                   )) : (
                     <tr><td colSpan={9} style={{ textAlign: 'center' }}>ไม่มีรายละเอียด</td></tr>
