@@ -2,20 +2,11 @@ import { Fragment, useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { buildInvoiceLotLedger } from '../../utils/invoiceLotLedgerUtils.js';
-import { INVOICE_DRAFT_STATUS } from '../../utils/billingInvoiceDraftUtils.js';
+import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 
-// Once a draft has actually been approved (and everything past that —
-// exported/billed), it's a real invoice, not a draft-in-progress anymore —
-// the printed document shouldn't still say ร่าง/DRAFT.
-const APPROVED_OR_LATER_STATUSES = [
-  INVOICE_DRAFT_STATUS.APPROVED,
-  INVOICE_DRAFT_STATUS.EXPORTED_TO_BPLUS,
-  INVOICE_DRAFT_STATUS.BILLED,
-];
-
-const PRINT_TABLE_COLUMN_COUNT = 18;
+const PRINT_TABLE_COLUMN_COUNT = 20;
 
 function fmt(value) {
   if (value == null) return '-';
@@ -81,7 +72,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
 
   const branding = normalizeDocumentBrandingConfig(getDefaultDocumentBranding());
   const { lots, grandTotal } = buildInvoiceLotLedger(lines);
-  const isApprovedOrLater = APPROVED_OR_LATER_STATUSES.includes(draft.status);
+  const isApprovedOrLater = APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES.includes(draft.status);
   const customerName = draft.customer_name ?? customer?.customer_name ?? '-';
 
   return (
@@ -134,19 +125,21 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           <col style={{ width: '5%' }} /> {/* received date */}
           <col style={{ width: '5%' }} /> {/* delivery date */}
           <col style={{ width: '7%' }} /> {/* lot no */}
-          <col style={{ width: '11%' }} /> {/* customer product */}
-          <col style={{ width: '6%' }} /> {/* desc / internal code */}
-          <col style={{ width: '5%' }} /> {/* weight/unit */}
-          <col style={{ width: '5%' }} /> {/* bal fwd volume */}
+          <col style={{ width: '9%' }} /> {/* customer product */}
+          <col style={{ width: '5%' }} /> {/* desc / internal code */}
+          <col style={{ width: '4%' }} /> {/* weight/unit */}
+          <col style={{ width: '4%' }} /> {/* bal fwd volume */}
           <col style={{ width: '5%' }} /> {/* bal fwd weight */}
-          <col style={{ width: '5%' }} /> {/* received volume */}
+          <col style={{ width: '4%' }} /> {/* received volume */}
           <col style={{ width: '5%' }} /> {/* received weight */}
-          <col style={{ width: '5%' }} /> {/* delivery volume */}
+          <col style={{ width: '4%' }} /> {/* delivery volume */}
           <col style={{ width: '5%' }} /> {/* delivery weight */}
           <col style={{ width: '5%' }} /> {/* balance volume */}
           <col style={{ width: '5%' }} /> {/* balance weight */}
           <col style={{ width: '5%' }} /> {/* handling fee rate */}
           <col style={{ width: '5%' }} /> {/* handling fee */}
+          <col style={{ width: '3%' }} /> {/* cycle count */}
+          <col style={{ width: '4%' }} /> {/* cold storage rate */}
           <col style={{ width: '5%' }} /> {/* cold storage charge */}
           <col style={{ width: '6%' }} /> {/* total */}
         </colgroup>
@@ -176,6 +169,8 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
             <th colSpan={2} style={TH}>BALANCE</th>
             <th rowSpan={2} style={TH}>HANDLING<br />FEE RATE</th>
             <th rowSpan={2} style={TH}>HANDLING<br />FEE</th>
+            <th rowSpan={2} style={TH}>CYCLES<br />(งวด)</th>
+            <th rowSpan={2} style={TH}>COLD STORAGE<br />RATE</th>
             <th rowSpan={2} style={TH}>COLD STORAGE<br />CHARGE</th>
             <th rowSpan={2} style={TH}>TOTAL</th>
           </tr>
@@ -218,6 +213,8 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{fmt(row.balanceWeight)}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.rate != null ? fmt(row.rate) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.handlingFee != null ? fmt(row.handlingFee) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.cycleCount ?? '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.chargeUnit != null ? fmt(row.chargeUnit) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.coldStorageCharge != null ? fmt(row.coldStorageCharge) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{row.total != null ? fmt(row.total) : '-'}</td>
                 </tr>
@@ -234,13 +231,15 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.balanceWeight)}</td>
                 <td style={TD} />
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.handlingFee)}</td>
+                <td style={TD} />
+                <td style={TD} />
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.coldStorageCharge)}</td>
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.total)}</td>
               </tr>
             </Fragment>
           )) : (
             <tr>
-              <td colSpan={18} style={{ ...TD, padding: 16, color: '#94a3b8' }}>ไม่มีรายการ</td>
+              <td colSpan={PRINT_TABLE_COLUMN_COUNT} style={{ ...TD, padding: 16, color: '#94a3b8' }}>ไม่มีรายการ</td>
             </tr>
           )}
         </tbody>
@@ -258,6 +257,8 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
               <td style={{ ...TD, textAlign: 'right' }}>{fmt(grandTotal.balanceWeight)}</td>
               <td style={TD} />
               <td style={{ ...TD, textAlign: 'right' }}>{fmt(grandTotal.handlingFee)}</td>
+              <td style={TD} />
+              <td style={TD} />
               <td style={{ ...TD, textAlign: 'right' }}>{fmt(grandTotal.coldStorageCharge)}</td>
               <td style={{ ...TD, textAlign: 'right', color: '#2d9348' }}>{fmt(grandTotal.total)}</td>
             </tr>

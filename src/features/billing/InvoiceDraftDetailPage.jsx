@@ -11,8 +11,10 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import { InvoiceDraftBplusReadinessPanel } from '../../components/billing/InvoiceDraftBplusReadinessPanel.jsx';
 import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
+import { exportInvoiceDraftPdf } from '../../utils/invoiceDraftPdfExport.js';
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from '../../utils/billingInvoiceDraftUtils.js';
 import {
   approveBillingInvoiceDraft,
   cancelBillingInvoiceDraft,
@@ -342,9 +344,10 @@ export function InvoiceDraftDetailPage() {
 
       <ReportPreviewModal
         open={printOpen}
-        title={`Invoice Draft — ${draft.draft_no ?? ''}`}
+        title={`${APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES.includes(draft.status) ? 'Invoice' : 'Invoice Draft'} — ${draft.draft_no ?? ''}`}
         orientation="landscape"
         onClose={() => setPrintOpen(false)}
+        onDownloadPdf={() => exportInvoiceDraftPdf({ draft, lines: state.lines })}
       >
         <InvoiceDraftPrintTemplate draft={draft} lines={state.lines} />
       </ReportPreviewModal>

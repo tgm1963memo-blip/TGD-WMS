@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 
@@ -37,8 +37,16 @@ export function ReportPreviewModal({
   language = 'th',
   orientation = 'portrait',
   onClose,
+  // Optional: a report that can also generate a real downloadable PDF file
+  // (distinct from Save-as-PDF via the print dialog, e.g. the invoice draft
+  // ledger's own vector-text export) passes an async callback here to get a
+  // "ดาวน์โหลด PDF" button next to Print. Reports that don't pass it keep
+  // today's Preview/Print/Close toolbar unchanged.
+  onDownloadPdf,
   children,
 }) {
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
   useEffect(() => {
     if (!open) return undefined;
 
@@ -64,6 +72,16 @@ export function ReportPreviewModal({
 
   const handlePrint = () => printWithOrientation(orientation, title);
 
+  async function handleDownloadPdf() {
+    if (!onDownloadPdf || downloadingPdf) return;
+    setDownloadingPdf(true);
+    try {
+      await onDownloadPdf();
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   return createPortal(
     <div className="operational-report-modal-backdrop" role="presentation" onClick={onClose}>
       <div
@@ -79,6 +97,17 @@ export function ReportPreviewModal({
             <button type="button" className="btn" data-testid="report-preview-button">
               {previewLabel}
             </button>
+            {onDownloadPdf ? (
+              <button
+                type="button"
+                className="btn"
+                data-testid="report-download-pdf-button"
+                disabled={downloadingPdf}
+                onClick={handleDownloadPdf}
+              >
+                {downloadingPdf ? 'กำลังสร้าง PDF...' : 'ดาวน์โหลด PDF'}
+              </button>
+            ) : null}
             <button type="button" className="btn btn-primary-gold" data-testid="report-print-button" onClick={handlePrint}>
               {printLabel}
             </button>

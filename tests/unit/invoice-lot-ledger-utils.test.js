@@ -164,6 +164,8 @@ describe('buildInvoiceLotLedger', () => {
     expect(row.deliveryWeight).toBe(20);
     // Must reconcile exactly: forward + received - delivery = balance.
     expect(row.balanceForwardWeight + row.receivedWeight - row.deliveryWeight).toBe(row.balanceWeight);
+    // Shows how many cycles were bundled into this one row's charge.
+    expect(row.cycleCount).toBe(3);
     // Only the last (chronologically) cycle's own note shows -- a lot
     // catching up several cycles in one draft must not dump every cycle's
     // sentence onto one row; the reconciled numbers above already

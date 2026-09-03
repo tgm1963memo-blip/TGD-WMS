@@ -68,12 +68,14 @@ export function chunkArray(items, size) {
 export function buildCatalogMaps(catalogRows = []) {
   const productIdByCode = new Map();
   const temperatureTypeByCode = new Map();
+  const productNameByCode = new Map();
   for (const row of catalogRows) {
     if (!row.customer_product_code) continue;
     productIdByCode.set(row.customer_product_code, row.id);
     if (row.temperature_type) temperatureTypeByCode.set(row.customer_product_code, row.temperature_type);
+    if (row.product_name) productNameByCode.set(row.customer_product_code, row.product_name);
   }
-  return { productIdByCode, temperatureTypeByCode };
+  return { productIdByCode, temperatureTypeByCode, productNameByCode };
 }
 
 // Groups, per deposit line, the withdrawal events (weight + date) that
@@ -123,7 +125,7 @@ async function fetchRateEngineInputs({ customerId }) {
       .select(`
         id, customer_id, expected_arrival_date, last_action_at, requires_r3_document,
         tgd_customer_deposit_request_lines(
-          id, customer_product_code, temperature_type, tracking_code, lot_no,
+          id, customer_product_code, product_name, temperature_type, tracking_code, lot_no,
           actual_boxes, actual_weight, expected_boxes, expected_weight
         )
       `)
@@ -149,7 +151,7 @@ async function fetchRateEngineInputs({ customerId }) {
   if (ratesResult.error) return { error: ratesResult.error };
   if (catalogResult.error) return { error: catalogResult.error };
 
-  const { productIdByCode, temperatureTypeByCode } = buildCatalogMaps(catalogResult.data ?? []);
+  const { productIdByCode, temperatureTypeByCode, productNameByCode } = buildCatalogMaps(catalogResult.data ?? []);
 
   const rawDepositLines = [];
   const depositRequestIds = [];
@@ -187,6 +189,10 @@ async function fetchRateEngineInputs({ customerId }) {
     receipt_date: line.receipt_date,
     withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],
     customer_product_code: line.customer_product_code ?? null,
+    // Master catalog's current name wins, same reasoning as temperature_type
+    // above; the line's own snapshot only covers products the catalog entry
+    // no longer has (renamed/removed since).
+    product_name: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
     lot_no: line.lot_no ?? null,
   }));
 

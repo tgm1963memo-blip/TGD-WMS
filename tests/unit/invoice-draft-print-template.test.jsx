@@ -71,4 +71,17 @@ describe('InvoiceDraftPrintTemplate', () => {
     expect(text).toContain('งวดละ 15 วัน');
     expect(text).toContain('1,540.00');
   });
+
+  it('shows the COLD STORAGE RATE column with the per-kg rate actually charged', () => {
+    const storageOnlyLines = [
+      {
+        lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20, chargeable_weight: 1540,
+        billing_period_start: '2026-08-03', billing_period_end: '2026-08-17',
+      },
+    ];
+    const { container } = render(<InvoiceDraftPrintTemplate draft={{ ...baseDraft, status: 'DRAFT' }} lines={storageOnlyLines} />);
+    expect(container.textContent).toContain('COLD STORAGERATE');
+    expect(container.textContent).toContain('0.23');
+  });
 });

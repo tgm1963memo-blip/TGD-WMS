@@ -18,4 +18,10 @@ database/seeds/.temp_*.sql
 test-results/
 playwright-report/
 uat-evidence/
+
+# jsPDF's save() writes directly to disk under Vitest's Node/jsdom test
+# environment (no real browser download prompt to intercept there) --
+# invoice-draft-pdf-export.test.js runs the real export end-to-end, which
+# drops stray .pdf files at the repo root each run.
+/*.pdf
 .vercel

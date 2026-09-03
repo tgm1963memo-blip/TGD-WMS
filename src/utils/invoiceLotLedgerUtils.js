@@ -105,6 +105,7 @@ export function buildInvoiceLotLedger(lines = []) {
         rate: rate ?? null,
         handlingFee: 0,
         chargeUnit: null,
+        cycleCount: null,
         coldStorageCharge: 0,
         total: round2(toNum(charge)),
         remark: remark ?? null,
@@ -199,6 +200,7 @@ export function buildInvoiceLotLedger(lines = []) {
     if (storageLines.length > 0) {
       const lastRow = rows[rows.length - 1];
       lastRow.chargeUnit = storageRate;
+      lastRow.cycleCount = sortedStorageLines.length;
       lastRow.coldStorageCharge = totalStorageCharge;
       lastRow.total = round2(lastRow.handlingFee + totalStorageCharge);
       lastRow.remark = [lastRow.remark, storageNote].filter(Boolean).join(' / ') || null;

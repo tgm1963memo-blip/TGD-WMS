@@ -32,6 +32,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "^4.3.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
     "react": "^18.3.1",

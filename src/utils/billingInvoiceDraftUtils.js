@@ -30,6 +30,18 @@ export const APPROVABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
   INVOICE_DRAFT_STATUS.READY_TO_REVIEW,
 ]);
 
+// Once a draft has actually been approved (and everything past that --
+// exported/billed), it's a real invoice, not a draft-in-progress anymore --
+// every place that shows the word "Draft"/"ร่าง" (print title, modal title,
+// etc.) should stop once the status reaches any of these. Shared here so
+// the printed document and the on-screen preview chrome can't drift apart
+// on which statuses count as "still a draft."
+export const APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES = Object.freeze([
+  INVOICE_DRAFT_STATUS.APPROVED,
+  INVOICE_DRAFT_STATUS.EXPORTED_TO_BPLUS,
+  INVOICE_DRAFT_STATUS.BILLED,
+]);
+
 // Hard-delete (not the soft CANCELLED transition) is only offered for plain
 // DRAFT — once a draft has moved to READY_TO_REVIEW or beyond it's been
 // seen/acted on, so cancel (which preserves an audit trail) is the right
@@ -183,7 +195,7 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
     customer_id: storageLine.customerId,
     product_id: null,
     product_code: depositLine.customer_product_code ?? null,
-    product_name: depositLine.customer_product_code ?? null,
+    product_name: depositLine.product_name ?? depositLine.customer_product_code ?? null,
     lot_no: depositLine.lot_no ?? null,
     pallet_no: null,
     movement_type: 'STORAGE',
@@ -242,7 +254,7 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
     customer_id: handlingLine.customerId,
     product_id: null,
     product_code: depositLine.customer_product_code ?? null,
-    product_name: depositLine.customer_product_code ?? null,
+    product_name: depositLine.product_name ?? depositLine.customer_product_code ?? null,
     lot_no: depositLine.lot_no ?? null,
     pallet_no: null,
     movement_type: documentType,

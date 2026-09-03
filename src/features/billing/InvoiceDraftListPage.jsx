@@ -9,6 +9,7 @@ import { InvoiceDraftFilterPanel } from '../../components/billing/InvoiceDraftFi
 import { InvoiceDraftListTable } from '../../components/billing/InvoiceDraftListTable.jsx';
 import { InvoiceDraftStatusBadge } from '../../components/billing/InvoiceDraftStatusBadge.jsx';
 import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
+import { exportInvoiceDraftPdf } from '../../utils/invoiceDraftPdfExport.js';
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
@@ -30,7 +31,9 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
-import { canApproveBillingInvoiceDraft, formatInvoiceDraftError } from '../../utils/billingInvoiceDraftUtils.js';
+import {
+  canApproveBillingInvoiceDraft, formatInvoiceDraftError, APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES,
+} from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
@@ -594,10 +597,10 @@ export function InvoiceDraftListPage() {
               <table className="data-table" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th>เอกสารต้นทาง</th>
-                    <th>สินค้า / รายการ</th>
+                    <th>ลำดับ</th>
+                    <th>รหัสสินค้า</th>
+                    <th>ชื่อสินค้า</th>
                     <th>ประเภท</th>
-                    <th>วันที่</th>
                     <th style={{ textAlign: 'right' }}>จำนวน</th>
                     <th style={{ textAlign: 'right' }}>น้ำหนัก</th>
                     <th style={{ textAlign: 'center' }}>งวด/วัน</th>
@@ -606,12 +609,12 @@ export function InvoiceDraftListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {viewLines.length ? viewLines.map((line) => (
+                  {viewLines.length ? viewLines.map((line, idx) => (
                     <tr key={line.id}>
-                      <td>{line.source_document_no ?? '-'}</td>
-                      <td>{line.product_name ?? line.product_code ?? '-'}{line.line_note ? <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div> : null}</td>
+                      <td>{idx + 1}</td>
+                      <td>{line.product_code ?? '-'}</td>
+                      <td>{line.product_name ?? '-'}{line.line_note ? <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div> : null}</td>
                       <td>{line.movement_type ?? '-'}</td>
-                      <td>{formatDocumentDate(line.movement_date, { dateOnly: true })}</td>
                       <td style={{ textAlign: 'right' }}>{formatFixed2(line.qty)}</td>
                       <td style={{ textAlign: 'right' }}>{formatFixed2(line.chargeable_weight)}</td>
                       <td style={{ textAlign: 'center' }}>{line.storage_days != null ? `${line.storage_days} วัน` : '-'}</td>
@@ -1034,9 +1037,10 @@ export function InvoiceDraftListPage() {
 
       <ReportPreviewModal
         open={printOpen}
-        title={`Invoice Draft — ${viewDraft?.draft_no ?? ''}`}
+        title={`${APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES.includes(viewDraft?.status) ? 'Invoice' : 'Invoice Draft'} — ${viewDraft?.draft_no ?? ''}`}
         orientation="landscape"
         onClose={() => setPrintOpen(false)}
+        onDownloadPdf={() => exportInvoiceDraftPdf({ draft: viewDraft, lines: viewLines })}
       >
         <InvoiceDraftPrintTemplate draft={viewDraft} lines={viewLines} />
       </ReportPreviewModal>
