@@ -392,9 +392,22 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // recorded per deposit REQUEST rather than per line/product, so they
   // have no single temperature to scope by and are always included in
   // full regardless of this filter.
-  const depositLines = temperatureType
+  const scopedDepositLines = temperatureType
     ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
     : allDepositLines;
+
+  // A line with no real received amount (received_weight resolves to
+  // actual_weight ?? expected_weight ?? 0 -- see fetchRateEngineInputs --
+  // so this is 0 only when actual_weight/actual_boxes were themselves
+  // recorded as 0, or nothing was ever entered at all) has nothing to
+  // charge for and nothing to flag: it's not "unrated," it's just empty.
+  // Confirmed real case: two TGM lines both RECEIVED_CONFIRMED at the
+  // document level but recorded actual_boxes=0/actual_weight=0 on the line
+  // itself (likely removed/zeroed during receiving without deleting the
+  // row) kept showing up in the "no rate configured" warning even though
+  // there was nothing to bill either way -- confusing staff into thinking
+  // a rate needed setting up for a lot that was never actually received.
+  const depositLines = scopedDepositLines.filter((dl) => Number(dl.received_weight) > 0);
 
   const storageLines = computeStorageInvoiceLines({
     depositLines,
@@ -426,6 +439,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
       lotNo: dl.lot_no,
       customerProductCode: dl.customer_product_code,
       temperatureType: dl.temperature_type,
+      weight: dl.received_weight,
       reason: classifyUnratedReason(rates, {
         customerId: dl.customer_id,
         customerProductId: dl.customer_product_id,
@@ -579,9 +593,13 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
   if (inputs.error) return { data: null, error: inputs.error };
   const { depositLines: allDepositLines, rates } = inputs;
   // Same per-lot storage-method scoping as getBillingPeriodPreview above.
-  const depositLines = temperatureType
+  const scopedDepositLines = temperatureType
     ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
     : allDepositLines;
+  // Same zero-received-amount exclusion as getBillingPeriodPreview -- a line
+  // recorded with actual_boxes=0/actual_weight=0 has nothing to bill and
+  // isn't a real "unrated" gap either.
+  const depositLines = scopedDepositLines.filter((dl) => Number(dl.received_weight) > 0);
 
   // A lot resolveServiceRate can't match at all (no rate configured for
   // this customer/temperature combination, or a temperature_type that's
@@ -610,6 +628,7 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
         lotNo: dl.lot_no,
         customerProductCode: dl.customer_product_code,
         temperatureType: dl.temperature_type,
+        weight: dl.received_weight,
         reason: classifyUnratedReason(rates, {
           customerId: dl.customer_id,
           customerProductId: dl.customer_product_id,

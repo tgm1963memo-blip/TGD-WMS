@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { UatOnly } from '../../components/common/UatOnly.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
@@ -25,7 +25,8 @@ import {
 } from '../../services/billingInvoiceDraftService.js';
 import { getAutoLotBillingPreview } from '../../services/billingRateEngineService.js';
 import { getCustomers } from '../../services/masterDataService.js';
-import { TEMPERATURE_TYPES } from '../../services/productServiceRatesService.js';
+import { TEMPERATURE_TYPES, upsertProductServiceRate } from '../../services/productServiceRatesService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -76,6 +77,13 @@ export function InvoiceDraftListPage() {
   const [storageBillLoading, setStorageBillLoading] = useState(false);
   const [storageBillError, setStorageBillError] = useState(null);
   const [storageBillSaving, setStorageBillSaving] = useState(false);
+  // Inline "set a rate" form for an unrated line in the storage-bill preview
+  // (see storageBillPreview.unratedDepositLines) — keyed by the unrated
+  // item's own index in that array, since it has no stable id of its own.
+  const [unratedRateFormIdx, setUnratedRateFormIdx] = useState(null);
+  const [unratedRateInputs, setUnratedRateInputs] = useState({ rate: '', periodDays: '30' });
+  const [unratedRateSaving, setUnratedRateSaving] = useState(false);
+  const [unratedRateError, setUnratedRateError] = useState('');
   const [autoBillThroughDate, setAutoBillThroughDate] = useState('');
   const [autoBillPreview, setAutoBillPreview] = useState(null);
   const [autoBillLoading, setAutoBillLoading] = useState(false);
@@ -226,6 +234,86 @@ export function InvoiceDraftListPage() {
       return;
     }
     setStorageBillPreview(result.data);
+  }
+
+  function openUnratedRateForm(idx) {
+    setUnratedRateFormIdx(idx);
+    setUnratedRateInputs({ rate: '', periodDays: '30' });
+    setUnratedRateError('');
+  }
+
+  // Sets a live STORAGE rate for an unrated lot straight from this preview,
+  // then re-runs the preview so it picks the new rate up immediately —
+  // avoids the previous round-trip of noting the product code here, leaving
+  // to the Product Service Rates admin page, then coming back to re-preview.
+  //
+  // Scope is chosen automatically, most specific first: a catalog entry for
+  // this exact customer_product_code (rate applies to only that one SKU) if
+  // one exists, else a customer-wide rate scoped to this lot's own
+  // temperature_type, else (only when the lot has no temperature_type on
+  // record either) a plain customer-wide rate with no restriction at all —
+  // the broadest tier, which also matches every OTHER unrated/future item
+  // for this customer with no temperature recorded, so it's confirmed with
+  // the user before saving rather than applied silently.
+  async function handleSaveUnratedRate(unratedItem) {
+    const rateValue = Number(unratedRateInputs.rate);
+    const periodDaysValue = Number(unratedRateInputs.periodDays);
+    if (!rateValue || rateValue <= 0) {
+      setUnratedRateError('กรุณาระบุอัตราค่าฝากเป็นตัวเลขมากกว่า 0');
+      return;
+    }
+    if (!periodDaysValue || periodDaysValue <= 0) {
+      setUnratedRateError('กรุณาระบุจำนวนวันต่อรอบเป็นตัวเลขมากกว่า 0');
+      return;
+    }
+
+    setUnratedRateSaving(true);
+    setUnratedRateError('');
+
+    let customerProductId = null;
+    if (unratedItem.customerProductCode) {
+      const catalogResult = await listCustomerProducts({ customerId: storageBillCustomerId, search: unratedItem.customerProductCode });
+      if (catalogResult.error) {
+        setUnratedRateSaving(false);
+        setUnratedRateError(formatInvoiceDraftError(catalogResult.error));
+        return;
+      }
+      const exactMatch = (catalogResult.data ?? []).find(
+        (p) => p.customer_product_code === unratedItem.customerProductCode,
+      );
+      customerProductId = exactMatch?.id ?? null;
+    }
+
+    const scopeDescription = customerProductId
+      ? `เฉพาะรหัสสินค้า ${unratedItem.customerProductCode} ของลูกค้ารายนี้เท่านั้น`
+      : unratedItem.temperatureType
+        ? `ทุกสินค้าประเภทจัดเก็บ "${unratedItem.temperatureType}" ของลูกค้ารายนี้ (ไม่พบสินค้านี้ในแคตตาล็อก จึงตั้งตามประเภทจัดเก็บแทน)`
+        : `ทุกสินค้าของลูกค้ารายนี้แบบไม่จำกัดประเภท (ไม่พบสินค้านี้ในแคตตาล็อกและไม่มีประเภทจัดเก็บระบุไว้ — เป็นขอบเขตกว้างที่สุด จะกระทบสินค้าอื่นที่ยังไม่มีอัตราด้วย)`;
+    const confirmed = window.confirm(
+      `ตั้งอัตราค่าฝาก ${rateValue} บาท/กก./รอบ${periodDaysValue} วัน จะมีผลกับ: ${scopeDescription}\n\nยืนยันบันทึก?`,
+    );
+    if (!confirmed) {
+      setUnratedRateSaving(false);
+      return;
+    }
+
+    const result = await upsertProductServiceRate({
+      customerId: customerProductId ? null : storageBillCustomerId,
+      customerProductId,
+      serviceType: 'STORAGE',
+      rate: rateValue,
+      unitBasis: 'PER_KG',
+      periodDays: periodDaysValue,
+      temperatureType: customerProductId ? null : (unratedItem.temperatureType || null),
+    });
+    setUnratedRateSaving(false);
+    if (result.error) {
+      setUnratedRateError(formatInvoiceDraftError(result.error));
+      return;
+    }
+
+    setUnratedRateFormIdx(null);
+    await handleStorageBillPreview();
   }
 
   // Two review files per the billing SOP: one workbook with every matched
@@ -825,17 +913,78 @@ export function InvoiceDraftListPage() {
                           <th>Lot</th>
                           <th>รหัสสินค้า</th>
                           <th>วิธีจัดเก็บ</th>
+                          <th style={{ textAlign: 'right' }}>จำนวน (กก.)</th>
                           <th>เหตุผล</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {storageBillPreview.unratedDepositLines.map((u, idx) => (
-                          <tr key={idx}>
-                            <td>{u.lotNo ?? '-'}</td>
-                            <td>{u.customerProductCode ?? '-'}</td>
-                            <td>{u.temperatureType ?? '-'}</td>
-                            <td>{UNRATED_REASON_LABELS[u.reason] ?? u.reason ?? '-'}</td>
-                          </tr>
+                          <Fragment key={idx}>
+                            <tr>
+                              <td>{u.lotNo ?? '-'}</td>
+                              <td>{u.customerProductCode ?? '-'}</td>
+                              <td>{u.temperatureType ?? '-'}</td>
+                              <td style={{ textAlign: 'right' }}>{u.weight != null ? u.weight.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                              <td>{UNRATED_REASON_LABELS[u.reason] ?? u.reason ?? '-'}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  data-testid={`unrated-set-rate-button-${idx}`}
+                                  onClick={() => (unratedRateFormIdx === idx ? setUnratedRateFormIdx(null) : openUnratedRateForm(idx))}
+                                >
+                                  {unratedRateFormIdx === idx ? 'ยกเลิก' : 'ตั้งค่าอัตรา'}
+                                </button>
+                              </td>
+                            </tr>
+                            {unratedRateFormIdx === idx ? (
+                              <tr>
+                                <td colSpan={6} style={{ background: '#fffdf5' }}>
+                                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', padding: '8px 0' }}>
+                                    <label style={{ fontSize: 12, fontWeight: 600 }}>
+                                      อัตรา (บาท/กก./รอบ)
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="form-control"
+                                        style={{ display: 'block', width: 140, marginTop: 4 }}
+                                        value={unratedRateInputs.rate}
+                                        onChange={(e) => setUnratedRateInputs((prev) => ({ ...prev, rate: e.target.value }))}
+                                        data-testid={`unrated-rate-input-${idx}`}
+                                      />
+                                    </label>
+                                    <label style={{ fontSize: 12, fontWeight: 600 }}>
+                                      จำนวนวันต่อรอบ
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        className="form-control"
+                                        style={{ display: 'block', width: 100, marginTop: 4 }}
+                                        value={unratedRateInputs.periodDays}
+                                        onChange={(e) => setUnratedRateInputs((prev) => ({ ...prev, periodDays: e.target.value }))}
+                                        data-testid={`unrated-period-days-input-${idx}`}
+                                      />
+                                    </label>
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      disabled={unratedRateSaving}
+                                      onClick={() => handleSaveUnratedRate(u)}
+                                      data-testid={`unrated-save-rate-button-${idx}`}
+                                    >
+                                      {unratedRateSaving ? 'กำลังบันทึก...' : 'บันทึกอัตราและคำนวณใหม่'}
+                                    </button>
+                                  </div>
+                                  {unratedRateError ? (
+                                    <div className="banner banner-danger" style={{ padding: 8, fontSize: 12 }}>{unratedRateError}</div>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>

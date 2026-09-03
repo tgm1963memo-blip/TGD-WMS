@@ -77,18 +77,17 @@ export function InvoiceDraftListTable({
               <td>{formatFixed2(draft.total_chargeable_weight)}</td>
               <td>{formatFixed2(draft.total_amount)}</td>
               <td>{formatDate(draft.created_at)}</td>
-              <td style={{ minWidth: 130 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'stretch' }}>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: 6 }}>
                   {onView ? (
-                    <button className="btn btn-outline" type="button" style={{ width: '100%' }} onClick={() => onView(draft)}>View</button>
+                    <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
                   ) : (
-                    <Link className="btn btn-outline" style={{ width: '100%', textAlign: 'center' }} to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
+                    <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
                   )}
                   {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
                     <button
                       className="btn btn-primary"
                       type="button"
-                      style={{ width: '100%' }}
                       disabled={approvingId === draft.id}
                       data-testid={`invoice-draft-approve-button-${draft.id}`}
                       onClick={() => onApprove(draft)}
@@ -100,7 +99,6 @@ export function InvoiceDraftListTable({
                     <button
                       className="btn btn-outline"
                       type="button"
-                      style={{ width: '100%' }}
                       disabled={recalculatingId === draft.id}
                       data-testid={`invoice-draft-recalculate-button-${draft.id}`}
                       onClick={() => onRecalculate(draft)}
@@ -113,7 +111,6 @@ export function InvoiceDraftListTable({
                     <button
                       className="btn btn-danger"
                       type="button"
-                      style={{ width: '100%' }}
                       data-testid={`invoice-draft-delete-button-${draft.id}`}
                       onClick={() => onDelete(draft)}
                     >

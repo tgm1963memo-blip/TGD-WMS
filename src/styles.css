@@ -1806,6 +1806,20 @@ table .status-badge,
 /* ── Hide on mobile ── */
 .hide-xs { }
 
+/* ── Desktop: same hamburger + isOpen flag as mobile, opposite polarity.
+   Mobile's default is "hidden, hamburger reveals it" (off-canvas drawer);
+   desktop's default is "visible, hamburger collapses it" (frees up width
+   for wide tables like the invoice draft list's Action column) — reusing
+   sidebar--mobile-open (already applied whenever the AppShell's toggle
+   state is true) rather than adding a second class/state to track. ── */
+@media (min-width: 1025px) {
+  .sidebar-hamburger { display: flex; }
+  .sidebar.sidebar--mobile-open,
+  .app-sidebar.sidebar--mobile-open {
+    display: none;
+  }
+}
+
 @media (max-width: 1024px) {
 
   /* Allow page-level scrolling on small screens */
