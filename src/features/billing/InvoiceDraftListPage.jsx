@@ -23,6 +23,7 @@ import {
   recalculateInvoiceDraftLineRates,
   saveLotBillingCutoffSeed,
   createAutoLotBillingDraft,
+  fetchDepositLineTrackingCodes,
 } from '../../services/billingInvoiceDraftService.js';
 import { getAutoLotBillingPreview } from '../../services/billingRateEngineService.js';
 import { getCustomers } from '../../services/masterDataService.js';
@@ -63,6 +64,8 @@ export function InvoiceDraftListPage() {
   const [viewDraft, setViewDraft] = useState(null);
   const [viewLines, setViewLines] = useState([]);
   const [viewLoading, setViewLoading] = useState(false);
+  const [viewProductNameByCode, setViewProductNameByCode] = useState(new Map());
+  const [viewTrackingCodeByDepositLineId, setViewTrackingCodeByDepositLineId] = useState(new Map());
   const [exportingSummary, setExportingSummary] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -459,10 +462,21 @@ export function InvoiceDraftListPage() {
   function handleView(draft) {
     setViewDraft(draft);
     setViewLines([]);
+    setViewProductNameByCode(new Map());
+    setViewTrackingCodeByDepositLineId(new Map());
     setViewLoading(true);
     getBillingInvoiceDraftById(draft.id).then((result) => {
-      setViewLines(result.data?.lines ?? []);
+      const lines = result.data?.lines ?? [];
+      setViewLines(lines);
       setViewLoading(false);
+      listCustomerProducts({ customerId: draft.customer_id }).then((catalogResult) => {
+        const map = new Map();
+        for (const row of catalogResult.data ?? []) {
+          if (row.customer_product_code && row.product_name) map.set(row.customer_product_code, row.product_name);
+        }
+        setViewProductNameByCode(map);
+      });
+      fetchDepositLineTrackingCodes(lines.map((line) => line.deposit_line_id)).then(setViewTrackingCodeByDepositLineId);
     });
   }
 
@@ -625,11 +639,19 @@ export function InvoiceDraftListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {viewLines.length ? viewLines.map((line, idx) => (
+                  {viewLines.length ? viewLines.map((line, idx) => {
+                    const productName = viewProductNameByCode.get(line.product_code) ?? line.product_name ?? '-';
+                    const trackingCode = viewTrackingCodeByDepositLineId.get(line.deposit_line_id);
+                    const lotTracking = [line.lot_no, trackingCode].filter(Boolean).join(' / ');
+                    return (
                     <tr key={line.id}>
                       <td>{idx + 1}</td>
                       <td>{line.product_code ?? '-'}</td>
-                      <td>{line.product_name ?? '-'}{line.line_note ? <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div> : null}</td>
+                      <td>
+                        {productName}
+                        {lotTracking ? <div style={{ fontSize: 11, color: '#555' }}>({lotTracking})</div> : null}
+                        {line.line_note ? <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div> : null}
+                      </td>
                       <td>{line.movement_type ?? '-'}</td>
                       <td style={{ textAlign: 'right' }}>{formatFixed2(line.qty)}</td>
                       <td style={{ textAlign: 'right' }}>{formatFixed2(line.chargeable_weight)}</td>
@@ -637,7 +659,8 @@ export function InvoiceDraftListPage() {
                       <td style={{ textAlign: 'right' }}>{line.rate ?? '-'}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatFixed2(line.amount)}</td>
                     </tr>
-                  )) : (
+                    );
+                  }) : (
                     <tr><td colSpan={9} style={{ textAlign: 'center' }}>ไม่มีรายละเอียด</td></tr>
                   )}
                 </tbody>

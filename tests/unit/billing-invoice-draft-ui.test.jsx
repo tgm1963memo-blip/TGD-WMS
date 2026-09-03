@@ -13,6 +13,7 @@ const {
   cancelBillingInvoiceDraftMock,
   getBillingInvoiceDraftBplusExportReadinessMock,
   findActiveDuplicateDraftLinesMock,
+  fetchDepositLineTrackingCodesMock,
   getBillingMovementWeightRowsMock,
   getMovementLedgerRowsMock,
   getConfirmedDepositReceiptRowsMock,
@@ -28,6 +29,7 @@ const {
   cancelBillingInvoiceDraftMock: vi.fn(),
   getBillingInvoiceDraftBplusExportReadinessMock: vi.fn(),
   findActiveDuplicateDraftLinesMock: vi.fn(),
+  fetchDepositLineTrackingCodesMock: vi.fn().mockResolvedValue(new Map()),
   getBillingMovementWeightRowsMock: vi.fn(),
   getMovementLedgerRowsMock: vi.fn(),
   getConfirmedDepositReceiptRowsMock: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
   cancelBillingInvoiceDraft: cancelBillingInvoiceDraftMock,
   getBillingInvoiceDraftBplusExportReadiness: getBillingInvoiceDraftBplusExportReadinessMock,
   findActiveDuplicateDraftLines: findActiveDuplicateDraftLinesMock,
+  fetchDepositLineTrackingCodes: fetchDepositLineTrackingCodesMock,
 }));
 
 vi.mock('../../src/services/billingMovementWeightService.js', () => ({

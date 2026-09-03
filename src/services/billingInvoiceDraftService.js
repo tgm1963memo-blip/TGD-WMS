@@ -417,6 +417,24 @@ export async function getBillingInvoiceDraftById(id) {
   };
 }
 
+// tracking_code lives on the source deposit line (tgd_customer_deposit_request_lines),
+// not on the invoice draft line itself -- draft lines only carry deposit_line_id,
+// so this resolves it live via that foreign key for display purposes (e.g. so a
+// customer can cross-check a billed line against the original deposit).
+export async function fetchDepositLineTrackingCodes(depositLineIds = []) {
+  const ids = [...new Set(depositLineIds.filter(Boolean))];
+  if (!ids.length || !supabase) return new Map();
+  const { data } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, tracking_code')
+    .in('id', ids);
+  const map = new Map();
+  for (const row of (data ?? [])) {
+    if (row.tracking_code) map.set(row.id, row.tracking_code);
+  }
+  return map;
+}
+
 // Backfills rate/amount on an existing draft's lines that predate the rate
 // lookup in resolveMovementRates/createBillingInvoiceDraftFromMovements —
 // those lines were persisted with rate/amount always null. Only lines

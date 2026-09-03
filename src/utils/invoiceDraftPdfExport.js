@@ -7,6 +7,7 @@ import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from './billingInvoiceDraftU
 import { SARABUN_REGULAR_BASE64, SARABUN_BOLD_BASE64 } from '../assets/fonts/SarabunBase64.js';
 import { supabase } from '../services/supabaseClient.js';
 import { listCustomerProducts } from '../services/customerProductCatalogService.js';
+import { fetchDepositLineTrackingCodes } from '../services/billingInvoiceDraftService.js';
 
 // jsPDF's built-in fonts (Helvetica etc.) have no Thai glyphs at all, so
 // every Thai character would render as a blank box without embedding a real
@@ -269,6 +270,7 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
     body: buildTableBody(lots, grandTotal),
     foot: lots.length ? buildTableFoot(grandTotal) : undefined,
     showFoot: 'lastPage',
+    rowPageBreak: 'avoid',
     startY: HEADER_HEIGHT_MM,
     margin: { top: HEADER_HEIGHT_MM, left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
     styles: { font: FONT_NAME, fontSize: 6, cellPadding: 1, overflow: 'linebreak', valign: 'middle' },
@@ -347,7 +349,10 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
 export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
   if (!draft) return;
 
-  const productNameByCode = await fetchProductNameByCode(draft.customer_id);
+  const [productNameByCode, trackingCodeByDepositLineId] = await Promise.all([
+    fetchProductNameByCode(draft.customer_id),
+    fetchDepositLineTrackingCodes(lines.map((line) => line.deposit_line_id)),
+  ]);
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   registerThaiFont(doc);
@@ -389,17 +394,23 @@ export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
   y += 3;
 
   const head = [['ลำดับ', 'รหัสสินค้า', 'ชื่อสินค้า', 'ประเภท', 'จำนวน', 'น้ำหนัก', 'งวด/วัน', 'อัตรา', 'จำนวนเงิน']];
-  const body = lines.map((line, idx) => [
-    idx + 1,
-    line.product_code ?? '-',
-    [productNameByCode.get(line.product_code) ?? line.product_name ?? '-', line.line_note].filter(Boolean).join('\n'),
-    line.movement_type ?? '-',
-    fmt(line.qty),
-    fmt(line.chargeable_weight),
-    line.storage_days != null ? `${line.storage_days} วัน` : '-',
-    line.rate ?? '-',
-    fmt(line.amount),
-  ]);
+  const body = lines.map((line, idx) => {
+    const productName = productNameByCode.get(line.product_code) ?? line.product_name ?? '-';
+    const trackingCode = trackingCodeByDepositLineId.get(line.deposit_line_id);
+    const lotTracking = [line.lot_no, trackingCode].filter(Boolean).join(' / ');
+    const nameCell = lotTracking ? `${productName} (${lotTracking})` : productName;
+    return [
+      idx + 1,
+      line.product_code ?? '-',
+      [nameCell, line.line_note].filter(Boolean).join('\n'),
+      line.movement_type ?? '-',
+      fmt(line.qty),
+      fmt(line.chargeable_weight),
+      line.storage_days != null ? `${line.storage_days} วัน` : '-',
+      line.rate ?? '-',
+      fmt(line.amount),
+    ];
+  });
 
   const totalQty = lines.reduce((sum, line) => sum + (Number(line.qty) || 0), 0);
   const totalWeight = lines.reduce((sum, line) => sum + (Number(line.chargeable_weight) || 0), 0);
@@ -418,6 +429,7 @@ export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
     body,
     foot,
     showFoot: 'lastPage',
+    rowPageBreak: 'avoid',
     startY: y,
     margin: { left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
     styles: { font: FONT_NAME, fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', valign: 'middle' },
