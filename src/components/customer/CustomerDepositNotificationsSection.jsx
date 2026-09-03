@@ -10,6 +10,7 @@ import { ReportPrintActions } from '../reports/ReportPrintActions.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 
 const WAREHOUSE_DEPOSIT_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -41,6 +42,8 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   const [mergedPrint, setMergedPrint] = useState(null);
   const [combining, setCombining] = useState(false);
   const [combineError, setCombineError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const isMountedRef = useRef(true);
 
   useEffect(() => () => { isMountedRef.current = false; }, []);
@@ -119,6 +122,64 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
     }));
     setMergedPrint(mergeDepositRequestsForPrint(entries));
     setCombining(false);
+  }
+
+  // Exports whichever requests are currently checked, or every row the
+  // active filters currently show when nothing's checked — unlike the
+  // "รวมเป็นใบงานเดียว" bulk-print selection above, this isn't restricted to
+  // BULK_PRINT_ELIGIBLE_STATUSES, since staff need line-item detail for a
+  // request regardless of what stage it's at (including ones already fully
+  // received, which the print-merge flow deliberately excludes).
+  async function handleExportExcel(rowsToExport) {
+    if (!rowsToExport.length) return;
+    setExporting(true);
+    setExportError('');
+    const results = await Promise.all(rowsToExport.map((r) => listCustomerDepositRequestLines(r.id)));
+    if (!isMountedRef.current) return;
+    const failed = results.find((r) => r.error);
+    if (failed) {
+      setExportError(failed.error.message ?? 'โหลดรายการไม่สำเร็จ');
+      setExporting(false);
+      return;
+    }
+
+    const exportRows = rowsToExport.flatMap((request, i) => {
+      const lines = results[i].data ?? [];
+      const requestFields = {
+        เลขที่คำขอ: request.request_no ?? '',
+        ลูกค้า: request.customer?.customer_name || request.customer?.name || request.customer_id || '',
+        สถานะ: getDepositStatusLabel(request.status, t),
+        วันที่แจ้งฝาก: formatDocumentDate(request.expected_arrival_date, { dateOnly: true }),
+        ผู้ติดต่อ: request.contact_name ?? '',
+        เบอร์โทร: request.contact_phone ?? '',
+        หมายเหตุคำขอ: request.note ?? '',
+      };
+      if (lines.length === 0) {
+        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่แจ้ง: '', น้ำหนักที่แจ้ง: '', จำนวนกล่องจริง: '', น้ำหนักจริง: '', อุณหภูมิ: '', หมายเหตุรายการ: '' }];
+      }
+      return lines.map((line) => ({
+        ...requestFields,
+        รหัสสินค้า: line.customer_product_code ?? '',
+        ชื่อสินค้า: line.product_name ?? '',
+        Lot: line.lot_no ?? '',
+        รหัสติดตาม: line.tracking_code ?? '',
+        จำนวนกล่องที่แจ้ง: line.expected_boxes ?? '',
+        น้ำหนักที่แจ้ง: line.expected_weight ?? '',
+        จำนวนกล่องจริง: line.actual_boxes ?? '',
+        น้ำหนักจริง: line.actual_weight ?? '',
+        อุณหภูมิ: line.temperature_type ?? '',
+        หมายเหตุรายการ: line.note ?? '',
+      }));
+    });
+
+    downloadExcelRows(
+      exportRows,
+      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งฝาก', 'ผู้ติดต่อ', 'เบอร์โทร', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่แจ้ง', 'น้ำหนักที่แจ้ง', 'จำนวนกล่องจริง', 'น้ำหนักจริง', 'อุณหภูมิ', 'หมายเหตุรายการ'],
+      `deposit-requests-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'รายการแจ้งฝาก',
+      [16, 28, 16, 14, 16, 14, 20, 14, 30, 20, 14, 12, 12, 12, 12, 12, 20],
+    );
+    setExporting(false);
   }
 
   if (state.loading) {
@@ -224,10 +285,25 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             {'ล้างตัวกรอง'}
           </button>
         ) : null}
+        <button
+          type="button"
+          className="btn btn-outline"
+          data-testid="receiving-customer-deposit-export-excel"
+          disabled={exporting || filteredRows.length === 0}
+          onClick={() => handleExportExcel(filteredRows)}
+          style={{ alignSelf: 'flex-end' }}
+          title="ดาวน์โหลดรายละเอียดสินค้าแต่ละรายการของทุกคำขอที่กรองอยู่ตอนนี้เป็น Excel"
+        >
+          {exporting ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด Excel'}
+        </button>
       </div>
 
       {state.error ? (
         <div className="banner banner-danger" role="alert">{state.error.message ?? t('customer_portal_load_error')}</div>
+      ) : null}
+
+      {exportError ? (
+        <div className="banner banner-danger" role="alert" style={{ margin: '0 20px 12px' }}>{exportError}</div>
       ) : null}
 
       {selectedRequestIds.size > 0 && (
