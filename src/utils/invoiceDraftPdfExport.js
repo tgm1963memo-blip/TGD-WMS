@@ -4,28 +4,25 @@ import { buildInvoiceLotLedger } from './invoiceLotLedgerUtils.js';
 import { formatFixed2 } from './numberFormat.js';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../config/documentBrandingConfig.js';
 import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from './billingInvoiceDraftUtils.js';
-import { NOTO_SANS_THAI_REGULAR_BASE64 } from '../assets/fonts/NotoSansThaiRegularBase64.js';
+import { SARABUN_REGULAR_BASE64, SARABUN_BOLD_BASE64 } from '../assets/fonts/SarabunBase64.js';
 import { supabase } from '../services/supabaseClient.js';
 
 // jsPDF's built-in fonts (Helvetica etc.) have no Thai glyphs at all, so
 // every Thai character would render as a blank box without embedding a real
-// Thai-covering font file first. See src/assets/fonts/NotoSansThaiRegularBase64.js
-// for where this comes from.
-const FONT_FILE = 'NotoSansThai-Regular.ttf';
-const FONT_NAME = 'NotoSansThai';
+// Thai-covering font file first. Sarabun (not Noto Sans Thai -- that family
+// is a Thai-script-ONLY companion font with zero Latin/digit glyphs, which
+// silently blanked every English/number cell) covers Thai + Latin + digits
+// in one file and matches this app's own print CSS font stack. See
+// src/assets/fonts/SarabunBase64.js.
+const FONT_FILE_REGULAR = 'Sarabun-Regular.ttf';
+const FONT_FILE_BOLD = 'Sarabun-Bold.ttf';
+const FONT_NAME = 'Sarabun';
 
 function registerThaiFont(doc) {
-  doc.addFileToVFS(FONT_FILE, NOTO_SANS_THAI_REGULAR_BASE64);
-  doc.addFont(FONT_FILE, FONT_NAME, 'normal');
-  // Only the regular weight is embedded (see NotoSansThaiRegularBase64.js) --
-  // autoTable's SUB TOTAL/GRAND TOTAL rows and a few emphasized cells below
-  // request fontStyle 'bold'. Without a 'bold' variant registered too, jsPDF
-  // can't find one for this font and silently falls back to a font with no
-  // Thai glyphs at all, rendering blank boxes instead of a warning -- so
-  // register the same regular file under the 'bold' slot too. Visually it's
-  // not genuinely heavier, but it keeps every Thai character rendering
-  // correctly, which matters far more than true bold weight here.
-  doc.addFont(FONT_FILE, FONT_NAME, 'bold');
+  doc.addFileToVFS(FONT_FILE_REGULAR, SARABUN_REGULAR_BASE64);
+  doc.addFont(FONT_FILE_REGULAR, FONT_NAME, 'normal');
+  doc.addFileToVFS(FONT_FILE_BOLD, SARABUN_BOLD_BASE64);
+  doc.addFont(FONT_FILE_BOLD, FONT_NAME, 'bold');
   doc.setFont(FONT_NAME, 'normal');
 }
 
