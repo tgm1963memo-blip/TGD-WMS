@@ -173,6 +173,48 @@ describe('buildInvoiceLotLedger', () => {
     expect(row.remark).toBe('cycle 3 (1980kg, -20 delivered)');
   });
 
+  // Real reported gap: two DIFFERENT deposit lines (different receipt
+  // dates, different tracking codes) shared the same free-text lot_no --
+  // this customer types a date/description as their lot_no, not a unique
+  // identifier -- so grouping by lot_no::product_code alone merged their
+  // two independently-consistent cycle histories into one row whose
+  // combined weights/dates looked like overlapping/duplicate billing.
+  it('keeps two deposit lines separate when they share the same free-text lot_no but have different deposit_line_id', () => {
+    const lines = [
+      {
+        lot_no: '10/08/2026 ต้น ใส่กล่อง', product_code: 'P-420', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', deposit_line_id: 'dep-A', amount: 92, chargeable_weight: 400,
+        billing_period_start: '2026-08-01', billing_period_end: '2026-08-15',
+      },
+      {
+        lot_no: '10/08/2026 ต้น ใส่กล่อง', product_code: 'P-420', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', deposit_line_id: 'dep-A', amount: 89.7, chargeable_weight: 390,
+        billing_period_start: '2026-08-16', billing_period_end: '2026-08-30',
+      },
+      {
+        lot_no: '10/08/2026 ต้น ใส่กล่อง', product_code: 'P-420', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', deposit_line_id: 'dep-B', amount: 230, chargeable_weight: 1000,
+        billing_period_start: '2026-08-04', billing_period_end: '2026-08-18',
+      },
+      {
+        lot_no: '10/08/2026 ต้น ใส่กล่อง', product_code: 'P-420', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', deposit_line_id: 'dep-B', amount: 227.7, chargeable_weight: 990,
+        billing_period_start: '2026-08-19', billing_period_end: '2026-09-02',
+      },
+    ];
+
+    const { lots } = buildInvoiceLotLedger(lines);
+    expect(lots).toHaveLength(2);
+
+    const depA = lots.find((l) => l.rows[0].balanceForwardWeight === 400);
+    expect(depA.rows[0].cycleCount).toBe(2);
+    expect(depA.rows[0].balanceWeight).toBe(390);
+
+    const depB = lots.find((l) => l.rows[0].balanceForwardWeight === 1000);
+    expect(depB.rows[0].cycleCount).toBe(2);
+    expect(depB.rows[0].balanceWeight).toBe(990);
+  });
+
   it('groups multiple lots independently and sums a grand total across them', () => {
     const lines = [
       { lot_no: 'L1', product_code: 'P1', movement_type: 'STORAGE_OPENING_BALANCE', qty: 10, chargeable_weight: 100 },

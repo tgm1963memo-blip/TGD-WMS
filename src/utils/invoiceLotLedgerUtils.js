@@ -26,7 +26,21 @@ export function buildInvoiceLotLedger(lines = []) {
   const order = [];
 
   for (const line of lines) {
-    const key = `${line.lot_no ?? ''}::${line.product_code ?? ''}`;
+    // Group by the real deposit line when a row carries one -- lot_no is
+    // free text some customers type as a date/description ("10/08/2026 ต้น
+    // ใส่กล่อง") rather than a unique identifier, so two genuinely different
+    // physical deposits (different receipt dates, different tracking codes)
+    // can share the exact same lot_no::product_code string. Grouping by
+    // that string alone merged their independent, individually-consistent
+    // cycle histories into one row whose combined weights/date-ranges
+    // looked like overlapping/duplicate billing even though each deposit's
+    // own cycles were correct on their own (confirmed real case: 3 cycles
+    // 400->390->380kg for one deposit + 2 cycles 1000->990kg for another,
+    // sharing a lot_no, merged into a nonsensical-looking 5-cycle row).
+    // Movement-based lines (no deposit_line_id) still fall back to the old key.
+    const key = line.deposit_line_id
+      ? `dep:${line.deposit_line_id}`
+      : `lot:${line.lot_no ?? ''}::${line.product_code ?? ''}`;
     if (!groupsByKey.has(key)) {
       groupsByKey.set(key, []);
       order.push(key);
