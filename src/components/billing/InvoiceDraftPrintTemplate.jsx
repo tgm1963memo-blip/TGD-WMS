@@ -2,8 +2,20 @@ import { Fragment, useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { buildInvoiceLotLedger } from '../../utils/invoiceLotLedgerUtils.js';
+import { INVOICE_DRAFT_STATUS } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
+
+// Once a draft has actually been approved (and everything past that —
+// exported/billed), it's a real invoice, not a draft-in-progress anymore —
+// the printed document shouldn't still say ร่าง/DRAFT.
+const APPROVED_OR_LATER_STATUSES = [
+  INVOICE_DRAFT_STATUS.APPROVED,
+  INVOICE_DRAFT_STATUS.EXPORTED_TO_BPLUS,
+  INVOICE_DRAFT_STATUS.BILLED,
+];
+
+const PRINT_TABLE_COLUMN_COUNT = 18;
 
 function fmt(value) {
   if (value == null) return '-';
@@ -69,6 +81,8 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
 
   const branding = normalizeDocumentBrandingConfig(getDefaultDocumentBranding());
   const { lots, grandTotal } = buildInvoiceLotLedger(lines);
+  const isApprovedOrLater = APPROVED_OR_LATER_STATUSES.includes(draft.status);
+  const customerName = draft.customer_name ?? customer?.customer_name ?? '-';
 
   return (
     <div className="operational-report operational-report-a4-landscape" style={{ fontSize: 13, color: '#1e293b' }}>
@@ -85,7 +99,9 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>ใบแจ้งหนี้ (ร่าง) / INVOICE (DRAFT)</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
+            {isApprovedOrLater ? 'ใบแจ้งหนี้ / INVOICE' : 'ใบแจ้งหนี้ (ร่าง) / INVOICE (DRAFT)'}
+          </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#2d9348', marginTop: 4 }}>{draft.draft_no}</div>
           <table style={{ marginTop: 8, marginLeft: 'auto', fontSize: 11 }}>
             <tbody>
@@ -135,6 +151,18 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           <col style={{ width: '6%' }} /> {/* total */}
         </colgroup>
         <thead>
+          {/* Slim identifier row -- repeats on every printed page (thead
+              behavior), same pattern as CustomerWithdrawalRequestPrintDocument,
+              so a continuation page identifies the document without
+              re-printing the full cover block above. */}
+          <tr>
+            <td colSpan={PRINT_TABLE_COLUMN_COUNT} className="operational-report-running-header">
+              {isApprovedOrLater ? 'ใบแจ้งหนี้ / INVOICE' : 'ใบแจ้งหนี้ (ร่าง) / INVOICE (DRAFT)'}
+              &nbsp;{draft.draft_no}
+              &nbsp;•&nbsp;ลูกค้า {customerName}
+              &nbsp;•&nbsp;FOR MONTH {fmtMonthYear(draft.billing_period_start)}
+            </td>
+          </tr>
           <tr>
             <th rowSpan={2} style={TH}>RECEIVED<br />DATE</th>
             <th rowSpan={2} style={TH}>DELIVERY<br />DATE</th>
@@ -260,7 +288,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
       </div>
 
       <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>
-        เอกสารนี้เป็นร่างเท่านั้น — This is a draft document only
+        {isApprovedOrLater ? null : 'เอกสารนี้เป็นร่างเท่านั้น — This is a draft document only'}
         {draft.note ? <div style={{ marginTop: 4 }}>หมายเหตุ: {draft.note}</div> : null}
       </div>
     </div>
