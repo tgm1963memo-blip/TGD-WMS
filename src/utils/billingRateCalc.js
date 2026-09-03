@@ -68,6 +68,34 @@ export function resolveServiceRate(rates = [], { customerId, customerProductId, 
   return allItemsGeneric ?? null;
 }
 
+// STORAGE-specific wrapper around resolveServiceRate: tries the deposit
+// line's own temperature_type first (so a customer who genuinely configured
+// a distinct FREEZE_FROZEN rate still gets it), and only when that finds
+// nothing AND the line is FREEZE_FROZEN, falls back to resolving under
+// FROZEN instead. Physically a Freeze & Frozen lot sits in the same frozen
+// storage as a plain FROZEN one, so it should bill at that rate by default
+// rather than showing up as "unrated" just because nobody thought to
+// configure a rate under a temperature tier that's really the same room.
+export function resolveStorageRateForLine(rates, dl, asOfDate) {
+  const direct = resolveServiceRate(rates, {
+    customerId: dl.customer_id,
+    customerProductId: dl.customer_product_id,
+    temperatureType: dl.temperature_type,
+    serviceType: 'STORAGE',
+    asOfDate,
+  });
+  if (direct) return direct;
+  if (dl.temperature_type !== 'FREEZE_FROZEN') return null;
+
+  return resolveServiceRate(rates, {
+    customerId: dl.customer_id,
+    customerProductId: dl.customer_product_id,
+    temperatureType: 'FROZEN',
+    serviceType: 'STORAGE',
+    asOfDate,
+  });
+}
+
 // depositLines: [{ id, customer_id, customer_product_id, temperature_type,
 //   received_weight, receipt_date (YYYY-MM-DD),
 //   withdrawal_events: [{ weight, date (YYYY-MM-DD) }] }]
@@ -145,13 +173,7 @@ export function computeStorageInvoiceLines({ depositLines = [], rates = [], peri
     // while a lot is still on cycle 4 of 6 — isn't modeled here; that would
     // need per-cycle re-resolution, which isn't built yet since there's no
     // confirmed need for it.)
-    const rate = resolveServiceRate(rates, {
-      customerId: dl.customer_id,
-      customerProductId: dl.customer_product_id,
-      temperatureType: dl.temperature_type,
-      serviceType: 'STORAGE',
-      asOfDate: receiptDate,
-    });
+    const rate = resolveStorageRateForLine(rates, dl, receiptDate);
     if (!rate) continue;
 
     const receivedWeight = toNumber(dl.received_weight);

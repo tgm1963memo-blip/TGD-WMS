@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, resolveServiceRate, generateLotBillingCycles,
-  computeHandlingFeeLines,
+  computeHandlingFeeLines, resolveStorageRateForLine,
 } from '../../src/utils/billingRateCalc.js';
 
 const STORAGE_RATE_30D = {
@@ -309,6 +309,56 @@ describe('computeStorageInvoiceLines', () => {
     });
     expect(line.amount).toBe(5000);
   });
+
+  it('bills a FREEZE_FROZEN lot under the FROZEN STORAGE rate when no FREEZE_FROZEN-specific rate is configured', () => {
+    const frozenRate = { ...STORAGE_RATE_30D, id: 'rate-frozen', temperature_type: 'FROZEN' };
+    const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: 'FREEZE_FROZEN',
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [frozenRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    expect(line).toBeDefined();
+    expect(line.amount).toBe(5000);
+    expect(line.rate.id).toBe('rate-frozen');
+  });
+
+  it('prefers an explicit FREEZE_FROZEN rate over the FROZEN fallback when the customer configured one', () => {
+    const frozenRate = { ...STORAGE_RATE_30D, id: 'rate-frozen', temperature_type: 'FROZEN', rate: 5 };
+    const freezeFrozenRate = { ...STORAGE_RATE_30D, id: 'rate-ff', temperature_type: 'FREEZE_FROZEN', rate: 9 };
+    const [line] = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: 'FREEZE_FROZEN',
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [frozenRate, freezeFrozenRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    expect(line.rate.id).toBe('rate-ff');
+    expect(line.amount).toBe(9000);
+  });
+
+  it('does not fall back to FROZEN for a plain FROZEN line with no matching rate (fallback is FREEZE_FROZEN-only)', () => {
+    const chilledRate = { ...STORAGE_RATE_30D, id: 'rate-chilled', temperature_type: 'CHILLED' };
+    const lines = computeStorageInvoiceLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: 'FROZEN',
+        received_weight: 1000, receipt_date: '2026-01-01', withdrawal_events: [],
+      }],
+      rates: [chilledRate],
+      periodStart: '2026-01-01', periodEnd: '2026-01-10',
+    });
+    expect(lines).toHaveLength(0);
+  });
+});
+
+describe('resolveStorageRateForLine', () => {
+  it('returns null (not the FROZEN fallback) for a FREEZE_FROZEN line with genuinely no rate anywhere', () => {
+    const rate = resolveStorageRateForLine([], { customer_id: 'cust-1', temperature_type: 'FREEZE_FROZEN' }, '2026-01-01');
+    expect(rate).toBeNull();
+  });
 });
 
 describe('computeHandlingFeeLines', () => {
@@ -316,6 +366,21 @@ describe('computeHandlingFeeLines', () => {
     id: 'rate-hi', service_type: 'HANDLING_IN', unit_basis: 'PER_KG',
     rate: 0.17, period_days: null, is_active: true, customer_id: 'cust-1', customer_product_id: null, temperature_type: null,
   };
+
+  it('computes a FREEZING fee the same way, when called with serviceType FREEZING', () => {
+    const freezingRate = { ...HANDLING_IN_RATE, id: 'rate-freezing', service_type: 'FREEZING', rate: 0.5 };
+    const [line] = computeHandlingFeeLines({
+      depositLines: [{
+        id: 'dl-1', customer_id: 'cust-1', customer_product_id: null, temperature_type: 'FREEZE_FROZEN',
+        received_weight: 1000, receipt_date: '2026-07-15',
+      }],
+      rates: [freezingRate],
+      periodStart: '2026-07-01', periodEnd: '2026-07-31',
+      serviceType: 'FREEZING',
+    });
+    expect(line.amount).toBeCloseTo(500, 2);
+    expect(line.rate.service_type).toBe('FREEZING');
+  });
 
   it('charges once, on the received weight, only in the period containing the receipt date', () => {
     const [line] = computeHandlingFeeLines({

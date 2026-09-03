@@ -229,18 +229,23 @@ export function buildInvoiceDraftLineFromStorageLine(storageLine, depositLine = 
 // storage, are always a one-time charge (no period_days/storage_days).
 export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine = {}) {
   const rate = handlingLine.rate ?? {};
+  // computeHandlingFeeLines is generic over serviceType (HANDLING_IN today,
+  // FREEZING as of the Freeze & Frozen billing fix) -- the resolved rate
+  // carries its own real service_type, so use that instead of hardcoding
+  // HANDLING_IN, or a FREEZING line would mislabel itself on the draft/print.
+  const documentType = rate.service_type ?? 'HANDLING_IN';
   return {
     invoice_draft_id: null,
     source_movement_id: null,
     source_document_no: null,
-    source_document_type: 'HANDLING_IN',
+    source_document_type: documentType,
     customer_id: handlingLine.customerId,
     product_id: null,
     product_code: depositLine.customer_product_code ?? null,
     product_name: depositLine.customer_product_code ?? null,
     lot_no: depositLine.lot_no ?? null,
     pallet_no: null,
-    movement_type: 'HANDLING_IN',
+    movement_type: documentType,
     movement_date: handlingLine.receiptDate ?? null,
     qty: 0,
     uom: 'กก.',

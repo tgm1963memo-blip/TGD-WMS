@@ -3,7 +3,7 @@ import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
-  computeHandlingFeeLines,
+  computeHandlingFeeLines, resolveStorageRateForLine,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
 
@@ -26,10 +26,11 @@ function missingSupabaseClientResult() {
 // from "a rate exists but this date falls outside its contract window" —
 // the latter needs the customer told which side of the window it's on
 // (not started yet vs. already expired) instead of just "missing."
-function classifyUnratedReason(rates, { customerId, customerProductId, temperatureType, asOfDate }) {
-  const dateUnfilteredCandidate = resolveServiceRate(rates, {
-    customerId, customerProductId, temperatureType, serviceType: 'STORAGE',
-  });
+function classifyUnratedReason(rates, dl, asOfDate) {
+  // resolveStorageRateForLine (not the bare resolveServiceRate) so a lot
+  // that resolves only via the FREEZE_FROZEN->FROZEN fallback is correctly
+  // read as "has a candidate rate" here too, not double-counted as missing.
+  const dateUnfilteredCandidate = resolveStorageRateForLine(rates, dl, null);
   if (!dateUnfilteredCandidate) return 'NO_RATE_CONFIGURED';
   if (!asOfDate) return 'NO_RATE_CONFIGURED';
   if (dateUnfilteredCandidate.contract_start_date && asOfDate < dateUnfilteredCandidate.contract_start_date) {
@@ -427,25 +428,14 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // unrated because its contract window doesn't cover its receipt date shows
   // up here with the correct reason instead of silently vanishing.
   const unratedDepositLines = depositLines
-    .filter((dl) => !resolveServiceRate(rates, {
-      customerId: dl.customer_id,
-      customerProductId: dl.customer_product_id,
-      temperatureType: dl.temperature_type,
-      serviceType: 'STORAGE',
-      asOfDate: dl.receipt_date,
-    }))
+    .filter((dl) => !resolveStorageRateForLine(rates, dl, dl.receipt_date))
     .map((dl) => ({
       depositLineId: dl.id,
       lotNo: dl.lot_no,
       customerProductCode: dl.customer_product_code,
       temperatureType: dl.temperature_type,
       weight: dl.received_weight,
-      reason: classifyUnratedReason(rates, {
-        customerId: dl.customer_id,
-        customerProductId: dl.customer_product_id,
-        temperatureType: dl.temperature_type,
-        asOfDate: dl.receipt_date,
-      }),
+      reason: classifyUnratedReason(rates, dl, dl.receipt_date),
     }));
 
   // HANDLING_IN (ค่าบริการจัดการแรกเข้า): one-time, weight-based fee charged
@@ -456,6 +446,17 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // rate configured, same as any other optional service type.
   const handlingLines = computeHandlingFeeLines({
     depositLines, rates, periodStart, periodEnd, serviceType: 'HANDLING_IN',
+  });
+
+  // FREEZING (ค่าฟรีส): same one-time weight-based fee mechanism as
+  // HANDLING_IN above, scoped to only the FREEZE_FROZEN lots -- these are
+  // billed for STORAGE under the FROZEN rate bucket (resolveStorageRateForLine)
+  // since physically they sit in the same frozen room, but the freezing
+  // service itself is a real, separate cost that must show as its own line
+  // rather than being folded into (or lost from) the storage charge.
+  const freezeFrozenLines = depositLines.filter((dl) => dl.temperature_type === 'FREEZE_FROZEN');
+  const freezingLines = computeHandlingFeeLines({
+    depositLines: freezeFrozenLines, rates, periodStart, periodEnd, serviceType: 'FREEZING',
   });
 
   // Scope the aux-service lookup to requests whose receipt/dispatch date
@@ -565,7 +566,12 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: r3Selections })];
   }
 
-  return { data: { storageLines, auxLines, handlingLines, depositLines, unratedDepositLines }, error: null };
+  return {
+    data: {
+      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], depositLines, unratedDepositLines,
+    },
+    error: null,
+  };
 }
 
 // Auto per-lot billing preview: instead of one staff-typed date range
@@ -613,13 +619,7 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
   const recurringLots = [];
   const unratedLots = [];
   for (const dl of depositLines) {
-    const rate = resolveServiceRate(rates, {
-      customerId: dl.customer_id,
-      customerProductId: dl.customer_product_id,
-      temperatureType: dl.temperature_type,
-      serviceType: 'STORAGE',
-      asOfDate: billThroughDate,
-    });
+    const rate = resolveStorageRateForLine(rates, dl, billThroughDate);
     if (rate && rate.period_days != null) {
       recurringLots.push({ depositLine: dl, rate });
     } else if (!rate) {
@@ -629,12 +629,7 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
         customerProductCode: dl.customer_product_code,
         temperatureType: dl.temperature_type,
         weight: dl.received_weight,
-        reason: classifyUnratedReason(rates, {
-          customerId: dl.customer_id,
-          customerProductId: dl.customer_product_id,
-          temperatureType: dl.temperature_type,
-          asOfDate: billThroughDate,
-        }),
+        reason: classifyUnratedReason(rates, dl, billThroughDate),
       });
     }
   }
