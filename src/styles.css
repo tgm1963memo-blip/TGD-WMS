@@ -826,6 +826,23 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
   }
 }
 
+/* Named page for wide, many-column reports (invoice ledger, inventory
+   movement) that are laid out for landscape -- without this override they
+   still print on the default A4 PORTRAIT page above, squeezing an
+   intentionally-wide table onto a page 87mm narrower than it was designed
+   for. `page: a4landscape` on the report root scopes this one element (and
+   the pages it spans) to the named @page rule below, standard CSS Paged
+   Media supported in Chromium print/PDF -- the rest of the app's printed
+   documents keep the default portrait @page untouched. */
+.operational-report-a4-landscape {
+  page: a4landscape;
+}
+
+@page a4landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
 @media print {
   /* The print preview modal (ReportPreviewModal) portals to document.body,
      so it's a sibling of #root — not a descendant. visibility:hidden below

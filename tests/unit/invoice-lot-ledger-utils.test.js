@@ -94,12 +94,14 @@ describe('buildInvoiceLotLedger', () => {
     const lines = [
       {
         lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
-        movement_type: 'STORAGE', rate: 0.23, amount: 354.20,
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20, chargeable_weight: 1540,
+        line_note: 'ค่าฝาก 1 งวด (งวดละ 15 วัน: 2026-08-03 ถึง 2026-08-17, น้ำหนักที่คิดค่าฝาก 1540 กก.)',
         billing_period_start: '2026-08-03', billing_period_end: '2026-08-17',
       },
       {
         lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
-        movement_type: 'STORAGE', rate: 0.23, amount: 354.20,
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20, chargeable_weight: 1540,
+        line_note: 'ค่าฝาก 1 งวด (งวดละ 15 วัน: 2026-08-18 ถึง 2026-09-01, น้ำหนักที่คิดค่าฝาก 1540 กก.)',
         billing_period_start: '2026-08-18', billing_period_end: '2026-09-01',
       },
     ];
@@ -112,6 +114,16 @@ describe('buildInvoiceLotLedger', () => {
     expect(lots[0].rows[0].receivedDate).toBe('2026-08-03');
     expect(lots[0].rows[0].deliveryDate).toBe('2026-09-01');
     expect(lots[0].rows[0].coldStorageCharge).toBe(708.40);
+    // Real reported gap: BALANCE FORWARD/BALANCE printed a flat 0.00 for a
+    // storage-only lot even though it genuinely holds real weight this
+    // period -- surface the latest cycle's own weight as the steady balance
+    // being carried, since no discrete in/out event happened on this row.
+    expect(lots[0].rows[0].balanceForwardWeight).toBe(1540);
+    expect(lots[0].rows[0].balanceWeight).toBe(1540);
+    // Cycle-detail text (period days, exact date range, weight) already
+    // shown on the draft-view table should also reach the printed invoice.
+    expect(lots[0].rows[0].remark).toContain('2026-08-03 ถึง 2026-08-17');
+    expect(lots[0].rows[0].remark).toContain('2026-08-18 ถึง 2026-09-01');
   });
 
   it('groups multiple lots independently and sums a grand total across them', () => {

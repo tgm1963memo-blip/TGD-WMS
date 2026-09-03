@@ -50,8 +50,8 @@ function fmtMonthYear(value) {
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 }
 
-const TH = { border: '1px solid #cbd5e1', padding: '4px 5px', background: '#f1fdf4', fontSize: 9, fontWeight: 700, textAlign: 'center' };
-const TD = { border: '1px solid #e5e7eb', padding: '4px 5px', fontSize: 9, textAlign: 'center', verticalAlign: 'middle', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
+const TH = { border: '1px solid #cbd5e1', padding: '3px 4px', background: '#f1fdf4', fontSize: 8, fontWeight: 700, textAlign: 'center' };
+const TD = { border: '1px solid #e5e7eb', padding: '3px 4px', fontSize: 8, textAlign: 'center', verticalAlign: 'middle', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
 
 // A customer's contact/address details aren't denormalized onto the draft
 // header (only customer_name is) — fetched separately here so this
@@ -85,7 +85,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
   const customerName = draft.customer_name ?? customer?.customer_name ?? '-';
 
   return (
-    <div className="operational-report operational-report-a4-landscape" style={{ fontSize: 13, color: '#1e293b' }}>
+    <div className="operational-report operational-report-a4-landscape" style={{ fontSize: 11, color: '#1e293b' }}>
 
       {/* ── Cover: company + document identity ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #2d9348' }}>
@@ -129,7 +129,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           resolves one amount per lot for the whole billing period (not
           repeating sub-periods), so that charge is shown on each lot's last
           event row rather than split into fabricated sub-period rows. ── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, tableLayout: 'fixed' }}>
+      <table className="report-print-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: '5%' }} /> {/* received date */}
           <col style={{ width: '5%' }} /> {/* delivery date */}
@@ -198,7 +198,14 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                   <td style={TD}>{i === 0 ? fmtDate(row.receivedDate) : ''}</td>
                   <td style={TD}>{fmtDate(row.deliveryDate)}</td>
                   <td style={{ ...TD, textAlign: 'left' }}>{i === 0 ? row.lotNo ?? '-' : ''}</td>
-                  <td style={{ ...TD, textAlign: 'left' }} title={row.productName ?? row.productCode ?? '-'}>{i === 0 ? fmtWrap(row.productName ?? row.productCode) : ''}</td>
+                  <td style={{ ...TD, textAlign: 'left' }} title={row.productName ?? row.productCode ?? '-'}>
+                    {i === 0 ? fmtWrap(row.productName ?? row.productCode) : ''}
+                    {/* remark (e.g. the storage cycle's own period/date/weight detail —
+                        see buildInvoiceDraftLineFromStorageLine's line_note) lands on
+                        whichever row actually carries the charge it explains, not always
+                        row 0, so it's shown independent of the product-name-once logic above. */}
+                    {row.remark ? <div style={{ fontSize: 7, color: '#888', marginTop: 2 }}>{fmtWrap(row.remark, 20)}</div> : null}
+                  </td>
                   <td style={TD}>{i === 0 ? row.productCode ?? '-' : ''}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.weightPerUnit != null ? fmt(row.weightPerUnit) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{fmtQty(row.balanceForwardVolume)}</td>

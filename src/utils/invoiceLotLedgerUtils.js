@@ -142,17 +142,39 @@ export function buildInvoiceLotLedger(lines = []) {
       }
     }
 
+    // A lot billed entirely through the period-based STORAGE flow has no
+    // discrete received/delivery event to report in this row at all -- but
+    // leaving BALANCE FORWARD/RECEIVED/DELIVERY/BALANCE at a flat 0.00 reads
+    // as "nothing here," even though the lot genuinely holds (and is being
+    // billed for) real weight this period. Surface the latest cycle's own
+    // chargeable weight as the steady balance being carried/billed, since no
+    // in/out event actually happened on this row -- it's what's "on hand,"
+    // not something newly received or delivered this row.
+    const latestStorageWeight = sortedStorageLines.length
+      ? toNum(sortedStorageLines[sortedStorageLines.length - 1].chargeable_weight)
+      : 0;
+
     if (rows.length === 0) {
+      balanceVolume = 0;
+      balanceWeight = latestStorageWeight;
       pushRow({ deliveryDate: storageCycleEndDate, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
     }
 
     const totalStorageCharge = round2(storageLines.reduce((s, l) => s + toNum(l.amount), 0));
     const storageRate = storageLines.find((l) => l.rate != null)?.rate ?? null;
+    // Cycle-detail text already generated per STORAGE line at draft-creation
+    // time (buildInvoiceDraftLineFromStorageLine's line_note — the period
+    // days, exact date range, and chargeable weight the customer already
+    // sees on the draft-view table) -- surface the same text here so the
+    // printed invoice carries the same detail instead of only the summed
+    // charge with no explanation of how it was derived.
+    const storageNote = storageLines.map((l) => l.line_note).filter(Boolean).join(' / ') || null;
     if (storageLines.length > 0) {
       const lastRow = rows[rows.length - 1];
       lastRow.chargeUnit = storageRate;
       lastRow.coldStorageCharge = totalStorageCharge;
       lastRow.total = round2(lastRow.handlingFee + totalStorageCharge);
+      lastRow.remark = [lastRow.remark, storageNote].filter(Boolean).join(' / ') || null;
     }
 
     const subtotal = {

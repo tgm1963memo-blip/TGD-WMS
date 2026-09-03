@@ -54,4 +54,21 @@ describe('InvoiceDraftPrintTemplate', () => {
     expect(runningHeader.textContent).toContain('BID-20260901-0001');
     expect(runningHeader.textContent).toContain('บริษัท ทดสอบ จำกัด');
   });
+
+  it('shows the storage cycle detail note and a populated balance for a storage-only lot', () => {
+    const storageOnlyLines = [
+      {
+        lot_no: 'A2-99999999', product_code: 'P-100', product_name: 'สินค้าฝาก',
+        movement_type: 'STORAGE', rate: 0.23, amount: 354.20, chargeable_weight: 1540,
+        line_note: 'ค่าฝาก 1 งวด (งวดละ 15 วัน: 2026-08-03 ถึง 2026-08-17, น้ำหนักที่คิดค่าฝาก 1540 กก.)',
+        billing_period_start: '2026-08-03', billing_period_end: '2026-08-17',
+      },
+    ];
+    const { container } = render(<InvoiceDraftPrintTemplate draft={{ ...baseDraft, status: 'DRAFT' }} lines={storageOnlyLines} />);
+    // fmtWrap inserts invisible soft-break characters into long text, so
+    // match on the raw text content (breaks stripped) rather than an exact node.
+    const text = container.textContent.replace(new RegExp('​', 'g'), '');
+    expect(text).toContain('งวดละ 15 วัน');
+    expect(text).toContain('1,540.00');
+  });
 });
