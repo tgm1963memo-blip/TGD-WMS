@@ -9,7 +9,7 @@ import { InvoiceDraftFilterPanel } from '../../components/billing/InvoiceDraftFi
 import { InvoiceDraftListTable } from '../../components/billing/InvoiceDraftListTable.jsx';
 import { InvoiceDraftStatusBadge } from '../../components/billing/InvoiceDraftStatusBadge.jsx';
 import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
-import { exportInvoiceDraftPdf } from '../../utils/invoiceDraftPdfExport.js';
+import { exportInvoiceDraftPdf, exportInvoiceDraftDetailPdf } from '../../utils/invoiceDraftPdfExport.js';
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
@@ -63,6 +63,7 @@ export function InvoiceDraftListPage() {
   const [viewDraft, setViewDraft] = useState(null);
   const [viewLines, setViewLines] = useState([]);
   const [viewLoading, setViewLoading] = useState(false);
+  const [exportingSummary, setExportingSummary] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
@@ -570,7 +571,7 @@ export function InvoiceDraftListPage() {
           size="lg"
           title={`เอกสาร ${viewDraft.draft_no ?? ''}`}
         >
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
             <button
               type="button"
               className="btn btn-primary-gold"
@@ -578,6 +579,21 @@ export function InvoiceDraftListPage() {
               disabled={viewLoading}
             >
               พิมพ์ / Print Invoice
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={viewLoading || exportingSummary}
+              onClick={async () => {
+                setExportingSummary(true);
+                try {
+                  await exportInvoiceDraftDetailPdf({ draft: viewDraft, lines: viewLines });
+                } finally {
+                  setExportingSummary(false);
+                }
+              }}
+            >
+              {exportingSummary ? 'กำลังสร้าง PDF...' : 'Export PDF'}
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, fontSize: 14 }}>

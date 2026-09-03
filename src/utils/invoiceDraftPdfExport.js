@@ -311,3 +311,89 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
 
   doc.save(safeFilename(draft.draft_no));
 }
+
+// Exports the simpler "เอกสาร {draft_no}" summary modal (header key/value
+// block + the flat "รายละเอียด" details table -- ลำดับ/รหัสสินค้า/ชื่อสินค้า/
+// ประเภท/จำนวน/น้ำหนัก/งวด/อัตรา/จำนวนเงิน, one row per invoice draft line)
+// as its own one-page-ish PDF. Deliberately NOT the same document as
+// exportInvoiceDraftPdf above (that one is the full per-lot balance-ledger
+// print layout) -- this mirrors exactly what the view modal itself shows,
+// for a quick take-away copy of that same summary.
+export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
+  if (!draft) return;
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  registerThaiFont(doc);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 14;
+  doc.setFontSize(13);
+  doc.setTextColor(30, 41, 59);
+  doc.text(`เอกสาร ${draft.draft_no ?? ''}`, PAGE_MARGIN_MM, y);
+  y += 8;
+
+  doc.setFontSize(9);
+  const leftX = PAGE_MARGIN_MM;
+  const rightX = pageWidth / 2 + 4;
+  const fields = [
+    ['Draft No', draft.draft_no ?? '-'],
+    ['ลูกค้า', draft.customer_name ?? '-'],
+    ['สถานะ', draft.status ?? '-'],
+    ['วันที่สร้าง', fmtDate(draft.created_at)],
+    ['ช่วงเวลา (เริ่ม)', draft.billing_period_start ?? '-'],
+    ['ช่วงเวลา (สิ้นสุด)', draft.billing_period_end ?? '-'],
+    ['จำนวนรวม', fmt(draft.total_qty)],
+    ['น้ำหนักรวม', fmt(draft.total_chargeable_weight)],
+    ['มูลค่ารวม', fmt(draft.total_amount)],
+  ];
+  fields.forEach(([label, value], i) => {
+    const col = i % 2 === 0 ? leftX : rightX;
+    const row = Math.floor(i / 2);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${label}:`, col, y + row * 5.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(String(value), col + 32, y + row * 5.5);
+  });
+  y += Math.ceil(fields.length / 2) * 5.5 + 6;
+
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text('รายละเอียด', PAGE_MARGIN_MM, y);
+  y += 3;
+
+  const head = [['ลำดับ', 'รหัสสินค้า', 'ชื่อสินค้า', 'ประเภท', 'จำนวน', 'น้ำหนัก', 'งวด/วัน', 'อัตรา', 'จำนวนเงิน']];
+  const body = lines.map((line, idx) => [
+    idx + 1,
+    line.product_code ?? '-',
+    [line.product_name ?? '-', line.line_note].filter(Boolean).join('\n'),
+    line.movement_type ?? '-',
+    fmt(line.qty),
+    fmt(line.chargeable_weight),
+    line.storage_days != null ? `${line.storage_days} วัน` : '-',
+    line.rate ?? '-',
+    fmt(line.amount),
+  ]);
+
+  autoTable(doc, {
+    head,
+    body,
+    startY: y,
+    margin: { left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
+    styles: { font: FONT_NAME, fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', valign: 'middle' },
+    headStyles: { font: FONT_NAME, fontSize: 7.5, fillColor: [241, 253, 244], textColor: [30, 41, 59], fontStyle: 'bold' },
+    bodyStyles: { lineColor: [229, 231, 235], lineWidth: 0.1 },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 14 },
+      1: { halign: 'left', cellWidth: 30 },
+      2: { halign: 'left', cellWidth: 'auto' },
+      3: { halign: 'center', cellWidth: 24 },
+      4: { halign: 'right', cellWidth: 20 },
+      5: { halign: 'right', cellWidth: 22 },
+      6: { halign: 'center', cellWidth: 20 },
+      7: { halign: 'right', cellWidth: 18 },
+      8: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+    },
+  });
+
+  doc.save(safeFilename(`${draft.draft_no ?? 'invoice-draft'}-summary`));
+}

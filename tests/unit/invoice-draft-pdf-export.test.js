@@ -67,3 +67,27 @@ describe('exportInvoiceDraftPdf', () => {
     await expect(exportInvoiceDraftPdf({ draft: null, lines })).resolves.toBeUndefined();
   });
 });
+
+describe('exportInvoiceDraftDetailPdf', () => {
+  const flatLines = [
+    {
+      id: 'line-1', product_code: 'P-100', product_name: 'สินค้าฝาก', line_note: 'หมายเหตุทดสอบ',
+      movement_type: 'STORAGE', qty: 0, chargeable_weight: 1540, storage_days: 15, rate: 0.23, amount: 354.2,
+    },
+  ];
+
+  it('builds and saves the summary PDF end-to-end without throwing', async () => {
+    const { exportInvoiceDraftDetailPdf } = await import('../../src/utils/invoiceDraftPdfExport.js');
+    await expect(exportInvoiceDraftDetailPdf({ draft: baseDraft, lines: flatLines })).resolves.toBeUndefined();
+  });
+
+  it('handles an empty line list without throwing', async () => {
+    const { exportInvoiceDraftDetailPdf } = await import('../../src/utils/invoiceDraftPdfExport.js');
+    await expect(exportInvoiceDraftDetailPdf({ draft: baseDraft, lines: [] })).resolves.toBeUndefined();
+  });
+
+  it('does nothing when no draft is given', async () => {
+    const { exportInvoiceDraftDetailPdf } = await import('../../src/utils/invoiceDraftPdfExport.js');
+    await expect(exportInvoiceDraftDetailPdf({ draft: null, lines: flatLines })).resolves.toBeUndefined();
+  });
+});
