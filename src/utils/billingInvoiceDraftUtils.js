@@ -374,6 +374,18 @@ export function validateInvoiceDraftSourceRows(rows = []) {
   rows.forEach((row) => {
     const movementId = row.movement_id ?? row.id ?? 'unknown';
 
+    // STORAGE charges (e.g. the STORAGE_OPENING_BALANCE "ยอดยกมา" rows shown on the
+    // Billing Movement Weight Report) must never be billed through this
+    // movement-based flow — it has no period/cycle context, so it can only ever
+    // resolve a flat rate x weight amount, silently skipping the audited period-based
+    // engine's minimum-charge floor, free-day grace period, discount percent, and
+    // "เต็มรอบทันที ไม่เฉลี่ยตามวัน" cycle proration (see the matching comment on
+    // RATE_SERVICE_TYPES in billingInvoiceDraftService.js). Blocked here rather than
+    // left to silently produce a wrong/lower amount.
+    if (String(row.billing_service_type ?? '').toUpperCase() === 'STORAGE') {
+      errors.push(`Movement ${movementId} is a STORAGE charge and cannot be billed from this movement-based draft — use the period-based billing flow ("+ สร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา" on Invoice Draft List) instead.`);
+    }
+
     if (!row.is_billable) {
       errors.push(`Movement ${movementId} is not billable.`);
     }
@@ -460,6 +472,14 @@ export function canRecalculateBillingInvoiceDraft(draft = {}) {
 export function getMovementDraftSelectionState(row = {}) {
   if (row.active_duplicate_guard) {
     return { selectable: false, reason: 'Already linked to an active invoice draft' };
+  }
+
+  // See the matching comment in validateInvoiceDraftSourceRows above — a STORAGE row
+  // has no period/cycle context on this movement-based path, so it must not be
+  // selectable here at all (not just rejected after the fact) to keep staff from
+  // ever building a STORAGE line with the wrong (flat-rate) amount.
+  if (String(row.billing_service_type ?? '').toUpperCase() === 'STORAGE') {
+    return { selectable: false, reason: 'STORAGE charges must be created via the period-based billing flow' };
   }
 
   if (!row.is_billable) {

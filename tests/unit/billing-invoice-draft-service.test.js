@@ -15,16 +15,20 @@ import {
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   findDuplicateDraftLines,
+  getMovementDraftSelectionState,
   validateInvoiceDraftSourceRows,
 } from '../../src/utils/billingInvoiceDraftUtils.js';
 
 const {
   fromMock, rpcMock, getBillingMovementWeightRowsMock, getAutoLotBillingPreviewMock,
+  listAllProductServiceRatesMock, listCustomerProductsMock,
 } = vi.hoisted(() => ({
   fromMock: vi.fn(),
   rpcMock: vi.fn(),
   getBillingMovementWeightRowsMock: vi.fn(),
   getAutoLotBillingPreviewMock: vi.fn(),
+  listAllProductServiceRatesMock: vi.fn(),
+  listCustomerProductsMock: vi.fn(),
 }));
 
 vi.mock('../../src/services/supabaseClient.js', () => ({
@@ -42,6 +46,23 @@ vi.mock('../../src/services/billingMovementWeightService.js', () => ({
 vi.mock('../../src/services/billingRateEngineService.js', async (importOriginal) => {
   const actual = await importOriginal();
   return { ...actual, getAutoLotBillingPreview: getAutoLotBillingPreviewMock };
+});
+
+// resolveMovementRates (see billingInvoiceDraftService.js) calls these two directly —
+// mocked here (rather than routed through fromMock/createTableChain below) because
+// both real implementations chain .eq() filters AFTER .order(), which the generic
+// createTableChain test helper below can't fake a real return value through. Defaults
+// to empty arrays, i.e. "no configured rate" — the exact same effective behavior the
+// unmocked functions already had against the bare fromMock in every existing test
+// here, so this changes nothing for tests that don't override it.
+vi.mock('../../src/services/productServiceRatesService.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, listAllProductServiceRates: listAllProductServiceRatesMock };
+});
+
+vi.mock('../../src/services/customerProductCatalogService.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, listCustomerProducts: listCustomerProductsMock };
 });
 
 const servicePath = path.join(process.cwd(), 'src/services/billingInvoiceDraftService.js');
@@ -177,12 +198,16 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     rpcMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
     getAutoLotBillingPreviewMock.mockReset();
+    listAllProductServiceRatesMock.mockReset();
+    listCustomerProductsMock.mockReset();
     rpcMock.mockResolvedValue({ data: 'BID-20260608-0001', error: null });
     getBillingMovementWeightRowsMock.mockResolvedValue({
       data: [validMovement, validMovementTwo],
       error: null,
       source: 'billing_database_view',
     });
+    listAllProductServiceRatesMock.mockResolvedValue({ data: [], error: null });
+    listCustomerProductsMock.mockResolvedValue({ data: [], error: null });
   });
 
   it('creates migration draft with additive tables and duplicate guard index', () => {
@@ -426,6 +451,145 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(fromMock).toHaveBeenCalledWith('tgd_billing_invoice_drafts');
     expect(fromMock).toHaveBeenCalledWith('tgd_billing_invoice_draft_lines');
     expect(rpcMock).toHaveBeenCalledWith('tgd_next_billing_invoice_draft_no');
+  });
+
+  // Real reported gap: resolveMovementRates (the movement-based invoice draft path)
+  // called resolveServiceRate without an asOfDate. resolveServiceRate treats a
+  // missing asOfDate as "skip the contract_start_date/contract_end_date check
+  // entirely" (see billingRateCalc.js), so a rate whose contract had already ended
+  // still matched a movement dated well after that end date — a real contract-window
+  // bypass the audited period-based flow (getBillingPeriodPreview/
+  // computeHandlingFeeLines) never had, since it always passes the deposit line's own
+  // receipt_date as asOfDate.
+  function mockDraftInsertChain({ draftId, draftNo }) {
+    let lineTableCalls = 0;
+    fromMock.mockImplementation((tableName) => {
+      if (tableName === 'tgd_billing_invoice_draft_lines') {
+        lineTableCalls += 1;
+        if (lineTableCalls === 1) {
+          return createTableChain(tableName, { inResult: () => ({ data: [], error: null }) });
+        }
+        return createTableChain(tableName, {
+          afterWrite: (state) => ({
+            data: (Array.isArray(state.payload) ? state.payload : []).map((line, index) => ({
+              id: `line-${index + 1}`,
+              ...line,
+            })),
+            error: null,
+          }),
+        });
+      }
+
+      if (tableName === 'tgd_billing_invoice_drafts') {
+        const headerRow = { id: draftId, draft_no: draftNo, customer_id: 'cust-1' };
+        return createTableChain(tableName, {
+          afterWrite: () => ({ data: headerRow, error: null }),
+          single: async () => ({ data: headerRow, error: null }),
+        });
+      }
+
+      return createTableChain(tableName);
+    });
+  }
+
+  it('does not resolve a rate for a movement dated after the rate contract has ended', async () => {
+    listAllProductServiceRatesMock.mockResolvedValue({
+      data: [{
+        id: 'rate-handling-expired',
+        customer_id: 'cust-1',
+        customer_product_id: null,
+        service_type: 'HANDLING_IN',
+        rate: 5,
+        unit_basis: 'PER_KG',
+        is_active: true,
+        contract_start_date: '2026-01-01',
+        contract_end_date: '2026-06-30',
+      }],
+      error: null,
+    });
+
+    const lateMovement = {
+      ...validMovement,
+      movement_id: 'mv-late',
+      movement_date: '2026-07-15T00:00:00.000Z',
+      billing_service_type: 'INBOUND_HANDLING',
+    };
+    getBillingMovementWeightRowsMock.mockResolvedValue({
+      data: [lateMovement],
+      error: null,
+      source: 'billing_database_view',
+    });
+
+    mockDraftInsertChain({ draftId: 'draft-late', draftNo: 'BID-20260715-0001' });
+
+    const result = await createBillingInvoiceDraftFromMovements({ movementIds: ['mv-late'] });
+
+    expect(result.error).toBeNull();
+    expect(result.data.lines).toHaveLength(1);
+    expect(result.data.lines[0].rate).toBeNull();
+    expect(result.data.lines[0].amount).toBeNull();
+  });
+
+  it('resolves a rate for a movement dated within the rate contract window', async () => {
+    listAllProductServiceRatesMock.mockResolvedValue({
+      data: [{
+        id: 'rate-handling-active',
+        customer_id: 'cust-1',
+        customer_product_id: null,
+        service_type: 'HANDLING_IN',
+        rate: 5,
+        unit_basis: 'PER_KG',
+        is_active: true,
+        contract_start_date: '2026-01-01',
+        contract_end_date: '2026-12-31',
+      }],
+      error: null,
+    });
+
+    const inWindowMovement = {
+      ...validMovement,
+      movement_id: 'mv-in-window',
+      movement_date: '2026-07-15T00:00:00.000Z',
+      billing_service_type: 'INBOUND_HANDLING',
+    };
+    getBillingMovementWeightRowsMock.mockResolvedValue({
+      data: [inWindowMovement],
+      error: null,
+      source: 'billing_database_view',
+    });
+
+    mockDraftInsertChain({ draftId: 'draft-window', draftNo: 'BID-20260715-0002' });
+
+    const result = await createBillingInvoiceDraftFromMovements({ movementIds: ['mv-in-window'] });
+
+    expect(result.error).toBeNull();
+    expect(result.data.lines).toHaveLength(1);
+    expect(result.data.lines[0].rate).toBe(5);
+    expect(result.data.lines[0].amount).toBe(500);
+  });
+
+  // Bug 3 investigation: STORAGE-classified rows (e.g. the STORAGE_OPENING_BALANCE
+  // "ยอดยกมา" rows BillingMovementWeightReportPage.jsx merges in) have no
+  // period/cycle context on this movement-based path, so resolving a flat rate for
+  // them would silently skip every contract term computeStorageInvoiceLines applies
+  // (minimum charge, free days, discount percent, cycle proration). Both guards below
+  // must block the row rather than let it through with a flat (and likely wrong)
+  // amount — see the matching comment on RATE_SERVICE_TYPES in
+  // billingInvoiceDraftService.js.
+  it('rejects a STORAGE-classified row from the movement-based draft validation', () => {
+    const storageRow = { ...validMovement, billing_service_type: 'STORAGE' };
+    const validation = validateInvoiceDraftSourceRows([storageRow]);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.join(' ')).toMatch(/period-based billing flow/i);
+  });
+
+  it('marks a STORAGE-classified row not selectable on the movement weight report', () => {
+    const storageRow = { ...validMovement, billing_service_type: 'STORAGE' };
+
+    const state = getMovementDraftSelectionState(storageRow);
+    expect(state.selectable).toBe(false);
+    expect(state.reason).toMatch(/period-based billing flow/i);
   });
 
   it('cancel draft updates status through service layer', async () => {

@@ -400,6 +400,90 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     expect(createBillingInvoiceDraftFromMovementsMock).not.toHaveBeenCalled();
   });
 
+  // Real reported gap: tgd_stock_movements actually stores 'CUSTOMER_DEPOSIT_REQUEST'
+  // for source_module, not the bare 'CUSTOMER_DEPOSIT' the outboundRows filter used to
+  // check for — that exact-match never fired, so a generic stock_movements row for a
+  // deposit confirmation event slipped through the filter and got billed a second time
+  // alongside the richer, lot_no-bearing row getConfirmedDepositReceiptRows already
+  // supplies for that same event (real double-billing risk). Both rows below share the
+  // same source_document_no, so BillingMovementWeightTable groups them into one
+  // checkbox — the double count would otherwise hide behind an inflated group weight
+  // total and a movementIds array carrying both ids into the created draft.
+  it('does not double count a deposit confirmation appearing in both raw movement rows and the richer deposit source', async () => {
+    createBillingInvoiceDraftFromMovementsMock.mockResolvedValue({
+      data: { draft: { id: 'draft-dep-1', draft_no: 'BID-DEP-0001' }, lines: [] },
+      error: null,
+    });
+    getConfirmedWithdrawalRowsMock.mockResolvedValue({ data: [], error: null });
+    getMovementLedgerRowsMock.mockResolvedValue({
+      data: [{
+        id: 'raw-mv-dep-1',
+        movement_type_raw: 'RECEIVE_CONFIRM',
+        movement_type: 'RECEIVE',
+        movement_date: '2026-06-01T10:00:00.000Z',
+        customer_id: 'cust-1',
+        customer_name: 'Alpha',
+        source_module: 'CUSTOMER_DEPOSIT_REQUEST',
+        source_document_no: 'DEP-100',
+        qty: 10,
+        quantity: 10,
+        weight: 100,
+        chargeable_weight: 100,
+        is_billable: true,
+        billing_status: 'READY_FOR_PREVIEW',
+      }],
+      error: null,
+    });
+    getConfirmedDepositReceiptRowsMock.mockResolvedValue({
+      data: [{
+        id: 'deposit-line-1',
+        // shapeBillingMovementWeightRow is identity-mocked in this test file (it
+        // normally maps row.id -> movement_id — see the mock above), so movement_id
+        // must be supplied directly here for the row to be selectable/toggleable.
+        movement_id: 'deposit-line-1',
+        movement_type_raw: 'RECEIVE_CONFIRM',
+        movement_date: '2026-06-01',
+        customer_id: 'cust-1',
+        customer_name: 'Alpha',
+        lot_no: 'LOT-100',
+        source_document_no: 'DEP-100',
+        qty: 10,
+        quantity: 10,
+        weight: 100,
+        chargeable_weight: 100,
+        is_billable: true,
+        billing_status: 'READY_FOR_PREVIEW',
+      }],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
+        <Routes>
+          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
+          <Route path="/billing/invoice-drafts/:draftId" element={<div data-testid="draft-detail-redirect" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
+
+    const checkboxes = await screen.findAllByTestId('billing-movement-row-checkbox');
+    expect(checkboxes).toHaveLength(1);
+    expect(screen.getByText('100.00')).toBeInTheDocument();
+    expect(screen.queryByText('200.00')).not.toBeInTheDocument();
+
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(screen.getByTestId('create-invoice-draft-button'));
+
+    await waitFor(() => {
+      expect(createBillingInvoiceDraftFromMovementsMock).toHaveBeenCalledWith({
+        movementIds: ['deposit-line-1'],
+        note: 'E2E_TEST',
+      });
+    });
+  });
+
   it('marks NEEDS_WEIGHT_REVIEW rows as not selectable', () => {
     expect(getMovementDraftSelectionState(blockedMovement).selectable).toBe(false);
     expect(getMovementDraftSelectionState(validMovement).selectable).toBe(true);

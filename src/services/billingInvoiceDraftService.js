@@ -179,7 +179,22 @@ async function fetchMovementsByIds(movementIds = []) {
   };
 }
 
-const RATE_SERVICE_TYPES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'OTHER']);
+// STORAGE deliberately excluded: a movement-based row (e.g. the
+// STORAGE_OPENING_BALANCE "ยอดยกมา" rows getStorageOpeningBalanceRows feeds into
+// this report) has no cycle/period context of its own, so a flat resolveServiceRate
+// lookup here would apply the raw rate.rate figure straight to the row's weight —
+// silently skipping every contract term computeStorageInvoiceLines applies for the
+// audited period-based flow (minimum-charge floor, free-day grace period, discount
+// percent, and the "เต็มรอบทันที ไม่เฉลี่ยตามวัน" cycle-based day proration itself).
+// A customer with any of those terms configured would get a different (almost
+// always lower/wrong) STORAGE amount here than the authoritative
+// createBillingInvoiceDraftForPeriod flow would produce for the exact same lot.
+// STORAGE charges must always go through that period-based flow instead — see the
+// matching guard in validateInvoiceDraftSourceRows (billingInvoiceDraftUtils.js) and
+// getMovementDraftSelectionState, which block a STORAGE-classified row from ever
+// reaching this movement-based draft path at all, rather than silently leaving it
+// with a flat (and possibly wrong) rate.
+const RATE_SERVICE_TYPES = new Set(['HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'OTHER']);
 
 // enrichClientMergedBillingMovementWeightRow classifies deposit/withdrawal
 // rows as INBOUND_HANDLING/OUTBOUND_HANDLING (see billingMovementWeightService.js)
@@ -242,11 +257,27 @@ async function resolveMovementRates(movements = []) {
       ?? (movement.customer_product_code ? catalogMaps?.temperatureTypeByCode.get(movement.customer_product_code) : null)
       ?? null;
 
+    // asOfDate must be the movement's own date, not omitted — resolveServiceRate treats
+    // a missing asOfDate as "skip the contract_start_date/contract_end_date check
+    // entirely" (see billingRateCalc.js), which let a rate match a movement dated
+    // outside the customer's actual contract window. The period-based flow
+    // (getBillingPeriodPreview/computeHandlingFeeLines) always passes the deposit
+    // line's own receipt_date for exactly this reason — mirror that here with the
+    // movement's own date so this path enforces the same contract window.
+    // Normalized to a plain YYYY-MM-DD date (same as every other asOfDate this rate
+    // engine compares against contract_start_date/contract_end_date, e.g.
+    // getConfirmedDepositReceiptRows' receiptDate) — movement_date can carry a full
+    // ISO timestamp, and comparing that directly against a date-only
+    // contract_end_date string would wrongly exclude a movement that happened ON the
+    // contract's last day (a longer "...T10:00:00.000Z" string sorts after the bare
+    // date it should be considered equal to/before).
+    const movementAsOfDate = movement.movement_date ? String(movement.movement_date).slice(0, 10) : null;
     const rate = resolveServiceRate(ratesByCustomer.get(movement.customer_id) ?? [], {
       customerId: movement.customer_id,
       customerProductId,
       temperatureType,
       serviceType,
+      asOfDate: movementAsOfDate,
     });
     if (!rate) return movement;
 

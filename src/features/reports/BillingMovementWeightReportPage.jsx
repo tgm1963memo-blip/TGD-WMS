@@ -115,7 +115,36 @@ export function BillingMovementWeightReportPage() {
 
       let outboundRows = (movResult.data ?? []).filter((r) => {
         const mt = String(r.movement_type_raw || '').toUpperCase();
-        return !mt.includes('DRAFT') && !INBOUND_SKIP.has(mt);
+        if (mt.includes('DRAFT')) return false;
+
+        // tgd_stock_movements actually stores 'CUSTOMER_DEPOSIT_REQUEST' (confirmed via
+        // direct query), not the bare 'CUSTOMER_DEPOSIT' this used to check for — that
+        // exact-match never fired, so every deposit confirmation was double counted here:
+        // once from this generic stock_movements row (blank lot_no, raw movement-id
+        // reference) and once from the richer, lot_no-bearing row depositResult.data
+        // already supplies for the same event. startsWith so any other
+        // 'CUSTOMER_DEPOSIT*' source_module variant is caught too. Mirrors the identical
+        // guard in MovementLedgerReportPage.jsx's fetchMergedRows — both pages merge the
+        // exact same three sources and must apply the same de-dup.
+        if (String(r.source_module || '').startsWith('CUSTOMER_DEPOSIT')) return false;
+
+        // Fallback for legacy records that might not have source_module populated:
+        // If it's an inbound movement but has no source_module, we assume it's a legacy
+        // deposit and skip it to prevent double-counting.
+        if (!r.source_module && INBOUND_SKIP.has(mt)) return false;
+
+        return true;
+      });
+
+      // Same withdrawal de-dup as MovementLedgerReportPage.jsx's fetchMergedRows: a
+      // legacy DISPATCH/CUSTOMER_WITHDRAWAL row in tgd_stock_movements referencing the
+      // same WD- withdrawal document that withdrawalResult.data already supplies (richer
+      // fields, e.g. tracking_code) must not also be counted from outboundRows.
+      const withdrawalDocNumbers = new Set((withdrawalResult.data ?? []).map((r) => String(r.source_document_no)));
+      outboundRows = outboundRows.filter((r) => {
+        const isWithdrawal = r.movement_type_raw === 'CUSTOMER_WITHDRAWAL' || (r.movement_type_raw === 'DISPATCH' && String(r.source_document_no).startsWith('WD-'));
+        if (isWithdrawal && withdrawalDocNumbers.has(String(r.source_document_no))) return false;
+        return true;
       });
 
       const allRaw = [
