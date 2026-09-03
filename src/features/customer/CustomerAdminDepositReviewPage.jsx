@@ -77,6 +77,7 @@ export function CustomerAdminDepositReviewPage() {
   const [recountQty, setRecountQty] = useState('');
   const [recountBoxes, setRecountBoxes] = useState('');
   const [recountNote, setRecountNote] = useState('');
+  const [recountTemperatureType, setRecountTemperatureType] = useState('');
   const [recountRequestOpen, setRecountRequestOpen] = useState(false);
   const [recountRequestComment, setRecountRequestComment] = useState('');
   const [addLineOpen, setAddLineOpen] = useState(false);
@@ -823,6 +824,7 @@ export function CustomerAdminDepositReviewPage() {
                                 setRecountBoxes(line.actual_boxes?.toString() ?? line.expected_boxes?.toString() ?? '');
                                 setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
                                 setRecountNote(line.actual_note ?? '');
+                                setRecountTemperatureType(line.temperature_type ?? '');
                               }}
                             >
                               {t('admin_recount_button')}
@@ -1032,6 +1034,7 @@ export function CustomerAdminDepositReviewPage() {
                   actualBoxes: recountBoxes,
                   actualWeight: recountQty,
                   note: recountNote || null,
+                  temperatureType: recountTemperatureType && recountTemperatureType !== recountLine.temperature_type ? recountTemperatureType : null,
                 });
                 setSubmitting(false);
                 if (result.error) {
@@ -1039,7 +1042,13 @@ export function CustomerAdminDepositReviewPage() {
                   return;
                 }
                 setLines((prev) => prev.map((l) => l.id === recountLine.id
-                  ? { ...l, actual_boxes: Number(recountBoxes) || null, actual_weight: Number(recountQty) || null, actual_note: recountNote || null }
+                  ? {
+                      ...l,
+                      actual_boxes: Number(recountBoxes) || null,
+                      actual_weight: Number(recountQty) || null,
+                      actual_note: recountNote || null,
+                      temperature_type: result.data?.temperature_type ?? l.temperature_type,
+                    }
                   : l));
                 setActionMsg(t('admin_recount_saved'));
                 setRecountLine(null);
@@ -1080,6 +1089,23 @@ export function CustomerAdminDepositReviewPage() {
                 />
               </label>
             </div>
+            <label className="form-field" style={{ marginTop: 8 }}>
+              <span>วิธีจัดเก็บ (LOT นี้)</span>
+              <select
+                className="form-control"
+                value={recountTemperatureType}
+                onChange={(e) => setRecountTemperatureType(e.target.value)}
+              >
+                {Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            {recountTemperatureType && recountTemperatureType !== recountLine.temperature_type ? (
+              <p className="form-helper" style={{ marginTop: 6, marginBottom: 0 }}>
+                ⚠️ การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
+              </p>
+            ) : null}
             <label className="form-field" style={{ marginTop: 8 }}>
               <span>หมายเหตุรายบรรทัด (Admin)</span>
               <input
