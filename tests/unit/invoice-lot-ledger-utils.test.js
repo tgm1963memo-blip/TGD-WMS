@@ -116,14 +116,59 @@ describe('buildInvoiceLotLedger', () => {
     expect(lots[0].rows[0].coldStorageCharge).toBe(708.40);
     // Real reported gap: BALANCE FORWARD/BALANCE printed a flat 0.00 for a
     // storage-only lot even though it genuinely holds real weight this
-    // period -- surface the latest cycle's own weight as the steady balance
-    // being carried, since no discrete in/out event happened on this row.
+    // period -- both cycles here hold the same 1540kg, so forward == balance.
     expect(lots[0].rows[0].balanceForwardWeight).toBe(1540);
     expect(lots[0].rows[0].balanceWeight).toBe(1540);
     // Cycle-detail text (period days, exact date range, weight) already
-    // shown on the draft-view table should also reach the printed invoice.
-    expect(lots[0].rows[0].remark).toContain('2026-08-03 ถึง 2026-08-17');
+    // shown on the draft-view table should also reach the printed invoice —
+    // only the LAST cycle's own note (the one anchoring this row's ending
+    // balance), not every cycle folded into this row.
     expect(lots[0].rows[0].remark).toContain('2026-08-18 ถึง 2026-09-01');
+    expect(lots[0].rows[0].remark).not.toContain('2026-08-03 ถึง 2026-08-17');
+  });
+
+  // Real reported gap: a lot billed over several STORAGE cycles within one
+  // draft period can hold a DIFFERENT weight per cycle (a withdrawal or
+  // extra deposit happened between cycle boundaries) -- picking one cycle's
+  // weight arbitrarily for BALANCE FORWARD/BALANCE showed numbers that
+  // didn't reconcile against each other or against the cycle-detail notes.
+  it('reconciles BALANCE FORWARD -> RECEIVED/DELIVERY -> BALANCE across multiple STORAGE cycles with different weights', () => {
+    const lines = [
+      {
+        lot_no: 'LOT-1', product_code: 'QP', product_name: 'QP กลาง ใส่กล่อง',
+        movement_type: 'STORAGE', rate: 0.58, amount: 580, chargeable_weight: 1000,
+        line_note: 'cycle 1 (1000kg)', billing_period_start: '2026-08-11', billing_period_end: '2026-08-25',
+      },
+      {
+        lot_no: 'LOT-1', product_code: 'QP', product_name: 'QP กลาง ใส่กล่อง',
+        movement_type: 'STORAGE', rate: 0.58, amount: 1160, chargeable_weight: 2000,
+        line_note: 'cycle 2 (2000kg, +1000 received)', billing_period_start: '2026-08-13', billing_period_end: '2026-08-27',
+      },
+      {
+        lot_no: 'LOT-1', product_code: 'QP', product_name: 'QP กลาง ใส่กล่อง',
+        movement_type: 'STORAGE', rate: 0.58, amount: 1148.40, chargeable_weight: 1980,
+        line_note: 'cycle 3 (1980kg, -20 delivered)', billing_period_start: '2026-08-15', billing_period_end: '2026-08-29',
+      },
+    ];
+
+    const { lots } = buildInvoiceLotLedger(lines);
+    expect(lots).toHaveLength(1);
+    expect(lots[0].rows).toHaveLength(1);
+    const row = lots[0].rows[0];
+    // Forward = first cycle's weight (period-start), balance = last cycle's
+    // weight (period-end, matching the selected end date).
+    expect(row.balanceForwardWeight).toBe(1000);
+    expect(row.balanceWeight).toBe(1980);
+    // 1000 -> 2000 is a +1000 received; 2000 -> 1980 is a -20 delivered.
+    expect(row.receivedWeight).toBe(1000);
+    expect(row.deliveryWeight).toBe(20);
+    // Must reconcile exactly: forward + received - delivery = balance.
+    expect(row.balanceForwardWeight + row.receivedWeight - row.deliveryWeight).toBe(row.balanceWeight);
+    // Only the last (chronologically) cycle's own note shows -- a lot
+    // catching up several cycles in one draft must not dump every cycle's
+    // sentence onto one row; the reconciled numbers above already
+    // summarize the whole span.
+    expect(row.remark).toBe('cycle 3 (1980kg, -20 delivered)');
   });
 
   it('groups multiple lots independently and sums a grand total across them', () => {

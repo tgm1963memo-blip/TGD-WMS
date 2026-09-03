@@ -143,21 +143,40 @@ export function buildInvoiceLotLedger(lines = []) {
     }
 
     // A lot billed entirely through the period-based STORAGE flow has no
-    // discrete received/delivery event to report in this row at all -- but
-    // leaving BALANCE FORWARD/RECEIVED/DELIVERY/BALANCE at a flat 0.00 reads
-    // as "nothing here," even though the lot genuinely holds (and is being
-    // billed for) real weight this period. Surface the latest cycle's own
-    // chargeable weight as the steady balance being carried/billed, since no
-    // in/out event actually happened on this row -- it's what's "on hand,"
-    // not something newly received or delivered this row.
-    const latestStorageWeight = sortedStorageLines.length
+    // discrete received/delivery event to report -- each STORAGE line is
+    // only a cycle's own weight-on-hand snapshot, not a movement. Leaving
+    // BALANCE FORWARD/RECEIVED/DELIVERY/BALANCE at a flat 0.00 reads as
+    // "nothing here" even though real weight is being carried and billed,
+    // and multiple cycles landing in one draft (e.g. a period spanning
+    // several 15-day cycles) can each snapshot a DIFFERENT weight if a
+    // withdrawal or additional deposit happened between them -- picking
+    // just one cycle's number arbitrarily doesn't reconcile against the
+    // others. Instead: BALANCE FORWARD is the first cycle's weight in this
+    // period (what was on hand when the period's coverage starts), BALANCE
+    // is the last cycle's weight (on hand as of the selected end date), and
+    // RECEIVED/DELIVERY are the sum of weight increases/decreases between
+    // consecutive cycles in between -- so forward + received - delivery
+    // always reconciles exactly to the ending balance, matching a real
+    // period-summary ledger instead of one arbitrary snapshot.
+    const lastStorageWeight = sortedStorageLines.length
       ? toNum(sortedStorageLines[sortedStorageLines.length - 1].chargeable_weight)
       : 0;
+    let periodReceivedWeight = 0;
+    let periodDeliveryWeight = 0;
+    for (let i = 1; i < sortedStorageLines.length; i += 1) {
+      const delta = toNum(sortedStorageLines[i].chargeable_weight) - toNum(sortedStorageLines[i - 1].chargeable_weight);
+      if (delta > 0) periodReceivedWeight += delta;
+      else periodDeliveryWeight += -delta;
+    }
 
     if (rows.length === 0) {
       balanceVolume = 0;
-      balanceWeight = latestStorageWeight;
-      pushRow({ deliveryDate: storageCycleEndDate, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
+      balanceWeight = lastStorageWeight;
+      pushRow({
+        deliveryDate: storageCycleEndDate,
+        receivedVolume: 0, receivedWeight: round2(periodReceivedWeight),
+        deliveryVolume: 0, deliveryWeight: round2(periodDeliveryWeight),
+      });
     }
 
     const totalStorageCharge = round2(storageLines.reduce((s, l) => s + toNum(l.amount), 0));
@@ -168,7 +187,15 @@ export function buildInvoiceLotLedger(lines = []) {
     // sees on the draft-view table) -- surface the same text here so the
     // printed invoice carries the same detail instead of only the summed
     // charge with no explanation of how it was derived.
-    const storageNote = storageLines.map((l) => l.line_note).filter(Boolean).join(' / ') || null;
+    // Show only the LAST cycle's own note -- a lot that hasn't been billed
+    // in a while can catch up many cycles at once in a single draft (real
+    // case: 11 cycles for one lot), and dumping every cycle's own sentence
+    // onto one row was an unreadable wall of text repeating the same
+    // "ค่าฝาก 1 งวด (...)" phrasing 11 times. The row's BALANCE FORWARD/
+    // RECEIVED/DELIVERY/BALANCE numbers above already summarize the whole
+    // span; the note only needs to explain the cycle actually anchoring
+    // this row's charge (the last one, matching the ending balance).
+    const storageNote = sortedStorageLines[sortedStorageLines.length - 1]?.line_note ?? null;
     if (storageLines.length > 0) {
       const lastRow = rows[rows.length - 1];
       lastRow.chargeUnit = storageRate;
