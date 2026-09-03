@@ -11,6 +11,7 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+import { mapWithConcurrencyLimit } from '../../utils/asyncBatch.js';
 
 const WAREHOUSE_DEPOSIT_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -129,12 +130,16 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   // "รวมเป็นใบงานเดียว" bulk-print selection above, this isn't restricted to
   // BULK_PRINT_ELIGIBLE_STATUSES, since staff need line-item detail for a
   // request regardless of what stage it's at (including ones already fully
-  // received, which the print-merge flow deliberately excludes).
+  // received, which the print-merge flow deliberately excludes). Lines are
+  // fetched with bounded concurrency, not one request per document all at
+  // once — the equivalent withdrawal-review export hit a filtered list of
+  // 529 requests in production and stalled the browser's connection pool
+  // when fired unbounded.
   async function handleExportExcel(rowsToExport) {
     if (!rowsToExport.length) return;
     setExporting(true);
     setExportError('');
-    const results = await Promise.all(rowsToExport.map((r) => listCustomerDepositRequestLines(r.id)));
+    const results = await mapWithConcurrencyLimit(rowsToExport, 8, (r) => listCustomerDepositRequestLines(r.id));
     if (!isMountedRef.current) return;
     const failed = results.find((r) => r.error);
     if (failed) {
@@ -290,7 +295,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
           className="btn btn-outline"
           data-testid="receiving-customer-deposit-export-excel"
           disabled={exporting || filteredRows.length === 0}
-          onClick={() => handleExportExcel(filteredRows)}
+          onClick={() => handleExportExcel(selectedRequestRows.length > 0 ? selectedRequestRows : filteredRows)}
           style={{ alignSelf: 'flex-end' }}
           title="ดาวน์โหลดรายละเอียดสินค้าแต่ละรายการของทุกคำขอที่กรองอยู่ตอนนี้เป็น Excel"
         >

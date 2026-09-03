@@ -28,6 +28,7 @@ import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesFo
 import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+import { mapWithConcurrencyLimit } from '../../utils/asyncBatch.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
@@ -339,12 +340,16 @@ export function CustomerAdminWithdrawalReviewPage() {
   // CustomerDepositNotificationsSection's bulk export. Unlike
   // exportCustomerWithdrawalDocumentExcel (one document's print-formatted
   // layout at a time), this is a flat, filterable multi-document dump for
-  // staff who need line-item detail across many requests at once.
+  // staff who need line-item detail across many requests at once. A live
+  // warehouse's unfiltered request list can run into the hundreds, so lines
+  // are fetched with bounded concurrency rather than one request per
+  // document all at once (confirmed via load test: 529 filtered rows fired
+  // in parallel stalled the browser's connection pool and never completed).
   async function handleExportExcel(rowsToExport) {
     if (!rowsToExport.length) return;
     setExporting(true);
     setExportError('');
-    const results = await Promise.all(rowsToExport.map((r) => listCustomerWithdrawalRequestLines(r.id)));
+    const results = await mapWithConcurrencyLimit(rowsToExport, 8, (r) => listCustomerWithdrawalRequestLines(r.id));
     if (!isMountedRef.current) return;
     const failed = results.find((r) => r.error);
     if (failed) {
@@ -665,7 +670,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               className="btn btn-outline"
               data-testid="withdrawal-review-export-excel"
               disabled={exporting || filteredRows.length === 0}
-              onClick={() => handleExportExcel(filteredRows)}
+              onClick={() => handleExportExcel(selectedRequestRows.length > 0 ? selectedRequestRows : filteredRows)}
               style={{ alignSelf: 'flex-end' }}
               title="ดาวน์โหลดรายละเอียดสินค้าแต่ละรายการของทุกคำขอที่กรองอยู่ตอนนี้เป็น Excel"
             >
