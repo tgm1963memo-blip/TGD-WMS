@@ -323,18 +323,57 @@ const WITHDRAWAL_DOCUMENT_LINE_HEADERS = [
   'MFG DATE', 'EXP DATE', 'T.WEIGHT KG', 'BOX', 'คงเหลือในล็อต (กล่อง)', 'คงเหลือในล็อต (กก.)', 'REMARK',
 ];
 
+// Shared by the flat document export and the form-styled one below so both
+// always show the exact same line figures (same confirmedWithdrawalQty
+// fallback rule the printed document itself uses).
+function buildWithdrawalLineRowsAndTotal(lines) {
+  let totalBoxes = 0;
+  let totalWeight = 0;
+
+  const lineRows = lines.map((line, idx) => {
+    const qty = confirmedWithdrawalQty(line);
+    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
+    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
+    return [
+      idx + 1,
+      line.tracking_code ?? '-',
+      line.lot_no ?? '-',
+      line.customer_product_code ?? line.product_code ?? '-',
+      line.product_name ?? '-',
+      line.location ?? '-',
+      fmtExcelDate(line.mfg_date),
+      fmtExcelDate(line.exp_date),
+      qty.weight ?? '-',
+      qty.boxes ?? '-',
+      line.lot_remaining_boxes ?? '-',
+      line.lot_remaining_weight ?? '-',
+      [line.note, line.admin_note].filter(Boolean).join(' / ') || '-',
+    ];
+  });
+
+  const totalRow = ['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', '', '', ''];
+  return { lineRows, totalRow };
+}
+
+function withdrawalHeaderFields(header) {
+  return {
+    customerName: header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-',
+    customerAddress: header.customer_address ?? header.customer?.address ?? '-',
+    contactPhone: header.contact_phone ?? header.customer?.phone ?? '-',
+    contactFax: header.contact_fax ?? header.customer?.fax ?? '-',
+    docDate: header.requested_dispatch_date
+      ? header.requested_dispatch_date
+      : header.created_at ? header.created_at.split('T')[0] : '-',
+    docNo: header.withdrawal_no ?? header.request_no ?? '-',
+  };
+}
+
 // Pure builder (no file I/O) so the row layout can be unit tested without
 // touching XLSX.writeFile — a header key/value block followed by the same
 // line table shown on the printed document.
 export function buildCustomerWithdrawalDocumentRows(header = {}, lines = []) {
-  const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
-  const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
-  const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
-  const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
-  const docDate = header.requested_dispatch_date
-    ? header.requested_dispatch_date
-    : header.created_at ? header.created_at.split('T')[0] : '-';
-  const docNo = header.withdrawal_no ?? header.request_no ?? '-';
+  const { customerName, customerAddress, contactPhone, contactFax, docDate, docNo } = withdrawalHeaderFields(header);
+  const { lineRows, totalRow } = buildWithdrawalLineRowsAndTotal(lines);
 
   const rows = [
     ['เลขที่เอกสาร', docNo],
@@ -351,33 +390,9 @@ export function buildCustomerWithdrawalDocumentRows(header = {}, lines = []) {
     ['หมายเหตุ', header.note ?? '-'],
     [],
     WITHDRAWAL_DOCUMENT_LINE_HEADERS,
+    ...lineRows,
+    totalRow,
   ];
-
-  let totalBoxes = 0;
-  let totalWeight = 0;
-
-  lines.forEach((line, idx) => {
-    const qty = confirmedWithdrawalQty(line);
-    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
-    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
-    rows.push([
-      idx + 1,
-      line.tracking_code ?? '-',
-      line.lot_no ?? '-',
-      line.customer_product_code ?? line.product_code ?? '-',
-      line.product_name ?? '-',
-      line.location ?? '-',
-      fmtExcelDate(line.mfg_date),
-      fmtExcelDate(line.exp_date),
-      qty.weight ?? '-',
-      qty.boxes ?? '-',
-      line.lot_remaining_boxes ?? '-',
-      line.lot_remaining_weight ?? '-',
-      [line.note, line.admin_note].filter(Boolean).join(' / ') || '-',
-    ]);
-  });
-
-  rows.push(['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', '', '', '']);
 
   return { rows, docNo };
 }
@@ -390,4 +405,65 @@ export function exportCustomerWithdrawalDocumentExcel(header = {}, lines = [], f
   const { rows, docNo } = buildCustomerWithdrawalDocumentRows(header, lines);
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   downloadExcelWorkbook(sheet, filename ?? `${docNo}.xlsx`, 'Withdrawal');
+}
+
+function mergeRange(r, c1, c2) {
+  return { s: { r, c: c1 }, e: { r, c: c2 } };
+}
+
+// A "form"-styled alternative to buildCustomerWithdrawalDocumentRows above:
+// same fields and same line table, but the header block is laid out as a
+// merged-cell grid (label | value spanning several columns, two fields per
+// row) instead of one label/value pair per row -- closer to how the printed
+// document's own meta table reads. xlsx (SheetJS community build) can't
+// preserve cell fills/borders/fonts on write, only structural merges, so
+// this is as close to the print layout as a plain .xlsx download can get.
+export function buildCustomerWithdrawalDocumentFormRows(header = {}, lines = []) {
+  const { customerName, customerAddress, contactPhone, contactFax, docDate, docNo } = withdrawalHeaderFields(header);
+  const { lineRows, totalRow } = buildWithdrawalLineRowsAndTotal(lines);
+
+  const rows = [];
+  const merges = [];
+
+  function titleRow(text) {
+    rows.push([text, '', '', '', '', '']);
+    merges.push(mergeRange(rows.length - 1, 0, 5));
+  }
+
+  function metaRow(pairs) {
+    const r = rows.length;
+    if (pairs.length === 1) {
+      rows.push([pairs[0][0], pairs[0][1], '', '', '', '']);
+      merges.push(mergeRange(r, 1, 5));
+    } else {
+      rows.push([pairs[0][0], pairs[0][1], '', pairs[1][0], pairs[1][1], '']);
+      merges.push(mergeRange(r, 1, 2));
+      merges.push(mergeRange(r, 4, 5));
+    }
+  }
+
+  titleRow('ใบขอเบิกสินค้า / WITHDRAWAL REQUEST');
+  rows.push([]);
+  metaRow([['เลขที่เอกสาร', docNo], ['วันที่', fmtExcelDate(docDate)]]);
+  metaRow([['ลูกค้า', customerName]]);
+  metaRow([['ที่อยู่', customerAddress]]);
+  metaRow([['โทร', contactPhone], ['แฟกซ์', contactFax]]);
+  metaRow([['ปลายทาง', header.destination ?? '-'], ['ทะเบียนรถ', header.vehicle_registration ?? '-']]);
+  metaRow([['ผู้ติดต่อรับสินค้า', header.pickup_contact ?? '-'], ['อุณหภูมิรถ', header.truck_temp ?? '-']]);
+  metaRow([['อุณหภูมิห้อง', header.room_temp ?? '-']]);
+  if (header.note) metaRow([['หมายเหตุ', header.note]]);
+  rows.push([]);
+  rows.push(WITHDRAWAL_DOCUMENT_LINE_HEADERS);
+  rows.push(...lineRows);
+  rows.push(totalRow);
+
+  return { rows, merges, docNo };
+}
+
+export function exportCustomerWithdrawalDocumentFormExcel(header = {}, lines = [], filename) {
+  const { rows, merges, docNo } = buildCustomerWithdrawalDocumentFormRows(header, lines);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet['!merges'] = merges;
+  sheet['!cols'] = WITHDRAWAL_DOCUMENT_LINE_HEADERS.map(() => ({ wch: 14 }));
+  downloadExcelWorkbook(sheet, filename ?? `${docNo}-form.xlsx`, 'Withdrawal');
 }

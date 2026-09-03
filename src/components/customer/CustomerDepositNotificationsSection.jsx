@@ -33,7 +33,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   const t = useTranslation();
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [filterText, setFilterText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatuses, setFilterStatuses] = useState([]);
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -208,7 +208,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
     const matchText = !text ||
       (row.request_no ?? '').toLowerCase().includes(text) ||
       (row.contact_name ?? '').toLowerCase().includes(text);
-    const matchStatus = !filterStatus || row.status === filterStatus;
+    const matchStatus = filterStatuses.length === 0 || filterStatuses.includes(row.status);
     const matchCustomer = !filterCustomer || row.customer_id === filterCustomer;
     const arrivalDate = row.expected_arrival_date ?? '';
     const matchDateFrom = !filterDateFrom || arrivalDate >= filterDateFrom;
@@ -254,19 +254,37 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             ))}
           </select>
         </label>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 160px', maxWidth: 220 }}>
-          {'สถานะ'}
-          <select
-            className="form-control"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">ทุกสถานะ</option>
-            {WAREHOUSE_DEPOSIT_STATUSES.map((s) => (
-              <option key={s} value={s}>{getDepositStatusLabel(s, t)}</option>
-            ))}
-          </select>
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
+          <span className="form-label" style={{ margin: 0 }}>
+            {'สถานะ (เลือกได้หลายรายการ — ใช้กรองทั้งตารางและตอนดาวน์โหลด Excel)'}
+          </span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {WAREHOUSE_DEPOSIT_STATUSES.map((status) => {
+              const active = filterStatuses.includes(status);
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  data-testid={`deposit-notifications-status-chip-${status}`}
+                  onClick={() => setFilterStatuses((prev) => (
+                    prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+                  ))}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    border: active ? '1px solid #2d9348' : '1px solid var(--tgd-border)',
+                    background: active ? '#2d9348' : '#fff',
+                    color: active ? '#fff' : '#334155',
+                  }}
+                >
+                  {getDepositStatusLabel(status, t)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
           {'วันที่แจ้งฝาก (ตั้งแต่)'}
           <input
@@ -285,11 +303,11 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             onChange={(e) => setFilterDateTo(e.target.value)}
           />
         </label>
-        {(filterText || filterStatus || filterCustomer || filterDateFrom || filterDateTo) ? (
+        {(filterText || filterStatuses.length > 0 || filterCustomer || filterDateFrom || filterDateTo) ? (
           <button
             type="button"
             className="btn"
-            onClick={() => { setFilterText(''); setFilterStatus(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+            onClick={() => { setFilterText(''); setFilterStatuses([]); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
             style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
           >
             {'ล้างตัวกรอง'}
@@ -416,7 +434,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             )) : (
               <tr>
                 <td colSpan={9}>
-                  {filterText || filterStatus
+                  {filterText || filterStatuses.length > 0
                     ? 'ไม่พบรายการที่ตรงกับเงื่อนไข'
                     : t('receiving_customer_deposit_empty')}
                 </td>

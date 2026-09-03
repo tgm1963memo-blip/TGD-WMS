@@ -26,7 +26,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { useUserRole } from '../../features/auth/UserRoleProvider.jsx';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
-import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
+import { exportCustomerWithdrawalDocumentExcel, exportCustomerWithdrawalDocumentFormExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 
@@ -120,6 +120,7 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [notifying, setNotifying] = useState(false);
   const [globalSearchText, setGlobalSearchText] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterStatuses, setFilterStatuses] = useState([]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [timelineEvents, setTimelineEvents] = useState([]);
@@ -147,11 +148,16 @@ export function CustomerAdminWithdrawalReviewPage() {
       if (!textMatch) return false;
     }
     if (filterCustomer && row.customer_id !== filterCustomer) return false;
+    if (filterStatuses.length && !filterStatuses.includes(row.status)) return false;
     const dispatchDate = row.requested_dispatch_date ?? '';
     if (filterDateFrom && dispatchDate && dispatchDate < filterDateFrom) return false;
     if (filterDateTo && dispatchDate && dispatchDate > filterDateTo) return false;
     return true;
   });
+
+  function toggleStatusFilter(status) {
+    setFilterStatuses((prev) => (prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]));
+  }
 
   const { sortedData, requestSort, getSortIndicator } = useTableSort(filteredRows);
 
@@ -662,16 +668,47 @@ export function CustomerAdminWithdrawalReviewPage() {
                 onChange={(e) => setFilterDateTo(e.target.value)}
               />
             </label>
-            {(globalSearchText || filterCustomer || filterDateFrom || filterDateTo) ? (
+            {(globalSearchText || filterCustomer || filterStatuses.length > 0 || filterDateFrom || filterDateTo) ? (
               <button
                 type="button"
                 className="btn"
-                onClick={() => { setGlobalSearchText(''); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                onClick={() => { setGlobalSearchText(''); setFilterCustomer(''); setFilterStatuses([]); setFilterDateFrom(''); setFilterDateTo(''); }}
                 style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
               >
                 {'ล้างตัวกรอง'}
               </button>
             ) : null}
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tgd-text-secondary, #475569)' }}>
+                {'สถานะ (เลือกได้หลายรายการ — ใช้กรองทั้งตารางและตอนดาวน์โหลด Excel)'}
+              </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {REVIEW_STATUSES.map((status) => {
+                  const active = filterStatuses.includes(status);
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      data-testid={`withdrawal-review-status-chip-${status}`}
+                      onClick={() => toggleStatusFilter(status)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        border: active ? '1px solid #2d9348' : '1px solid var(--tgd-border)',
+                        background: active ? '#2d9348' : '#fff',
+                        color: active ? '#fff' : '#334155',
+                      }}
+                    >
+                      {getWithdrawalStatusLabel(status, t)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <button
               type="button"
               className="btn btn-outline"
@@ -729,6 +766,14 @@ export function CustomerAdminWithdrawalReviewPage() {
               onClick={() => exportCustomerWithdrawalDocumentExcel(mergedPrint.header, mergedPrint.lines)}
             >
               ดาวน์โหลด Excel
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: 8 }}
+              onClick={() => exportCustomerWithdrawalDocumentFormExcel(mergedPrint.header, mergedPrint.lines)}
+            >
+              ดาวน์โหลด Excel (แบบฟอร์ม)
             </button>
           </div>
         )}
@@ -920,6 +965,15 @@ export function CustomerAdminWithdrawalReviewPage() {
                 onClick={() => exportCustomerWithdrawalDocumentExcel(selected, lines)}
               >
                 ดาวน์โหลด Excel
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: 8 }}
+                data-testid="withdrawal-detail-export-excel-form"
+                onClick={() => exportCustomerWithdrawalDocumentFormExcel(selected, lines)}
+              >
+                ดาวน์โหลด Excel (แบบฟอร์ม)
               </button>
               <button
                 type="button"

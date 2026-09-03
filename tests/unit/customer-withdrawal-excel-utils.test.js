@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCustomerWithdrawalDocumentRows,
+  buildCustomerWithdrawalDocumentFormRows,
   downloadCustomerWithdrawalLineTemplate,
   mapImportedRowsToWithdrawalLines,
   parseCustomerWithdrawalLineImportFile,
@@ -343,5 +344,63 @@ describe('customerWithdrawalLineExcelUtils: buildCustomerWithdrawalDocumentRows'
 
   it('does not throw when there are no lines', () => {
     expect(() => buildCustomerWithdrawalDocumentRows(header, [])).not.toThrow();
+  });
+});
+
+describe('customerWithdrawalLineExcelUtils: buildCustomerWithdrawalDocumentFormRows', () => {
+  const header = {
+    withdrawal_no: 'WDR-0001',
+    customer_name: 'Acme Foods',
+    customer_address: '123 Main St',
+    contact_phone: '02-000-0000',
+    requested_dispatch_date: '2026-07-21',
+    destination: 'Warehouse B',
+    vehicle_registration: 'AB-1234',
+    note: 'handle with care',
+  };
+
+  const lines = [
+    {
+      id: 'wl-1',
+      tracking_code: 'TRK-1',
+      lot_no: 'LOT-1',
+      customer_product_code: 'SAMPLE-001',
+      product_name: 'Sample product',
+      requested_boxes: 10,
+      requested_weight: 100,
+    },
+  ];
+
+  it('lays out the header block as a merged-cell grid with the same field values as the flat export', () => {
+    const { rows, merges, docNo } = buildCustomerWithdrawalDocumentFormRows(header, lines);
+
+    expect(docNo).toBe('WDR-0001');
+    expect(merges.length).toBeGreaterThan(0);
+    const flat = rows.flat();
+    expect(flat).toContain('WDR-0001');
+    expect(flat).toContain('Acme Foods');
+    expect(flat).toContain('AB-1234');
+    expect(flat).toContain('handle with care');
+  });
+
+  it('still includes the same line table and TOTAL row as the flat export', () => {
+    const { rows } = buildCustomerWithdrawalDocumentFormRows(header, lines);
+    const lineHeaderIdx = rows.findIndex((r) => r[0] === '#');
+    expect(lineHeaderIdx).toBeGreaterThan(-1);
+    expect(rows[lineHeaderIdx + 1][8]).toBe(100);
+    expect(rows[rows.length - 1]).toContain('TOTAL');
+  });
+
+  it('omits the note row entirely when there is no note, without shifting merges out of range', () => {
+    const { rows, merges } = buildCustomerWithdrawalDocumentFormRows({ ...header, note: '' }, lines);
+    expect(rows.flat()).not.toContain('handle with care');
+    for (const m of merges) {
+      expect(m.s.r).toBeGreaterThanOrEqual(0);
+      expect(m.e.r).toBeLessThan(rows.length);
+    }
+  });
+
+  it('does not throw when there are no lines', () => {
+    expect(() => buildCustomerWithdrawalDocumentFormRows(header, [])).not.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCustomerDepositDocumentRows,
+  buildCustomerDepositDocumentFormRows,
   mapImportedRowsToDepositLines,
   parseCustomerDepositLineImportFile,
 } from '../../src/utils/customerDepositLineExcelUtils.js';
@@ -69,6 +70,37 @@ describe('customerDepositLineExcelUtils', () => {
     expect(totalsRow[7]).toBe('TOTAL');
     expect(totalsRow[8]).toBe(125);
     expect(totalsRow[9]).toBe(15);
+  });
+
+  it('builds a form-styled sheet with a merged-cell header block carrying the same field values', () => {
+    const header = {
+      request_no: 'CDR-0001',
+      customer_name: 'Acme Foods',
+      expected_arrival_date: '2026-08-01',
+      vehicle_registration: 'AB-1234',
+      note: 'handle with care',
+    };
+    const lines = [
+      { line_no: 1, tracking_code: 'FR260801001', lot_no: 'LOT-1', customer_product_code: 'SAMPLE-001', product_name: 'Sample', actual_boxes: 10, actual_weight: 100 },
+    ];
+
+    const { rows, merges, docNo } = buildCustomerDepositDocumentFormRows(header, lines);
+
+    expect(docNo).toBe('CDR-0001');
+    expect(merges.length).toBeGreaterThan(0);
+    const flat = rows.flat();
+    expect(flat).toContain('CDR-0001');
+    expect(flat).toContain('Acme Foods');
+    expect(flat).toContain('handle with care');
+    const lineHeaderIndex = rows.findIndex((r) => r[0] === '#');
+    expect(rows[lineHeaderIndex + 1]).toEqual([1, 'FR260801001', 'LOT-1', 'SAMPLE-001', 'Sample', '-', '-', '-', 100, 10, '-']);
+    for (const m of merges) {
+      expect(m.e.r).toBeLessThan(rows.length);
+    }
+  });
+
+  it('does not throw building the form-styled sheet when there are no lines', () => {
+    expect(() => buildCustomerDepositDocumentFormRows({ request_no: 'CDR-0002' }, [])).not.toThrow();
   });
 });
 

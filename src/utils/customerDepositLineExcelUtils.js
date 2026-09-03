@@ -165,20 +165,57 @@ const DEPOSIT_DOCUMENT_LINE_HEADERS = [
   'MFG DATE', 'EXP DATE', 'T.WEIGHT KG', 'BOX', 'REMARK',
 ];
 
+// Shared by the flat document export and the form-styled one below so both
+// always show the exact same line figures (same confirmedDepositQty
+// fallback rule the printed document itself uses).
+function buildDepositLineRowsAndTotal(lines) {
+  let totalBoxes = 0;
+  let totalWeight = 0;
+
+  const lineRows = lines.map((line, idx) => {
+    const qty = confirmedDepositQty(line);
+    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
+    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
+    return [
+      idx + 1,
+      line.tracking_code ?? '-',
+      line.lot_no ?? '-',
+      line.customer_product_code ?? line.internal_product_code ?? '-',
+      line.product_name ?? '-',
+      line.location_code ?? line.location ?? '-',
+      fmtExcelDate(line.mfg_date),
+      fmtExcelDate(line.exp_date),
+      qty.weight ?? '-',
+      qty.boxes ?? '-',
+      [line.note, line.actual_note].filter(Boolean).join(' / ') || '-',
+    ];
+  });
+
+  const totalRow = ['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', ''];
+  return { lineRows, totalRow };
+}
+
+function depositHeaderFields(header) {
+  return {
+    customerName: header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-',
+    customerAddress: header.customer_address ?? header.customer?.address ?? '-',
+    contactPhone: header.contact_phone ?? header.customer?.phone ?? '-',
+    contactFax: header.contact_fax ?? header.customer?.fax ?? '-',
+    docDate: header.expected_arrival_date
+      ? header.expected_arrival_date
+      : header.created_at ? header.created_at.split('T')[0] : '-',
+    docNo: header.request_no ?? '-',
+  };
+}
+
 // Pure builder (no file I/O) so the row layout can be unit tested, and so
 // it can be reused server-side (api/process-email-queue.js attaches this
 // to the customer confirmation email) without touching XLSX.writeFile,
 // which writes to the filesystem under Node instead of triggering a
 // browser download — mirrors buildCustomerWithdrawalDocumentRows exactly.
 export function buildCustomerDepositDocumentRows(header = {}, lines = []) {
-  const customerName = header.customer_name ?? header.customer?.customer_name ?? header.customer?.name ?? '-';
-  const customerAddress = header.customer_address ?? header.customer?.address ?? '-';
-  const contactPhone = header.contact_phone ?? header.customer?.phone ?? '-';
-  const contactFax = header.contact_fax ?? header.customer?.fax ?? '-';
-  const docDate = header.expected_arrival_date
-    ? header.expected_arrival_date
-    : header.created_at ? header.created_at.split('T')[0] : '-';
-  const docNo = header.request_no ?? '-';
+  const { customerName, customerAddress, contactPhone, contactFax, docDate, docNo } = depositHeaderFields(header);
+  const { lineRows, totalRow } = buildDepositLineRowsAndTotal(lines);
 
   const rows = [
     ['เลขที่เอกสาร', docNo],
@@ -192,31 +229,9 @@ export function buildCustomerDepositDocumentRows(header = {}, lines = []) {
     ['หมายเหตุ', header.note ?? '-'],
     [],
     DEPOSIT_DOCUMENT_LINE_HEADERS,
+    ...lineRows,
+    totalRow,
   ];
-
-  let totalBoxes = 0;
-  let totalWeight = 0;
-
-  lines.forEach((line, idx) => {
-    const qty = confirmedDepositQty(line);
-    if (qty.boxes != null) totalBoxes += Number(qty.boxes) || 0;
-    if (qty.weight != null) totalWeight += Number(qty.weight) || 0;
-    rows.push([
-      idx + 1,
-      line.tracking_code ?? '-',
-      line.lot_no ?? '-',
-      line.customer_product_code ?? line.internal_product_code ?? '-',
-      line.product_name ?? '-',
-      line.location_code ?? line.location ?? '-',
-      fmtExcelDate(line.mfg_date),
-      fmtExcelDate(line.exp_date),
-      qty.weight ?? '-',
-      qty.boxes ?? '-',
-      [line.note, line.actual_note].filter(Boolean).join(' / ') || '-',
-    ]);
-  });
-
-  rows.push(['', '', '', '', '', '', '', 'TOTAL', totalWeight || '-', totalBoxes || '-', '']);
 
   return { rows, docNo };
 }
@@ -227,4 +242,61 @@ export function exportCustomerDepositDocumentExcel(header = {}, lines = [], file
   const { rows, docNo } = buildCustomerDepositDocumentRows(header, lines);
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   downloadExcelWorkbook(sheet, filename ?? `${docNo}.xlsx`, 'Deposit');
+}
+
+function mergeRange(r, c1, c2) {
+  return { s: { r, c: c1 }, e: { r, c: c2 } };
+}
+
+// A "form"-styled alternative to buildCustomerDepositDocumentRows above:
+// same fields and same line table, but the header block is laid out as a
+// merged-cell grid (label | value spanning several columns, two fields per
+// row) instead of one label/value pair per row — mirrors
+// buildCustomerWithdrawalDocumentFormRows.
+export function buildCustomerDepositDocumentFormRows(header = {}, lines = []) {
+  const { customerName, customerAddress, contactPhone, contactFax, docDate, docNo } = depositHeaderFields(header);
+  const { lineRows, totalRow } = buildDepositLineRowsAndTotal(lines);
+
+  const rows = [];
+  const merges = [];
+
+  function titleRow(text) {
+    rows.push([text, '', '', '', '', '']);
+    merges.push(mergeRange(rows.length - 1, 0, 5));
+  }
+
+  function metaRow(pairs) {
+    const r = rows.length;
+    if (pairs.length === 1) {
+      rows.push([pairs[0][0], pairs[0][1], '', '', '', '']);
+      merges.push(mergeRange(r, 1, 5));
+    } else {
+      rows.push([pairs[0][0], pairs[0][1], '', pairs[1][0], pairs[1][1], '']);
+      merges.push(mergeRange(r, 1, 2));
+      merges.push(mergeRange(r, 4, 5));
+    }
+  }
+
+  titleRow('ใบแจ้งฝากสินค้า / DEPOSIT REQUEST');
+  rows.push([]);
+  metaRow([['เลขที่เอกสาร', docNo], ['วันที่', fmtExcelDate(docDate)]]);
+  metaRow([['ลูกค้า', customerName]]);
+  metaRow([['ที่อยู่', customerAddress]]);
+  metaRow([['โทร', contactPhone], ['แฟกซ์', contactFax]]);
+  metaRow([['ทะเบียนรถ', header.vehicle_registration ?? '-'], ['ผู้ติดต่อ', header.contact_name ?? '-']]);
+  if (header.note) metaRow([['หมายเหตุ', header.note]]);
+  rows.push([]);
+  rows.push(DEPOSIT_DOCUMENT_LINE_HEADERS);
+  rows.push(...lineRows);
+  rows.push(totalRow);
+
+  return { rows, merges, docNo };
+}
+
+export function exportCustomerDepositDocumentFormExcel(header = {}, lines = [], filename) {
+  const { rows, merges, docNo } = buildCustomerDepositDocumentFormRows(header, lines);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet['!merges'] = merges;
+  sheet['!cols'] = DEPOSIT_DOCUMENT_LINE_HEADERS.map(() => ({ wch: 14 }));
+  downloadExcelWorkbook(sheet, filename ?? `${docNo}-form.xlsx`, 'Deposit');
 }

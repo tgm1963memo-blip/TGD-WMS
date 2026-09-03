@@ -37,6 +37,7 @@ import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/te
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { exportCustomerDepositDocumentExcel, exportCustomerDepositDocumentFormExcel } from '../../utils/customerDepositLineExcelUtils.js';
 
 const REVIEW_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -545,6 +546,22 @@ export function CustomerAdminDepositReviewPage() {
                 />
               )}
             />
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: 8 }}
+              onClick={() => exportCustomerDepositDocumentExcel(mergedPrint.header, mergedPrint.lines)}
+            >
+              ดาวน์โหลด Excel
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: 8 }}
+              onClick={() => exportCustomerDepositDocumentFormExcel(mergedPrint.header, mergedPrint.lines)}
+            >
+              ดาวน์โหลด Excel (แบบฟอร์ม)
+            </button>
           </div>
         )}
         <div className="responsive-table">
@@ -715,6 +732,24 @@ export function CustomerAdminDepositReviewPage() {
                 )}
                 title={`${selected.request_no} — ${t('admin_staff_work_order')}`}
               />
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: 8 }}
+                data-testid="deposit-detail-export-excel"
+                onClick={() => exportCustomerDepositDocumentExcel(selected, lines)}
+              >
+                ดาวน์โหลด Excel
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: 8 }}
+                data-testid="deposit-detail-export-excel-form"
+                onClick={() => exportCustomerDepositDocumentFormExcel(selected, lines)}
+              >
+                ดาวน์โหลด Excel (แบบฟอร์ม)
+              </button>
             </div>
 
             {/* Lines table with actual qty column and recount button */}
