@@ -91,6 +91,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [lotEditMfgDate, setLotEditMfgDate] = useState('');
   const [lotEditExpDate, setLotEditExpDate] = useState('');
   const [lotEditProductCode, setLotEditProductCode] = useState('');
+  const [lotEditTemperatureType, setLotEditTemperatureType] = useState('');
   const [locationLine, setLocationLine] = useState(null);
   const [allLocations, setAllLocations] = useState([]);
   const [locZone, setLocZone] = useState('');
@@ -406,6 +407,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       expDate: lotEditExpDate || null,
       locationId: lotEditLine.location_id,
       customerProductCode: newProductCode && newProductCode !== lotEditLine.customer_product_code ? newProductCode : null,
+      temperatureType: lotEditTemperatureType && lotEditTemperatureType !== lotEditLine.temperature_type ? lotEditTemperatureType : null,
     });
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Save failed'); return; }
@@ -809,6 +811,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   setLotEditMfgDate(line.mfg_date ?? '');
                                   setLotEditExpDate(line.exp_date ?? '');
                                   setLotEditProductCode(line.customer_product_code ?? '');
+                                  setLotEditTemperatureType(line.temperature_type ?? '');
                                 }}
                               >
                                 ✏️
@@ -1160,10 +1163,27 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <span>วันหมดอายุ</span>
                 <DateInputDMY value={lotEditExpDate} onChange={(e) => setLotEditExpDate(e.target.value)} />
               </label>
+              <label className="form-field">
+                <span>วิธีจัดเก็บ (LOT นี้)</span>
+                <select
+                  className="form-control"
+                  value={lotEditTemperatureType}
+                  onChange={(e) => setLotEditTemperatureType(e.target.value)}
+                >
+                  {Object.entries(TEMPERATURE_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
             {lotEditProductCode.trim() && lotEditProductCode.trim() !== lotEditLine.customer_product_code ? (
               <p className="form-helper" style={{ marginTop: 10, marginBottom: 0 }}>
                 ⚠️ การเปลี่ยนรหัสสินค้าจะปรับชื่อสินค้าตามรายการสินค้าของลูกค้า (ถ้าพบรหัสใหม่ในแคตตาล็อก) — กระทบยอดคงเหลือ/การเรียกเก็บเงินที่อ้างอิงรายการนี้
+              </p>
+            ) : null}
+            {lotEditTemperatureType && lotEditTemperatureType !== lotEditLine.temperature_type ? (
+              <p className="form-helper" style={{ marginTop: 10, marginBottom: 0 }}>
+                ⚠️ การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
               </p>
             ) : null}
           </>
