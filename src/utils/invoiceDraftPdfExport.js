@@ -6,6 +6,7 @@ import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../
 import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from './billingInvoiceDraftUtils.js';
 import { SARABUN_REGULAR_BASE64, SARABUN_BOLD_BASE64 } from '../assets/fonts/SarabunBase64.js';
 import { supabase } from '../services/supabaseClient.js';
+import { listCustomerProducts } from '../services/customerProductCatalogService.js';
 
 // jsPDF's built-in fonts (Helvetica etc.) have no Thai glyphs at all, so
 // every Thai character would render as a blank box without embedding a real
@@ -56,6 +57,24 @@ async function fetchCustomerContact(customerId) {
     .eq('id', customerId)
     .maybeSingle();
   return data ?? null;
+}
+
+// Some already-created invoice draft lines have product_name stuck
+// duplicating product_code (a data snapshot bug fixed upstream for lines
+// created after it, but not backfilled for older ones) -- so resolve the
+// display name from the customer's current product catalog instead of
+// trusting the stored field, same "master catalog wins" reasoning already
+// used when building draft lines in the first place.
+async function fetchProductNameByCode(customerId) {
+  if (!customerId) return new Map();
+  const { data } = await listCustomerProducts({ customerId });
+  const map = new Map();
+  for (const row of data ?? []) {
+    if (row.customer_product_code && row.product_name) {
+      map.set(row.customer_product_code, row.product_name);
+    }
+  }
+  return map;
 }
 
 // Filenames can't carry path separators or other characters Windows/macOS
@@ -127,7 +146,6 @@ function buildTableHead() {
       { content: 'DELIVERY\nDATE', rowSpan: 2 },
       { content: 'LOT NO', rowSpan: 2 },
       { content: 'CUSTOMER PRODUCT', rowSpan: 2 },
-      { content: 'DESC', rowSpan: 2 },
       { content: 'WT/UNIT\n(KG)', rowSpan: 2 },
       { content: 'BALANCE FORWARD', colSpan: 2, styles: { halign: 'center' } },
       { content: 'RECEIVED', colSpan: 2, styles: { halign: 'center' } },
@@ -148,15 +166,17 @@ function buildTableBody(lots, grandTotal) {
   const body = [];
   for (const lot of lots) {
     lot.rows.forEach((row, i) => {
+      const codeAndName = row.productName && row.productName !== row.productCode
+        ? `${row.productCode ?? '-'}  ${row.productName}`
+        : (row.productCode ?? row.productName ?? '-');
       const productCell = i === 0
-        ? [row.productName ?? row.productCode ?? '-', row.remark].filter(Boolean).join('\n')
+        ? [codeAndName, row.remark].filter(Boolean).join('\n')
         : '';
       body.push([
         i === 0 ? fmtDate(row.receivedDate) : '',
         fmtDate(row.deliveryDate),
         i === 0 ? row.lotNo ?? '-' : '',
         productCell,
-        i === 0 ? row.productCode ?? '-' : '',
         row.weightPerUnit != null ? fmt(row.weightPerUnit) : '-',
         fmtQty(row.balanceForwardVolume),
         fmt(row.balanceForwardWeight),
@@ -175,7 +195,7 @@ function buildTableBody(lots, grandTotal) {
       ]);
     });
     body.push([
-      { content: `SUB TOTAL (${lot.lotNo ?? '-'})`, colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: `SUB TOTAL (${lot.lotNo ?? '-'})`, colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: fmtQty(lot.subtotal.balanceForwardVolume), styles: { fontStyle: 'bold' } },
       { content: fmt(lot.subtotal.balanceForwardWeight), styles: { fontStyle: 'bold' } },
       { content: fmtQty(lot.subtotal.receivedVolume), styles: { fontStyle: 'bold' } },
@@ -197,7 +217,7 @@ function buildTableBody(lots, grandTotal) {
 
 function buildTableFoot(grandTotal) {
   return [[
-    { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
+    { content: 'GRAND TOTAL', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
     fmtQty(grandTotal.balanceForwardVolume),
     fmt(grandTotal.balanceForwardWeight),
     fmtQty(grandTotal.receivedVolume),
@@ -226,9 +246,16 @@ function buildTableFoot(grandTotal) {
 export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
   if (!draft) return;
 
-  const customer = await fetchCustomerContact(draft.customer_id);
+  const [customer, productNameByCode] = await Promise.all([
+    fetchCustomerContact(draft.customer_id),
+    fetchProductNameByCode(draft.customer_id),
+  ]);
   const branding = normalizeDocumentBrandingConfig(getDefaultDocumentBranding());
-  const { lots, grandTotal } = buildInvoiceLotLedger(lines);
+  const resolvedLines = lines.map((line) => ({
+    ...line,
+    product_name: productNameByCode.get(line.product_code) ?? line.product_name ?? null,
+  }));
+  const { lots, grandTotal } = buildInvoiceLotLedger(resolvedLines);
   const isApprovedOrLater = APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES.includes(draft.status);
   const customerName = draft.customer_name ?? customer?.customer_name ?? '-';
 
@@ -241,6 +268,7 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
     head: buildTableHead(),
     body: buildTableBody(lots, grandTotal),
     foot: lots.length ? buildTableFoot(grandTotal) : undefined,
+    showFoot: 'lastPage',
     startY: HEADER_HEIGHT_MM,
     margin: { top: HEADER_HEIGHT_MM, left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
     styles: { font: FONT_NAME, fontSize: 6, cellPadding: 1, overflow: 'linebreak', valign: 'middle' },
@@ -251,15 +279,15 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
       0: { halign: 'center', cellWidth: 15 },
       1: { halign: 'center', cellWidth: 15 },
       2: { halign: 'left', cellWidth: 18 },
-      3: { halign: 'left', cellWidth: 42 },
-      4: { halign: 'center', cellWidth: 16 },
-      5: { halign: 'right', cellWidth: 12 },
+      3: { halign: 'left', cellWidth: 55 },
+      4: { halign: 'right', cellWidth: 12 },
     },
     didDrawPage: () => drawHeaderBlock(doc, headerArgs),
     didParseCell: (data) => {
-      // Right-align every numeric column (everything from WT/UNIT onward)
-      // except the ones already given an explicit alignment above.
-      if (data.section !== 'head' && data.column.index >= 6) {
+      // Right-align every numeric column (everything from BALANCE FORWARD
+      // VOL. onward) except the ones already given an explicit alignment
+      // above.
+      if (data.section !== 'head' && data.column.index >= 5) {
         data.cell.styles.halign = 'right';
       }
     },
@@ -319,6 +347,8 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
 export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
   if (!draft) return;
 
+  const productNameByCode = await fetchProductNameByCode(draft.customer_id);
+
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   registerThaiFont(doc);
 
@@ -362,7 +392,7 @@ export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
   const body = lines.map((line, idx) => [
     idx + 1,
     line.product_code ?? '-',
-    [line.product_name ?? '-', line.line_note].filter(Boolean).join('\n'),
+    [productNameByCode.get(line.product_code) ?? line.product_name ?? '-', line.line_note].filter(Boolean).join('\n'),
     line.movement_type ?? '-',
     fmt(line.qty),
     fmt(line.chargeable_weight),
@@ -387,6 +417,7 @@ export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
     head,
     body,
     foot,
+    showFoot: 'lastPage',
     startY: y,
     margin: { left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
     styles: { font: FONT_NAME, fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', valign: 'middle' },

@@ -7,18 +7,30 @@ import { describe, expect, it, vi } from 'vitest';
 // PDF byte content (out of scope for a unit test), just that the whole
 // pipeline runs end-to-end for a realistic multi-lot draft.
 
+// A chainable stub covering both query shapes exercised here: the customer
+// contact lookup (.select().eq().maybeSingle()) and listCustomerProducts's
+// catalog lookup (.select().order()[.eq()], awaited directly without a
+// terminal method) -- same object supports both by being thenable itself.
+function chainable(result) {
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: () => query,
+    in: () => query,
+    maybeSingle: () => Promise.resolve(result),
+    then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+  };
+  return query;
+}
+
 vi.mock('../../src/services/supabaseClient.js', () => ({
   supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({
-            data: { customer_name: 'บริษัท ทดสอบ จำกัด', address: '123 ถนนทดสอบ', phone: '02-000-0000', contact_name: 'คุณทดสอบ' },
-            error: null,
-          }),
-        }),
-      }),
-    }),
+    from: (table) => (table === 'tgd_customer_products'
+      ? chainable({ data: [], error: null })
+      : chainable({
+        data: { customer_name: 'บริษัท ทดสอบ จำกัด', address: '123 ถนนทดสอบ', phone: '02-000-0000', contact_name: 'คุณทดสอบ' },
+        error: null,
+      })),
   },
 }));
 
