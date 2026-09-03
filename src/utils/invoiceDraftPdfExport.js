@@ -371,13 +371,27 @@ export async function exportInvoiceDraftDetailPdf({ draft, lines = [] }) {
     fmt(line.amount),
   ]);
 
+  const totalQty = lines.reduce((sum, line) => sum + (Number(line.qty) || 0), 0);
+  const totalWeight = lines.reduce((sum, line) => sum + (Number(line.chargeable_weight) || 0), 0);
+  const totalAmount = lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+  const foot = lines.length ? [[
+    { content: 'ยอดรวม', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+    { content: fmt(totalQty), styles: { fontStyle: 'bold' } },
+    { content: fmt(totalWeight), styles: { fontStyle: 'bold' } },
+    '',
+    '',
+    { content: fmt(totalAmount), styles: { fontStyle: 'bold', textColor: [45, 147, 72] } },
+  ]] : undefined;
+
   autoTable(doc, {
     head,
     body,
+    foot,
     startY: y,
     margin: { left: PAGE_MARGIN_MM, right: PAGE_MARGIN_MM, bottom: 10 },
     styles: { font: FONT_NAME, fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', valign: 'middle' },
     headStyles: { font: FONT_NAME, fontSize: 7.5, fillColor: [241, 253, 244], textColor: [30, 41, 59], fontStyle: 'bold' },
+    footStyles: { font: FONT_NAME, fontSize: 7.5, fillColor: [241, 253, 244], textColor: [30, 41, 59], fontStyle: 'bold' },
     bodyStyles: { lineColor: [229, 231, 235], lineWidth: 0.1 },
     columnStyles: {
       0: { halign: 'center', cellWidth: 14 },
