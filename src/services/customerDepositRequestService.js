@@ -422,6 +422,22 @@ export async function listCustomerDepositRequestLines(requestId) {
     .order('line_no', { ascending: true });
 }
 
+// Bulk variant of listCustomerDepositRequestLines for a multi-document export
+// (e.g. the receiving page's "ดาวน์โหลด Excel" button) — one .in() query for
+// every requested document's lines instead of one round-trip per document,
+// which stalled the browser once the filtered list ran into the hundreds
+// (see the identical fix on the withdrawal side, listWithdrawalLineDetailsForDocs).
+export async function listDepositLineDetailsForDocs(requestIds = []) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!requestIds.length) return { data: [], error: null };
+
+  return supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select(DEPOSIT_LINE_SELECT)
+    .in('deposit_request_id', requestIds)
+    .order('line_no', { ascending: true });
+}
+
 export async function listDepositLineSummariesForDocs(docIds) {
   if (!supabase || !docIds?.length) return { data: [], error: null };
   return supabase

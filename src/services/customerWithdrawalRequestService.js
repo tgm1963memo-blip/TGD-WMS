@@ -127,6 +127,25 @@ export async function listCustomerWithdrawalRequestLines(requestId) {
   return { ...result, data: await attachRemainingLotBalance(result.data, requestRow?.customer_id ?? null, requestId) };
 }
 
+// Bulk variant for a multi-document export (e.g. the review page's
+// "ดาวน์โหลด Excel" button) — one .in() query for every requested document's
+// lines instead of one round-trip per document, deliberately skipping the
+// per-line attachRemainingLotBalance enrichment listCustomerWithdrawalRequestLines
+// does (that alone adds 2 more queries per call): a bulk export doesn't
+// display remaining-lot-balance, so paying for it per document, hundreds of
+// times over, was the real cost behind the browser stalling once the
+// filtered list ran into the hundreds (confirmed via load test).
+export async function listWithdrawalLineDetailsForDocs(requestIds = []) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!requestIds.length) return { data: [], error: null };
+
+  return supabase
+    .from('tgd_customer_withdrawal_request_lines')
+    .select(WITHDRAWAL_LINE_SELECT)
+    .in('withdrawal_request_id', requestIds)
+    .order('line_no', { ascending: true });
+}
+
 // For each line's source deposit batch, resolves how many boxes/kg remain
 // in that batch and its storage location code — so the printed pick/
 // delivery document can show staff what's left in that lot and where it's

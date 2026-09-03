@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { LoadingState } from '../ui/LoadingState.jsx';
-import { listCustomerDepositRequests, listCustomerDepositRequestLines } from '../../services/customerDepositRequestService.js';
+import { listCustomerDepositRequests, listCustomerDepositRequestLines, listDepositLineDetailsForDocs } from '../../services/customerDepositRequestService.js';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -11,7 +11,6 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
-import { mapWithConcurrencyLimit } from '../../utils/asyncBatch.js';
 
 const WAREHOUSE_DEPOSIT_STATUSES = [
   'SUBMITTED_BY_CUSTOMER',
@@ -130,26 +129,32 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   // "รวมเป็นใบงานเดียว" bulk-print selection above, this isn't restricted to
   // BULK_PRINT_ELIGIBLE_STATUSES, since staff need line-item detail for a
   // request regardless of what stage it's at (including ones already fully
-  // received, which the print-merge flow deliberately excludes). Lines are
-  // fetched with bounded concurrency, not one request per document all at
-  // once — the equivalent withdrawal-review export hit a filtered list of
-  // 529 requests in production and stalled the browser's connection pool
-  // when fired unbounded.
+  // received, which the print-merge flow deliberately excludes). Lines for
+  // every requested document are fetched in one .in() query
+  // (listDepositLineDetailsForDocs) instead of one round-trip per document —
+  // the equivalent per-document fetch on the withdrawal-review export hit a
+  // filtered list of 529 requests in production and stalled the browser even
+  // with bounded concurrency (confirmed via load test).
   async function handleExportExcel(rowsToExport) {
     if (!rowsToExport.length) return;
     setExporting(true);
     setExportError('');
-    const results = await mapWithConcurrencyLimit(rowsToExport, 8, (r) => listCustomerDepositRequestLines(r.id));
+    const linesResult = await listDepositLineDetailsForDocs(rowsToExport.map((r) => r.id));
     if (!isMountedRef.current) return;
-    const failed = results.find((r) => r.error);
-    if (failed) {
-      setExportError(failed.error.message ?? 'โหลดรายการไม่สำเร็จ');
+    if (linesResult.error) {
+      setExportError(linesResult.error.message ?? 'โหลดรายการไม่สำเร็จ');
       setExporting(false);
       return;
     }
+    const linesByRequestId = new Map();
+    (linesResult.data ?? []).forEach((line) => {
+      const key = line.deposit_request_id;
+      if (!linesByRequestId.has(key)) linesByRequestId.set(key, []);
+      linesByRequestId.get(key).push(line);
+    });
 
-    const exportRows = rowsToExport.flatMap((request, i) => {
-      const lines = results[i].data ?? [];
+    const exportRows = rowsToExport.flatMap((request) => {
+      const lines = linesByRequestId.get(request.id) ?? [];
       const requestFields = {
         เลขที่คำขอ: request.request_no ?? '',
         ลูกค้า: request.customer?.customer_name || request.customer?.name || request.customer_id || '',

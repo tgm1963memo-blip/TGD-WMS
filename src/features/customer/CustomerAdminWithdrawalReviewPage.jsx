@@ -11,6 +11,7 @@ import { getWithdrawalStatusLabel, getLinePickingStatus } from '../../utils/cust
 import {
   listCustomerWithdrawalRequests,
   listCustomerWithdrawalRequestLines,
+  listWithdrawalLineDetailsForDocs,
   reviewCustomerWithdrawalRequest,
   cancelCustomerWithdrawalRequest,
   enqueueCustomerWithdrawalNotification,
@@ -28,7 +29,6 @@ import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesFo
 import { exportCustomerWithdrawalDocumentExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
-import { mapWithConcurrencyLimit } from '../../utils/asyncBatch.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
@@ -340,26 +340,33 @@ export function CustomerAdminWithdrawalReviewPage() {
   // CustomerDepositNotificationsSection's bulk export. Unlike
   // exportCustomerWithdrawalDocumentExcel (one document's print-formatted
   // layout at a time), this is a flat, filterable multi-document dump for
-  // staff who need line-item detail across many requests at once. A live
-  // warehouse's unfiltered request list can run into the hundreds, so lines
-  // are fetched with bounded concurrency rather than one request per
-  // document all at once (confirmed via load test: 529 filtered rows fired
-  // in parallel stalled the browser's connection pool and never completed).
+  // staff who need line-item detail across many requests at once. Lines for
+  // every requested document are fetched in one .in() query
+  // (listWithdrawalLineDetailsForDocs) instead of one round-trip per
+  // document — a live warehouse's unfiltered request list runs into the
+  // hundreds (529 in production), and even bounded concurrency over
+  // per-document calls (each of which also does its own extra
+  // attachRemainingLotBalance round-trips) never completed within 90s.
   async function handleExportExcel(rowsToExport) {
     if (!rowsToExport.length) return;
     setExporting(true);
     setExportError('');
-    const results = await mapWithConcurrencyLimit(rowsToExport, 8, (r) => listCustomerWithdrawalRequestLines(r.id));
+    const linesResult = await listWithdrawalLineDetailsForDocs(rowsToExport.map((r) => r.id));
     if (!isMountedRef.current) return;
-    const failed = results.find((r) => r.error);
-    if (failed) {
-      setExportError(failed.error.message ?? 'โหลดรายการไม่สำเร็จ');
+    if (linesResult.error) {
+      setExportError(linesResult.error.message ?? 'โหลดรายการไม่สำเร็จ');
       setExporting(false);
       return;
     }
+    const linesByRequestId = new Map();
+    (linesResult.data ?? []).forEach((line) => {
+      const key = line.withdrawal_request_id;
+      if (!linesByRequestId.has(key)) linesByRequestId.set(key, []);
+      linesByRequestId.get(key).push(line);
+    });
 
-    const exportRows = rowsToExport.flatMap((request, i) => {
-      const requestLines = results[i].data ?? [];
+    const exportRows = rowsToExport.flatMap((request) => {
+      const requestLines = linesByRequestId.get(request.id) ?? [];
       const requestFields = {
         เลขที่คำขอ: request.withdrawal_no ?? '',
         ลูกค้า: request.customer?.customer_name || request.customer?.name || request.customer_id || '',
