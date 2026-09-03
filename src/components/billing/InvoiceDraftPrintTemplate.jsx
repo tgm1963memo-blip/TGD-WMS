@@ -5,6 +5,8 @@ import { buildInvoiceLotLedger } from '../../utils/invoiceLotLedgerUtils.js';
 import { APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { fetchDepositLineTrackingCodes } from '../../services/billingInvoiceDraftService.js';
 
 const PRINT_TABLE_COLUMN_COUNT = 20;
 
@@ -66,12 +68,45 @@ function useCustomerContact(customerId) {
   return customer;
 }
 
+// product_name on an already-created invoice draft line can be stuck
+// duplicating product_code (a stale snapshot from before an earlier fix --
+// see invoiceDraftPdfExport.js), and tracking_code isn't stored on draft
+// lines at all -- both are resolved live here (product catalog + the
+// source deposit line via deposit_line_id) so the printed CUSTOMER PRODUCT
+// / DESC columns show the real name and tracking code instead.
+function useResolvedLines(lines, customerId) {
+  const [resolved, setResolved] = useState(lines);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      customerId ? listCustomerProducts({ customerId }) : Promise.resolve({ data: [] }),
+      fetchDepositLineTrackingCodes(lines.map((line) => line.deposit_line_id)),
+    ]).then(([catalogResult, trackingCodeByDepositLineId]) => {
+      if (!active) return;
+      const nameByCode = new Map();
+      for (const row of catalogResult.data ?? []) {
+        if (row.customer_product_code && row.product_name) nameByCode.set(row.customer_product_code, row.product_name);
+      }
+      setResolved(lines.map((line) => ({
+        ...line,
+        product_name: nameByCode.get(line.product_code) ?? line.product_name ?? null,
+        tracking_code: trackingCodeByDepositLineId.get(line.deposit_line_id) ?? null,
+      })));
+    });
+    return () => { active = false; };
+  }, [lines, customerId]);
+
+  return resolved;
+}
+
 export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
   const customer = useCustomerContact(draft?.customer_id);
+  const resolvedLines = useResolvedLines(lines, draft?.customer_id);
   if (!draft) return null;
 
   const branding = normalizeDocumentBrandingConfig(getDefaultDocumentBranding());
-  const { lots, grandTotal } = buildInvoiceLotLedger(lines);
+  const { lots, grandTotal } = buildInvoiceLotLedger(resolvedLines);
   const isApprovedOrLater = APPROVED_OR_LATER_INVOICE_DRAFT_STATUSES.includes(draft.status);
   const customerName = draft.customer_name ?? customer?.customer_name ?? '-';
 
@@ -201,7 +236,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                         row 0, so it's shown independent of the product-name-once logic above. */}
                     {row.remark ? <div style={{ fontSize: 7, color: '#888', marginTop: 2 }}>{fmtWrap(row.remark, 20)}</div> : null}
                   </td>
-                  <td style={TD}>{i === 0 ? row.productCode ?? '-' : ''}</td>
+                  <td style={TD}>{i === 0 ? row.trackingCode ?? '-' : ''}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.weightPerUnit != null ? fmt(row.weightPerUnit) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{fmtQty(row.balanceForwardVolume)}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{fmt(row.balanceForwardWeight)}</td>

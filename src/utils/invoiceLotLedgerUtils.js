@@ -106,6 +106,7 @@ export function buildInvoiceLotLedger(lines = []) {
         lotNo: first.lot_no,
         productCode: first.product_code,
         productName: first.product_name,
+        trackingCode: first.tracking_code ?? null,
         weightPerUnit,
         balanceForwardVolume: balanceVolume - receivedVolume + deliveryVolume,
         balanceForwardWeight: balanceWeight - receivedWeight + deliveryWeight,
@@ -234,7 +235,10 @@ export function buildInvoiceLotLedger(lines = []) {
       total: round2(rows.reduce((s, r) => s + r.total, 0)),
     };
 
-    return { key, lotNo: first.lot_no, productCode: first.product_code, productName: first.product_name, rows, subtotal };
+    return {
+      key, lotNo: first.lot_no, productCode: first.product_code, productName: first.product_name,
+      trackingCode: first.tracking_code ?? null, rows, subtotal,
+    };
   });
 
   const sumField = (field) => round2(lots.reduce((s, l) => s + l.subtotal[field], 0));
