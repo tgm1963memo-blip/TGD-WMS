@@ -64,6 +64,7 @@ export function CustomerAdminDepositReviewPage() {
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
+  const [linesLoading, setLinesLoading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [selectedId, setSelectedId] = useState(routeRequestId ?? '');
   const [detailOpen, setDetailOpen] = useState(!!routeRequestId);
@@ -146,11 +147,20 @@ export function CustomerAdminDepositReviewPage() {
   useEffect(() => {
     let active = true;
     setSelectedLineIds(new Set());
-    if (!selectedId) { setLines([]); return undefined; }
+    if (!selectedId) { setLines([]); setLinesLoading(false); return undefined; }
 
+    // Switching to a different document while the previous one's lines are
+    // still in state showed that PREVIOUS document's rows for a moment
+    // before this fetch resolved -- confusing since the header above (drawn
+    // synchronously from already-loaded row data) already shows the new
+    // document. Clear immediately and show a loading state instead of
+    // stale data.
+    setLines([]);
+    setLinesLoading(true);
     listCustomerDepositRequestLines(selectedId).then((result) => {
       if (!active) return;
       setLines(result.data ?? []);
+      setLinesLoading(false);
     });
 
     return () => { active = false; };
@@ -804,7 +814,9 @@ export function CustomerAdminDepositReviewPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.length ? lines.map((line) => (
+                    {linesLoading ? (
+                      <tr><td colSpan={10}><LoadingState /></td></tr>
+                    ) : lines.length ? lines.map((line) => (
                       <tr key={line.id}>
                         <td>
                           <input

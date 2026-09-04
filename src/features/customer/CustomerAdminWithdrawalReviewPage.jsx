@@ -73,6 +73,7 @@ export function CustomerAdminWithdrawalReviewPage() {
   const canWrite = hasRoleFunctionWriteAccess(userRole, 'withdrawal_request');
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
+  const [linesLoading, setLinesLoading] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRequestIds, setSelectedRequestIds] = useState(() => new Set());
@@ -216,12 +217,21 @@ export function CustomerAdminWithdrawalReviewPage() {
   useEffect(() => {
     let active = true;
     setTimelineOpen(false);
-    if (!selectedId) { setLines([]); setTimelineEvents([]); return undefined; }
+    if (!selectedId) { setLines([]); setLinesLoading(false); setTimelineEvents([]); return undefined; }
 
+    // Switching to a different document while the previous one's lines are
+    // still in state showed that PREVIOUS document's rows for a moment
+    // before this fetch resolved -- confusing since the header above (drawn
+    // synchronously from already-loaded row data) already shows the new
+    // document. Clear immediately and show a loading state instead of
+    // stale data.
+    setLines([]);
+    setLinesLoading(true);
     listCustomerWithdrawalRequestLines(selectedId).then((result) => {
       if (!active) return;
       const loadedLines = result.data ?? [];
       setLines(loadedLines);
+      setLinesLoading(false);
       const initNotes = {};
       const initTrackingCodes = {};
       loadedLines.forEach((l) => {
@@ -1062,7 +1072,9 @@ export function CustomerAdminWithdrawalReviewPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.length ? lines.map((line) => (
+                    {linesLoading ? (
+                      <tr><td colSpan={8}><LoadingState /></td></tr>
+                    ) : lines.length ? lines.map((line) => (
                       <tr key={line.id}>
                         <td>{line.line_no}</td>
                         <td style={{ minWidth: 130 }}>
