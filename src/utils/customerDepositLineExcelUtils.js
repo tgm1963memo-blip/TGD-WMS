@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { downloadExcelRows, downloadExcelWorkbook, readExcelFile } from './excelFileUtils.js';
+import { downloadExcelRows, downloadExcelWorkbook, formatExcelDate, readExcelFile } from './excelFileUtils.js';
 
 export const CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS = [
   'customer_product_code',
@@ -109,8 +109,8 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
       expected_boxes: expectedBoxes,
       pack_entry_mode: expectedWeight && !expectedBoxes ? 'WEIGHT' : 'BOXES',
       lot_no: String(row.lot_no ?? '').trim(),
-      mfg_date: String(row.mfg_date ?? '').trim(),
-      exp_date: String(row.exp_date ?? '').trim(),
+      mfg_date: formatExcelDate(row.mfg_date),
+      exp_date: formatExcelDate(row.exp_date),
       line_note: String(row.line_note ?? '').trim(),
     });
   });

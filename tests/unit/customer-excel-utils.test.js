@@ -136,4 +136,53 @@ describe('parseCustomerDepositLineImportFile', () => {
 
     expect(result.errors[0]).toContain('customer_product_code');
   });
+
+  // Regression for a real report: a template uploaded with mfg_date/exp_date
+  // typed as genuine Excel dates (not plain text) came through as a
+  // locale-formatted display string like "9/1/26" -- which then rendered as
+  // a blank date everywhere downstream expects ISO YYYY-MM-DD (a native
+  // <input type="date"> just shows empty for a non-ISO value, with no error
+  // to explain why). aoa_to_sheet gives a JS Date value the same real
+  // date-formatted cell type (t:'d') a user's own Excel date cell would have.
+  it('normalizes a genuine Excel date cell (not plain text) to ISO YYYY-MM-DD', async () => {
+    const XLSX = await import('xlsx');
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['customer_product_code', 'mfg_date', 'exp_date'],
+      ['SAMPLE-001', new Date(Date.UTC(2026, 8, 1)), new Date(Date.UTC(2027, 0, 9))],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Lines');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const file = { arrayBuffer: async () => buffer };
+    const result = await parseCustomerDepositLineImportFile(file);
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0].mfg_date).toBe('2026-09-01');
+    expect(result.rows[0].exp_date).toBe('2027-01-09');
+  });
+
+  // A first attempt at the fix above (convert via cellDates:true -> JS Date
+  // -> toISOString()/local getters) passed the synthetic test above but
+  // silently corrupted the actual reported file: Excel serial 46266 (Excel's
+  // own cached display "9/1/26", i.e. 2026-09-01) round-tripped through a JS
+  // Date and landed at 2026-08-31T23:59:56 -- 4 seconds short of midnight,
+  // read back as August 31 by both UTC and local extraction. Setting the
+  // raw numeric serial directly (bypassing aoa_to_sheet's own Date-to-serial
+  // encoding, which doesn't reproduce the drift) reproduces the exact
+  // real-world case and pins the fix to SSF.parse_date_code, which reads
+  // date parts directly off the serial with no such rounding.
+  it('does not lose a day to floating-point drift on a real serial number that round-trips imprecisely through cellDates', async () => {
+    const XLSX = await import('xlsx');
+    const sheet = XLSX.utils.aoa_to_sheet([['customer_product_code', 'mfg_date'], ['SAMPLE-001', '']]);
+    sheet.B2 = { t: 'n', v: 46266, z: 'm/d/yy' };
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Lines');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const file = { arrayBuffer: async () => buffer };
+    const result = await parseCustomerDepositLineImportFile(file);
+
+    expect(result.rows[0].mfg_date).toBe('2026-09-01');
+  });
 });

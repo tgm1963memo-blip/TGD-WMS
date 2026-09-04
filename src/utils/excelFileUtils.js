@@ -44,26 +44,69 @@ export function downloadExcelWorkbookMultiSheet(sheets = [], filename = 'export.
   XLSX.writeFile(workbook, filename);
 }
 
+// Converts an Excel date SERIAL NUMBER (the raw cell value under a date
+// number format, e.g. 46266) to an exact ISO YYYY-MM-DD using SheetJS's own
+// date-code parser -- deliberately NOT `new Date(...)` + cellDates:true.
+// That path was tried first and found to silently corrupt real files: for
+// serial 46266 (Excel's own cached display: "9/1/26", i.e. 2026-09-01),
+// cellDates:true produced a JS Date landing at 2026-08-31T23:59:56 local
+// (4 seconds short of midnight -- a known SheetJS float-precision quirk in
+// its serial-to-Date epoch math), which both toISOString() and the local
+// y/m/d getters then read back as August 31 -- one day off, on a field
+// (mfg_date/exp_date) where being off by a day is a real food-safety
+// concern, not just cosmetic. SSF.parse_date_code works directly off the
+// integer serial with no such rounding.
+function excelSerialToIsoDate(serial) {
+  const parsed = XLSX.SSF.parse_date_code(serial);
+  if (!parsed) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${parsed.y}-${pad(parsed.m)}-${pad(parsed.d)}`;
+}
+
 export async function readExcelFile(file) {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-  const sheetName = workbook.SheetNames[0];
+  // Two parses of the same buffer: cellDates:true only to DETECT which
+  // cells are genuinely date-formatted (Date instances are just a signal
+  // here, their own y/m/d are not trusted -- see excelSerialToIsoDate);
+  // the default (cellDates unset) keeps numeric-formatted-as-date cells as
+  // their raw serial number, which is what actually gets converted.
+  const workbookDates = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const workbookRaw = XLSX.read(buffer, { type: 'array' });
+  const sheetName = workbookDates.SheetNames[0];
   if (!sheetName) return { headers: [], rows: [] };
 
-  const sheet = workbook.Sheets[sheetName];
+  const sheetDates = workbookDates.Sheets[sheetName];
+  const sheetRaw = workbookRaw.Sheets[sheetName];
 
   // Read the header row directly so it's available even when the sheet has
   // zero data rows (sheet_to_json's default json output has no rows to pull
   // Object.keys from in that case, which used to make a valid, header-only
   // template file look like it was missing its required columns).
-  const [headerRow] = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 });
+  const [headerRow] = XLSX.utils.sheet_to_json(sheetDates, { header: 1, range: 0 });
   const headers = (headerRow ?? []).map((h) => String(h ?? '').trim());
 
-  const json = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-  const rows = json.map((row, index) => ({
-    ...row,
-    __row: index + 2,
-  }));
+  const json = XLSX.utils.sheet_to_json(sheetDates, { defval: '', raw: false });
+  // raw:false renders every cell (including a real Excel date cell) as its
+  // locale-formatted DISPLAY text -- e.g. a date cell shows as "9/1/26" or
+  // "1/9/2027" depending on the cell's own number format, not an unambiguous
+  // ISO string, so it silently fails whatever expects YYYY-MM-DD downstream
+  // (a native <input type="date"> just renders blank for a non-ISO value)
+  // with no error to explain why the date "isn't showing". The Date-signal
+  // pass below finds which cells actually need correcting; the raw-serial
+  // pass supplies the exact number excelSerialToIsoDate converts.
+  const jsonDateSignal = XLSX.utils.sheet_to_json(sheetDates, { defval: '', raw: true });
+  const jsonRawSerial = XLSX.utils.sheet_to_json(sheetRaw, { defval: '', raw: true });
+  const rows = json.map((row, index) => {
+    const signalRow = jsonDateSignal[index] ?? {};
+    const rawRow = jsonRawSerial[index] ?? {};
+    const corrected = { ...row };
+    for (const key of Object.keys(row)) {
+      if (signalRow[key] instanceof Date && typeof rawRow[key] === 'number') {
+        corrected[key] = excelSerialToIsoDate(rawRow[key]);
+      }
+    }
+    return { ...corrected, __row: index + 2 };
+  });
 
   return { headers, rows };
 }
