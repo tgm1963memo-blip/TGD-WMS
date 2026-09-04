@@ -46,9 +46,17 @@ declare
   v_claimed_weight numeric;
 begin
   -- Unconditional initializer (see migration header) -- must match the
-  -- column list/order/types of the real `select ... into v_source` below.
-  select null::uuid, null::uuid, null::text, null::text,
-         null::numeric, null::numeric, null::numeric, null::numeric, null::uuid
+  -- column list/order/types/ALIASES of the real `select ... into v_source`
+  -- below (a `select expr into record_var` with no `as alias` gives the
+  -- record positional/anonymous field names, not the names used elsewhere
+  -- in this function -- confirmed live: this exact initializer without
+  -- aliases raised "record v_source has no field customer_product_code"
+  -- instead of fixing the original bug).
+  select null::uuid as deposit_line_id, null::uuid as deposit_request_id,
+         null::text as customer_product_code, null::text as lot_no,
+         null::numeric as actual_boxes, null::numeric as actual_weight,
+         null::numeric as expected_boxes, null::numeric as expected_weight,
+         null::uuid as customer_id
   into v_source;
 
   if v_auth_user_id is null or not public.tgd_current_user_is_active() then
