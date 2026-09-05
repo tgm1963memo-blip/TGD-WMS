@@ -422,6 +422,28 @@ export async function listCustomerDepositRequestLines(requestId) {
     .order('line_no', { ascending: true });
 }
 
+// Looks up which document a physical box's tracking-code sticker belongs to
+// -- for the handheld "Update Location" flow's scan button, so a worker
+// holding a box can jump straight to setting its location instead of
+// hunting through a couple hundred pending documents by hand. Scoped to the
+// same "received" statuses that flow's own document list already filters
+// to, so scanning a box from an unrelated/older document reports a clean
+// not-found instead of surfacing a document the flow wouldn't otherwise show.
+export async function getDepositLineByTrackingCode(trackingCode) {
+  if (!supabase) return missingSupabaseClientResult();
+  const code = String(trackingCode ?? '').trim();
+  if (!code) return { data: null, error: null };
+
+  const { data, error } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, deposit_request_id, tracking_code, tgd_customer_deposit_requests!inner(status)')
+    .eq('tracking_code', code)
+    .in('tgd_customer_deposit_requests.status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'])
+    .maybeSingle();
+
+  return { data, error };
+}
+
 // Bulk variant of listCustomerDepositRequestLines for a multi-document export
 // (e.g. the receiving page's "ดาวน์โหลด Excel" button) — one .in() query for
 // every requested document's lines instead of one round-trip per document,

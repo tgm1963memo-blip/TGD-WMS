@@ -8,6 +8,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   listDepositLineSummariesForDocs,
+  getDepositLineByTrackingCode,
   recordDepositLineActualReceipt,
   updateDepositLineLocation,
   upsertCustomerDepositRequestLine,
@@ -1849,6 +1850,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [updated, setUpdated] = useState([]);
+  const [trackingScanError, setTrackingScanError] = useState('');
+  const [trackingScanning, setTrackingScanning] = useState(false);
+  const { trigger: cameraTracking, el: cameraTrackingEl } = useCameraScanner((v) => handleTrackingScan(v));
 
   function parseLocCode(code) {
     const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
@@ -1894,19 +1898,46 @@ function LocationUpdateWorkflow({ onBack, t }) {
     getActiveLocations().then(({ data }) => setLocations(data ?? []));
   }, []);
 
-  function pickDoc(doc) {
+  // preselectLineId: set when jumping in via a tracking-code scan (see
+  // handleTrackingScan below) -- once this document's lines load, go
+  // straight to that specific line's location editor instead of leaving the
+  // worker to find it again in the list they just scanned past.
+  function pickDoc(doc, preselectLineId = null) {
     setSelectedDoc(doc);
     setLinesLoading(true);
     listCustomerDepositRequestLines(doc.id).then((r) => {
-      setLines(r.data ?? []);
+      const loadedLines = r.data ?? [];
+      setLines(loadedLines);
       setLinesLoading(false);
-      setSelectedLine(null);
+      setSelectedLine(preselectLineId ? (loadedLines.find((l) => l.id === preselectLineId) ?? null) : null);
     });
     if (doc.customer_id) {
       listCustomerProducts({ customerId: doc.customer_id }).then((r) => setCatalogProducts(r.data ?? []));
     } else {
       setCatalogProducts([]);
     }
+  }
+
+  // Scanning a box's tracking-code sticker jumps straight to that specific
+  // line's location editor -- a tracking code uniquely identifies one
+  // physical box regardless of which of the (often 200+) pending documents
+  // it belongs to, so this skips both "find the right document" and "find
+  // the right line inside it" instead of only the first (unlike the QR-scan
+  // shortcuts on the receiving/picking screens, which only jump to a
+  // document since those flows scan the work order, not a specific box).
+  async function handleTrackingScan(val) {
+    const raw = (val || '').trim();
+    if (!raw) return;
+    setTrackingScanError('');
+    setTrackingScanning(true);
+    const result = await getDepositLineByTrackingCode(raw);
+    setTrackingScanning(false);
+    const doc = result.data ? docs.find((d) => d.id === result.data.deposit_request_id) : null;
+    if (!result.data || !doc) {
+      setTrackingScanError(`ไม่พบรหัสติดตาม "${raw}" ในรายการที่รับแล้ว`);
+      return;
+    }
+    pickDoc(doc, result.data.id);
   }
 
   function handlePrintSticker(line, event) {
@@ -1962,6 +1993,21 @@ function LocationUpdateWorkflow({ onBack, t }) {
       <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
+          {cameraTrackingEl}
+          {/* Scan a box's tracking-code sticker to jump straight to its location editor -- no need to find the right document first. */}
+          <button type="button" onClick={cameraTracking} disabled={trackingScanning}
+            style={{
+              width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
+              padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            }}>
+            📷 {trackingScanning ? 'กำลังค้นหา...' : 'สแกนรหัสติดตาม'}
+          </button>
+          {trackingScanError && (
+            <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+              {trackingScanError}
+            </div>
+          )}
           {(() => {
             const customerOptions = [...new Map(
               docs.map((d) => ({ id: d.customer_id, name: d.customer?.customer_name || d.customer?.name || d.customer_id }))
