@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCustomerDepositDocumentRows,
   buildCustomerDepositDocumentFormRows,
+  buildDepositLineTemplateRows,
+  CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS,
   mapImportedRowsToDepositLines,
   parseCustomerDepositLineImportFile,
 } from '../../src/utils/customerDepositLineExcelUtils.js';
+import { rowsToSheet } from '../../src/utils/excelFileUtils.js';
 import {
   resolveBarcodeCode,
 } from '../../src/utils/customerProductExcelUtils.js';
@@ -43,6 +46,25 @@ describe('customerDepositLineExcelUtils', () => {
     expect(lines[0].weight_per_box).toBe('10');
     expect(lines[0].expected_boxes).toBe('5');
     expect(lines[0].line_note).toBe('note');
+  });
+
+  // The downloadable template's example mfg_date/exp_date used to be blank
+  // text, leaving a user to guess what date format the importer expects.
+  // Now they're real Date values -- rowsToSheet/json_to_sheet writes those
+  // as genuine Excel date cells (same convention as a user's own real
+  // Excel dates), which readExcelFile's exact-serial fix already handles,
+  // so filling the template in normally (overtyping an already-date cell)
+  // produces exactly the format that round-trips correctly.
+  it('template sample row writes mfg_date/exp_date as real Excel date cells, not text', () => {
+    const rows = buildDepositLineTemplateRows([]);
+    const sheet = rowsToSheet(rows, CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS);
+
+    // mfg_date/exp_date are columns G/H (1-indexed 7th/8th header), so on
+    // the first data row (sheet row 2) that's cells G2/H2.
+    expect(sheet.G2.t).toBe('n');
+    expect(typeof sheet.G2.v).toBe('number');
+    expect(sheet.H2.t).toBe('n');
+    expect(typeof sheet.H2.v).toBe('number');
   });
 
   it('builds document rows with a header block, line table, and totals row', () => {

@@ -27,7 +27,10 @@ export function mapDepositLineToExcelRow(line = {}) {
   };
 }
 
-export function downloadCustomerDepositLineTemplate(catalogProducts = [], filename = 'customer-deposit-lines-template.xlsx') {
+// Pure builder (no file I/O) so the row layout -- specifically that the
+// example mfg_date/exp_date land as real date cells, not text -- can be
+// unit tested without touching XLSX.writeFile.
+export function buildDepositLineTemplateRows(catalogProducts = []) {
   const rows = catalogProducts.length > 0
     ? catalogProducts.map((p) => ({
         customer_product_code: p.customer_product_code ?? '',
@@ -47,11 +50,22 @@ export function downloadCustomerDepositLineTemplate(catalogProducts = [], filena
         expected_weight: '100',
         expected_boxes: '10',
         lot_no: '',
-        mfg_date: '',
-        exp_date: '',
+        // Real Date objects (not text) -- rowsToSheet/json_to_sheet writes
+        // these as genuine Excel date cells, the same kind readExcelFile
+        // now parses correctly via the exact-serial fix. Filling this
+        // template in normally (typing/picking a date in Excel, which
+        // keeps whatever cell already showed here formatted as a date)
+        // produces exactly the format the importer handles best, instead
+        // of the user having to guess what plain-text format is expected.
+        mfg_date: new Date(),
+        exp_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         line_note: 'ตัวอย่างหมายเหตุ',
       }];
-  downloadExcelRows(rows, CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS, filename, 'DepositLines');
+  return rows;
+}
+
+export function downloadCustomerDepositLineTemplate(catalogProducts = [], filename = 'customer-deposit-lines-template.xlsx') {
+  downloadExcelRows(buildDepositLineTemplateRows(catalogProducts), CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS, filename, 'DepositLines');
 }
 
 export function exportCustomerDepositLinesExcel(lines = [], filename = 'customer-deposit-lines.xlsx') {
