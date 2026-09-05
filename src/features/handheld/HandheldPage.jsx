@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { printSticker } from '../../utils/stickerPrint.jsx';
@@ -84,45 +85,111 @@ function triggerSuccessFeedback() {
 }
 
 // ── Camera barcode scanner ────────────────────────────────────
+// Live continuous scanning via ZXing over getUserMedia, not the native
+// BarcodeDetector API this used to rely on -- BarcodeDetector doesn't exist
+// in Safari (desktop OR iOS) at all, so on an iPhone this previously always
+// fell through to opening the native camera app for a single still photo
+// (capture="environment"), requiring the user to manually press the
+// shutter, then usually STILL failed to decode (BarcodeDetector missing)
+// and fell back to a plain window.prompt() text box -- on the one browser
+// (iOS Safari) most handheld devices in an actual warehouse would be using.
+// ZXing decodes video frames in pure JS, so it works identically on iOS
+// Safari, desktop Chrome, Android -- point the camera at the code and it's
+// read automatically, no capture button.
+const SCAN_HINTS = new Map([[DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE, BarcodeFormat.CODE_39,
+  BarcodeFormat.CODE_93, BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+  BarcodeFormat.ITF, BarcodeFormat.DATA_MATRIX,
+]]]);
+
 function useCameraScanner(onScanned) {
-  const inputRef = useRef(null);
+  const [active, setActive] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const [manualValue, setManualValue] = useState('');
+  const videoRef = useRef(null);
+  const readerRef = useRef(null);
 
-  function trigger() { inputRef.current?.click(); }
-
-  function handleCapture(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = async () => {
-      URL.revokeObjectURL(objectUrl);
-      if ('BarcodeDetector' in window) {
-        try {
-          const detector = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'code_39', 'ean_13', 'ean_8', 'itf', 'data_matrix'] });
-          const codes = await detector.detect(img);
-          if (codes.length > 0) {
-            onScanned(codes[0].rawValue);
-          } else {
-            alert('ไม่พบบาร์โค้ดในภาพ กรุณาถ่ายภาพใหม่ให้ชัดขึ้น');
-          }
-        } catch {
-          alert('ไม่สามารถอ่านบาร์โค้ดได้ กรุณาลองใหม่');
-        }
-      } else {
-        // Fallback: prompt user to enter manually
-        const manual = window.prompt('เบราว์เซอร์ไม่รองรับการสแกนอัตโนมัติ กรุณากรอกรหัสสินค้า:');
-        if (manual) onScanned(manual.trim());
-      }
-    };
-    img.src = objectUrl;
-    e.target.value = '';
+  function trigger() {
+    setScanError('');
+    setManualValue('');
+    setActive(true);
   }
 
-  // Use capture="environment" to open rear camera directly on mobile
-  const el = (
-    <input ref={inputRef} type="file" accept="image/*;capture=camera" capture="environment"
-      style={{ display: 'none' }} onChange={handleCapture} />
+  function close() {
+    readerRef.current?.reset();
+    setActive(false);
+  }
+
+  useEffect(() => {
+    if (!active) return undefined;
+    let cancelled = false;
+    const reader = new BrowserMultiFormatReader(SCAN_HINTS);
+    readerRef.current = reader;
+
+    reader.decodeFromConstraints(
+      { video: { facingMode: 'environment' } },
+      videoRef.current,
+      (result) => {
+        // The callback fires on every frame attempt, including ones where
+        // nothing was found yet (a NotFoundException passed as the second
+        // arg) -- that's the normal "still looking" case while the camera
+        // is pointed at nothing/blur, not a real error, so it's ignored
+        // rather than surfaced.
+        if (cancelled || !result) return;
+        onScanned(result.getText());
+        reader.reset();
+        setActive(false);
+      },
+    ).catch(() => {
+      if (cancelled) return;
+      setScanError('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้กล้อง หรือกรอกรหัสด้านล่างแทน');
+    });
+
+    return () => {
+      cancelled = true;
+      reader.reset();
+    };
+  }, [active]);
+
+  function submitManual() {
+    const v = manualValue.trim();
+    if (!v) return;
+    onScanned(v);
+    setActive(false);
+  }
+
+  const el = !active ? null : (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(9,17,28,0.96)', zIndex: 9999,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }}>
+      <video ref={videoRef} muted playsInline
+        style={{ width: '100%', maxWidth: 440, borderRadius: 20, background: '#000', boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }} />
+      <div style={{ color: '#fff', marginTop: 18, fontSize: 14, fontWeight: 700, textAlign: 'center' }}>
+        เล็งกล้องไปที่บาร์โค้ดหรือ QR Code
+      </div>
+      {scanError && (
+        <div style={{ color: '#fca5a5', marginTop: 10, fontSize: 13, fontWeight: 700, textAlign: 'center', maxWidth: 440 }}>
+          {scanError}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 18, width: '100%', maxWidth: 440 }}>
+        <input type="text" value={manualValue} onChange={(e) => setManualValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitManual(); }}
+          placeholder="หรือพิมพ์รหัสเอง" autoFocus={Boolean(scanError)}
+          style={{ flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none', fontSize: 15, outline: 'none' }} />
+        <button type="button" onClick={submitManual}
+          style={{ padding: '12px 20px', borderRadius: 14, border: 'none', background: '#d4af37', color: '#09111c', fontWeight: 800, cursor: 'pointer' }}>
+          ตกลง
+        </button>
+      </div>
+      <button type="button" onClick={close}
+        style={{ marginTop: 18, background: 'transparent', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', borderRadius: 14, padding: '10px 24px', fontWeight: 700, cursor: 'pointer' }}>
+        ปิด
+      </button>
+    </div>
   );
+
   return { trigger, el };
 }
 
