@@ -152,6 +152,23 @@ export async function getSectionsWithOccupancy() {
       .map((s) => s.location_id)
   );
 
+  // tgd_stock_balances isn't updated when a deposit line's location is set
+  // or changed via the handheld "Update Location" scan flow (that RPC only
+  // ever writes tgd_customer_deposit_request_lines.location_id) -- without
+  // this, a location just assigned there via a scan keeps showing as empty
+  // on this map until/unless something else independently creates a
+  // matching stock_balances row. Same fallback checkLocationHasInventory
+  // already uses to avoid warning "location free" for one of these.
+  const { data: depositLineRows } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('location_id, actual_boxes, actual_weight')
+    .not('location_id', 'is', null)
+    .or('actual_boxes.gt.0,actual_weight.gt.0');
+
+  for (const line of depositLineRows ?? []) {
+    if (line.location_id) occupiedSet.add(line.location_id);
+  }
+
   const sections = (zones ?? []).map((zone) => {
     const locations = (zone.tgd_rooms ?? []).flatMap((r) => r.tgd_locations ?? []);
     const total = locations.length;
@@ -189,7 +206,40 @@ export async function getStockAtLocation(locationId) {
     console.error('Failed to fetch stock at location:', error);
   }
 
-  return { data: data ?? [], error };
+  if (data && data.length > 0) return { data, error };
+
+  // No tgd_stock_balances row here -- same gap getSectionsWithOccupancy
+  // works around (see its comment): fall back to deposit lines actually
+  // received at this location, so a location the map now marks occupied
+  // (via that same fallback) isn't shown as empty the moment someone
+  // clicks it. Only used when stock_balances had nothing, so a location
+  // genuinely tracked there isn't ever listed twice.
+  const { data: depositLines, error: depositError } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('id, actual_boxes, actual_weight, uom, lot_no, exp_date, product_id, product_name, customer_product_code, tgd_customer_deposit_requests(customer_id)')
+    .eq('location_id', locationId)
+    .or('actual_boxes.gt.0,actual_weight.gt.0');
+
+  if (depositError) {
+    console.error('Failed to fetch deposit lines at location:', depositError);
+    return { data: data ?? [], error };
+  }
+
+  const mapped = (depositLines ?? []).map((line) => ({
+    id: `dep-${line.id}`,
+    qty_on_hand: Number(line.actual_boxes ?? 0),
+    qty_allocated: 0,
+    uom: line.uom || 'กล่อง',
+    weight: line.actual_weight != null ? Number(line.actual_weight) : null,
+    customer_id: line.tgd_customer_deposit_requests?.customer_id ?? null,
+    product_id: line.product_id ?? null,
+    product_name: line.product_name ?? line.customer_product_code ?? null,
+    lot_id: null,
+    pallet_id: null,
+    tgd_lots: (line.lot_no || line.exp_date) ? { lot_number: line.lot_no ?? null, expiry_date: line.exp_date ?? null } : null,
+  }));
+
+  return { data: mapped, error: null };
 }
 
 export async function getActiveLocations() {

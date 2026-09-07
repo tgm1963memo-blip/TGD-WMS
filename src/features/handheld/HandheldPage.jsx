@@ -1919,6 +1919,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [updated, setUpdated] = useState([]);
   const [trackingScanError, setTrackingScanError] = useState('');
   const [trackingScanning, setTrackingScanning] = useState(false);
+  const [trackingInputValue, setTrackingInputValue] = useState('');
   const { trigger: cameraTracking, el: cameraTrackingEl } = useCameraScanner((v) => handleTrackingScan(v));
 
   function parseLocCode(code) {
@@ -2004,7 +2005,15 @@ function LocationUpdateWorkflow({ onBack, t }) {
       setTrackingScanError(`ไม่พบรหัสติดตาม "${raw}" ในรายการที่รับแล้ว`);
       return;
     }
+    setTrackingInputValue('');
     pickDoc(doc, result.data.id);
+  }
+
+  // Typing/pasting the tracking code (e.g. from a hardware barcode-scanner
+  // gun emitting keystrokes into a focused field, or just read off a label
+  // by eye) reuses the exact same lookup as the camera scan button above.
+  function submitManualTracking() {
+    handleTrackingScan(trackingInputValue);
   }
 
   function handlePrintSticker(line, event) {
@@ -2061,7 +2070,27 @@ function LocationUpdateWorkflow({ onBack, t }) {
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
           {cameraTrackingEl}
-          {/* Scan a box's tracking-code sticker to jump straight to its location editor -- no need to find the right document first. */}
+          {/* Scan a box's tracking-code sticker, or type/paste it (e.g. from a hardware scanner gun) -- either jumps straight to its location editor, no need to find the right document first. */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input
+              type="text" value={trackingInputValue}
+              onChange={(e) => setTrackingInputValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitManualTracking(); }}
+              placeholder="พิมพ์รหัสติดตาม..." disabled={trackingScanning}
+              style={{
+                flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+                padding: '12px 14px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none',
+                minHeight: 46, boxSizing: 'border-box',
+              }}
+            />
+            <button type="button" onClick={submitManualTracking} disabled={trackingScanning || !trackingInputValue.trim()}
+              style={{
+                background: C.gold, color: C.primaryDark, border: 'none', borderRadius: 14,
+                padding: '0 18px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              }}>
+              ตกลง
+            </button>
+          </div>
           <button type="button" onClick={cameraTracking} disabled={trackingScanning}
             style={{
               width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,

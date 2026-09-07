@@ -617,7 +617,7 @@ export function WarehouseLayoutWidget() {
                 {stockItems.map((item) => (
                   <div key={item.id} style={{ background: '#f8fafb', borderRadius: 12, padding: '14px 16px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 8 }}>
-                      {productMap[item.product_id] ?? item.product_id}
+                      {productMap[item.product_id] ?? item.product_name ?? item.product_id}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
                       <div style={{ color: '#64748b' }}>ลูกค้า</div>
