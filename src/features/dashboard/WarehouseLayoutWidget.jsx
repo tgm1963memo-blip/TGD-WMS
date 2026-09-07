@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSectionsWithOccupancy, getStockAtLocation } from '../../services/warehouseLayoutService.js';
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { supabase } from '../../services/supabaseClient.js';
+import { parseLocationCode } from '../../utils/locationCodeUtils.js';
 
 function pctColor(pct) {
   if (pct >= 80) return '#e74c3c';
@@ -29,253 +30,76 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500'
   );
 }
 
-// Parses {room}-{side}-{row}-{level}-{bay} — bay ("ตอน") optional so
-// locations still on the pre-bay 4-segment format parse too (defaulting
-// to bay 1), matching every other location-code parser in the codebase.
-function parseLocationCode(code) {
-  const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
-  return m ? { side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
+// Each location is now one full ROW (see locationCodeUtils.js -- level/bay
+// no longer exist as a separate identity, a row just holds several pallets
+// loosely). Rendered as a 1-dimensional list per side instead of the old
+// 2D grid of level×bay dots, with a fill bar + "used/capacity" count
+// instead of a plain on/off occupied dot.
+function RowBar({ location, onClick }) {
+  const capacity = location.capacity || 0;
+  const used = location.usedCount || 0;
+  const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
+  const color = pctColor(pct);
+  const parsed = parseLocationCode(location.location_code);
+
+  return (
+    <div
+      onClick={() => onClick?.(location.id, location.location_code)}
+      title={location.location_code}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
+        borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer',
+        background: '#fff', transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', width: 56, flexShrink: 0 }}>
+        แถว {parsed?.row ?? '-'}
+      </span>
+      <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color, width: 48, textAlign: 'right', flexShrink: 0 }}>
+        {used}/{capacity}
+      </span>
+    </div>
+  );
 }
 
 function SectionGrid({ section, onLocClick }) {
-  const [hovered, setHovered] = useState(null);
-  // Cell = one (side, row, level) shelf position. A cell holds exactly one
-  // location unless the room was configured with more than 1 "ตอน" (bay),
-  // in which case it holds several — expandedCellKey tracks which
-  // multi-bay cell the user clicked to reveal its bay list, since there
-  // isn't room to draw every bay as its own dot on the map.
-  const [expandedCellKey, setExpandedCellKey] = useState(null);
-  const { rows, cols, locations, gridInfo } = section;
-  const total = rows * cols;
+  const { locations } = section;
 
-  // Keyed by "{side}-{row}-{level}", not the full location_code — a cell
-  // can hold more than one bay, and the code's bay segment isn't known
-  // ahead of time while walking the row/level grid below.
-  const cellMap = useMemo(() => {
-    const map = {};
+  const bySide = useMemo(() => {
+    const map = { L: [], R: [] };
     for (const loc of locations || []) {
       const parsed = parseLocationCode(loc?.location_code);
-      if (!parsed) continue;
-      const key = `${parsed.side}-${parsed.row}-${parsed.level}`;
-      if (!map[key]) map[key] = [];
-      map[key].push({ ...loc, bay: parsed.bay });
+      if (parsed && map[parsed.side]) map[parsed.side].push({ loc, row: parsed.row });
     }
-    for (const bays of Object.values(map)) bays.sort((a, b) => a.bay - b.bay);
+    map.L.sort((a, b) => a.row - b.row);
+    map.R.sort((a, b) => a.row - b.row);
     return map;
   }, [locations]);
 
-  // Modern Asymmetric Rendering
-  if (gridInfo?.sidesConfig) {
-    const leftConfig = gridInfo.sidesConfig.L || { rows: 0, levels: 0 };
-    const rightConfig = gridInfo.sidesConfig.R || { rows: 0, levels: 0 };
-
-    const renderDot = (side, r, c) => {
-      const cellKey = `${side}-${r}-${c}`;
-      const bays = cellMap[cellKey] ?? [];
-      const codeLabel = bays.length === 1 ? bays[0].location_code : `${section.code}-${side}-${String(r).padStart(2, '0')}-${String(c).padStart(2, '0')}`;
-      const occupiedCount = bays.filter((b) => b.isOccupied).length;
-      const isOccupied = occupiedCount > 0;
-      const isMultiBay = bays.length > 1;
-      const isExpanded = expandedCellKey === cellKey;
-
-      function handleClick() {
-        if (isMultiBay) {
-          setExpandedCellKey(isExpanded ? null : cellKey);
-          return;
-        }
-        if (isOccupied && bays[0]) onLocClick?.(bays[0].id, bays[0].location_code);
-      }
-
-      return (
-        <div key={cellKey} style={{ position: 'relative' }}>
-          <div
-            onMouseEnter={() => setHovered({ code: codeLabel, row: r, col: c, isOccupied, bayCount: bays.length, occupiedCount })}
-            onMouseLeave={() => setHovered(null)}
-            onClick={handleClick}
-            title={isMultiBay ? `${codeLabel} · ${bays.length} ตอน` : codeLabel}
-            style={{
-              width: 14, height: 14,
-              borderRadius: isMultiBay ? 4 : '50%',
-              background: bays.length === 0 ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
-              boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-              border: isMultiBay ? '2px solid #6366f1' : 'none',
-              cursor: (isOccupied || isMultiBay) ? 'pointer' : 'default',
-              transition: 'transform 0.2s, opacity 0.2s',
-              transform: hovered?.code === codeLabel ? 'scale(1.5)' : 'scale(1)',
-              opacity: hovered && hovered.code !== codeLabel ? 0.6 : 1,
-            }}
-          />
-          {isExpanded && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute', top: '120%', left: '50%', transform: 'translateX(-50%)',
-                zIndex: 20, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: 8, minWidth: 150,
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6, whiteSpace: 'nowrap' }}>
-                {section.code}-{side}-{String(r).padStart(2, '0')}-{String(c).padStart(2, '0')} · {bays.length} ตอน
-              </div>
-              {bays.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => { if (b.isOccupied) onLocClick?.(b.id, b.location_code); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 6,
-                    cursor: b.isOccupied ? 'pointer' : 'default', fontSize: 12, whiteSpace: 'nowrap',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: b.isOccupied ? '#f59e0b' : '#10b981' }} />
-                  <span style={{ color: '#334155' }}>ตอน {b.bay}</span>
-                  <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: 11 }}>{b.isOccupied ? 'มีสินค้า' : 'ว่าง'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    return (
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
-        {/* Left Aisle — horizontal band: each column = 1 row, each grid row = 1 level */}
-        {leftConfig.rows > 0 && leftConfig.levels > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${leftConfig.rows}, 1fr)`, gap: 6 }}>
-            {Array.from({ length: leftConfig.rows * leftConfig.levels }).map((_, idx) => {
-              const r = (idx % leftConfig.rows) + 1;
-              const c = Math.floor(idx / leftConfig.rows) + 1;
-              return renderDot('L', r, c);
-            })}
-          </div>
-        )}
-
-        {/* Walking Path — horizontal */}
-        {(leftConfig.rows > 0 || rightConfig.rows > 0) && (
-          <div style={{ height: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
-        )}
-
-        {/* Right Aisle — horizontal band */}
-        {rightConfig.rows > 0 && rightConfig.levels > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rightConfig.rows}, 1fr)`, gap: 6 }}>
-            {Array.from({ length: rightConfig.rows * rightConfig.levels }).map((_, idx) => {
-              const r = (idx % rightConfig.rows) + 1;
-              const c = Math.floor(idx / rightConfig.rows) + 1;
-              return renderDot('R', r, c);
-            })}
-          </div>
-        )}
-
-        {hovered && (
-          <div style={{
-            position: 'absolute',
-            top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            zIndex: 10,
-            background: 'rgba(15, 23, 42, 0.85)', color: '#fff',
-            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-            borderRadius: 12, padding: '12px 16px',
-            fontSize: 13, fontWeight: 600,
-            pointerEvents: 'none',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
-            minWidth: 160, whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 2 }}>{section.name}</div>
-            <div>{hovered.code}</div>
-            <div style={{ marginTop: 4, fontWeight: 400, fontSize: 12 }}>
-              {hovered.bayCount > 1
-                ? `📦 ${hovered.occupiedCount}/${hovered.bayCount} ตอนมีสินค้า · คลิกเพื่อดูรายละเอียด`
-                : (hovered.isOccupied ? '🟠 มีสินค้า' : '⬜ ว่าง')}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+  if (!locations?.length) {
+    return <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
   }
 
-  // Fallback Legacy Rendering
-  const halfCols = Math.ceil(cols / 2);
-  const leftCols = halfCols;
-  const rightCols = cols - halfCols;
-
   return (
-    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows}, 1fr)`, gap: 6 }}>
-        {Array.from({ length: rows * leftCols }).map((_, idx) => {
-          const row = (idx % rows) + 1;
-          const col = Math.floor(idx / rows) + 1;
-          const globalIdx = (row - 1) * cols + (col - 1);
-          const loc = (locations || [])[globalIdx];
-          const isOccupied = loc?.isOccupied ?? false;
-          return (
-            <div
-              key={`L-${idx}`}
-              onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => isOccupied && loc && onLocClick?.(loc.id, loc.location_code)}
-              title={loc?.location_code ?? `R${row}C${col}`}
-              style={{
-                width: 14, height: 14, borderRadius: '50%',
-                background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
-                boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-                cursor: isOccupied ? 'pointer' : 'default',
-                transition: 'transform 0.2s, opacity 0.2s',
-                transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
-                opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
-              }}
-            />
-          );
-        })}
-      </div>
-
-      <div style={{ height: 8, background: 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows}, 1fr)`, gap: 6 }}>
-        {Array.from({ length: rows * rightCols }).map((_, idx) => {
-          const row = (idx % rows) + 1;
-          const col = leftCols + Math.floor(idx / rows) + 1;
-          const globalIdx = (row - 1) * cols + (col - 1);
-          const loc = (locations || [])[globalIdx];
-          const isOccupied = loc?.isOccupied ?? false;
-          return (
-            <div
-              key={`R-${idx}`}
-              onMouseEnter={() => setHovered({ idx: globalIdx, row, col, isOccupied, code: loc?.location_code })}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => isOccupied && loc && onLocClick?.(loc.id, loc.location_code)}
-              title={loc?.location_code ?? `R${row}C${col}`}
-              style={{
-                width: 14, height: 14, borderRadius: '50%',
-                background: !loc ? '#e2e8f0' : isOccupied ? '#f59e0b' : '#10b981',
-                boxShadow: isOccupied ? '0 0 8px rgba(245, 158, 11, 0.4)' : 'none',
-                cursor: isOccupied ? 'pointer' : 'default',
-                transition: 'transform 0.2s, opacity 0.2s',
-                transform: hovered?.idx === globalIdx ? 'scale(1.5)' : 'scale(1)',
-                opacity: hovered && hovered.idx !== globalIdx ? 0.6 : 1,
-              }}
-            />
-          );
-        })}
-      </div>
-
-      {hovered && (
-        <div style={{
-          position: 'absolute',
-          top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          zIndex: 10,
-          background: 'rgba(15, 23, 42, 0.85)', color: '#fff',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          borderRadius: 12, padding: '12px 16px',
-          fontSize: 13, fontWeight: 600,
-          pointerEvents: 'none',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
-          minWidth: 160, whiteSpace: 'nowrap',
-        }}>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 2 }}>{section.name}</div>
-          <div>{hovered.code ?? `แถว ${hovered.row} · ช่อง ${hovered.col}`}</div>
-          <div style={{ marginTop: 4, fontWeight: 400, fontSize: 12 }}>
-            {hovered.isOccupied ? '🟠 มีสินค้า' : '⬜ ว่าง'}
+    <div style={{ display: 'grid', gridTemplateColumns: bySide.L.length && bySide.R.length ? '1fr 1fr' : '1fr', gap: 20, padding: 16 }}>
+      {bySide.L.length > 0 && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ฝั่งซ้าย (L)</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bySide.L.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
+          </div>
+        </div>
+      )}
+      {bySide.R.length > 0 && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ฝั่งขวา (R)</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bySide.R.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
           </div>
         </div>
       )}

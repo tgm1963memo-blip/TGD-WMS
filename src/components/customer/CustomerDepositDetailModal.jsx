@@ -24,6 +24,7 @@ import { listCustomerDocumentTimelineEvents } from '../../services/customerDocum
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
+import { parseLocationCode } from '../../utils/locationCodeUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -97,8 +98,6 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [locZone, setLocZone] = useState('');
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
-  const [locLevel, setLocLevel] = useState('');
-  const [locBay, setLocBay] = useState('');
   const [customerData, setCustomerData] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
@@ -168,23 +167,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     getActiveLocations().then(({ data }) => setAllLocations(data ?? []));
   }, []);
 
-  // Parse location code into hierarchy parts (bay/"ตอน" optional so
-  // pre-retrofit 4-segment codes still parse, defaulting to bay 1)
-  function parseLocCode(code) {
-    const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
-    return m ? { zone: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
-  }
-
-  const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocCode(l.code) })).filter((l) => l.parsed);
-  const locZoneOptions = [...new Set(parsedAllLocs.map((l) => l.parsed.zone))].sort();
-  const locSideOptions = locZone ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone).map((l) => l.parsed.side))].sort() : [];
-  const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
-  const locLevelOptions = (locZone && locSide && locRow) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow).map((l) => l.parsed.level))].sort((a, b) => a - b) : [];
-  const locBayOptions = (locZone && locSide && locRow && locLevel)
-    ? [...new Set(parsedAllLocs.filter((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel).map((l) => l.parsed.bay))].sort((a, b) => a - b)
-    : [];
-  const selectedLocObj = (locZone && locSide && locRow && locLevel && locBay)
-    ? (parsedAllLocs.find((l) => l.parsed.zone === locZone && l.parsed.side === locSide && l.parsed.row === +locRow && l.parsed.level === +locLevel && l.parsed.bay === +locBay) ?? null)
+  const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })).filter((l) => l.parsed);
+  const locZoneOptions = [...new Set(parsedAllLocs.map((l) => l.parsed.room))].sort();
+  const locSideOptions = locZone ? [...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))].sort() : [];
+  const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
+  const selectedLocObj = (locZone && locSide && locRow)
+    ? (parsedAllLocs.find((l) => l.parsed.room === locZone && l.parsed.side === locSide && l.parsed.row === +locRow) ?? null)
     : null;
 
   const branding = getDocumentBrandingConfig();
@@ -765,12 +753,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               onClick={() => {
                                 setLocationLine(line);
                                 const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
-                                const p = existingLoc ? parseLocCode(existingLoc.code) : null;
-                                setLocZone(p?.zone ?? '');
+                                const p = existingLoc ? parseLocationCode(existingLoc.code) : null;
+                                setLocZone(p?.room ?? '');
                                 setLocSide(p?.side ?? '');
                                 setLocRow(p?.row ? String(p.row) : '');
-                                setLocLevel(p?.level ? String(p.level) : '');
-                                setLocBay(p?.bay ? String(p.bay) : '');
                               }}
                             >
                               📍
@@ -1221,37 +1207,23 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <div className="form-grid" style={{ gap: 10 }}>
                 <label className="form-field">
                   <span>ห้อง / โซน</span>
-                  <select className="form-control" value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}>
+                  <select className="form-control" value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); }}>
                     <option value="">-- เลือกห้อง --</option>
                     {locZoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
                   <span>ฝั่ง</span>
-                  <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); setLocLevel(''); setLocBay(''); }} disabled={!locZone}>
+                  <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); }} disabled={!locZone}>
                     <option value="">-- เลือกฝั่ง --</option>
                     {locSideOptions.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
                   <span>แถว</span>
-                  <select className="form-control" value={locRow} onChange={(e) => { setLocRow(e.target.value); setLocLevel(''); setLocBay(''); }} disabled={!locSide}>
+                  <select className="form-control" value={locRow} onChange={(e) => setLocRow(e.target.value)} disabled={!locSide}>
                     <option value="">-- เลือกแถว --</option>
                     {locRowOptions.map((r) => <option key={r} value={String(r)}>แถว {r}</option>)}
-                  </select>
-                </label>
-                <label className="form-field">
-                  <span>ชั้น</span>
-                  <select className="form-control" value={locLevel} onChange={(e) => { setLocLevel(e.target.value); setLocBay(''); }} disabled={!locRow}>
-                    <option value="">-- เลือกชั้น --</option>
-                    {locLevelOptions.map((lv) => <option key={lv} value={String(lv)}>ชั้น {lv}</option>)}
-                  </select>
-                </label>
-                <label className="form-field">
-                  <span>ตอน</span>
-                  <select className="form-control" value={locBay} onChange={(e) => setLocBay(e.target.value)} disabled={!locLevel}>
-                    <option value="">-- เลือกตอน --</option>
-                    {locBayOptions.map((b) => <option key={b} value={String(b)}>ตอน {b}</option>)}
                   </select>
                 </label>
                 {selectedLocObj && (

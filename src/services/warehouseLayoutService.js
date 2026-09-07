@@ -1,4 +1,7 @@
 import { supabase } from './supabaseClient.js';
+import { parseLocationCode, buildLocationCode } from '../utils/locationCodeUtils.js';
+
+const DEFAULT_ROW_CAPACITY = 14;
 
 function missing() {
   return { data: null, error: new Error('Supabase client not configured.') };
@@ -20,84 +23,24 @@ export async function ensureDefaultWarehouse() {
     .single();
 }
 
-// New format: {RoomCode}-{L|R}-{Row:02d}-{Level:02d}-{Bay:02d}  e.g. H1-L-01-03-01
-// Bay ("ตอน") is optional in the regex so pre-existing 4-segment codes (rooms
-// created before this dimension existed) still parse — they're treated as
-// bay 1, matching how they were retrofitted in the database.
-function parseNewCode(code) {
-  const m = /^(.+)-([LR])-(\d+)-(\d+)(?:-(\d+))?$/i.exec(code ?? '');
-  return m ? { room: m[1], side: m[2].toUpperCase(), row: +m[3], level: +m[4], bay: m[5] ? +m[5] : 1 } : null;
-}
-
-// Legacy format: PREFIX-RxxCxx  e.g. S001-R01C01
-function parseOldCode(code) {
-  const m = /R(\d+)C(\d+)$/i.exec(code ?? '');
-  return m ? { row: +m[1], col: +m[2] } : null;
-}
-
-// Legacy v2 format: PREFIX-{Row:02d}{L|R}-{Level:02d}  e.g. S001-01L-03
-function parseMidCode(code) {
-  const m = /(\d+)([LR])-(\d+)$/i.exec(code ?? '');
-  return m ? { row: +m[1], side: m[2].toUpperCase(), level: +m[3] } : null;
-}
-
-// Analyze location codes to return structured grid info
+// Analyzes a zone's locations (now always {room}-{side}-{row}, see
+// locationCodeUtils.js) into per-side row counts for the dashboard's
+// 1-dimensional row list. A location that doesn't match the current format
+// (shouldn't exist after the 20260905090000 consolidation migration, but
+// defensive against a bad manual insert) is just excluded from the count
+// rather than falling back to a legacy grid-shape guess -- there's no
+// legacy shape left to guess at.
 function analyzeLocations(locations) {
-  if (!locations.length) return { type: 'empty', rows: 0, cols: 0 };
+  if (!locations.length) return { rows: 0, sidesConfig: { L: { rows: 0 }, R: { rows: 0 } } };
 
-  const newParsed = locations.map((l) => parseNewCode(l.location_code)).filter(Boolean);
-  if (newParsed.length === locations.length) {
-    const numRows = Math.max(...newParsed.map((p) => p.row));
-    const sides = [...new Set(newParsed.map((p) => p.side))].sort();
-    const numLevels = Math.max(...newParsed.map((p) => p.level));
-    const numBays = Math.max(...newParsed.map((p) => p.bay));
-
-    const sidesConfig = { L: { rows: 0, levels: 0, bays: 0 }, R: { rows: 0, levels: 0, bays: 0 } };
-    newParsed.forEach(p => {
-      if (sidesConfig[p.side]) {
-        sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
-        sidesConfig[p.side].levels = Math.max(sidesConfig[p.side].levels, p.level);
-        sidesConfig[p.side].bays = Math.max(sidesConfig[p.side].bays, p.bay);
-      }
-    });
-
-    return {
-      type: 'new',
-      numRows,
-      numSides: sides.length,
-      sides,
-      numLevels,
-      numBays,
-      sidesConfig,
-      rows: numRows * sides.length,
-      cols: numLevels * numBays,
-    };
+  const parsed = locations.map((l) => parseLocationCode(l.location_code)).filter(Boolean);
+  const sidesConfig = { L: { rows: 0 }, R: { rows: 0 } };
+  for (const p of parsed) {
+    if (sidesConfig[p.side]) sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
   }
+  const sides = [...new Set(parsed.map((p) => p.side))].sort();
 
-  const midParsed = locations.map((l) => parseMidCode(l.location_code)).filter(Boolean);
-  if (midParsed.length === locations.length) {
-    const numRows = Math.max(...midParsed.map((p) => p.row));
-    const sides = [...new Set(midParsed.map((p) => p.side))].sort();
-    const numLevels = Math.max(...midParsed.map((p) => p.level));
-    
-    const sidesConfig = { L: { rows: 0, levels: 0 }, R: { rows: 0, levels: 0 } };
-    midParsed.forEach(p => {
-      if (sidesConfig[p.side]) {
-        sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
-        sidesConfig[p.side].levels = Math.max(sidesConfig[p.side].levels, p.level);
-      }
-    });
-
-    return { type: 'new', numRows, numSides: sides.length, sides, numLevels, sidesConfig, rows: numRows * sides.length, cols: numLevels };
-  }
-
-  const oldParsed = locations.map((l) => parseOldCode(l.location_code)).filter(Boolean);
-  if (oldParsed.length === locations.length && oldParsed.length > 0) {
-    return { type: 'old', rows: Math.max(...oldParsed.map((p) => p.row)), cols: Math.max(...oldParsed.map((p) => p.col)) };
-  }
-
-  const cols = Math.min(12, Math.ceil(Math.sqrt(locations.length * 1.5)));
-  return { type: 'unknown', rows: Math.ceil(locations.length / cols), cols };
+  return { rows: sidesConfig.L.rows + sidesConfig.R.rows, numSides: sides.length, sides, sidesConfig };
 }
 
 function isUnknownColumnError(error) {
@@ -135,7 +78,7 @@ export async function getSectionsWithOccupancy() {
 
   const { data: zones, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, temperature_type, is_active, tgd_rooms(id, tgd_locations(id, location_code))')
+    .select('id, zone_code, zone_name, temperature_type, is_active, tgd_rooms(id, tgd_locations(id, location_code, capacity))')
     .eq('is_active', true)
     .order('zone_code');
 
@@ -146,11 +89,17 @@ export async function getSectionsWithOccupancy() {
     .select('location_id, qty_on_hand, qty_allocated')
     .gt('qty_on_hand', 0);
 
-  const occupiedSet = new Set(
-    (stockRows ?? [])
-      .filter((s) => s.location_id && (Number(s.qty_on_hand || 0) - Number(s.qty_allocated || 0)) > 0)
-      .map((s) => s.location_id)
-  );
+  // A row now holds several pallets, not one binary occupied/empty slot, so
+  // occupancy is a COUNT per location (one qualifying row ≈ one pallet) that
+  // gets compared against that location's capacity, not a plain Set of
+  // "has stock" membership like before.
+  const usedCountMap = new Map();
+  for (const s of stockRows ?? []) {
+    if (s.location_id && (Number(s.qty_on_hand || 0) - Number(s.qty_allocated || 0)) > 0) {
+      usedCountMap.set(s.location_id, (usedCountMap.get(s.location_id) ?? 0) + 1);
+    }
+  }
+  const locationIdsWithStockBalance = new Set(usedCountMap.keys());
 
   // tgd_stock_balances isn't updated when a deposit line's location is set
   // or changed via the handheld "Update Location" scan flow (that RPC only
@@ -158,7 +107,10 @@ export async function getSectionsWithOccupancy() {
   // this, a location just assigned there via a scan keeps showing as empty
   // on this map until/unless something else independently creates a
   // matching stock_balances row. Same fallback checkLocationHasInventory
-  // already uses to avoid warning "location free" for one of these.
+  // already uses to avoid warning "location free" for one of these. Only
+  // counted for a location with NO stock_balances rows at all (matching
+  // getStockAtLocation's own fallback), so the same physical stock is never
+  // counted from both sources at once.
   const { data: depositLineRows } = await supabase
     .from('tgd_customer_deposit_request_lines')
     .select('location_id, actual_boxes, actual_weight')
@@ -166,13 +118,15 @@ export async function getSectionsWithOccupancy() {
     .or('actual_boxes.gt.0,actual_weight.gt.0');
 
   for (const line of depositLineRows ?? []) {
-    if (line.location_id) occupiedSet.add(line.location_id);
+    if (!line.location_id || locationIdsWithStockBalance.has(line.location_id)) continue;
+    usedCountMap.set(line.location_id, (usedCountMap.get(line.location_id) ?? 0) + 1);
   }
 
   const sections = (zones ?? []).map((zone) => {
     const locations = (zone.tgd_rooms ?? []).flatMap((r) => r.tgd_locations ?? []);
     const total = locations.length;
-    const used = locations.filter((l) => occupiedSet.has(l.id)).length;
+    const totalCapacity = locations.reduce((sum, l) => sum + (Number(l.capacity) || 0), 0);
+    const used = locations.reduce((sum, l) => sum + (usedCountMap.get(l.id) ?? 0), 0);
     const gridInfo = analyzeLocations(locations);
     return {
       id: zone.id,
@@ -181,12 +135,17 @@ export async function getSectionsWithOccupancy() {
       temperatureType: zone.temperature_type ?? null,
       gridInfo,
       rows: gridInfo.rows,
-      cols: gridInfo.cols,
       total,
+      totalCapacity,
       used,
-      empty: total - used,
-      usedPct: total > 0 ? Number(((used / total) * 100).toFixed(2)) : 0,
-      locations: locations.map((l) => ({ ...l, isOccupied: occupiedSet.has(l.id) })),
+      empty: Math.max(0, totalCapacity - used),
+      usedPct: totalCapacity > 0 ? Number(((used / totalCapacity) * 100).toFixed(2)) : 0,
+      locations: locations.map((l) => ({
+        ...l,
+        capacity: Number(l.capacity) || 0,
+        usedCount: usedCountMap.get(l.id) ?? 0,
+        isOccupied: (usedCountMap.get(l.id) ?? 0) > 0,
+      })),
     };
   });
 
@@ -270,8 +229,10 @@ export async function getActiveLocations() {
 }
 
 // sides: array of 'L' | 'R' | both
-// Location code format: {roomCode}-{side}-{row:02d}-{level:02d}-{bay:02d}  e.g. H1-L-01-03-01
-export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig }) {
+// Location code format: {roomCode}-{side}-{row:02d}  e.g. H1-L-01 -- one
+// location per row now (see locationCodeUtils.js); capacity is a single
+// pallets-per-row figure applied to every row created for this zone.
+export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig, capacity }) {
   if (!supabase) return missing();
 
   let { data: zone, error: ze } = await supabase
@@ -309,27 +270,22 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   if (re) return { error: re };
 
   const sideNames = { L: 'ซ้าย', R: 'ขวา' };
+  const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
   const inserts = [];
 
   const addSideLocations = (side, config) => {
     if (!config?.active) return;
-    const bayCount = Math.max(1, Number(config.bays) || 1);
     for (let r = 1; r <= config.rows; r++) {
-      for (let lv = 1; lv <= config.levels; lv++) {
-        for (let b = 1; b <= bayCount; b++) {
-          const rowStr = String(r).padStart(2, '0');
-          const lvStr = String(lv).padStart(2, '0');
-          const bayStr = String(b).padStart(2, '0');
-          inserts.push({
-            room_id: room.id,
-            zone_id: zone.id,
-            name: `${zoneCode}-${side}-${rowStr}-${lvStr}-${bayStr}`,
-            location_code: `${zoneCode}-${side}-${rowStr}-${lvStr}-${bayStr}`,
-            location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv} ตอน${b}`,
-            location_type: 'SHELF',
-          });
-        }
-      }
+      const code = buildLocationCode(zoneCode, side, r);
+      inserts.push({
+        room_id: room.id,
+        zone_id: zone.id,
+        name: code,
+        location_code: code,
+        location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r}`,
+        location_type: 'SHELF',
+        capacity: rowCapacity,
+      });
     }
   };
 
@@ -344,7 +300,7 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   return { data: zone, error: null };
 }
 
-export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig, rightConfig }) {
+export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig, rightConfig, capacity }) {
   if (!supabase) return missing();
 
   const { data: rooms, error: roomErr } = await supabase
@@ -366,31 +322,39 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
     const { data: stockRows } = await supabase
       .from('tgd_stock_balances').select('location_id').in('location_id', locIds).gt('qty_on_hand', 0);
     occupiedIds = new Set((stockRows ?? []).map((s) => s.location_id));
+
+    // Same gap fixed elsewhere for the dashboard (tgd_stock_balances isn't
+    // updated by the handheld "Update Location" flow) -- without this, a
+    // row that's actually holding pallets only tracked via deposit lines
+    // could look "empty" here and get deleted out from under real stock.
+    const { data: depositLineRows } = await supabase
+      .from('tgd_customer_deposit_request_lines')
+      .select('location_id')
+      .in('location_id', locIds)
+      .or('actual_boxes.gt.0,actual_weight.gt.0');
+    for (const line of depositLineRows ?? []) occupiedIds.add(line.location_id);
   }
 
   const sideNames = { L: 'ซ้าย', R: 'ขวา' };
+  const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
   const desiredCodes = new Set();
   const toInsertRows = [];
 
   const addSide = (side, config) => {
     if (!config?.active) return;
-    const bayCount = Math.max(1, Number(config.bays) || 1);
     for (let r = 1; r <= config.rows; r++) {
-      for (let lv = 1; lv <= config.levels; lv++) {
-        for (let b = 1; b <= bayCount; b++) {
-          const code = `${zoneCode}-${side}-${String(r).padStart(2, '0')}-${String(lv).padStart(2, '0')}-${String(b).padStart(2, '0')}`;
-          desiredCodes.add(code);
-          if (!existingCodes.has(code)) {
-            toInsertRows.push({
-              room_id: roomId,
-              zone_id: zoneId,
-              name: code,
-              location_code: code,
-              location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r} ชั้น${lv} ตอน${b}`,
-              location_type: 'SHELF',
-            });
-          }
-        }
+      const code = buildLocationCode(zoneCode, side, r);
+      desiredCodes.add(code);
+      if (!existingCodes.has(code)) {
+        toInsertRows.push({
+          room_id: roomId,
+          zone_id: zoneId,
+          name: code,
+          location_code: code,
+          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r}`,
+          location_type: 'SHELF',
+          capacity: rowCapacity,
+        });
       }
     }
   };
@@ -414,6 +378,14 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
       const { error: delErr } = await supabase.from('tgd_locations').delete().in('id', idsToDelete);
       if (delErr) return { error: delErr };
     }
+  }
+
+  // Apply a changed capacity to every row this zone already has too, not
+  // just newly-inserted ones -- otherwise adjusting it later would only
+  // ever affect rows added after that point.
+  if (locIds.length > 0) {
+    const { error: capErr } = await supabase.from('tgd_locations').update({ capacity: rowCapacity }).in('id', locIds);
+    if (capErr) return { error: capErr };
   }
 
   if (toInsertRows.length > 0) {

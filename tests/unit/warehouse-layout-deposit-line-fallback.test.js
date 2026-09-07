@@ -31,7 +31,7 @@ describe('getSectionsWithOccupancy', () => {
             return chainableSelect({
               data: [{
                 id: 'zone-1', zone_code: '41', zone_name: 'ห้องเย็น 41', temperature_type: 'FROZEN', is_active: true,
-                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01-01-01' }] }],
+                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01', capacity: 14 }] }],
               }],
               error: null,
             });
@@ -52,8 +52,9 @@ describe('getSectionsWithOccupancy', () => {
 
     expect(data).toHaveLength(1);
     expect(data[0].used).toBe(1);
-    expect(data[0].empty).toBe(0);
+    expect(data[0].empty).toBe(13);
     expect(data[0].locations[0].isOccupied).toBe(true);
+    expect(data[0].locations[0].usedCount).toBe(1);
   });
 
   it('leaves a location empty when neither source has stock there', async () => {
@@ -65,7 +66,7 @@ describe('getSectionsWithOccupancy', () => {
             return chainableSelect({
               data: [{
                 id: 'zone-1', zone_code: '41', zone_name: 'ห้องเย็น 41', temperature_type: 'FROZEN', is_active: true,
-                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01-01-01' }] }],
+                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01', capacity: 14 }] }],
               }],
               error: null,
             });

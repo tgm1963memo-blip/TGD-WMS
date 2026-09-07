@@ -9,18 +9,17 @@ import {
   updateSectionSize,
 } from '../../services/warehouseLayoutService.js';
 
+const DEFAULT_CAPACITY = 14;
+
 const EMPTY_FORM = {
   zoneCode: '',
   zoneName: '',
   temperatureType: 'FROZEN',
   sideLeft: true,
   leftRows: 5,
-  leftLevels: 5,
-  leftBays: 1,
   sideRight: true,
   rightRows: 5,
-  rightLevels: 5,
-  rightBays: 1,
+  capacity: DEFAULT_CAPACITY,
 };
 
 const TEMP_OPTIONS = [
@@ -43,24 +42,15 @@ function pctColor(pct) {
 }
 
 function describeGrid(gridInfo) {
-  if (!gridInfo || gridInfo.type === 'empty') return '';
-  if (gridInfo.type === 'new') {
-    const parts = [];
-    if (gridInfo.sidesConfig?.L && gridInfo.sidesConfig.L.rows > 0) {
-      parts.push(`L: ${gridInfo.sidesConfig.L.rows}×${gridInfo.sidesConfig.L.levels}×${gridInfo.sidesConfig.L.bays || 1}`);
-    }
-    if (gridInfo.sidesConfig?.R && gridInfo.sidesConfig.R.rows > 0) {
-      parts.push(`R: ${gridInfo.sidesConfig.R.rows}×${gridInfo.sidesConfig.R.levels}×${gridInfo.sidesConfig.R.bays || 1}`);
-    }
-    if (parts.length > 0) return parts.join(' · ');
+  if (!gridInfo || !gridInfo.rows) return '';
+  const parts = [];
+  if (gridInfo.sidesConfig?.L?.rows > 0) parts.push(`L: ${gridInfo.sidesConfig.L.rows} แถว`);
+  if (gridInfo.sidesConfig?.R?.rows > 0) parts.push(`R: ${gridInfo.sidesConfig.R.rows} แถว`);
+  return parts.join(' · ');
+}
 
-    const sideStr = gridInfo.numSides === 2
-      ? 'ซ้าย + ขวา'
-      : (gridInfo.sides?.[0] === 'L' ? 'ฝั่งซ้าย' : 'ฝั่งขวา');
-    return `${gridInfo.numRows} แถว · ${sideStr} · ${gridInfo.numLevels} ชั้น · ${gridInfo.numBays || 1} ตอน`;
-  }
-  if (gridInfo.type === 'old') return `${gridInfo.rows} แถว × ${gridInfo.cols} ช่อง`;
-  return '';
+function sectionCapacity(section) {
+  return section.locations?.find((l) => l.capacity)?.capacity ?? DEFAULT_CAPACITY;
 }
 
 function initEditForm(section) {
@@ -68,12 +58,9 @@ function initEditForm(section) {
   return {
     leftActive: (sc.L?.rows ?? 0) > 0,
     leftRows: sc.L?.rows || 5,
-    leftLevels: sc.L?.levels || 5,
-    leftBays: sc.L?.bays || 1,
     rightActive: (sc.R?.rows ?? 0) > 0,
     rightRows: sc.R?.rows || 5,
-    rightLevels: sc.R?.levels || 5,
-    rightBays: sc.R?.bays || 1,
+    capacity: sectionCapacity(section),
   };
 }
 
@@ -89,7 +76,6 @@ function SectionCard({ section, onDelete, onEdit }) {
   const color = pctColor(section.usedPct);
   const gridDesc = describeGrid(section.gridInfo);
   const tempBadge = TEMP_BADGE[section.temperatureType] ?? null;
-  const canEdit = section.gridInfo?.type === 'new';
 
   function setEf(k, v) { setEditForm((f) => ({ ...f, [k]: v })); }
 
@@ -122,16 +108,14 @@ function SectionCard({ section, onDelete, onEdit }) {
     setEditError('');
     setEditSuccess('');
     const lRows = Math.max(1, Math.min(50, +editForm.leftRows || 1));
-    const lLevels = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
-    const lBays = Math.max(1, Math.min(20, +editForm.leftBays || 1));
     const rRows = Math.max(1, Math.min(50, +editForm.rightRows || 1));
-    const rLevels = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
-    const rBays = Math.max(1, Math.min(20, +editForm.rightBays || 1));
+    const capacity = Math.max(1, +editForm.capacity || DEFAULT_CAPACITY);
     const result = await onEdit(section.id, {
       zoneCode: section.code,
       zoneName: section.name,
-      leftConfig: { active: editForm.leftActive, rows: lRows, levels: lLevels, bays: lBays },
-      rightConfig: { active: editForm.rightActive, rows: rRows, levels: rLevels, bays: rBays },
+      leftConfig: { active: editForm.leftActive, rows: lRows },
+      rightConfig: { active: editForm.rightActive, rows: rRows },
+      capacity,
     });
     setEditSaving(false);
     if (result?.error) {
@@ -144,12 +128,8 @@ function SectionCard({ section, onDelete, onEdit }) {
   }
 
   const efLR = Math.max(1, Math.min(50, +editForm.leftRows || 1));
-  const efLL = Math.max(1, Math.min(20, +editForm.leftLevels || 1));
-  const efLB = Math.max(1, Math.min(20, +editForm.leftBays || 1));
   const efRR = Math.max(1, Math.min(50, +editForm.rightRows || 1));
-  const efRL = Math.max(1, Math.min(20, +editForm.rightLevels || 1));
-  const efRB = Math.max(1, Math.min(20, +editForm.rightBays || 1));
-  const editTotal = (editForm.leftActive ? efLR * efLL * efLB : 0) + (editForm.rightActive ? efRR * efRL * efRB : 0);
+  const editTotal = (editForm.leftActive ? efLR : 0) + (editForm.rightActive ? efRR : 0);
 
   return (
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
@@ -177,7 +157,7 @@ function SectionCard({ section, onDelete, onEdit }) {
             )}
           </div>
           <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-            {section.total} location
+            {section.total} แถว · ความจุ {sectionCapacity(section)} pallet/แถว (รวม {section.totalCapacity} pallet)
             {gridDesc ? ` · ${gridDesc}` : ''}
           </div>
         </div>
@@ -185,12 +165,12 @@ function SectionCard({ section, onDelete, onEdit }) {
           <div style={{ width: 80, height: 6, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${section.usedPct}%`, background: color, borderRadius: 4 }} />
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color, width: 36, textAlign: 'right' }}>
-            {section.usedPct}%
+          <span style={{ fontSize: 12, fontWeight: 700, color, width: 70, textAlign: 'right' }}>
+            {section.used}/{section.totalCapacity}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {!confirm && canEdit && (
+          {!confirm && (
             <button
               type="button"
               onClick={editing ? cancelEdit : openEdit}
@@ -250,41 +230,17 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งซ้าย (L)
               </label>
               {editForm.leftActive && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนแถว
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={50}
-                      value={editForm.leftRows}
-                      onChange={(e) => setEf('leftRows', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนชั้น
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={20}
-                      value={editForm.leftLevels}
-                      onChange={(e) => setEf('leftLevels', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนตอน
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={20}
-                      value={editForm.leftBays}
-                      onChange={(e) => setEf('leftBays', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                </div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  จำนวนแถว
+                  <input
+                    className="form-control"
+                    type="number"
+                    min={1} max={50}
+                    value={editForm.leftRows}
+                    onChange={(e) => setEf('leftRows', e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                  />
+                </label>
               )}
             </div>
             {/* Right side */}
@@ -299,50 +255,38 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งขวา (R)
               </label>
               {editForm.rightActive && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนแถว
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={50}
-                      value={editForm.rightRows}
-                      onChange={(e) => setEf('rightRows', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนชั้น
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={20}
-                      value={editForm.rightLevels}
-                      onChange={(e) => setEf('rightLevels', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    จำนวนตอน
-                    <input
-                      className="form-control"
-                      type="number"
-                      min={1} max={20}
-                      value={editForm.rightBays}
-                      onChange={(e) => setEf('rightBays', e.target.value)}
-                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                    />
-                  </label>
-                </div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  จำนวนแถว
+                  <input
+                    className="form-control"
+                    type="number"
+                    min={1} max={50}
+                    value={editForm.rightRows}
+                    onChange={(e) => setEf('rightRows', e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                  />
+                </label>
               )}
             </div>
           </div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 14, maxWidth: 220 }}>
+            ความจุต่อแถว (pallet)
+            <input
+              className="form-control"
+              type="number"
+              min={1} max={99}
+              value={editForm.capacity}
+              onChange={(e) => setEf('capacity', e.target.value)}
+              style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+            />
+            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
+          </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 13, color: '#64748b' }}>
-              รวม <strong style={{ color: '#1e293b' }}>{editTotal}</strong> location
-              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}×{efLL}×{efLB}</span>}
+              รวม <strong style={{ color: '#1e293b' }}>{editTotal}</strong> แถว
+              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}</span>}
               {editForm.leftActive && editForm.rightActive && <span style={{ color: '#94a3b8' }}> / </span>}
-              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}×{efRL}×{efRB}</span>}
+              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}</span>}
             </div>
             <button
               type="button"
@@ -373,18 +317,11 @@ function AddSectionForm({ onAdd }) {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  const sides = [];
-  if (form.sideLeft) sides.push('L');
-  if (form.sideRight) sides.push('R');
-
   const leftRows = Math.max(1, Math.min(50, +form.leftRows || 1));
-  const leftLevels = Math.max(1, Math.min(20, +form.leftLevels || 1));
-  const leftBays = Math.max(1, Math.min(20, +form.leftBays || 1));
   const rightRows = Math.max(1, Math.min(50, +form.rightRows || 1));
-  const rightLevels = Math.max(1, Math.min(20, +form.rightLevels || 1));
-  const rightBays = Math.max(1, Math.min(20, +form.rightBays || 1));
+  const capacity = Math.max(1, +form.capacity || DEFAULT_CAPACITY);
 
-  const total = (form.sideLeft ? leftRows * leftLevels * leftBays : 0) + (form.sideRight ? rightRows * rightLevels * rightBays : 0);
+  const total = (form.sideLeft ? leftRows : 0) + (form.sideRight ? rightRows : 0);
   const totalSides = (form.sideLeft ? 1 : 0) + (form.sideRight ? 1 : 0);
 
   async function handleSubmit(e) {
@@ -399,16 +336,17 @@ function AddSectionForm({ onAdd }) {
     }
     setSaving(true);
     setError('');
-    
-    const leftConfig = { active: form.sideLeft, rows: leftRows, levels: leftLevels, bays: leftBays };
-    const rightConfig = { active: form.sideRight, rows: rightRows, levels: rightLevels, bays: rightBays };
-    
+
+    const leftConfig = { active: form.sideLeft, rows: leftRows };
+    const rightConfig = { active: form.sideRight, rows: rightRows };
+
     const result = await onAdd({
       zoneCode: form.zoneCode.trim().toUpperCase(),
       zoneName: form.zoneName.trim(),
       temperatureType: form.temperatureType,
       leftConfig,
       rightConfig,
+      capacity,
     });
     setSaving(false);
     if (result?.error) {
@@ -503,41 +441,17 @@ function AddSectionForm({ onAdd }) {
             ฝั่งซ้าย (L)
           </label>
           {form.sideLeft && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนแถว
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={50}
-                  value={form.leftRows}
-                  onChange={(e) => set('leftRows', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนชั้น
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={20}
-                  value={form.leftLevels}
-                  onChange={(e) => set('leftLevels', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนตอน
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={20}
-                  value={form.leftBays}
-                  onChange={(e) => set('leftBays', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              จำนวนแถว
+              <input
+                className="form-control"
+                type="number"
+                min={1} max={50}
+                value={form.leftRows}
+                onChange={(e) => set('leftRows', e.target.value)}
+                style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+              />
+            </label>
           )}
         </div>
 
@@ -553,44 +467,33 @@ function AddSectionForm({ onAdd }) {
             ฝั่งขวา (R)
           </label>
           {form.sideRight && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนแถว
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={50}
-                  value={form.rightRows}
-                  onChange={(e) => set('rightRows', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนชั้น
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={20}
-                  value={form.rightLevels}
-                  onChange={(e) => set('rightLevels', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                จำนวนตอน
-                <input
-                  className="form-control"
-                  type="number"
-                  min={1} max={20}
-                  value={form.rightBays}
-                  onChange={(e) => set('rightBays', e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                />
-              </label>
-            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              จำนวนแถว
+              <input
+                className="form-control"
+                type="number"
+                min={1} max={50}
+                value={form.rightRows}
+                onChange={(e) => set('rightRows', e.target.value)}
+                style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+              />
+            </label>
           )}
         </div>
       </div>
+
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 14, maxWidth: 220 }}>
+        ความจุต่อแถว (pallet)
+        <input
+          className="form-control"
+          type="number"
+          min={1} max={99}
+          value={form.capacity}
+          onChange={(e) => set('capacity', e.target.value)}
+          style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+        />
+        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
+      </label>
 
       {/* Preview */}
       <div style={{
@@ -601,20 +504,20 @@ function AddSectionForm({ onAdd }) {
         <span style={{ fontWeight: 700, color: '#2d9348' }}>ตัวอย่างรหัส Location:</span>
         {form.zoneCode.trim() && totalSides > 0 ? (
           <span style={{ fontFamily: 'monospace', color: '#1e293b', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
-            {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01-01-01
+            {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01
           </span>
         ) : (
           <span style={{ color: '#94a3b8' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
         )}
         <span style={{ color: '#64748b' }}>
-          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{totalSides > 0 ? total : 0}</strong> location
+          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{totalSides > 0 ? total : 0}</strong> แถว
           {totalSides > 0 && total > 0 && (
             <span style={{ color: '#94a3b8', marginLeft: 6 }}>
               (
-                {form.sideLeft ? `L: ${leftRows}×${leftLevels}×${leftBays}` : ''}
+                {form.sideLeft ? `L: ${leftRows}` : ''}
                 {form.sideLeft && form.sideRight ? ' / ' : ''}
-                {form.sideRight ? `R: ${rightRows}×${rightLevels}×${rightBays}` : ''}
-              )
+                {form.sideRight ? `R: ${rightRows}` : ''}
+              ) · {total * capacity} pallet รวม
             </span>
           )}
         </span>
@@ -626,7 +529,7 @@ function AddSectionForm({ onAdd }) {
         disabled={saving || totalSides === 0}
         style={{ width: '100%' }}
       >
-        {saving ? 'กำลังสร้าง...' : `สร้างห้อง (${totalSides > 0 ? total : 0} location)`}
+        {saving ? 'กำลังสร้าง...' : `สร้างห้อง (${totalSides > 0 ? total : 0} แถว)`}
       </button>
     </form>
   );
@@ -669,22 +572,24 @@ export function WarehouseLocationSetupPage() {
     return result;
   }
 
-  const totalLocations = sections.reduce((s, z) => s + z.total, 0);
+  const totalRows = sections.reduce((s, z) => s + z.total, 0);
+  const totalCapacity = sections.reduce((s, z) => s + z.totalCapacity, 0);
 
   return (
     <section className={getPageShellClassName()}>
       <PageHeader
         title="ตั้งค่า Location คลังสินค้า"
-        description="กำหนดห้อง ฝั่ง แถว ชั้น และตอน — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว}-{ชั้น}-{ตอน} เช่น H1-L-01-03-01"
+        description="กำหนดห้อง ฝั่ง และแถว — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว} เช่น H1-L-01 (1 แถวบรรจุได้หลาย pallet ตามความจุที่ตั้งไว้)"
       />
 
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         {[
           { label: 'ห้องทั้งหมด', value: sections.length, color: '#2563eb' },
-          { label: 'Location ทั้งหมด', value: totalLocations, color: '#2d9348' },
-          { label: 'มีสินค้า', value: sections.reduce((s, z) => s + z.used, 0), color: '#f0a500' },
-          { label: 'ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: '#94a3b8' },
+          { label: 'แถวทั้งหมด', value: totalRows, color: '#2d9348' },
+          { label: 'ความจุรวม (pallet)', value: totalCapacity, color: '#0e7a3a' },
+          { label: 'Pallet ที่ใช้', value: sections.reduce((s, z) => s + z.used, 0), color: '#f0a500' },
+          { label: 'Pallet ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: '#94a3b8' },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
