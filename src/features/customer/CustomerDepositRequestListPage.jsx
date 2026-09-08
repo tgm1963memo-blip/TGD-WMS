@@ -1,18 +1,19 @@
 import { useTableSort } from '../../hooks/useTableSort.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { listCustomerDepositRequests, cancelCustomerDepositRequest, recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
+import { listCustomerDepositRequests, listDepositLineDetailsForDocs, cancelCustomerDepositRequest, recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { getDepositRecallEligibility } from '../../utils/customerRequestCancelUtils.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 
 export function CustomerDepositRequestListPage() {
   const t = useTranslation();
@@ -26,7 +27,13 @@ export function CustomerDepositRequestListPage() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [selectedRequestIds, setSelectedRequestIds] = useState(() => new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const isMountedRef = useRef(true);
   const { sortedData, requestSort, getSortIndicator } = useTableSort(state.rows);
+
+  useEffect(() => () => { isMountedRef.current = false; }, []);
 
   useEffect(() => {
     let active = true;
@@ -67,7 +74,7 @@ export function CustomerDepositRequestListPage() {
     };
   }, [customerId, profileLoading, isRequestProxy]);
 
-  const columnCount = isRequestProxy ? 9 : 8;
+  const columnCount = (isRequestProxy ? 9 : 8) + 1;
   const q = searchText.trim().toLowerCase();
   const filteredData = sortedData.filter((row) => {
     if (q) {
@@ -84,8 +91,91 @@ export function CustomerDepositRequestListPage() {
     if (filterDateTo && date > filterDateTo) return false;
     return true;
   });
+  const selectedRequestRows = filteredData.filter((r) => selectedRequestIds.has(r.id));
 
   const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
+
+  function toggleRequestSelected(id) {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllRequests(candidateRows) {
+    setSelectedRequestIds((prev) => {
+      const selectableIds = candidateRows.map((r) => r.id);
+      const allSelected = selectableIds.length > 0 && selectableIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(selectableIds);
+    });
+  }
+
+  // Exports whichever requests are currently checked, or every row the
+  // active filters currently show when nothing's checked -- mirrors
+  // CustomerDepositNotificationsSection's bulk export. Not restricted to any
+  // status, since a customer may want line-item detail for a request
+  // regardless of what stage it's at. Lines for every requested document are
+  // fetched in one .in() query (listDepositLineDetailsForDocs) instead of one
+  // round-trip per document -- a per-document fetch loop stalled the browser
+  // once a filtered list ran into the hundreds (confirmed via load test on
+  // the equivalent admin export).
+  async function handleExportExcel(rowsToExport) {
+    if (!rowsToExport.length) return;
+    setExporting(true);
+    setExportError('');
+    const linesResult = await listDepositLineDetailsForDocs(rowsToExport.map((r) => r.id));
+    if (!isMountedRef.current) return;
+    if (linesResult.error) {
+      setExportError(linesResult.error.message ?? 'โหลดรายการไม่สำเร็จ');
+      setExporting(false);
+      return;
+    }
+    const linesByRequestId = new Map();
+    (linesResult.data ?? []).forEach((line) => {
+      const key = line.deposit_request_id;
+      if (!linesByRequestId.has(key)) linesByRequestId.set(key, []);
+      linesByRequestId.get(key).push(line);
+    });
+
+    const exportRows = rowsToExport.flatMap((request) => {
+      const lines = linesByRequestId.get(request.id) ?? [];
+      const requestFields = {
+        เลขที่คำขอ: request.request_no ?? '',
+        ลูกค้า: request.customer?.customer_name || request.customer?.name || customerNames[request.customer_id] || request.customer_id || '',
+        สถานะ: getDepositStatusLabel(request.status, t),
+        วันที่แจ้งฝาก: formatDocumentDate(request.expected_arrival_date, { dateOnly: true }),
+        ผู้ติดต่อ: request.contact_name ?? '',
+        เบอร์โทร: request.contact_phone ?? '',
+        หมายเหตุคำขอ: request.note ?? '',
+      };
+      if (lines.length === 0) {
+        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่แจ้ง: '', น้ำหนักที่แจ้ง: '', จำนวนกล่องจริง: '', น้ำหนักจริง: '', อุณหภูมิ: '', หมายเหตุรายการ: '' }];
+      }
+      return lines.map((line) => ({
+        ...requestFields,
+        รหัสสินค้า: line.customer_product_code ?? '',
+        ชื่อสินค้า: line.product_name ?? '',
+        Lot: line.lot_no ?? '',
+        รหัสติดตาม: line.tracking_code ?? '',
+        จำนวนกล่องที่แจ้ง: line.expected_boxes ?? '',
+        น้ำหนักที่แจ้ง: line.expected_weight ?? '',
+        จำนวนกล่องจริง: line.actual_boxes ?? '',
+        น้ำหนักจริง: line.actual_weight ?? '',
+        อุณหภูมิ: line.temperature_type ?? '',
+        หมายเหตุรายการ: line.note ?? '',
+      }));
+    });
+
+    downloadExcelRows(
+      exportRows,
+      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งฝาก', 'ผู้ติดต่อ', 'เบอร์โทร', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่แจ้ง', 'น้ำหนักที่แจ้ง', 'จำนวนกล่องจริง', 'น้ำหนักจริง', 'อุณหภูมิ', 'หมายเหตุรายการ'],
+      `deposit-requests-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'รายการแจ้งฝาก',
+      [16, 28, 16, 14, 16, 14, 20, 14, 30, 20, 14, 12, 12, 12, 12, 12, 20],
+    );
+    setExporting(false);
+  }
 
   async function handleDelete(requestId) {
     setDeleting(true);
@@ -142,6 +232,10 @@ export function CustomerDepositRequestListPage() {
         <div className="banner banner-danger" role="alert">{state.error.message ?? t('customer_portal_load_error')}</div>
       ) : null}
 
+      {exportError ? (
+        <div className="banner banner-danger" role="alert">{exportError}</div>
+      ) : null}
+
       <div className="table-card">
         <div className="table-card-header">
           <h3>{t('customer_deposit_list_title')}</h3>
@@ -177,12 +271,33 @@ export function CustomerDepositRequestListPage() {
               ล้างตัวกรอง
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            data-testid="customer-deposit-export-excel"
+            disabled={exporting || filteredData.length === 0}
+            onClick={() => handleExportExcel(selectedRequestRows.length > 0 ? selectedRequestRows : filteredData)}
+            title="ดาวน์โหลดรายละเอียดสินค้าแต่ละรายการของเอกสารที่เลือก (หรือทุกใบที่กรองอยู่ถ้าไม่ได้เลือก) เป็น Excel"
+          >
+            {exporting ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด Excel'}
+          </button>
         </div>
+        {selectedRequestIds.size > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--tgd-border)' }}>
+            <span>{selectedRequestIds.size} รายการที่เลือก</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedRequestIds(new Set())}>ยกเลิกการเลือก</button>
+          </div>
+        )}
         {(profileLoading || state.loading) ? <LoadingState message={t('customer_portal_loading')} /> : null}
         <div className="responsive-table">
           <table className="data-table sticky-header-table" data-testid="customer-deposit-list-table">
             <thead>
               <tr>
+                <th>
+                  <input type="checkbox" aria-label="เลือกทั้งหมด"
+                    checked={filteredData.length > 0 && filteredData.every((r) => selectedRequestIds.has(r.id))}
+                    onChange={() => toggleSelectAllRequests(filteredData)} />
+                </th>
                 <th onClick={() => requestSort('request_no')} style={{ cursor: 'pointer' }}>{t('customer_col_request_no')} {getSortIndicator('request_no')}</th>
                 {isRequestProxy ? <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>{t('customer_col_customer_name')} {getSortIndicator('customer_id')}</th> : null}
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
@@ -197,6 +312,11 @@ export function CustomerDepositRequestListPage() {
             <tbody>
               {filteredData.length ? filteredData.map((row) => (
                 <tr key={row.id}>
+                  <td>
+                    <input type="checkbox" aria-label={`เลือก ${row.request_no}`}
+                      checked={selectedRequestIds.has(row.id)}
+                      onChange={() => toggleRequestSelected(row.id)} />
+                  </td>
                   <td>{row.request_no}</td>
                   {isRequestProxy ? <td>{customerNames[row.customer_id] ?? row.customer_id ?? '-'}</td> : null}
                   <td>
