@@ -132,7 +132,7 @@ export function WarehouseLayoutWidget() {
         const cMap = {};
         for (const c of cRes.data ?? []) cMap[c.id] = c.customer_name ?? c.customer_code ?? c.id;
         const pMap = {};
-        for (const p of pRes.data ?? []) pMap[p.id] = p.product_name ?? p.sku ?? p.id;
+        for (const p of pRes.data ?? []) pMap[p.id] = p.name ?? p.sku ?? p.id;
         setCustomerMap(cMap);
         setProductMap(pMap);
       }
@@ -441,11 +441,23 @@ export function WarehouseLayoutWidget() {
                 {stockItems.map((item) => (
                   <div key={item.id} style={{ background: '#f8fafb', borderRadius: 12, padding: '14px 16px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 8 }}>
-                      {productMap[item.product_id] ?? item.product_name ?? item.product_id}
+                      {item.matched_product_name ?? productMap[item.product_id] ?? item.product_name ?? item.product_id}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
                       <div style={{ color: '#64748b' }}>ลูกค้า</div>
                       <div style={{ fontWeight: 600, color: '#334155' }}>{customerMap[item.customer_id] ?? item.customer_id}</div>
+                      {item.matched_product_code && (
+                        <>
+                          <div style={{ color: '#64748b' }}>รหัสสินค้า</div>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.matched_product_code}</div>
+                        </>
+                      )}
+                      {item.tracking_code && (
+                        <>
+                          <div style={{ color: '#64748b' }}>รหัสติดตาม</div>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.tracking_code}</div>
+                        </>
+                      )}
                       <div style={{ color: '#64748b' }}>จำนวนคงเหลือ</div>
                       <div style={{ fontWeight: 600, color: '#334155' }}>{item.qty_on_hand} {item.uom}</div>
                       <div style={{ color: '#64748b' }}>จำนวนพร้อมจ่าย</div>

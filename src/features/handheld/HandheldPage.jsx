@@ -689,7 +689,7 @@ function ReceivingWorkflow({ onBack, t }) {
     setStickerItem(confirmedItem);
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight('');
     setSelectedLocation(null); setMismatchWarned(false); setLocationOccupied(null); setLocationOccupiedWarned(false);
-    setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay('');
+    setLocZone(''); setLocSide(''); setLocRow('');
     setEditLotNo(''); setEditMfgDate(''); setEditExpDate('');
   }
 
@@ -858,7 +858,7 @@ function ReceivingWorkflow({ onBack, t }) {
       <TopBar
         title={selectedDoc.request_no}
         subtitle={`✅ ${doneCount}/${lines.length} รายการ`}
-        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
+        onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); }}
         badge={
           <div style={{
             background: 'rgba(255,255,255,0.2)', borderRadius: 20,
@@ -2009,7 +2009,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
     triggerSuccessFeedback();
     setLines((prev) => prev.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation?.id ?? null } : l));
     setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
-    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay('');
+    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow('');
   }
 
   const pendingCount = lines.filter((l) => !l.location_id).length;
@@ -2160,7 +2160,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
               const hasloc = !!l.location_id;
               return (
                 <div key={l.id}
-                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
+                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); }}
                   style={{
                     background: hasloc ? C.greenLight : C.surface,
                     border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
@@ -2171,6 +2171,13 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                       <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{l.product_name ?? l.customer_product_code}</div>
+                      {(l.customer_product_code || l.tracking_code) && (
+                        <div style={{ fontSize: 12, color: C.textSec, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          {l.customer_product_code && <>รหัสสินค้า: {l.customer_product_code}</>}
+                          {l.customer_product_code && l.tracking_code && ' · '}
+                          {l.tracking_code && <>รหัสติดตาม: {l.tracking_code}</>}
+                        </div>
+                      )}
                       <div style={{ fontSize: 12, color: C.textSec, overflowWrap: 'break-word', wordBreak: 'break-word' }}>LOT: {l.lot_no ?? '-'} · รับจริง: {l.actual_boxes ?? l.expected_boxes ?? '-'} กล่อง · วันที่รับ: {selectedDoc.expected_arrival_date ?? '-'}</div>
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
@@ -2216,6 +2223,13 @@ function LocationUpdateWorkflow({ onBack, t }) {
           </div>
           <div style={{ background: C.blueLight, borderRadius: 14, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
             <div style={{ fontWeight: 800, color: C.text }}>{selectedLine.product_name}</div>
+            {(selectedLine.customer_product_code || selectedLine.tracking_code) && (
+              <div style={{ color: C.textSec, marginTop: 2 }}>
+                {selectedLine.customer_product_code && <>รหัสสินค้า: {selectedLine.customer_product_code}</>}
+                {selectedLine.customer_product_code && selectedLine.tracking_code && ' · '}
+                {selectedLine.tracking_code && <>รหัสติดตาม: {selectedLine.tracking_code}</>}
+              </div>
+            )}
             <div style={{ color: C.textSec, marginTop: 2 }}>LOT: {selectedLine.lot_no ?? '-'} · รับจริง: {selectedLine.actual_boxes ?? selectedLine.expected_boxes ?? '-'} กล่อง {selectedLine.actual_weight != null ? `· ${selectedLine.actual_weight} กก.` : ''}</div>
             <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>ยอดรับไม่สามารถแก้ไขได้</div>
           </div>

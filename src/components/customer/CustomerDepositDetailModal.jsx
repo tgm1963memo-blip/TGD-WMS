@@ -1179,7 +1179,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       {/* Location update modal — only for RECEIVED_CONFIRMED lines */}
       <Modal
         isOpen={!!locationLine}
-        onClose={() => { setLocationLine(null); setLocZone(''); setLocSide(''); setLocRow(''); setLocLevel(''); setLocBay(''); }}
+        onClose={() => { setLocationLine(null); setLocZone(''); setLocSide(''); setLocRow(''); }}
         title="อัปเดต Location"
         size="sm"
         footer={(

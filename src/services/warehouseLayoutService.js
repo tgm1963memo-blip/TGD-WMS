@@ -152,6 +152,42 @@ export async function getSectionsWithOccupancy() {
   return { data: sections, error: null };
 }
 
+// Nothing links a tgd_stock_balances row back to the deposit line that put
+// it there (last_movement_id is frequently null, and even when set doesn't
+// always carry a source_line_id) -- so tracking_code/customer_product_code
+// aren't derivable from stock_balances alone. Best-effort recovers them by
+// matching the deposit line(s) at the same location for the same customer,
+// preferring the most recently received one. Not a guaranteed-correct join
+// when one customer has several lots sharing a row, but strictly additive
+// display info -- never affects quantities or availability.
+async function attachDepositLineDetails(locationId, items) {
+  const customerIds = [...new Set(items.map((i) => i.customer_id).filter(Boolean))];
+  if (!customerIds.length) return items;
+
+  const { data: depositLines } = await supabase
+    .from('tgd_customer_deposit_request_lines')
+    .select('product_name, customer_product_code, tracking_code, created_at, tgd_customer_deposit_requests(customer_id)')
+    .eq('location_id', locationId)
+    .order('created_at', { ascending: false });
+
+  const byCustomer = new Map();
+  for (const line of depositLines ?? []) {
+    const cid = line.tgd_customer_deposit_requests?.customer_id;
+    if (cid && !byCustomer.has(cid)) byCustomer.set(cid, line);
+  }
+
+  return items.map((item) => {
+    const match = byCustomer.get(item.customer_id);
+    if (!match) return item;
+    return {
+      ...item,
+      matched_product_name: match.product_name ?? null,
+      matched_product_code: match.customer_product_code ?? null,
+      tracking_code: match.tracking_code ?? null,
+    };
+  });
+}
+
 export async function getStockAtLocation(locationId) {
   if (!supabase || !locationId) return { data: [], error: null };
 
@@ -165,7 +201,9 @@ export async function getStockAtLocation(locationId) {
     console.error('Failed to fetch stock at location:', error);
   }
 
-  if (data && data.length > 0) return { data, error };
+  if (data && data.length > 0) {
+    return { data: await attachDepositLineDetails(locationId, data), error };
+  }
 
   // No tgd_stock_balances row here -- same gap getSectionsWithOccupancy
   // works around (see its comment): fall back to deposit lines actually
@@ -175,7 +213,7 @@ export async function getStockAtLocation(locationId) {
   // genuinely tracked there isn't ever listed twice.
   const { data: depositLines, error: depositError } = await supabase
     .from('tgd_customer_deposit_request_lines')
-    .select('id, actual_boxes, actual_weight, uom, lot_no, exp_date, product_id, product_name, customer_product_code, tgd_customer_deposit_requests(customer_id)')
+    .select('id, actual_boxes, actual_weight, uom, lot_no, exp_date, product_id, product_name, customer_product_code, tracking_code, tgd_customer_deposit_requests(customer_id)')
     .eq('location_id', locationId)
     .or('actual_boxes.gt.0,actual_weight.gt.0');
 
@@ -193,6 +231,9 @@ export async function getStockAtLocation(locationId) {
     customer_id: line.tgd_customer_deposit_requests?.customer_id ?? null,
     product_id: line.product_id ?? null,
     product_name: line.product_name ?? line.customer_product_code ?? null,
+    matched_product_name: line.product_name ?? null,
+    matched_product_code: line.customer_product_code ?? null,
+    tracking_code: line.tracking_code ?? null,
     lot_id: null,
     pallet_id: null,
     tgd_lots: (line.lot_no || line.exp_date) ? { lot_number: line.lot_no ?? null, expiry_date: line.exp_date ?? null } : null,
