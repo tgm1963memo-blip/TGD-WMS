@@ -1318,6 +1318,86 @@ table .status-badge,
   -webkit-overflow-scrolling: touch;
 }
 
+/* Scroll-shadow cue: hints that a horizontally-scrollable table has more
+   content off to a side, since iOS Safari hides scrollbars until touched
+   and a table with no visible cue otherwise looks like it simply ends —
+   this was reported as action buttons "disappearing" on mobile. The white
+   fade masks content approaching the edge; the faint dark sliver right at
+   the edge stays visible even over a light table background. Both layers
+   use background-attachment so they only show while there's actually more
+   to scroll to (they sit "inside" the scrolling content on that axis). */
+.responsive-table, .table-responsive {
+  background:
+    linear-gradient(to right, #fff 0%, rgba(255, 255, 255, 0) 100%) 0 0 / 24px 100% no-repeat,
+    linear-gradient(to left, #fff 0%, rgba(255, 255, 255, 0) 100%) 100% 0 / 24px 100% no-repeat,
+    linear-gradient(to right, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0) 100%) 0 0 / 8px 100% no-repeat local,
+    linear-gradient(to left, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0) 100%) 100% 0 / 8px 100% no-repeat local;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Reusable "list as cards" pattern for narrow screens -- an alternative to
+   a horizontally-scrolling table for rows whose action-button group has too
+   many buttons to fit without scrolling (the literal cause of buttons
+   "disappearing" on mobile: an inline flexWrap:'nowrap' on the actions cell
+   overrides the .action-row wrap rule below). A page opts in by wrapping
+   its existing <table> in .list-table-view and adding a parallel
+   .list-card-view rendering the same rows as .list-card entries; CSS alone
+   swaps which one is visible, matching how every other responsive
+   adjustment in this file works (no JS matchMedia/isMobile anywhere). */
+.list-card-view {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .list-table-view {
+    display: none;
+  }
+
+  .list-card-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
+.list-card {
+  background: #fff;
+  border: 1px solid var(--tgd-border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.list-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.list-card-fields {
+  color: #52525b;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 3px;
+}
+
+.list-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.list-card-actions .btn {
+  flex: 1 1 auto;
+  min-width: 90px;
+}
+
 .empty-state {
   background: var(--tgd-surface);
   border: 1px dashed var(--tgd-border);

@@ -217,7 +217,7 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     render(<MemoryRouter><InvoiceDraftListPage /></MemoryRouter>);
     expect(await screen.findByTestId('billing-invoice-drafts-page')).toBeInTheDocument();
     expect(await screen.findByTestId('billing-invoice-drafts-table')).toBeInTheDocument();
-    expect(screen.getByText('BID-20260608-0001')).toBeInTheDocument();
+    expect(screen.getAllByText('BID-20260608-0001').length).toBeGreaterThan(0);
   });
 
   it('renders invoice draft detail page with approve and cancel actions', async () => {

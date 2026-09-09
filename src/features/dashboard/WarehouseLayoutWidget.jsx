@@ -412,7 +412,7 @@ export function WarehouseLayoutWidget() {
           <div
             style={{
               background: '#fff', borderRadius: 16, padding: 28,
-              minWidth: 360, maxWidth: 520, width: '90vw',
+              maxWidth: 520, width: '90vw',
               boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
               maxHeight: '80vh', overflowY: 'auto',
             }}

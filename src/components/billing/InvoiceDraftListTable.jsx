@@ -46,83 +46,121 @@ export function InvoiceDraftListTable({
     );
   }
 
+  // Shared between the desktop table's action cell and the mobile card
+  // view's action row (see .list-card-view in styles.css) -- same buttons,
+  // same conditions, just a different container so it isn't duplicated.
+  function renderActions(draft) {
+    return (
+      <>
+        {onView ? (
+          <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
+        ) : (
+          <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
+        )}
+        {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={approvingId === draft.id}
+            data-testid={`invoice-draft-approve-button-${draft.id}`}
+            onClick={() => onApprove(draft)}
+          >
+            {approvingId === draft.id ? '⏳ Approving...' : 'Approve'}
+          </button>
+        ) : null}
+        {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
+          <button
+            className="btn btn-outline"
+            type="button"
+            disabled={recalculatingId === draft.id}
+            data-testid={`invoice-draft-recalculate-button-${draft.id}`}
+            onClick={() => onRecalculate(draft)}
+            title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
+          >
+            {recalculatingId === draft.id ? '⏳ กำลังคำนวณ...' : 'คำนวณอัตราใหม่'}
+          </button>
+        ) : null}
+        {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
+          <button
+            className="btn btn-danger"
+            type="button"
+            data-testid={`invoice-draft-delete-button-${draft.id}`}
+            onClick={() => onDelete(draft)}
+          >
+            Delete
+          </button>
+        ) : null}
+      </>
+    );
+  }
+
   return (
-    <div className="table-responsive responsive-table" data-testid="billing-invoice-drafts-table">
-      <table className="tgd-table">
-        <thead>
-          <tr>
-            <th>Draft No</th>
-            <th>Customer</th>
-            <th>Status</th>
-            <th>Period Start</th>
-            <th>Period End</th>
-            <th>Storage Type</th>
-            <th>Total Qty</th>
-            <th>Total Chargeable Weight</th>
-            <th>Total Amount</th>
-            <th>Created At</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((draft) => (
-            <tr key={draft.id}>
-              <td>{draft.draft_no}</td>
-              <td>{draft.customer_name ?? '-'}</td>
-              <td><InvoiceDraftStatusBadge status={draft.status} /></td>
-              <td>{draft.billing_period_start ?? '-'}</td>
-              <td>{draft.billing_period_end ?? '-'}</td>
-              <td>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</td>
-              <td>{formatNumber(draft.total_qty)}</td>
-              <td>{formatFixed2(draft.total_chargeable_weight)}</td>
-              <td>{formatFixed2(draft.total_amount)}</td>
-              <td>{formatDate(draft.created_at)}</td>
-              <td style={{ whiteSpace: 'nowrap' }}>
-                <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: 6 }}>
-                  {onView ? (
-                    <button className="btn btn-outline" type="button" onClick={() => onView(draft)}>View</button>
-                  ) : (
-                    <Link className="btn btn-outline" to={`/billing/invoice-drafts/${draft.id}`}>View</Link>
-                  )}
-                  {canWrite && onApprove && canApproveBillingInvoiceDraft(draft) ? (
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      disabled={approvingId === draft.id}
-                      data-testid={`invoice-draft-approve-button-${draft.id}`}
-                      onClick={() => onApprove(draft)}
-                    >
-                      {approvingId === draft.id ? '⏳ Approving...' : 'Approve'}
-                    </button>
-                  ) : null}
-                  {canWrite && onRecalculate && canRecalculateBillingInvoiceDraft(draft) ? (
-                    <button
-                      className="btn btn-outline"
-                      type="button"
-                      disabled={recalculatingId === draft.id}
-                      data-testid={`invoice-draft-recalculate-button-${draft.id}`}
-                      onClick={() => onRecalculate(draft)}
-                      title="ดึงอัตราค่าบริการที่ตั้งไว้มาคำนวณจำนวนเงินใหม่"
-                    >
-                      {recalculatingId === draft.id ? '⏳ กำลังคำนวณ...' : 'คำนวณอัตราใหม่'}
-                    </button>
-                  ) : null}
-                  {canWrite && onDelete && canDeleteBillingInvoiceDraft(draft) ? (
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      data-testid={`invoice-draft-delete-button-${draft.id}`}
-                      onClick={() => onDelete(draft)}
-                    >
-                      Delete
-                    </button>
-                  ) : null}
-                </div>
-              </td>
+    <>
+      <div className="table-responsive responsive-table list-table-view" data-testid="billing-invoice-drafts-table">
+        <table className="tgd-table">
+          <thead>
+            <tr>
+              <th>Draft No</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Period Start</th>
+              <th>Period End</th>
+              <th>Storage Type</th>
+              <th>Total Qty</th>
+              <th>Total Chargeable Weight</th>
+              <th>Total Amount</th>
+              <th>Created At</th>
+              <th>Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {data.map((draft) => (
+              <tr key={draft.id}>
+                <td>{draft.draft_no}</td>
+                <td>{draft.customer_name ?? '-'}</td>
+                <td><InvoiceDraftStatusBadge status={draft.status} /></td>
+                <td>{draft.billing_period_start ?? '-'}</td>
+                <td>{draft.billing_period_end ?? '-'}</td>
+                <td>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</td>
+                <td>{formatNumber(draft.total_qty)}</td>
+                <td>{formatFixed2(draft.total_chargeable_weight)}</td>
+                <td>{formatFixed2(draft.total_amount)}</td>
+                <td>{formatDate(draft.created_at)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <div className="action-row" style={{ flexWrap: 'wrap' }}>
+                    {renderActions(draft)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="list-card-view">
+        {data.map((draft) => (
+          <div className="list-card" key={draft.id}>
+            <div className="list-card-header">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700 }}>{draft.draft_no}</div>
+                <InvoiceDraftStatusBadge status={draft.status} />
+              </div>
+            </div>
+            <div className="list-card-fields">
+              <div>Customer: {draft.customer_name ?? '-'}</div>
+              <div>Period: {draft.billing_period_start ?? '-'} – {draft.billing_period_end ?? '-'}</div>
+              <div>Storage Type: {draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</div>
+              <div>Total Qty: {formatNumber(draft.total_qty)}</div>
+              <div>Total Chargeable Weight: {formatFixed2(draft.total_chargeable_weight)}</div>
+              <div>Total Amount: {formatFixed2(draft.total_amount)}</div>
+              <div>Created At: {formatDate(draft.created_at)}</div>
+            </div>
+            <div className="list-card-actions">
+              {renderActions(draft)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
