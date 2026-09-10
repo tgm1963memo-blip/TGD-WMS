@@ -154,7 +154,7 @@ export async function getPendingAdminDocuments() {
       .order('submitted_at', { ascending: true }),
     supabase
       .from('tgd_customer_withdrawal_requests')
-      .select('id, request_no, status, submitted_at, created_at, customer:tgd_customers(customer_name, customer_code)')
+      .select('id, withdrawal_no, status, submitted_at, created_at, customer:tgd_customers(customer_name, customer_code)')
       .eq('status', 'SUBMITTED_BY_CUSTOMER')
       .order('submitted_at', { ascending: true }),
   ]);
@@ -164,7 +164,11 @@ export async function getPendingAdminDocuments() {
   }
 
   const deposits = (depositResult.data ?? []).map((r) => ({ ...r, docType: 'deposit' }));
-  const withdrawals = (withdrawalResult.data ?? []).map((r) => ({ ...r, docType: 'withdrawal' }));
+  // tgd_customer_withdrawal_requests' document-number column is
+  // withdrawal_no, not request_no (that's the deposit table's column) --
+  // normalized to request_no here so callers can display doc.request_no
+  // uniformly regardless of docType.
+  const withdrawals = (withdrawalResult.data ?? []).map((r) => ({ ...r, docType: 'withdrawal', request_no: r.withdrawal_no }));
   const all = [...deposits, ...withdrawals].sort((a, b) => {
     const da = a.submitted_at ?? a.created_at ?? '';
     const db = b.submitted_at ?? b.created_at ?? '';
