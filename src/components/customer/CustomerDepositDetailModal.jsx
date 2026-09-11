@@ -482,7 +482,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       }
     }
 
-    const r = await updateDepositLineLocation(locationLine.id, locId, locationLine);
+    const r = await updateDepositLineLocation(locationLine.id, locId);
     setSubmitting(false);
     if (r.error) { setError(r.error.message ?? 'Save location failed'); return; }
     setLines((prev) => prev.map((l) =>

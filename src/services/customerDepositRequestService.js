@@ -713,17 +713,18 @@ export async function addAdminDepositRequestLine(depositRequestId, {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
-// Update only the location on a deposit line — preserves actual_boxes/actual_weight unchanged
-export async function updateDepositLineLocation(lineId, locationId, existingLine = {}) {
-  return recordDepositLineActualReceipt(lineId, {
-    actualBoxes: existingLine.actual_boxes,
-    actualWeight: existingLine.actual_weight,
-    note: existingLine.actual_note,
-    lotNo: existingLine.lot_no,
-    mfgDate: existingLine.mfg_date,
-    expDate: existingLine.exp_date,
-    locationId,
-  });
+// Update only the location on a deposit line. Deliberately omits every
+// other field (actualBoxes/actualWeight/lotNo/etc.) rather than echoing
+// back a caller-supplied "existing" snapshot of them -- the RPC falls back
+// to whatever is currently live on the row for any field left null
+// (coalesce(p_actual_boxes, v_line.actual_boxes), and so on), so leaving
+// them out is what actually preserves the current value. Passing a
+// snapshot instead risks silently reverting a concurrent edit (e.g. an
+// admin correcting actual_boxes) with stale data -- a real risk once a
+// caller might be replaying this from an offline queue queued hours
+// earlier (see src/features/handheld/HandheldPage.jsx's LocationUpdateWorkflow).
+export async function updateDepositLineLocation(lineId, locationId) {
+  return recordDepositLineActualReceipt(lineId, { locationId });
 }
 
 export async function enqueueCustomerDepositNotification(requestId, customerId, documentNo, submitterEmail = null) {

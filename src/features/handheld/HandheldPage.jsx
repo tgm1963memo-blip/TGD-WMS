@@ -9,6 +9,7 @@ import {
   listCustomerDepositRequests,
   listCustomerDepositRequestLines,
   listDepositLineSummariesForDocs,
+  listDepositLineDetailsForDocs,
   getDepositLineByTrackingCode,
   recordDepositLineActualReceipt,
   updateDepositLineLocation,
@@ -24,6 +25,9 @@ import {
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { enqueue as enqueueOfflineAction, listQueued as listQueuedOfflineActions, syncQueue as syncOfflineQueue } from '../../utils/offlineActionQueue.js';
+import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
@@ -1855,7 +1859,16 @@ function PickingWorkflow({ onBack, t }) {
 }
 
 // ── Location Update workflow ──────────────────────────────────
+// The only handheld workflow with offline support (see plan) -- cold
+// rooms typically have zero signal, and unlike Receiving/Picking this
+// workflow's write (location_id only) doesn't depend on a live balance
+// check, so a queued write replayed later is safe to retry rather than
+// likely to conflict.
+const LOCATION_UPDATE_SNAPSHOT_KEY = 'locationUpdate';
+const LOCATION_UPDATE_ACTION_TYPE = 'LOCATION_UPDATE';
+
 function LocationUpdateWorkflow({ onBack, t }) {
+  const isOnline = useOnlineStatus();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docLineSummary, setDocLineSummary] = useState({});
@@ -1878,7 +1891,21 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [trackingScanError, setTrackingScanError] = useState('');
   const [trackingScanning, setTrackingScanning] = useState(false);
   const [trackingInputValue, setTrackingInputValue] = useState('');
+  // Offline support: snapshotLinesByDocId is the full line list per document
+  // prefetched while online (see the effect below) -- the source of truth
+  // for lookups while isOnline is false, since the live per-doc/per-code
+  // reads used online can't reach the server at all in a cold room.
+  const [snapshotLinesByDocId, setSnapshotLinesByDocId] = useState({});
+  const [snapshotAt, setSnapshotAt] = useState(null);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
   const { trigger: cameraTracking, el: cameraTrackingEl } = useCameraScanner((v) => handleTrackingScan(v));
+
+  async function refreshPendingSyncCount() {
+    const queued = await listQueuedOfflineActions();
+    setPendingSyncCount(queued.filter((item) => item.status === 'pending' || item.status === 'failed').length);
+  }
 
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })), [locations]);
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
@@ -1898,13 +1925,37 @@ function LocationUpdateWorkflow({ onBack, t }) {
     }
   }, [locZone, locSide, locRow, parsedLocs, useHierarchy]);
 
+  // Online: (1) sync any offline queue left over from a previous session,
+  // (2) load the live doc/line/location lists, (3) prefetch every pending
+  // line across every doc into a snapshot (via the bulk
+  // listDepositLineDetailsForDocs already built for the Excel export
+  // feature, one query for every doc instead of one per doc) and persist it
+  // to IndexedDB -- this snapshot is what the workflow falls back to below
+  // once offline. Offline: skip straight to whatever was last persisted.
   useEffect(() => {
-    listCustomerDepositRequests({ statusIn: ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'] }).then((r) => {
+    let active = true;
+
+    async function syncThenLoadOnline() {
+      setSyncing(true);
+      const result = await syncOfflineQueue({
+        [LOCATION_UPDATE_ACTION_TYPE]: (payload) => updateDepositLineLocation(payload.lineId, payload.locationId),
+      });
+      if (!active) return;
+      setSyncing(false);
+      if (result.synced > 0 || result.failed > 0) {
+        setSyncMessage(`ซิงค์สำเร็จ ${result.synced} รายการ${result.failed > 0 ? ` · ล้มเหลว ${result.failed} รายการ` : ''}`);
+      }
+      await refreshPendingSyncCount();
+
+      const r = await listCustomerDepositRequests({ statusIn: ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'] });
+      if (!active) return;
       const loaded = r.data ?? [];
       setDocs(loaded);
       setDocsLoading(false);
       const ids = loaded.map((d) => d.id);
+
       listDepositLineSummariesForDocs(ids).then((sr) => {
+        if (!active) return;
         const map = {};
         (sr.data ?? []).forEach((l) => {
           if (!map[l.deposit_request_id]) map[l.deposit_request_id] = { lots: [], exps: [] };
@@ -1913,9 +1964,46 @@ function LocationUpdateWorkflow({ onBack, t }) {
         });
         setDocLineSummary(map);
       });
-    });
-    getActiveLocations().then(({ data }) => setLocations(data ?? []));
-  }, []);
+
+      const locResult = await getActiveLocations();
+      if (!active) return;
+      const loadedLocations = locResult.data ?? [];
+      setLocations(loadedLocations);
+
+      const lineDetailsResult = await listDepositLineDetailsForDocs(ids);
+      if (!active) return;
+      const linesByDoc = {};
+      (lineDetailsResult.data ?? []).forEach((line) => {
+        if (!linesByDoc[line.deposit_request_id]) linesByDoc[line.deposit_request_id] = [];
+        linesByDoc[line.deposit_request_id].push(line);
+      });
+      setSnapshotLinesByDocId(linesByDoc);
+      const savedAt = new Date().toISOString();
+      setSnapshotAt(savedAt);
+      saveSnapshot(LOCATION_UPDATE_SNAPSHOT_KEY, { docs: loaded, locations: loadedLocations, linesByDocId: linesByDoc, savedAt });
+    }
+
+    async function loadFromSnapshot() {
+      const record = await loadSnapshot(LOCATION_UPDATE_SNAPSHOT_KEY);
+      if (!active) return;
+      if (record?.data) {
+        setDocs(record.data.docs ?? []);
+        setLocations(record.data.locations ?? []);
+        setSnapshotLinesByDocId(record.data.linesByDocId ?? {});
+        setSnapshotAt(record.data.savedAt ?? null);
+      }
+      setDocsLoading(false);
+      await refreshPendingSyncCount();
+    }
+
+    if (isOnline) {
+      syncThenLoadOnline();
+    } else {
+      loadFromSnapshot();
+    }
+
+    return () => { active = false; };
+  }, [isOnline]);
 
   // preselectLineId: set when jumping in via a tracking-code scan (see
   // handleTrackingScan below) -- once this document's lines load, go
@@ -1923,6 +2011,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
   // worker to find it again in the list they just scanned past.
   function pickDoc(doc, preselectLineId = null) {
     setSelectedDoc(doc);
+
+    if (!isOnline) {
+      // No network round-trip available -- use whatever this doc's lines
+      // looked like at the last prefetch (see the sync/prefetch effect
+      // above), already merged with any not-yet-synced local changes by
+      // handleSaveLocation below.
+      const loadedLines = snapshotLinesByDocId[doc.id] ?? [];
+      setLines(loadedLines);
+      setLinesLoading(false);
+      setSelectedLine(preselectLineId ? (loadedLines.find((l) => l.id === preselectLineId) ?? null) : null);
+      return;
+    }
+
     setLinesLoading(true);
     listCustomerDepositRequestLines(doc.id).then((r) => {
       const loadedLines = r.data ?? [];
@@ -1948,6 +2049,23 @@ function LocationUpdateWorkflow({ onBack, t }) {
     const raw = (val || '').trim();
     if (!raw) return;
     setTrackingScanError('');
+
+    if (!isOnline) {
+      // Same lookup, against the prefetched snapshot instead of the server
+      // -- getDepositLineByTrackingCode itself can't be reached at all
+      // without a network round-trip.
+      const allSnapshotLines = Object.values(snapshotLinesByDocId).flat();
+      const line = allSnapshotLines.find((l) => l.tracking_code === raw);
+      const doc = line ? docs.find((d) => d.id === line.deposit_request_id) : null;
+      if (!line || !doc) {
+        setTrackingScanError(`ไม่พบรหัสติดตาม "${raw}" ในข้อมูลที่เตรียมไว้ล่วงหน้า`);
+        return;
+      }
+      setTrackingInputValue('');
+      pickDoc(doc, line.id);
+      return;
+    }
+
     setTrackingScanning(true);
     const result = await getDepositLineByTrackingCode(raw);
     setTrackingScanning(false);
@@ -1992,7 +2110,32 @@ function LocationUpdateWorkflow({ onBack, t }) {
   async function handleSaveLocation() {
     if (!selectedLine) return;
     setSaving(true); setSaveError('');
-    
+
+    if (!isOnline) {
+      // checkLocationHasInventory needs a live read -- skipped offline (a
+      // soft warning, not a hard lock, so nothing unsafe about proceeding
+      // without it). Queue the write instead of calling the RPC directly;
+      // it's replayed by the sync effect above once signal returns.
+      const locationId = selectedLocation?.id || null;
+      await enqueueOfflineAction(LOCATION_UPDATE_ACTION_TYPE, { lineId: selectedLine.id, locationId });
+      await refreshPendingSyncCount();
+
+      const nextLines = lines.map((l) => l.id === selectedLine.id ? { ...l, location_id: locationId } : l);
+      setLines(nextLines);
+      const nextSnapshot = { ...snapshotLinesByDocId, [selectedDoc.id]: nextLines };
+      setSnapshotLinesByDocId(nextSnapshot);
+      // Persist immediately so the optimistic change survives a reload
+      // while still offline (e.g. the tab getting suspended and reopened
+      // before signal returns).
+      saveSnapshot(LOCATION_UPDATE_SNAPSHOT_KEY, { docs, locations, linesByDocId: nextSnapshot, savedAt: snapshotAt });
+
+      setSaving(false);
+      triggerSuccessFeedback();
+      setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), pending: true }, ...prev]);
+      setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow('');
+      return;
+    }
+
     if (selectedLocation?.id) {
       const hasStock = await checkLocationHasInventory(selectedLocation.id);
       if (hasStock) {
@@ -2003,7 +2146,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       }
     }
 
-    const r = await updateDepositLineLocation(selectedLine.id, selectedLocation?.id || null, selectedLine);
+    const r = await updateDepositLineLocation(selectedLine.id, selectedLocation?.id || null);
     setSaving(false);
     if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
@@ -2014,11 +2157,34 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   const pendingCount = lines.filter((l) => !l.location_id).length;
 
+  // Shown right under the TopBar in both this workflow's screens -- status
+  // is the same regardless of whether a document is currently open.
+  function renderOfflineStatusBar() {
+    if (isOnline && pendingSyncCount === 0 && !syncMessage) return null;
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+        padding: '8px 14px', fontSize: 12, fontWeight: 700,
+        background: isOnline ? C.greenLight : '#fef3c7',
+        color: isOnline ? C.green : '#92400e',
+        borderBottom: `1px solid ${isOnline ? C.greenBorder : '#f59e0b'}`,
+      }}>
+        <span>
+          {isOnline ? (syncing ? '🔄 กำลังซิงค์...' : '🟢 ออนไลน์') : '🟡 ออฟไลน์ — ใช้ข้อมูลที่เตรียมไว้ล่วงหน้า'}
+          {!isOnline && snapshotAt && ` (เมื่อ ${new Date(snapshotAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })})`}
+        </span>
+        {pendingSyncCount > 0 && <span>· รอซิงค์ {pendingSyncCount} รายการ</span>}
+        {syncMessage && <span>· {syncMessage}</span>}
+      </div>
+    );
+  }
+
   if (!selectedDoc) {
     return (
       <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
+        {renderOfflineStatusBar()}
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
           {cameraTrackingEl}
           {/* Scan a box's tracking-code sticker, or type/paste it (e.g. from a hardware scanner gun) -- either jumps straight to its location editor, no need to find the right document first. */}
@@ -2136,6 +2302,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
         subtitle={`📍 รอระบุ Location ${pendingCount}/${lines.length} รายการ`}
         onBack={() => { setSelectedDoc(null); setLines([]); setSelectedLine(null); setUpdated([]); }}
       />
+      {renderOfflineStatusBar()}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 10px 280px', background: C.bg }}>
         {linesLoading ? (
@@ -2147,10 +2314,11 @@ function LocationUpdateWorkflow({ onBack, t }) {
                 <div style={{ color: C.green, fontSize: 13, fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>อัปเดตแล้ว ({updated.length})</div>
                 {updated.slice(0, 3).map((item, i) => (
                   <div key={i} style={{ background: C.greenLight, borderRadius: 14, padding: '10px 14px', marginBottom: 8, border: `1px solid ${C.greenBorder}`, fontSize: 13 }}>
-                    <span style={{ fontWeight: 800, color: C.green }}>✓ {item.line.product_name}</span>
+                    <span style={{ fontWeight: 800, color: C.green }}>{item.pending ? '⏳' : '✓'} {item.line.product_name}</span>
                     {' → '}
                     <span style={{ color: C.textSec }}>{item.location?.code ?? 'ไม่ระบุ'}</span>
                     <span style={{ color: C.muted, marginLeft: 8 }}>{item.at}</span>
+                    {item.pending && <span style={{ color: '#92400e', marginLeft: 8 }}>(รอซิงค์)</span>}
                   </div>
                 ))}
               </div>
