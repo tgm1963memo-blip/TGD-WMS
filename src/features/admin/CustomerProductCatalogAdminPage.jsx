@@ -38,6 +38,7 @@ const EMPTY_FORM = {
   allergenHas: false,
   allergen: '',
   productCategory: '',
+  defaultBoxesPerPallet: '',
   note: '',
   units: [],
   originalUnits: [],
@@ -301,6 +302,19 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
             </datalist>
           </label>
 
+          <label className="form-field" style={{ margin: '0 0 14px' }}>
+            <span>จำนวนต่อ pallet (ค่าเริ่มต้น)</span>
+            <input
+              className="form-control"
+              type="number"
+              min="1"
+              step="1"
+              onChange={(e) => onFieldChange('defaultBoxesPerPallet', e.target.value)}
+              value={form.defaultBoxesPerPallet}
+              placeholder="เช่น 20 — ใช้เสนอจำนวนตอนแบ่งจัดเก็บหลาย pallet (เว้นว่างได้)"
+            />
+          </label>
+
           <label className="form-field" style={{ margin: '0 0 20px' }}>
             <span>หมายเหตุ</span>
             <textarea className="form-control" onChange={(e) => onFieldChange('note', e.target.value)} rows={2} value={form.note} style={{ resize: 'vertical' }} />
@@ -390,6 +404,7 @@ export function CustomerProductCatalogAdminPage() {
       allergenHas: !!(row.allergen),
       allergen: row.allergen ?? '',
       productCategory: row.product_category ?? '',
+      defaultBoxesPerPallet: row.default_boxes_per_pallet != null ? String(row.default_boxes_per_pallet) : '',
       note: row.note ?? '',
       units: unitsFromCatalogRow(row),
       originalUnits: row.units ?? [],
@@ -422,6 +437,7 @@ export function CustomerProductCatalogAdminPage() {
       storageChargeBasis: form.storageChargeBasis,
       allergen: form.allergen,
       productCategory: form.productCategory,
+      defaultBoxesPerPallet: form.defaultBoxesPerPallet !== '' ? parseInt(form.defaultBoxesPerPallet, 10) : null,
       note: form.note,
       isActive: true,
     });

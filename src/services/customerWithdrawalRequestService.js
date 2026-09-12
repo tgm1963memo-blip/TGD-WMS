@@ -6,6 +6,7 @@ import {
   toNullableText,
 } from './customerPortalServiceUtils.js';
 import { getDepositInventoryLines } from './customerDepositRequestService.js';
+import { buildPalletCode } from '../utils/locationCodeUtils.js';
 
 const WITHDRAWAL_HEADER_SELECT = [
   'id',
@@ -485,6 +486,165 @@ export async function recordWithdrawalLinePick(lineId, pickedBoxes, pickedWeight
   });
 
   return { data, error };
+}
+
+// Every pallet a deposit line's stock currently sits on that still has
+// unpicked balance -- drives the handheld picking screen's "หยิบจาก pallet"
+// step (see PickingWorkflow in HandheldPage.jsx): auto-select when only one
+// comes back, otherwise let staff choose which pallet they're physically
+// taking boxes off of. remainingBoxes mirrors getPalletDetailsAtLocation's
+// same math (allocation boxes minus the sum of picks already recorded
+// against it) but scoped by deposit line instead of by location, since here
+// the caller already knows which line it's picking FROM and needs every
+// pallet that line is split across, not every pallet at one spot.
+export async function listPickablePalletsForDepositLine(depositLineId) {
+  if (!supabase || !depositLineId) return { data: [], error: null };
+
+  const { data: allocations, error } = await supabase
+    .from('tgd_customer_deposit_line_locations')
+    .select('id, location_id, pallet_no, boxes, weight, tgd_locations(location_code)')
+    .eq('line_id', depositLineId)
+    .order('pallet_no', { ascending: true });
+
+  if (error) return { data: [], error };
+
+  const allocationIds = (allocations ?? []).map((a) => a.id);
+  const pickedByAllocationId = new Map();
+  if (allocationIds.length > 0) {
+    const { data: picks } = await supabase
+      .from('tgd_customer_withdrawal_line_pallet_picks')
+      .select('deposit_line_location_id, boxes')
+      .in('deposit_line_location_id', allocationIds);
+    for (const p of (picks ?? [])) {
+      pickedByAllocationId.set(
+        p.deposit_line_location_id,
+        (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
+      );
+    }
+  }
+
+  const pallets = (allocations ?? [])
+    .map((a) => {
+      const picked = pickedByAllocationId.get(a.id) ?? 0;
+      const remainingBoxes = a.boxes != null ? Math.max(0, Number(a.boxes) - picked) : null;
+      return {
+        allocationId: a.id,
+        locationId: a.location_id,
+        locationCode: a.tgd_locations?.location_code ?? null,
+        palletNo: a.pallet_no,
+        boxes: a.boxes != null ? Number(a.boxes) : null,
+        weight: a.weight != null ? Number(a.weight) : null,
+        remainingBoxes,
+      };
+    })
+    .filter((p) => p.remainingBoxes == null || p.remainingBoxes > 0);
+
+  return { data: pallets, error: null };
+}
+
+// Saves one "หยิบจาก pallet" pick against a specific allocation -- one
+// pallet at a time, mirroring the deposit side's one-allocation-at-a-time
+// pattern (see addDepositLineLocationAllocation). The server
+// (tgd_record_withdrawal_line_pallet_pick) validates the picked quantity
+// against that pallet's own remaining balance and recomputes the
+// withdrawal line's aggregate picked_boxes/picked_weight as the SUM of all
+// its pick rows -- unlike the older recordWithdrawalLinePick RPC above,
+// which overwrites picked_boxes/picked_weight absolutely each call (fine
+// there since a line only ever gets one such call; not fine here, where a
+// line can now be picked from several pallets across several calls).
+export async function recordWithdrawalLinePalletPick({ withdrawalLineId, depositLineLocationId, boxes = null, weight = null }) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_record_withdrawal_line_pallet_pick', {
+    p_withdrawal_line_id: withdrawalLineId,
+    p_deposit_line_location_id: depositLineLocationId,
+    p_boxes: toNullableNumber(boxes),
+    p_weight: toNullableNumber(weight),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Undoes one pallet pick (e.g. staff picked from the wrong pallet) --
+// returns the quantity to that pallet's remaining balance and recomputes
+// the withdrawal line's aggregate picked_boxes/picked_weight from whatever
+// pick rows are left.
+export async function removeWithdrawalLinePalletPick(pickId) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_remove_withdrawal_line_pallet_pick', {
+    p_pick_id: pickId,
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Bulk variant of listWithdrawalLinePalletPicks for a multi-document Excel
+// export (see the "ดาวน์โหลด Excel" button on
+// CustomerWithdrawalRequestListPage.jsx) -- one .in() query for every
+// requested line instead of one round-trip per line, same reasoning as
+// listWithdrawalLineDetailsForDocs. Returns a Map of withdrawal_line_id ->
+// every pallet code that line was picked from, joined ready for a single
+// spreadsheet cell.
+export async function listWithdrawalLinePalletCodesForLines(withdrawalLineIds = []) {
+  const result = new Map();
+  if (!supabase || !withdrawalLineIds.length) return result;
+
+  const chunkSize = 150;
+  const chunks = [];
+  for (let i = 0; i < withdrawalLineIds.length; i += chunkSize) chunks.push(withdrawalLineIds.slice(i, i + chunkSize));
+
+  const chunkResults = await Promise.all(chunks.map((chunk) => supabase
+    .from('tgd_customer_withdrawal_line_pallet_picks')
+    .select(`
+      withdrawal_line_id,
+      tgd_customer_deposit_line_locations(pallet_no, tgd_locations(location_code))
+    `)
+    .in('withdrawal_line_id', chunk)));
+
+  for (const { data, error } of chunkResults) {
+    if (error) continue; // best-effort -- affected lines just show no storage location
+    for (const p of (data ?? [])) {
+      const alloc = p.tgd_customer_deposit_line_locations;
+      const locationCode = alloc?.tgd_locations?.location_code;
+      if (!locationCode) continue;
+      const bucket = result.get(p.withdrawal_line_id) ?? [];
+      bucket.push(buildPalletCode(locationCode, alloc.pallet_no));
+      result.set(p.withdrawal_line_id, bucket);
+    }
+  }
+  return result;
+}
+
+// Every pallet pick recorded against one withdrawal line so far -- shown
+// under the picking screen's confirm panel once a line is already marked
+// done, each with its own "ยกเลิกการหยิบ" button (see
+// removeWithdrawalLinePalletPick above).
+export async function listWithdrawalLinePalletPicks(withdrawalLineId) {
+  if (!supabase || !withdrawalLineId) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('tgd_customer_withdrawal_line_pallet_picks')
+    .select(`
+      id, boxes, weight, picked_at,
+      tgd_customer_deposit_line_locations(pallet_no, tgd_locations(location_code))
+    `)
+    .eq('withdrawal_line_id', withdrawalLineId)
+    .order('picked_at', { ascending: true });
+
+  if (error) return { data: [], error };
+
+  return {
+    data: (data ?? []).map((p) => ({
+      id: p.id,
+      boxes: p.boxes != null ? Number(p.boxes) : null,
+      weight: p.weight != null ? Number(p.weight) : null,
+      pickedAt: p.picked_at,
+      palletNo: p.tgd_customer_deposit_line_locations?.pallet_no ?? null,
+      locationCode: p.tgd_customer_deposit_line_locations?.tgd_locations?.location_code ?? null,
+    })),
+    error: null,
+  };
 }
 
 export async function updateWithdrawalLineAdminNote(lineId, adminNote) {

@@ -19,6 +19,7 @@ const CATALOG_SELECT = [
   'pack_weight_kg',
   'allergen',
   'product_category',
+  'default_boxes_per_pallet',
   'is_active',
   'note',
   'created_at',
@@ -76,6 +77,9 @@ export async function upsertCustomerProduct(payload = {}) {
     p_note: toNullableText(payload.note),
     p_is_active: typeof payload.isActive === 'boolean' ? payload.isActive : true,
     p_product_category: toNullableText(payload.productCategory),
+    p_default_boxes_per_pallet: payload.defaultBoxesPerPallet != null && payload.defaultBoxesPerPallet !== ''
+      ? Number(payload.defaultBoxesPerPallet)
+      : null,
   });
 
   if (error) return { data: null, error };

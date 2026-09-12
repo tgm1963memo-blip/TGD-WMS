@@ -8,6 +8,7 @@ import {
   deleteSection,
   updateSectionSize,
 } from '../../services/warehouseLayoutService.js';
+import { parseLocationCode } from '../../utils/locationCodeUtils.js';
 
 const DEFAULT_CAPACITY = 14;
 
@@ -17,8 +18,10 @@ const EMPTY_FORM = {
   temperatureType: 'FROZEN',
   sideLeft: true,
   leftRows: 5,
+  leftStaging: false,
   sideRight: true,
   rightRows: 5,
+  rightStaging: false,
   capacity: DEFAULT_CAPACITY,
 };
 
@@ -53,13 +56,26 @@ function sectionCapacity(section) {
   return section.locations?.find((l) => l.capacity)?.capacity ?? DEFAULT_CAPACITY;
 }
 
+// A "รอจ่าย" staging row is just row 0 for that side (see
+// locationCodeUtils.js's formatRowLabel) -- not reflected in
+// gridInfo.sidesConfig.rows (a MAX of real row numbers, unaffected by 0),
+// so its presence has to be detected directly off this zone's own locations.
+function sideHasStagingRow(section, side) {
+  return (section.locations ?? []).some((l) => {
+    const parsed = parseLocationCode(l.location_code);
+    return parsed?.side === side && parsed.row === 0;
+  });
+}
+
 function initEditForm(section) {
   const sc = section.gridInfo?.sidesConfig ?? {};
   return {
     leftActive: (sc.L?.rows ?? 0) > 0,
     leftRows: sc.L?.rows || 5,
+    leftStaging: sideHasStagingRow(section, 'L'),
     rightActive: (sc.R?.rows ?? 0) > 0,
     rightRows: sc.R?.rows || 5,
+    rightStaging: sideHasStagingRow(section, 'R'),
     capacity: sectionCapacity(section),
   };
 }
@@ -113,8 +129,8 @@ function SectionCard({ section, onDelete, onEdit }) {
     const result = await onEdit(section.id, {
       zoneCode: section.code,
       zoneName: section.name,
-      leftConfig: { active: editForm.leftActive, rows: lRows },
-      rightConfig: { active: editForm.rightActive, rows: rRows },
+      leftConfig: { active: editForm.leftActive, rows: lRows, staging: editForm.leftStaging },
+      rightConfig: { active: editForm.rightActive, rows: rRows, staging: editForm.rightStaging },
       capacity,
     });
     setEditSaving(false);
@@ -230,17 +246,28 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งซ้าย (L)
               </label>
               {editForm.leftActive && (
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                  จำนวนแถว
-                  <input
-                    className="form-control"
-                    type="number"
-                    min={1} max={50}
-                    value={editForm.leftRows}
-                    onChange={(e) => setEf('leftRows', e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                  />
-                </label>
+                <>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนแถว
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={50}
+                      value={editForm.leftRows}
+                      onChange={(e) => setEf('leftRows', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#b9660a', marginTop: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.leftStaging}
+                      onChange={(e) => setEf('leftStaging', e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: '#b9660a' }}
+                    />
+                    มีแถวรอจ่าย (ก่อนแถว 1)
+                  </label>
+                </>
               )}
             </div>
             {/* Right side */}
@@ -255,17 +282,28 @@ function SectionCard({ section, onDelete, onEdit }) {
                 ฝั่งขวา (R)
               </label>
               {editForm.rightActive && (
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                  จำนวนแถว
-                  <input
-                    className="form-control"
-                    type="number"
-                    min={1} max={50}
-                    value={editForm.rightRows}
-                    onChange={(e) => setEf('rightRows', e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-                  />
-                </label>
+                <>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    จำนวนแถว
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1} max={50}
+                      value={editForm.rightRows}
+                      onChange={(e) => setEf('rightRows', e.target.value)}
+                      style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#b9660a', marginTop: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.rightStaging}
+                      onChange={(e) => setEf('rightStaging', e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: '#b9660a' }}
+                    />
+                    มีแถวรอจ่าย (ก่อนแถว 1)
+                  </label>
+                </>
               )}
             </div>
           </div>
@@ -337,8 +375,8 @@ function AddSectionForm({ onAdd }) {
     setSaving(true);
     setError('');
 
-    const leftConfig = { active: form.sideLeft, rows: leftRows };
-    const rightConfig = { active: form.sideRight, rows: rightRows };
+    const leftConfig = { active: form.sideLeft, rows: leftRows, staging: form.leftStaging };
+    const rightConfig = { active: form.sideRight, rows: rightRows, staging: form.rightStaging };
 
     const result = await onAdd({
       zoneCode: form.zoneCode.trim().toUpperCase(),
@@ -441,17 +479,28 @@ function AddSectionForm({ onAdd }) {
             ฝั่งซ้าย (L)
           </label>
           {form.sideLeft && (
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-              จำนวนแถว
-              <input
-                className="form-control"
-                type="number"
-                min={1} max={50}
-                value={form.leftRows}
-                onChange={(e) => set('leftRows', e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-              />
-            </label>
+            <>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนแถว
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={50}
+                  value={form.leftRows}
+                  onChange={(e) => set('leftRows', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#b9660a', marginTop: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={form.leftStaging}
+                  onChange={(e) => set('leftStaging', e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#b9660a' }}
+                />
+                มีแถวรอจ่าย (ก่อนแถว 1)
+              </label>
+            </>
           )}
         </div>
 
@@ -467,17 +516,28 @@ function AddSectionForm({ onAdd }) {
             ฝั่งขวา (R)
           </label>
           {form.sideRight && (
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-              จำนวนแถว
-              <input
-                className="form-control"
-                type="number"
-                min={1} max={50}
-                value={form.rightRows}
-                onChange={(e) => set('rightRows', e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-              />
-            </label>
+            <>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                จำนวนแถว
+                <input
+                  className="form-control"
+                  type="number"
+                  min={1} max={50}
+                  value={form.rightRows}
+                  onChange={(e) => set('rightRows', e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#b9660a', marginTop: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={form.rightStaging}
+                  onChange={(e) => set('rightStaging', e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#b9660a' }}
+                />
+                มีแถวรอจ่าย (ก่อนแถว 1)
+              </label>
+            </>
           )}
         </div>
       </div>

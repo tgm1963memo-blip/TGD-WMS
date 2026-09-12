@@ -12,8 +12,11 @@ import {
   listDepositLineDetailsForDocs,
   getDepositLineByTrackingCode,
   recordDepositLineActualReceipt,
-  updateDepositLineLocation,
   upsertCustomerDepositRequestLine,
+  getDepositLineAvailableBalance,
+  listDepositLineLocationAllocations,
+  addDepositLineLocationAllocation,
+  removeDepositLineLocationAllocation,
 } from '../../services/customerDepositRequestService.js';
 import {
   listCustomerWithdrawalRequests,
@@ -21,10 +24,14 @@ import {
   listWithdrawalLineSummariesForDocs,
   reviewCustomerWithdrawalRequest,
   recordWithdrawalLinePick,
+  listPickablePalletsForDepositLine,
+  recordWithdrawalLinePalletPick,
+  removeWithdrawalLinePalletPick,
+  listWithdrawalLinePalletPicks,
 } from '../../services/customerWithdrawalRequestService.js';
-import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { getActiveLocations, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
-import { parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, listQueued as listQueuedOfflineActions, syncQueue as syncOfflineQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -509,6 +516,15 @@ function ReceivingWorkflow({ onBack, t }) {
   const [extraSaving, setExtraSaving] = useState(false);
   const [extraError, setExtraError] = useState('');
 
+  // Pallet number for the single allocation this confirm step creates (see
+  // handleConfirm below) -- covers the common case (whatever's received
+  // fits on one pallet) in one step; splitting the same line across MORE
+  // pallets afterward is done from "ระบุ Location" (LocationUpdateWorkflow),
+  // which also lists/cancels every allocation a line already has.
+  const [palletCapacity, setPalletCapacity] = useState(0);
+  const [palletTaken, setPalletTaken] = useState(new Set());
+  const [allocPalletNo, setAllocPalletNo] = useState('');
+
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })), [locations]);
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
 
@@ -547,6 +563,21 @@ function ReceivingWorkflow({ onBack, t }) {
     checkLocationHasInventory(selectedLocation.id).then((occupied) => {
       setLocationOccupied(occupied);
       setLocationCheckLoading(false);
+    });
+  }, [selectedLocation?.id]);
+
+  // Loads which pallet numbers are free at the chosen row and defaults to
+  // the first free one -- same pattern as LocationUpdateWorkflow.
+  useEffect(() => {
+    if (!selectedLocation?.id) { setPalletCapacity(0); setPalletTaken(new Set()); setAllocPalletNo(''); return; }
+    getPalletDetailsAtLocation(selectedLocation.id).then(({ data }) => {
+      const capacity = data?.capacity ?? 0;
+      const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+      setPalletCapacity(capacity);
+      setPalletTaken(taken);
+      let firstFree = '';
+      for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
+      setAllocPalletNo(firstFree);
     });
   }, [selectedLocation?.id]);
 
@@ -661,8 +692,21 @@ function ReceivingWorkflow({ onBack, t }) {
       expDate: editExpDate || null,
       locationId: selectedLocation?.id || null,
     });
+    if (r.error) { setSaving(false); setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+
+    // Covers the common case (whatever's received fits on one pallet) in
+    // this same confirm step -- creates the pallet allocation alongside the
+    // receipt itself. If staff leaves the pallet unpicked (deferring
+    // placement), the line stays "received, not yet stored" and gets placed
+    // later from "ระบุ Location" instead, same as before this feature.
+    if (selectedLocation?.id && allocPalletNo) {
+      const allocResult = await addDepositLineLocationAllocation({
+        lineId: matchedLine.id, locationId: selectedLocation.id, palletNo: Number(allocPalletNo),
+        boxes: boxes !== '' ? Number(boxes) : null, weight: weight !== '' ? Number(weight) : null,
+      });
+      if (allocResult.error) { setSaving(false); setSaveError(allocResult.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+    }
     setSaving(false);
-    if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
 
     triggerSuccessFeedback();
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === matchedLine.customer_product_code);
@@ -670,7 +714,7 @@ function ReceivingWorkflow({ onBack, t }) {
     if (boxes) quantityParts.push(`${Number(boxes).toLocaleString()} กล่อง`);
     if (weight) quantityParts.push(`${formatFixed2(weight)} กก.`);
     const confirmedItem = {
-      line: matchedLine, boxes, weight, location: selectedLocation,
+      line: matchedLine, boxes, weight, location: selectedLocation, palletNo: selectedLocation?.id ? allocPalletNo : null,
       lotNo: editLotNo, mfgDate: editMfgDate, expDate: editExpDate,
       confirmedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
@@ -948,7 +992,7 @@ function ReceivingWorkflow({ onBack, t }) {
               <div><strong>จำนวน:</strong> {stickerItem.quantityLabel || '-'}</div>
               <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {stickerItem.allergenLabel}</div>
               <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'}</div>
-              <div><strong>Location:</strong> {stickerItem.location?.code ?? 'ยังไม่ได้เลือก'}</div>
+              <div><strong>Location:</strong> {stickerItem.location?.code ? (stickerItem.palletNo ? buildPalletCode(stickerItem.location.code, stickerItem.palletNo) : stickerItem.location.code) : 'ยังไม่ได้เลือก'}</div>
               <div><strong>Tracking Code:</strong> {stickerItem.trackingCode}</div>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
@@ -964,7 +1008,9 @@ function ReceivingWorkflow({ onBack, t }) {
                     quantityLabel: stickerItem.quantityLabel,
                     allergenLabel: stickerItem.allergenLabel,
                     mfgDate: stickerItem.mfgDate,
-                    locationCode: stickerItem.location?.code,
+                    locationCode: stickerItem.location?.code
+                      ? (stickerItem.palletNo ? buildPalletCode(stickerItem.location.code, stickerItem.palletNo) : stickerItem.location.code)
+                      : undefined,
                     trackingCode: stickerItem.trackingCode,
                   });
                 }}
@@ -1071,7 +1117,7 @@ function ReceivingWorkflow({ onBack, t }) {
                 </div>
 
                 {useHierarchy ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
                       <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); }}
@@ -1095,7 +1141,18 @@ function ReceivingWorkflow({ onBack, t }) {
                         disabled={!locSide}
                         style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
-                        {availableRows.map((r) => <option key={r} value={r}>{r}</option>)}
+                        {availableRows.map((r) => <option key={r} value={r}>{formatRowLabel(r)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>เลข Pallet</div>
+                      <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
+                        disabled={!selectedLocation || palletCapacity === 0}
+                        style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                        {selectedLocation && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                        {Array.from({ length: palletCapacity }, (_, i) => i + 1)
+                          .filter((n) => !palletTaken.has(n))
+                          .map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1302,6 +1359,17 @@ function PickingWorkflow({ onBack, t }) {
   const [completeError, setCompleteError] = useState('');
   const [docCompleted, setDocCompleted] = useState(false);
 
+  // Pallet-aware picking: a withdrawal line can now be sourced from several
+  // pallets (see tgd_customer_deposit_line_locations), so before confirming
+  // a pick this resolves which pallet(s) still hold that line's stock --
+  // auto-selected when there's only one, otherwise staff must choose which
+  // one they're physically taking boxes off of.
+  const [pickablePallets, setPickablePallets] = useState([]);
+  const [pickablePalletsLoading, setPickablePalletsLoading] = useState(false);
+  const [selectedPalletId, setSelectedPalletId] = useState('');
+  const [existingPicks, setExistingPicks] = useState([]);
+  const [existingPicksLoading, setExistingPicksLoading] = useState(false);
+
   const { trigger: cameraItem, el: cameraItemEl } = useCameraScanner((v) => handleScan(v));
   const { trigger: cameraDoc, el: cameraDocEl } = useCameraScanner((v) => handleDocScan(v));
   const [docScanError, setDocScanError] = useState('');
@@ -1356,20 +1424,78 @@ function PickingWorkflow({ onBack, t }) {
     });
   }
 
+  // A withdrawal line doesn't carry its source deposit line's id directly
+  // unless it was created via the matched-batch flow (source_customer_
+  // deposit_request_line_id) -- older/looser-matched lines only carry the
+  // tracking code, which getDepositLineByTrackingCode resolves the same way
+  // the deposit/withdrawal balance matching elsewhere in this file already
+  // does.
+  async function resolveDepositLineIdForPick(line) {
+    if (line.source_customer_deposit_request_line_id) return line.source_customer_deposit_request_line_id;
+    if (line.tracking_code) {
+      const { data } = await getDepositLineByTrackingCode(line.tracking_code);
+      return data?.id ?? null;
+    }
+    return null;
+  }
+
+  async function loadPickablePalletsForLine(line) {
+    setPickablePalletsLoading(true);
+    const depositLineId = await resolveDepositLineIdForPick(line);
+    const { data } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+    setPickablePallets(data ?? []);
+    setSelectedPalletId(data?.length === 1 ? data[0].allocationId : '');
+    setPickablePalletsLoading(false);
+  }
+
+  async function loadExistingPicksForLine(line) {
+    setExistingPicksLoading(true);
+    const { data } = await listWithdrawalLinePalletPicks(line.id);
+    setExistingPicks(data ?? []);
+    setExistingPicksLoading(false);
+  }
+
+  // Refreshes both the pallet options (a pick or an undo can free/take a
+  // slot) and the picked-so-far list, then re-syncs this line's own
+  // aggregate picked_boxes/picked_weight/picked_at from the server -- the
+  // RPCs recompute those as the SUM of all pick rows, so the client's copy
+  // has to be re-fetched rather than adjusted locally.
+  async function refreshPickState(line) {
+    await Promise.all([loadPickablePalletsForLine(line), loadExistingPicksForLine(line)]);
+    const { data } = await listCustomerWithdrawalRequestLines(selectedDoc.id);
+    const refreshed = (data ?? []).find((l) => l.id === line.id);
+    if (refreshed) {
+      setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, ...refreshed } : l));
+      setMatchedLine((prev) => (prev?.id === line.id ? { ...prev, ...refreshed } : prev));
+    }
+  }
+
+  useEffect(() => {
+    if (!matchedLine) { setPickablePallets([]); setSelectedPalletId(''); setExistingPicks([]); return; }
+    loadPickablePalletsForLine(matchedLine);
+    if (isDone(matchedLine)) loadExistingPicksForLine(matchedLine);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedLine?.id]);
+
   function isDone(line) {
     return confirmed.some((c) => c.line.id === line.id) || line.picked_at != null;
   }
 
   // Shared by the manual "ยืนยันหยิบสินค้า" button and the tracking-code
-  // auto-confirm path below, so both persist a pick the same way.
-  async function confirmPick(line, boxesVal, weightVal) {
+  // auto-confirm path below, so both persist a pick the same way. `pallet`
+  // (an entry from listPickablePalletsForDepositLine) records exactly which
+  // pallet the boxes came off of via the new pallet-pick RPC; omitted, this
+  // falls back to the old whole-line RPC (recordWithdrawalLinePick) --
+  // still correct for a line the pallet-split model has no allocation data
+  // for at all (e.g. never received through the pallet-aware flow).
+  async function confirmPick(line, boxesVal, weightVal, pallet = null) {
     setSaving(true);
     setSaveError('');
-    const result = await recordWithdrawalLinePick(
-      line.id,
-      boxesVal ? Number(boxesVal) : null,
-      weightVal ? Number(weightVal) : null,
-    );
+    const numBoxes = boxesVal ? Number(boxesVal) : null;
+    const numWeight = weightVal ? Number(weightVal) : null;
+    const result = pallet
+      ? await recordWithdrawalLinePalletPick({ withdrawalLineId: line.id, depositLineLocationId: pallet.allocationId, boxes: numBoxes, weight: numWeight })
+      : await recordWithdrawalLinePick(line.id, numBoxes, numWeight);
     setSaving(false);
     if (result.error) {
       setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ');
@@ -1387,9 +1513,17 @@ function PickingWorkflow({ onBack, t }) {
         : [confirmedItem, ...prev]
     );
     setLines((prev) => prev.map((l) => l.id === line.id
-      ? { ...l, picked_boxes: boxesVal ? Number(boxesVal) : null, picked_weight: weightVal ? Number(weightVal) : null, picked_at: new Date().toISOString() }
+      ? { ...l, picked_boxes: numBoxes, picked_weight: numWeight, picked_at: new Date().toISOString() }
       : l));
     return true;
+  }
+
+  async function handleUndoPick(pickId) {
+    setSaveError('');
+    const result = await removeWithdrawalLinePalletPick(pickId);
+    if (result.error) { setSaveError(result.error.message ?? 'ยกเลิกไม่สำเร็จ'); return; }
+    triggerSuccessFeedback();
+    if (matchedLine) await refreshPickState(matchedLine);
   }
 
   async function handleScan(val) {
@@ -1441,15 +1575,26 @@ function PickingWorkflow({ onBack, t }) {
     if (!match) { setMatchedLine(null); return; }
 
     // A tracking-code scan uniquely identifies the physical box in hand, so
-    // mark it prepared immediately instead of requiring a separate button tap.
+    // mark it prepared immediately instead of requiring a separate button tap
+    // -- but only when its deposit line resolves to 0 or 1 pallet still
+    // holding stock. 0 means no pallet-split data exists for it at all (old/
+    // unmigrated line -- fall back to the whole-line pick, same as always).
+    // More than 1 means the same tracking code is spread across several
+    // pallets, and nothing about a bare tracking-code scan says which one
+    // this particular box came from -- auto-confirming would guess, so fall
+    // through to the manual panel below and let staff pick the right one.
     if (matchedByTrackingCode && match.picked_at == null) {
-      const ok = await confirmPick(match, match.requested_boxes, match.requested_weight);
-      if (ok) {
-        setScanValue('');
-        setAutoConfirmedItem(match);
-        setTimeout(() => setAutoConfirmedItem((current) => (current === match ? null : current)), 2500);
+      const depositLineId = await resolveDepositLineIdForPick(match);
+      const { data: pallets } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+      if (pallets.length <= 1) {
+        const ok = await confirmPick(match, match.requested_boxes, match.requested_weight, pallets[0] ?? null);
+        if (ok) {
+          setScanValue('');
+          setAutoConfirmedItem(match);
+          setTimeout(() => setAutoConfirmedItem((current) => (current === match ? null : current)), 2500);
+        }
+        return;
       }
-      return;
     }
 
     triggerSuccessFeedback();
@@ -1467,7 +1612,12 @@ function PickingWorkflow({ onBack, t }) {
       setEditWarned(true);
       return;
     }
-    const ok = await confirmPick(matchedLine, boxes, weight);
+    if (pickablePallets.length > 1 && !selectedPalletId) {
+      setSaveError('กรุณาเลือก pallet ที่จะหยิบ');
+      return;
+    }
+    const pallet = pickablePallets.length === 1 ? pickablePallets[0] : pickablePallets.find((p) => p.allocationId === selectedPalletId) ?? null;
+    const ok = await confirmPick(matchedLine, boxes, weight, pallet);
     if (!ok) return;
     setScanValue(''); setMatchedLine(null); setBoxes(''); setWeight(''); setEditWarned(false);
   }
@@ -1775,6 +1925,51 @@ function PickingWorkflow({ onBack, t }) {
               </div>
             )}
 
+            {pickablePalletsLoading ? (
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>กำลังตรวจสอบ pallet...</div>
+            ) : pickablePallets.length === 1 ? (
+              <div style={{ background: C.blueLight, borderRadius: 12, padding: '8px 12px', marginBottom: 12, fontSize: 13, fontWeight: 700, color: C.text }}>
+                📍 หยิบจาก {buildPalletCode(pickablePallets[0].locationCode ?? '?', pickablePallets[0].palletNo)}
+                <span style={{ color: C.muted, fontWeight: 500, marginLeft: 6 }}>(เหลือ {pickablePallets[0].remainingBoxes ?? '-'} กล่อง)</span>
+              </div>
+            ) : pickablePallets.length > 1 ? (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 6 }}>📍 เลือก pallet ที่จะหยิบ</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {pickablePallets.map((p) => {
+                    const isSel = selectedPalletId === p.allocationId;
+                    return (
+                      <button key={p.allocationId} type="button" onClick={() => setSelectedPalletId(p.allocationId)}
+                        style={{ padding: '8px 12px', borderRadius: 12, border: `2px solid ${isSel ? C.pickAccent : C.border}`, background: isSel ? '#eef2ff' : C.surfaceSolid, color: isSel ? C.pickAccent : C.textSec, fontSize: 13, fontWeight: isSel ? 800 : 600, cursor: 'pointer' }}>
+                        {buildPalletCode(p.locationCode ?? '?', p.palletNo)}
+                        <span style={{ marginLeft: 6, opacity: 0.7 }}>เหลือ {p.remainingBoxes ?? '-'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {existingPicksLoading ? (
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>กำลังโหลดประวัติการหยิบ...</div>
+            ) : existingPicks.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 6 }}>หยิบไปแล้ว</div>
+                {existingPicks.map((p) => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 12px', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+                      {p.locationCode ? buildPalletCode(p.locationCode, p.palletNo) : 'ไม่ระบุ pallet'}
+                      <span style={{ color: C.muted, fontWeight: 500, marginLeft: 6 }}>{p.boxes ?? '-'} กล่อง{p.weight != null ? ` · ${p.weight} กก.` : ''}</span>
+                    </span>
+                    <button type="button" onClick={() => handleUndoPick(p.id)}
+                      style={{ background: C.redLight, color: C.red, border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      ยกเลิกการหยิบ
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <QtyRow
               boxes={boxes} setBoxes={setBoxes} weight={weight} setWeight={setWeight}
               weightPerBox={matchedLine.resolved_weight_per_box}
@@ -1782,13 +1977,13 @@ function PickingWorkflow({ onBack, t }) {
               onToggleWeightLock={() => setWeightAutoLocked((prev) => !prev)}
             />
 
-            <button type="button" disabled={(!boxes && !weight) || saving} onClick={handleConfirm}
+            <button type="button" disabled={(!boxes && !weight) || saving || (pickablePallets.length > 1 && !selectedPalletId)} onClick={handleConfirm}
               style={{
                 width: '100%', padding: '20px', borderRadius: 20,
-                background: (!boxes && !weight) ? C.border : (editWarned ? '#f59e0b' : C.pickAccent),
-                color: (!boxes && !weight) ? C.muted : '#ffffff',
-                border: 'none', fontSize: 18, fontWeight: 900, cursor: (!boxes && !weight) ? 'not-allowed' : 'pointer',
-                boxShadow: (!boxes && !weight) ? 'none' : (editWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(9,17,28,0.3)'),
+                background: ((!boxes && !weight) || (pickablePallets.length > 1 && !selectedPalletId)) ? C.border : (editWarned ? '#f59e0b' : C.pickAccent),
+                color: ((!boxes && !weight) || (pickablePallets.length > 1 && !selectedPalletId)) ? C.muted : '#ffffff',
+                border: 'none', fontSize: 18, fontWeight: 900, cursor: ((!boxes && !weight) || (pickablePallets.length > 1 && !selectedPalletId)) ? 'not-allowed' : 'pointer',
+                boxShadow: ((!boxes && !weight) || (pickablePallets.length > 1 && !selectedPalletId)) ? 'none' : (editWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(9,17,28,0.3)'),
                 transition: 'all 0.2s',
               }}>
               {saving ? '⏳ กำลังบันทึก...' : (editWarned ? '⚠ ยืนยันการแก้ไข' : '✓ ยืนยันหยิบสินค้า')}
@@ -1902,6 +2097,20 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [syncMessage, setSyncMessage] = useState('');
   const { trigger: cameraTracking, el: cameraTrackingEl } = useCameraScanner((v) => handleTrackingScan(v));
 
+  // Pallet-split "add storage" state -- one line can now be spread across
+  // several pallets/locations (see tgd_customer_deposit_line_locations), so
+  // this screen adds ONE allocation at a time (matching the real physical
+  // action of moving one pallet to one spot) and lists everything already
+  // saved for the selected line, each with its own "ยกเลิก" button.
+  const [allocations, setAllocations] = useState([]);
+  const [allocLoading, setAllocLoading] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState({ availableBoxes: 0, availableWeight: 0 });
+  const [palletCapacity, setPalletCapacity] = useState(0);
+  const [palletTaken, setPalletTaken] = useState(new Set());
+  const [allocPalletNo, setAllocPalletNo] = useState('');
+  const [allocBoxes, setAllocBoxes] = useState('');
+  const [allocWeight, setAllocWeight] = useState('');
+
   async function refreshPendingSyncCount() {
     const queued = await listQueuedOfflineActions();
     setPendingSyncCount(queued.filter((item) => item.status === 'pending' || item.status === 'failed').length);
@@ -1925,6 +2134,70 @@ function LocationUpdateWorkflow({ onBack, t }) {
     }
   }, [locZone, locSide, locRow, parsedLocs, useHierarchy]);
 
+  async function refreshLineAllocations(line) {
+    if (!line || !isOnline) return;
+    setAllocLoading(true);
+    const [{ data: allocs }, { data: balance }] = await Promise.all([
+      listDepositLineLocationAllocations(line.id),
+      getDepositLineAvailableBalance(line.id, selectedDoc?.customer_id),
+    ]);
+    setAllocations(allocs ?? []);
+    setAvailableBalance(balance ?? { availableBoxes: 0, availableWeight: 0 });
+    setAllocLoading(false);
+  }
+
+  // Loads this line's already-saved pallet allocations (and its withdrawal-
+  // available balance) the moment it's opened -- offline, this whole panel
+  // is skipped entirely (see the render below), since neither read can
+  // reach the server without a connection.
+  useEffect(() => {
+    if (!selectedLine) { setAllocations([]); setAvailableBalance({ availableBoxes: 0, availableWeight: 0 }); return; }
+    refreshLineAllocations(selectedLine);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLine?.id, isOnline]);
+
+  const allocatedBoxes = allocations.reduce((sum, a) => sum + (Number(a.boxes) || 0), 0);
+  const allocatedWeight = allocations.reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
+  const unallocatedBoxes = selectedLine ? Math.max(0, Number(selectedLine.actual_boxes ?? 0) - allocatedBoxes) : 0;
+  const unallocatedWeight = selectedLine ? Math.max(0, Number(selectedLine.actual_weight ?? 0) - allocatedWeight) : 0;
+
+  async function refreshPalletSlots(locationId) {
+    const { data } = await getPalletDetailsAtLocation(locationId);
+    const capacity = data?.capacity ?? 0;
+    const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+    setPalletCapacity(capacity);
+    setPalletTaken(taken);
+    let firstFree = '';
+    for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
+    setAllocPalletNo(firstFree);
+  }
+
+  // Loads which pallet numbers are free at the chosen row, and defaults the
+  // pallet dropdown to the first free one (staff can still change it) --
+  // skipped offline, same reasoning as refreshLineAllocations above; the
+  // pallet number picked offline is only checked for a real collision once
+  // the queued action syncs back online (see syncThenLoadOnline below).
+  useEffect(() => {
+    if (!selectedLocation?.id || !isOnline) { setPalletCapacity(0); setPalletTaken(new Set()); setAllocPalletNo(''); return; }
+    refreshPalletSlots(selectedLocation.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocation?.id, isOnline]);
+
+  // Suggests how many boxes go on THIS pallet: the product's own default (if
+  // the customer catalog has one set), capped at whatever's actually left
+  // unallocated -- re-suggested every time the allocation list changes (i.e.
+  // right after adding one), so the next pallet's suggestion reflects what
+  // actually remains. Staff can always type over it.
+  useEffect(() => {
+    if (!selectedLine) { setAllocBoxes(''); setAllocWeight(''); return; }
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === selectedLine.customer_product_code);
+    const defaultPerPallet = catalogMatch?.default_boxes_per_pallet;
+    const suggested = defaultPerPallet ? Math.min(defaultPerPallet, unallocatedBoxes) : unallocatedBoxes;
+    setAllocBoxes(suggested > 0 ? String(suggested) : '');
+    setAllocWeight('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLine?.id, allocatedBoxes]);
+
   // Online: (1) sync any offline queue left over from a previous session,
   // (2) load the live doc/line/location lists, (3) prefetch every pending
   // line across every doc into a snapshot (via the bulk
@@ -1938,7 +2211,10 @@ function LocationUpdateWorkflow({ onBack, t }) {
     async function syncThenLoadOnline() {
       setSyncing(true);
       const result = await syncOfflineQueue({
-        [LOCATION_UPDATE_ACTION_TYPE]: (payload) => updateDepositLineLocation(payload.lineId, payload.locationId),
+        [LOCATION_UPDATE_ACTION_TYPE]: (payload) => addDepositLineLocationAllocation({
+          lineId: payload.lineId, locationId: payload.locationId, palletNo: payload.palletNo,
+          boxes: payload.boxes, weight: payload.weight,
+        }),
       });
       if (!active) return;
       setSyncing(false);
@@ -2107,52 +2383,86 @@ function LocationUpdateWorkflow({ onBack, t }) {
     });
   }
 
-  async function handleSaveLocation() {
-    if (!selectedLine) return;
+  // Saves ONE pallet allocation for the selected line -- repeatable (staff
+  // picks the next pallet/location and adds again) until unallocatedBoxes
+  // reaches 0, matching the real physical action of placing one pallet at a
+  // time. A row holding several pallets from several lines is now the
+  // expected, normal case, so (unlike the old handleSaveLocation this
+  // replaces) there's no "this location already has stock, are you sure?"
+  // confirmation any more -- the server itself is what actually enforces
+  // "this pallet slot is free" (via the (location_id, pallet_no) unique
+  // constraint) and "this row isn't over its capacity".
+  async function handleAddAllocation() {
+    if (!selectedLine || !selectedLocation?.id || !allocPalletNo) return;
     setSaving(true); setSaveError('');
+    const palletNo = Number(allocPalletNo);
+    const boxesVal = allocBoxes !== '' ? Number(allocBoxes) : null;
+    const weightVal = allocWeight !== '' ? Number(allocWeight) : null;
 
     if (!isOnline) {
-      // checkLocationHasInventory needs a live read -- skipped offline (a
-      // soft warning, not a hard lock, so nothing unsafe about proceeding
-      // without it). Queue the write instead of calling the RPC directly;
-      // it's replayed by the sync effect above once signal returns.
-      const locationId = selectedLocation?.id || null;
-      await enqueueOfflineAction(LOCATION_UPDATE_ACTION_TYPE, { lineId: selectedLine.id, locationId });
+      // Queued and replayed by the sync effect above once signal returns --
+      // a real collision (someone else took this exact pallet slot while
+      // offline) surfaces there as a visible sync failure, not silently.
+      await enqueueOfflineAction(LOCATION_UPDATE_ACTION_TYPE, {
+        lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal,
+      });
       await refreshPendingSyncCount();
 
-      const nextLines = lines.map((l) => l.id === selectedLine.id ? { ...l, location_id: locationId } : l);
+      const nextLines = lines.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation.id } : l);
       setLines(nextLines);
       const nextSnapshot = { ...snapshotLinesByDocId, [selectedDoc.id]: nextLines };
       setSnapshotLinesByDocId(nextSnapshot);
-      // Persist immediately so the optimistic change survives a reload
-      // while still offline (e.g. the tab getting suspended and reopened
-      // before signal returns).
       saveSnapshot(LOCATION_UPDATE_SNAPSHOT_KEY, { docs, locations, linesByDocId: nextSnapshot, savedAt: snapshotAt });
 
+      setAllocations((prev) => [...prev, {
+        id: `pending-${Date.now()}`, locationId: selectedLocation.id, locationCode: selectedLocation.code,
+        palletNo, boxes: boxesVal, weight: weightVal, pending: true,
+      }]);
       setSaving(false);
       triggerSuccessFeedback();
-      setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), pending: true }, ...prev]);
-      setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow('');
+      setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, palletNo, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), pending: true }, ...prev]);
       return;
     }
 
-    if (selectedLocation?.id) {
-      const hasStock = await checkLocationHasInventory(selectedLocation.id);
-      if (hasStock) {
-        if (!window.confirm('Location นี้มีสินค้าอยู่แล้ว คุณแน่ใจหรือไม่ที่จะจัดเก็บสินค้าเพิ่มที่นี่?')) {
-          setSaving(false);
-          return;
-        }
-      }
-    }
-
-    const r = await updateDepositLineLocation(selectedLine.id, selectedLocation?.id || null);
+    const result = await addDepositLineLocationAllocation({ lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal });
     setSaving(false);
-    if (r.error) { setSaveError(r.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+    if (result.error) { setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
-    setLines((prev) => prev.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation?.id ?? null } : l));
-    setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
-    setSelectedLine(null); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow('');
+
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === selectedLine.customer_product_code);
+    const quantityParts = [];
+    if (boxesVal) quantityParts.push(`${Number(boxesVal).toLocaleString()} กล่อง`);
+    if (weightVal) quantityParts.push(`${formatFixed2(weightVal)} กก.`);
+    printSticker({
+      depositDate: selectedDoc?.expected_arrival_date,
+      customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
+      productCode: selectedLine.customer_product_code ?? selectedLine.internal_product_code ?? '',
+      productName: selectedLine.product_name,
+      lotNo: selectedLine.lot_no,
+      storageLabel: getTemperatureTypeShortLabel(selectedLine.temperature_type),
+      quantityLabel: quantityParts.join(' / ') || '-',
+      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      mfgDate: selectedLine.mfg_date,
+      locationCode: buildPalletCode(selectedLocation.code, palletNo),
+      trackingCode: selectedLine.tracking_code ?? '-',
+    });
+
+    setLines((prev) => prev.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation.id } : l));
+    setUpdated((prev) => [{ line: selectedLine, location: selectedLocation, palletNo, at: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
+    await refreshLineAllocations(selectedLine);
+    await refreshPalletSlots(selectedLocation.id);
+  }
+
+  // Cancels one saved allocation (e.g. wrong pallet picked) -- the server
+  // blocks this and returns a clear error if a withdrawal has already
+  // picked from it (see tgd_remove_deposit_line_location_allocation).
+  async function handleRemoveAllocation(allocationId) {
+    setSaveError('');
+    const result = await removeDepositLineLocationAllocation(allocationId);
+    if (result.error) { setSaveError(result.error.message ?? 'ยกเลิกไม่สำเร็จ'); return; }
+    triggerSuccessFeedback();
+    await refreshLineAllocations(selectedLine);
+    if (selectedLocation?.id) await refreshPalletSlots(selectedLocation.id);
   }
 
   const pendingCount = lines.filter((l) => !l.location_id).length;
@@ -2316,7 +2626,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   <div key={i} style={{ background: C.greenLight, borderRadius: 14, padding: '10px 14px', marginBottom: 8, border: `1px solid ${C.greenBorder}`, fontSize: 13 }}>
                     <span style={{ fontWeight: 800, color: C.green }}>{item.pending ? '⏳' : '✓'} {item.line.product_name}</span>
                     {' → '}
-                    <span style={{ color: C.textSec }}>{item.location?.code ?? 'ไม่ระบุ'}</span>
+                    <span style={{ color: C.textSec }}>{item.location?.code ? (item.palletNo ? buildPalletCode(item.location.code, item.palletNo) : item.location.code) : 'ไม่ระบุ'}</span>
                     <span style={{ color: C.muted, marginLeft: 8 }}>{item.at}</span>
                     {item.pending && <span style={{ color: '#92400e', marginLeft: 8 }}>(รอซิงค์)</span>}
                   </div>
@@ -2402,6 +2712,41 @@ function LocationUpdateWorkflow({ onBack, t }) {
             <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>ยอดรับไม่สามารถแก้ไขได้</div>
           </div>
 
+          {isOnline && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+              {[
+                { label: 'จัดเก็บแล้ว', value: `${allocatedBoxes.toLocaleString()} กล่อง`, color: C.green },
+                { label: 'เหลือที่ยังไม่ระบุ', value: `${unallocatedBoxes.toLocaleString()} กล่อง`, color: unallocatedBoxes > 0 ? C.amber : C.muted },
+                { label: 'คงเหลือพร้อมเบิก', value: `${(availableBalance.availableBoxes ?? 0).toLocaleString()} กล่อง`, color: '#6366f1' },
+              ].map((stat) => (
+                <div key={stat.label} style={{ background: C.blueLight, borderRadius: 12, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: stat.color }}>{allocLoading ? '…' : stat.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {allocations.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: C.textSec, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>จัดเก็บไปแล้ว ({allocations.length} pallet)</div>
+              {allocations.map((a) => (
+                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 12px', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+                    {a.pending && '⏳ '}{buildPalletCode(a.locationCode ?? '?', a.palletNo)}
+                    <span style={{ color: C.muted, fontWeight: 500, marginLeft: 6 }}>{a.boxes ?? '-'} กล่อง{a.weight != null ? ` · ${a.weight} กก.` : ''}</span>
+                  </span>
+                  {!a.pending && (
+                    <button type="button" onClick={() => handleRemoveAllocation(a.id)}
+                      style={{ background: C.redLight, color: C.red, border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      ยกเลิก
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {saveError && (
             <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>{saveError}</div>
           )}
@@ -2409,11 +2754,11 @@ function LocationUpdateWorkflow({ onBack, t }) {
           {locations.length > 0 ? (
             <div style={{ marginBottom: 16 }}>
               <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                📍 เลือก Location จัดเก็บ
+                📍 เพิ่มการจัดเก็บ (เลือกที่ว่างทีละ pallet)
                 {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>✓ {selectedLocation.code}</span>}
               </div>
               {useHierarchy ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>ห้อง / โซน</div>
                     <select value={locZone} onChange={(e) => { setLocZone(e.target.value); setLocSide(''); setLocRow(''); }}
@@ -2437,7 +2782,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       disabled={!locSide}
                       style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
-                      {availableRows.map((r) => <option key={r} value={r}>{r}</option>)}
+                      {availableRows.map((r) => <option key={r} value={r}>{formatRowLabel(r)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>เลข Pallet</div>
+                    <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
+                      disabled={!selectedLocation || (isOnline && palletCapacity === 0)}
+                      style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
+                      {isOnline && selectedLocation && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                      {!isOnline && selectedLocation && <option value="1">1 (ยืนยันตอนซิงค์)</option>}
+                      {isOnline && Array.from({ length: palletCapacity }, (_, i) => i + 1)
+                        .filter((n) => !palletTaken.has(n))
+                        .map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                 </div>
@@ -2459,16 +2816,31 @@ function LocationUpdateWorkflow({ onBack, t }) {
             <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>ไม่มีข้อมูล Location ในระบบ</div>
           )}
 
-          <button type="button" disabled={!selectedLocation || saving} onClick={handleSaveLocation}
+          {selectedLocation && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <label style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>
+                จำนวน (กล่อง)
+                <input type="number" value={allocBoxes} onChange={(e) => setAllocBoxes(e.target.value)}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 4, background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 44 }} />
+              </label>
+              <label style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>
+                น้ำหนัก (กก.)
+                <input type="number" value={allocWeight} onChange={(e) => setAllocWeight(e.target.value)}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 4, background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: C.text, outline: 'none', minHeight: 44 }} />
+              </label>
+            </div>
+          )}
+
+          <button type="button" disabled={!selectedLocation || !allocPalletNo || saving} onClick={handleAddAllocation}
             style={{
               width: '100%', padding: '20px', borderRadius: 20,
-              background: !selectedLocation ? C.border : '#6366f1',
-              color: !selectedLocation ? C.muted : '#fff',
-              border: 'none', fontSize: 18, fontWeight: 900, cursor: !selectedLocation ? 'not-allowed' : 'pointer',
-              boxShadow: !selectedLocation ? 'none' : '0 8px 24px rgba(99,102,241,0.4)',
+              background: (!selectedLocation || !allocPalletNo) ? C.border : '#6366f1',
+              color: (!selectedLocation || !allocPalletNo) ? C.muted : '#fff',
+              border: 'none', fontSize: 18, fontWeight: 900, cursor: (!selectedLocation || !allocPalletNo) ? 'not-allowed' : 'pointer',
+              boxShadow: (!selectedLocation || !allocPalletNo) ? 'none' : '0 8px 24px rgba(99,102,241,0.4)',
               transition: 'all 0.2s',
             }}>
-            {saving ? '⏳ กำลังบันทึก...' : '📍 บันทึก Location'}
+            {saving ? '⏳ กำลังบันทึก...' : '📍 เพิ่มการจัดเก็บ + พิมพ์สติกเกอร์'}
           </button>
         </div>
       )}

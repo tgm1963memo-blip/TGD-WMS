@@ -6,6 +6,7 @@ import {
   toNullableText,
 } from './customerPortalServiceUtils.js';
 import { chunkArray } from './billingRateEngineService.js';
+import { buildPalletCode } from '../utils/locationCodeUtils.js';
 
 const DEPOSIT_REQUEST_ID_CHUNK_SIZE = 150;
 
@@ -725,6 +726,127 @@ export async function addAdminDepositRequestLine(depositRequestId, {
 // earlier (see src/features/handheld/HandheldPage.jsx's LocationUpdateWorkflow).
 export async function updateDepositLineLocation(lineId, locationId) {
   return recordDepositLineActualReceipt(lineId, { locationId });
+}
+
+// "คงเหลือพร้อมเบิก" (remaining available-for-withdrawal) for ONE deposit
+// line, for display on the receiving/"ระบุ Location" screens alongside the
+// pallet-allocation UI -- distinct from "เหลือที่ยังไม่ระบุ location" (see
+// listDepositLineLocationAllocations below), which is about STORAGE, not
+// withdrawal eligibility. Reuses getDepositInventoryLines' existing, already
+// battle-tested "claimed by non-cancelled withdrawals" computation (see its
+// own comments for the incident history behind it) rather than
+// re-implementing that logic a second time. A line that getDepositInventoryLines
+// doesn't return at all (its deposit request has already reached COMPLETED)
+// legitimately has 0 left to withdraw, same reasoning attachRemainingLotBalance
+// in customerWithdrawalRequestService.js already applies.
+export async function getDepositLineAvailableBalance(lineId, customerId) {
+  if (!supabase || !lineId || !customerId) return { data: { availableBoxes: 0, availableWeight: 0 }, error: null };
+
+  const { data, error } = await getDepositInventoryLines({ customerId });
+  if (error) return { data: null, error };
+
+  const match = (data ?? []).find((l) => l.id === lineId);
+  return {
+    data: {
+      availableBoxes: match ? Number(match.actual_boxes) || 0 : 0,
+      availableWeight: match ? Number(match.actual_weight) || 0 : 0,
+    },
+    error: null,
+  };
+}
+
+// Every pallet a deposit line's stock has been split across so far -- the
+// "already saved" list the add-storage UI shows under its form, each with a
+// "ยกเลิก" button (see removeDepositLineLocationAllocation). Summing
+// boxes/weight across these (allocatedBoxes/allocatedWeight) is how the UI
+// derives "เหลือที่ยังไม่ระบุ location" (actual_boxes/actual_weight minus this).
+export async function listDepositLineLocationAllocations(lineId) {
+  if (!supabase || !lineId) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('tgd_customer_deposit_line_locations')
+    .select('id, location_id, pallet_no, boxes, weight, created_at, tgd_locations(location_code)')
+    .eq('line_id', lineId)
+    .order('created_at', { ascending: true });
+
+  if (error) return { data: [], error };
+
+  return {
+    data: (data ?? []).map((a) => ({
+      id: a.id,
+      locationId: a.location_id,
+      locationCode: a.tgd_locations?.location_code ?? null,
+      palletNo: a.pallet_no,
+      boxes: a.boxes != null ? Number(a.boxes) : null,
+      weight: a.weight != null ? Number(a.weight) : null,
+      createdAt: a.created_at,
+    })),
+    error: null,
+  };
+}
+
+// Saves one "add storage" action -- one pallet at a time, matching the real
+// physical action of moving one pallet to one spot (see the plan's "เพิ่ม
+// การจัดเก็บทีละ pallet" design). Server-side (tgd_add_deposit_line_location_allocation)
+// re-validates pallet_no <= location capacity, the (location, pallet_no)
+// slot isn't already taken, and the running allocation total doesn't exceed
+// actual_boxes/actual_weight -- this wrapper is a thin passthrough so the
+// UI can show the RPC's own error text (e.g. "เต็มแล้ว") verbatim.
+export async function addDepositLineLocationAllocation({ lineId, locationId, palletNo, boxes = null, weight = null }) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_add_deposit_line_location_allocation', {
+    p_line_id: lineId,
+    p_location_id: locationId,
+    p_pallet_no: palletNo,
+    p_boxes: toNullableNumber(boxes),
+    p_weight: toNullableNumber(weight),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Cancels one saved allocation (e.g. staff picked the wrong pallet) -- the
+// server blocks this if any withdrawal pick already references it ("ยกเลิก
+// การหยิบก่อน") rather than silently orphaning that pick row.
+export async function removeDepositLineLocationAllocation(allocationId) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_remove_deposit_line_location_allocation', {
+    p_allocation_id: allocationId,
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Bulk variant of listDepositLineLocationAllocations for a multi-document
+// Excel export (see the "ดาวน์โหลด Excel" buttons on
+// CustomerDepositRequestListPage.jsx / CustomerWithdrawalRequestListPage.jsx)
+// -- one .in() query for every requested line instead of one round-trip per
+// line, same reasoning as listDepositLineDetailsForDocs. Returns a Map of
+// line_id -> every pallet code that line's stock currently sits on (e.g.
+// "42-L-01-01, 42-L-01-02"), joined ready for a single spreadsheet cell.
+export async function listDepositLineLocationCodesForLines(lineIds = []) {
+  const result = new Map();
+  if (!supabase || !lineIds.length) return result;
+
+  const chunkResults = await Promise.all(chunkArray(lineIds, 150).map((chunk) => supabase
+    .from('tgd_customer_deposit_line_locations')
+    .select('line_id, pallet_no, tgd_locations(location_code)')
+    .in('line_id', chunk)
+    .order('pallet_no', { ascending: true })));
+
+  for (const { data, error } of chunkResults) {
+    if (error) continue; // best-effort -- affected lines just show no storage location
+    for (const a of (data ?? [])) {
+      const locationCode = a.tgd_locations?.location_code;
+      if (!locationCode) continue;
+      const bucket = result.get(a.line_id) ?? [];
+      bucket.push(buildPalletCode(locationCode, a.pallet_no));
+      result.set(a.line_id, bucket);
+    }
+  }
+  return result;
 }
 
 export async function enqueueCustomerDepositNotification(requestId, customerId, documentNo, submitterEmail = null) {

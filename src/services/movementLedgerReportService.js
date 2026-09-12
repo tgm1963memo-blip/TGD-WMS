@@ -1,6 +1,7 @@
 import { getUnifiedMovementRows } from './unifiedMovementReadService.js';
 import { supabase } from './supabaseClient.js';
 import { computeDepositLineBalances } from '../utils/stockBalanceCalc.js';
+import { buildPalletCode } from '../utils/locationCodeUtils.js';
 
 function missingSupabaseClientResult() {
   return {
@@ -739,6 +740,47 @@ function resolveWithdrawalLocation(line, customerId, inboundIndex) {
   return null;
 }
 
+// A withdrawal line can now be picked from several pallets, possibly across
+// several locations (tgd_customer_withdrawal_line_pallet_picks -> its
+// deposit_line_location_id -> that pallet's location_id) -- exact, since
+// it's the same record the pick itself was saved against, unlike
+// resolveWithdrawalLocation's A/B/C heuristic match below (kept only as a
+// fallback for withdrawal lines picked before the pallet-split migration,
+// which the backfill couldn't confidently resolve for every line).
+// Chunked the same way the other id-list lookups in this file are.
+const WITHDRAWAL_LINE_ID_CHUNK_SIZE = 150;
+
+async function resolveWithdrawalLinePalletLocations(withdrawalLineIds) {
+  const result = new Map();
+  const ids = [...new Set((withdrawalLineIds ?? []).filter(Boolean))];
+  if (!supabase || ids.length === 0) return result;
+
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += WITHDRAWAL_LINE_ID_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + WITHDRAWAL_LINE_ID_CHUNK_SIZE));
+  }
+  const chunkResults = await Promise.all(chunks.map((chunk) => supabase
+    .from('tgd_customer_withdrawal_line_pallet_picks')
+    .select(`
+      withdrawal_line_id,
+      tgd_customer_deposit_line_locations(location_id, pallet_no, tgd_locations(location_code))
+    `)
+    .in('withdrawal_line_id', chunk)));
+
+  for (const { data, error } of chunkResults) {
+    if (error) continue; // best-effort — affected lines fall back to the heuristic match below
+    for (const pick of (data ?? [])) {
+      const alloc = pick.tgd_customer_deposit_line_locations;
+      const locationCode = alloc?.tgd_locations?.location_code;
+      if (!alloc?.location_id || !locationCode) continue;
+      const bucket = result.get(pick.withdrawal_line_id) ?? [];
+      bucket.push({ locationId: alloc.location_id, code: buildPalletCode(locationCode, alloc.pallet_no) });
+      result.set(pick.withdrawal_line_id, bucket);
+    }
+  }
+  return result;
+}
+
 function resolveWithdrawalProductId(line, customerId, inboundIndex, skuMap) {
   if (line.product_id) return line.product_id;
 
@@ -824,7 +866,8 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
   if (error) return { data: [], error };
 
   const customerIds = [...new Set((data ?? []).map((req) => req.customer_id).filter(Boolean))];
-  const [inboundIndex, skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }, confirmedDateByReqId] = await Promise.all([
+  const allLineIds = (data ?? []).flatMap((req) => (req.tgd_customer_withdrawal_request_lines ?? []).map((l) => l.id));
+  const [inboundIndex, skuMap, { tempMap: catalogTempMap, categoryMap: catalogCategoryMap }, confirmedDateByReqId, palletLocationsByLineId] = await Promise.all([
     getInboundTemperatureIndex(customerIds),
     getProductSkuMap(),
     getCatalogTemperatureMap(customerIds),
@@ -836,6 +879,7 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       'CUSTOMER_WITHDRAWAL_REQUEST',
       'COMPLETED',
     ),
+    resolveWithdrawalLinePalletLocations(allLineIds),
   ]);
 
   const rows = [];
@@ -876,6 +920,17 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         }
       }
 
+      // Prefer the exact pallet-pick trail (one row per pick, since a
+      // withdrawal line can now be sourced from several pallets/locations)
+      // and only fall back to the A/B/C heuristic match for lines picked
+      // before the pallet-split migration that the backfill couldn't
+      // confidently resolve.
+      const palletLocs = palletLocationsByLineId.get(line.id) ?? [];
+      const uniquePalletLocs = [...new Map(palletLocs.map((p) => [p.code, p])).values()];
+      const locationId = uniquePalletLocs.length > 0
+        ? uniquePalletLocs[0].locationId
+        : (resolveWithdrawalLocation(line, req.customer_id, inboundIndex) ?? null);
+
       rows.push({
         id: `withdrawal-${line.id}`,
         ledger_source: 'stock_ledger',
@@ -899,7 +954,8 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
         product_category: line.customer_product_code
           ? (catalogCategoryMap.get(`${req.customer_id}::${line.customer_product_code}`) ?? null)
           : null,
-        location_id: resolveWithdrawalLocation(line, req.customer_id, inboundIndex) ?? null,
+        location_id: locationId,
+        location_name: uniquePalletLocs.length > 0 ? uniquePalletLocs.map((p) => p.code).join(', ') : undefined,
         tracking_code: line.tracking_code ?? null,
         from_warehouse_id: 'DISPATCH',
         to_warehouse_id: null,

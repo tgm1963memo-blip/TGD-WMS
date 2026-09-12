@@ -16,15 +16,17 @@ import {
   recordDepositLineActualReceipt,
   addAdminDepositRequestLine,
   recallConfirmedDepositRequest,
-  updateDepositLineLocation,
   enqueueCustomerDepositNotification,
   cancelCustomerDepositRequest,
+  getDepositLineAvailableBalance,
+  listDepositLineLocationAllocations,
+  addDepositLineLocationAllocation,
+  removeDepositLineLocationAllocation,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
-import { getActiveLocations } from '../../services/warehouseLayoutService.js';
-import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
-import { parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { getActiveLocations, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
+import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -98,6 +100,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [locZone, setLocZone] = useState('');
   const [locSide, setLocSide] = useState('');
   const [locRow, setLocRow] = useState('');
+  // Pallet-split "add storage" state -- one line can now be spread across
+  // several pallets/locations (see tgd_customer_deposit_line_locations),
+  // mirroring the same add-one-allocation-at-a-time pattern the handheld
+  // "ระบุ Location" workflow uses (src/features/handheld/HandheldPage.jsx).
+  const [allocations, setAllocations] = useState([]);
+  const [allocLoading, setAllocLoading] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState({ availableBoxes: 0, availableWeight: 0 });
+  const [palletCapacity, setPalletCapacity] = useState(0);
+  const [palletTaken, setPalletTaken] = useState(new Set());
+  const [allocPalletNo, setAllocPalletNo] = useState('');
+  const [allocBoxes, setAllocBoxes] = useState('');
+  const [allocWeight, setAllocWeight] = useState('');
+  const [allocError, setAllocError] = useState('');
   const [customerData, setCustomerData] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
@@ -174,6 +189,56 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const selectedLocObj = (locZone && locSide && locRow)
     ? (parsedAllLocs.find((l) => l.parsed.room === locZone && l.parsed.side === locSide && l.parsed.row === +locRow) ?? null)
     : null;
+
+  async function refreshLocationLineAllocations(line) {
+    if (!line) return;
+    setAllocLoading(true);
+    const [{ data: allocs }, { data: balance }] = await Promise.all([
+      listDepositLineLocationAllocations(line.id),
+      getDepositLineAvailableBalance(line.id, header?.customer_id),
+    ]);
+    setAllocations(allocs ?? []);
+    setAvailableBalance(balance ?? { availableBoxes: 0, availableWeight: 0 });
+    setAllocLoading(false);
+  }
+
+  useEffect(() => {
+    if (!locationLine) { setAllocations([]); setAvailableBalance({ availableBoxes: 0, availableWeight: 0 }); return; }
+    refreshLocationLineAllocations(locationLine);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationLine?.id]);
+
+  const allocatedBoxes = allocations.reduce((sum, a) => sum + (Number(a.boxes) || 0), 0);
+  const allocatedWeight = allocations.reduce((sum, a) => sum + (Number(a.weight) || 0), 0);
+  const unallocatedBoxes = locationLine ? Math.max(0, Number(locationLine.actual_boxes ?? 0) - allocatedBoxes) : 0;
+  const unallocatedWeight = locationLine ? Math.max(0, Number(locationLine.actual_weight ?? 0) - allocatedWeight) : 0;
+
+  async function refreshPalletSlots(locationId) {
+    const { data } = await getPalletDetailsAtLocation(locationId);
+    const capacity = data?.capacity ?? 0;
+    const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+    setPalletCapacity(capacity);
+    setPalletTaken(taken);
+    let firstFree = '';
+    for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
+    setAllocPalletNo(firstFree);
+  }
+
+  useEffect(() => {
+    if (!selectedLocObj?.id) { setPalletCapacity(0); setPalletTaken(new Set()); setAllocPalletNo(''); return; }
+    refreshPalletSlots(selectedLocObj.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocObj?.id]);
+
+  useEffect(() => {
+    if (!locationLine) { setAllocBoxes(''); setAllocWeight(''); return; }
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === locationLine.customer_product_code);
+    const defaultPerPallet = catalogMatch?.default_boxes_per_pallet;
+    const suggested = defaultPerPallet ? Math.min(defaultPerPallet, unallocatedBoxes) : unallocatedBoxes;
+    setAllocBoxes(suggested > 0 ? String(suggested) : '');
+    setAllocWeight('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationLine?.id, allocatedBoxes]);
 
   const branding = getDocumentBrandingConfig();
 
@@ -467,29 +532,38 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     printStickers(items);
   }
 
-  async function handleSaveLocation() {
-    if (!locationLine) return;
-    const locId = selectedLocObj?.id ?? null;
-    setSubmitting(true); setError('');
+  // Saves ONE pallet allocation for the line being located -- repeatable
+  // (pick the next pallet/location and add again) until unallocatedBoxes
+  // reaches 0, matching the handheld "ระบุ Location" workflow's same
+  // add-one-pallet-at-a-time pattern. No "location already has stock, are
+  // you sure?" confirmation any more -- a row holding several pallets from
+  // several lines is the normal case now; the server enforces the real
+  // constraints (pallet slot free, row not over capacity).
+  async function handleAddAllocation() {
+    if (!locationLine || !selectedLocObj?.id || !allocPalletNo) return;
+    setSubmitting(true); setAllocError('');
+    const boxesVal = allocBoxes !== '' ? Number(allocBoxes) : null;
+    const weightVal = allocWeight !== '' ? Number(allocWeight) : null;
 
-    if (locId) {
-      const hasStock = await checkLocationHasInventory(locId);
-      if (hasStock) {
-        if (!window.confirm('Location นี้มีสินค้าอยู่แล้ว คุณแน่ใจหรือไม่ที่จะจัดเก็บสินค้าเพิ่มที่นี่?')) {
-          setSubmitting(false);
-          return;
-        }
-      }
-    }
-
-    const r = await updateDepositLineLocation(locationLine.id, locId);
+    const result = await addDepositLineLocationAllocation({
+      lineId: locationLine.id, locationId: selectedLocObj.id, palletNo: Number(allocPalletNo),
+      boxes: boxesVal, weight: weightVal,
+    });
     setSubmitting(false);
-    if (r.error) { setError(r.error.message ?? 'Save location failed'); return; }
-    setLines((prev) => prev.map((l) =>
-      l.id === locationLine.id ? { ...l, location_id: locId } : l,
-    ));
-    setActionMsg('อัปเดต Location เรียบร้อยแล้ว');
-    setLocationLine(null);
+    if (result.error) { setAllocError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+
+    setLines((prev) => prev.map((l) => l.id === locationLine.id ? { ...l, location_id: selectedLocObj.id } : l));
+    setActionMsg('เพิ่มการจัดเก็บเรียบร้อยแล้ว');
+    await refreshLocationLineAllocations(locationLine);
+    await refreshPalletSlots(selectedLocObj.id);
+  }
+
+  async function handleRemoveAllocation(allocationId) {
+    setAllocError('');
+    const result = await removeDepositLineLocationAllocation(allocationId);
+    if (result.error) { setAllocError(result.error.message ?? 'ยกเลิกไม่สำเร็จ'); return; }
+    await refreshLocationLineAllocations(locationLine);
+    if (selectedLocObj?.id) await refreshPalletSlots(selectedLocObj.id);
   }
 
   return (
@@ -1184,8 +1258,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         size="sm"
         footer={(
           <div className="action-row">
-            <button className="btn btn-primary" disabled={submitting || !selectedLocObj} type="button" onClick={handleSaveLocation}>
-              {t('save')}
+            <button className="btn btn-primary" disabled={submitting || !selectedLocObj || !allocPalletNo} type="button" onClick={handleAddAllocation}>
+              เพิ่มการจัดเก็บ
             </button>
             <button className="btn btn-secondary" onClick={() => setLocationLine(null)} type="button">{t('cancel')}</button>
           </div>
@@ -1201,6 +1275,37 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               {locationLine.actual_weight != null ? ` · ${locationLine.actual_weight} กก.` : ''}
               {' '}(แก้ไขยอดรับไม่ได้)
             </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'จัดเก็บแล้ว', value: `${allocatedBoxes.toLocaleString()} กล่อง` },
+                { label: 'เหลือที่ยังไม่ระบุ', value: `${unallocatedBoxes.toLocaleString()} กล่อง` },
+                { label: 'คงเหลือพร้อมเบิก', value: `${(availableBalance.availableBoxes ?? 0).toLocaleString()} กล่อง` },
+              ].map((stat) => (
+                <div key={stat.label} style={{ background: 'var(--tgd-surface-alt, #f8fafc)', borderRadius: 8, padding: '6px 10px' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--tgd-muted-text)', fontWeight: 700, textTransform: 'uppercase' }}>{stat.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{allocLoading ? '…' : stat.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {allocations.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>จัดเก็บไปแล้ว ({allocations.length} pallet)</div>
+                {allocations.map((a) => (
+                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--tgd-border)', borderRadius: 8, padding: '6px 10px', marginBottom: 6, fontSize: 13 }}>
+                    <span>
+                      <strong>{buildPalletCode(a.locationCode ?? '?', a.palletNo)}</strong>
+                      <span style={{ color: 'var(--tgd-muted-text)', marginLeft: 6 }}>{a.boxes ?? '-'} กล่อง{a.weight != null ? ` · ${a.weight} กก.` : ''}</span>
+                    </span>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRemoveAllocation(a.id)}>ยกเลิก</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {allocError && <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>{allocError}</p>}
+
             {parsedAllLocs.length === 0 ? (
               <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>ไม่พบข้อมูล Location ในระบบ</p>
             ) : (
@@ -1223,7 +1328,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   <span>แถว</span>
                   <select className="form-control" value={locRow} onChange={(e) => setLocRow(e.target.value)} disabled={!locSide}>
                     <option value="">-- เลือกแถว --</option>
-                    {locRowOptions.map((r) => <option key={r} value={String(r)}>แถว {r}</option>)}
+                    {locRowOptions.map((r) => <option key={r} value={String(r)}>{formatRowLabel(r)}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>เลข Pallet</span>
+                  <select className="form-control" value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)} disabled={!selectedLocObj || palletCapacity === 0}>
+                    {selectedLocObj && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                    {Array.from({ length: palletCapacity }, (_, i) => i + 1)
+                      .filter((n) => !palletTaken.has(n))
+                      .map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
                 {selectedLocObj && (
@@ -1231,6 +1345,18 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                     <strong style={{ color: 'var(--tgd-success)' }}>✓ {selectedLocObj.code}</strong>
                     {selectedLocObj.name && <span style={{ color: '#555', marginLeft: 8 }}>{selectedLocObj.name}</span>}
                   </div>
+                )}
+                {selectedLocObj && (
+                  <>
+                    <label className="form-field">
+                      <span>จำนวน (กล่อง)</span>
+                      <input className="form-control" type="number" value={allocBoxes} onChange={(e) => setAllocBoxes(e.target.value)} />
+                    </label>
+                    <label className="form-field">
+                      <span>น้ำหนัก (กก.)</span>
+                      <input className="form-control" type="number" value={allocWeight} onChange={(e) => setAllocWeight(e.target.value)} />
+                    </label>
+                  </>
                 )}
               </div>
             )}

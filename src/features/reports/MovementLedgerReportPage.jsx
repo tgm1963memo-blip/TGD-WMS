@@ -271,7 +271,12 @@ export function MovementLedgerReportPage() {
         product_name: row.product_name ?? productMap[row.product_id] ?? row.product_id,
         customer_name: row.customer_name ?? customerMap[row.customer_id] ?? row.customer_id,
         temperature_type: row.temperature_type ?? productTempMap[row.product_id] ?? null,
-        location_name: row.location_id ? (locationMap[row.location_id] ?? row.location_id) : null,
+        // A withdrawal row may already carry a joined multi-pallet location
+        // string (e.g. "42-L-01-01, 42-L-01-02") from getConfirmedWithdrawalRows
+        // — only fall back to the single location_id -> label lookup when it
+        // doesn't (deposit rows, and withdrawal rows the pallet-pick trail
+        // couldn't resolve).
+        location_name: row.location_name ?? (row.location_id ? (locationMap[row.location_id] ?? row.location_id) : null),
       }));
     };
 

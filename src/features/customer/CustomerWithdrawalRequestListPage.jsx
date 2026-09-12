@@ -12,7 +12,7 @@ import { ReportPrintActions } from '../../components/reports/ReportPrintActions.
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
-import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines, listWithdrawalLineDetailsForDocs, cancelCustomerWithdrawalRequest, recallCustomerWithdrawalRequest } from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerWithdrawalRequests, listCustomerWithdrawalRequestLines, listWithdrawalLineDetailsForDocs, listWithdrawalLinePalletCodesForLines, cancelCustomerWithdrawalRequest, recallCustomerWithdrawalRequest } from '../../services/customerWithdrawalRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { getWithdrawalRecallEligibility } from '../../utils/customerRequestCancelUtils.js';
@@ -263,6 +263,7 @@ export function CustomerWithdrawalRequestListPage() {
       if (!linesByRequestId.has(key)) linesByRequestId.set(key, []);
       linesByRequestId.get(key).push(line);
     });
+    const palletCodesByLineId = await listWithdrawalLinePalletCodesForLines((linesResult.data ?? []).map((l) => l.id));
 
     const exportRows = rowsToExport.flatMap((request) => {
       const requestLines = linesByRequestId.get(request.id) ?? [];
@@ -276,7 +277,7 @@ export function CustomerWithdrawalRequestListPage() {
         หมายเหตุคำขอ: request.note ?? '',
       };
       if (requestLines.length === 0) {
-        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่ขอเบิก: '', น้ำหนักที่ขอเบิก: '', จำนวนกล่องที่จ่ายจริง: '', น้ำหนักที่จ่ายจริง: '', หมายเหตุรายการ: '' }];
+        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่ขอเบิก: '', น้ำหนักที่ขอเบิก: '', จำนวนกล่องที่จ่ายจริง: '', น้ำหนักที่จ่ายจริง: '', ตำแหน่งจัดเก็บ: '', หมายเหตุรายการ: '' }];
       }
       return requestLines.map((line) => ({
         ...requestFields,
@@ -288,16 +289,17 @@ export function CustomerWithdrawalRequestListPage() {
         น้ำหนักที่ขอเบิก: line.requested_weight ?? '',
         จำนวนกล่องที่จ่ายจริง: line.picked_boxes ?? '',
         น้ำหนักที่จ่ายจริง: line.picked_weight ?? '',
+        ตำแหน่งจัดเก็บ: (palletCodesByLineId.get(line.id) ?? []).join(', '),
         หมายเหตุรายการ: line.admin_note ?? line.note ?? '',
       }));
     });
 
     downloadExcelRows(
       exportRows,
-      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งเบิก', 'ปลายทาง', 'ผู้ติดต่อรับสินค้า', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่ขอเบิก', 'น้ำหนักที่ขอเบิก', 'จำนวนกล่องที่จ่ายจริง', 'น้ำหนักที่จ่ายจริง', 'หมายเหตุรายการ'],
+      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งเบิก', 'ปลายทาง', 'ผู้ติดต่อรับสินค้า', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่ขอเบิก', 'น้ำหนักที่ขอเบิก', 'จำนวนกล่องที่จ่ายจริง', 'น้ำหนักที่จ่ายจริง', 'ตำแหน่งจัดเก็บ', 'หมายเหตุรายการ'],
       `withdrawal-requests-${new Date().toISOString().slice(0, 10)}.xlsx`,
       'รายการแจ้งเบิก',
-      [16, 28, 16, 14, 20, 20, 20, 14, 30, 20, 14, 14, 14, 14, 14, 20],
+      [16, 28, 16, 14, 20, 20, 20, 14, 30, 20, 14, 14, 14, 14, 14, 24, 20],
     );
     setExporting(false);
   }

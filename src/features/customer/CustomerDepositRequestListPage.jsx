@@ -6,7 +6,7 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { listCustomerDepositRequests, listDepositLineDetailsForDocs, cancelCustomerDepositRequest, recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
+import { listCustomerDepositRequests, listDepositLineDetailsForDocs, listDepositLineLocationCodesForLines, cancelCustomerDepositRequest, recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { buildCustomerRequestCopyPath } from '../../utils/customerRequestCopyUtils.js';
 import { getDepositRecallEligibility } from '../../utils/customerRequestCancelUtils.js';
@@ -137,6 +137,7 @@ export function CustomerDepositRequestListPage() {
       if (!linesByRequestId.has(key)) linesByRequestId.set(key, []);
       linesByRequestId.get(key).push(line);
     });
+    const locationCodesByLineId = await listDepositLineLocationCodesForLines((linesResult.data ?? []).map((l) => l.id));
 
     const exportRows = rowsToExport.flatMap((request) => {
       const lines = linesByRequestId.get(request.id) ?? [];
@@ -150,7 +151,7 @@ export function CustomerDepositRequestListPage() {
         หมายเหตุคำขอ: request.note ?? '',
       };
       if (lines.length === 0) {
-        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่แจ้ง: '', น้ำหนักที่แจ้ง: '', จำนวนกล่องจริง: '', น้ำหนักจริง: '', อุณหภูมิ: '', หมายเหตุรายการ: '' }];
+        return [{ ...requestFields, รหัสสินค้า: '', ชื่อสินค้า: '', Lot: '', รหัสติดตาม: '', จำนวนกล่องที่แจ้ง: '', น้ำหนักที่แจ้ง: '', จำนวนกล่องจริง: '', น้ำหนักจริง: '', อุณหภูมิ: '', ตำแหน่งจัดเก็บ: '', หมายเหตุรายการ: '' }];
       }
       return lines.map((line) => ({
         ...requestFields,
@@ -163,16 +164,17 @@ export function CustomerDepositRequestListPage() {
         จำนวนกล่องจริง: line.actual_boxes ?? '',
         น้ำหนักจริง: line.actual_weight ?? '',
         อุณหภูมิ: line.temperature_type ?? '',
+        ตำแหน่งจัดเก็บ: (locationCodesByLineId.get(line.id) ?? []).join(', '),
         หมายเหตุรายการ: line.note ?? '',
       }));
     });
 
     downloadExcelRows(
       exportRows,
-      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งฝาก', 'ผู้ติดต่อ', 'เบอร์โทร', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่แจ้ง', 'น้ำหนักที่แจ้ง', 'จำนวนกล่องจริง', 'น้ำหนักจริง', 'อุณหภูมิ', 'หมายเหตุรายการ'],
+      ['เลขที่คำขอ', 'ลูกค้า', 'สถานะ', 'วันที่แจ้งฝาก', 'ผู้ติดต่อ', 'เบอร์โทร', 'หมายเหตุคำขอ', 'รหัสสินค้า', 'ชื่อสินค้า', 'Lot', 'รหัสติดตาม', 'จำนวนกล่องที่แจ้ง', 'น้ำหนักที่แจ้ง', 'จำนวนกล่องจริง', 'น้ำหนักจริง', 'อุณหภูมิ', 'ตำแหน่งจัดเก็บ', 'หมายเหตุรายการ'],
       `deposit-requests-${new Date().toISOString().slice(0, 10)}.xlsx`,
       'รายการแจ้งฝาก',
-      [16, 28, 16, 14, 16, 14, 20, 14, 30, 20, 14, 12, 12, 12, 12, 12, 20],
+      [16, 28, 16, 14, 16, 14, 20, 14, 30, 20, 14, 12, 12, 12, 12, 12, 24, 20],
     );
     setExporting(false);
   }

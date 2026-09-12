@@ -413,7 +413,14 @@ export function DashboardPage() {
       {/* Warehouse Layout Map */}
       <DashboardSection title={language === 'th' ? 'แผนผังคลังสินค้า' : 'Warehouse Layout Map'}>
         <div style={{ margin: '-8px -16px', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--tgd-border)' }}>
-          <WarehouseLayoutWidget key={refreshKey} />
+          {/* No key={refreshKey} here -- that forced a full unmount/remount
+              (not just a data refetch) on every 30s poll tick and every
+              realtime stock change anywhere in the warehouse, which is
+              what caused the visible flicker/reset. The widget already
+              refreshes its own data internally (its own polling + realtime
+              subscription), so it doesn't need the parent to force a
+              remount at all. */}
+          <WarehouseLayoutWidget />
         </div>
       </DashboardSection>
 

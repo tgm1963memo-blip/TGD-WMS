@@ -19,3 +19,20 @@ export function parseLocationCode(code) {
 export function buildLocationCode(room, side, row) {
   return `${room}-${side}-${String(row).padStart(2, '0')}`;
 }
+
+// Appends a pallet number to a row's location code for DISPLAY only -- a
+// pallet is an attribute of how a deposit line's stock was allocated
+// within a row (see tgd_customer_deposit_line_locations), never a real
+// tgd_locations record of its own, so this never gets parsed back or
+// stored as a location_code anywhere.
+export function buildPalletCode(locationCode, palletNo) {
+  return `${locationCode}-${String(palletNo).padStart(2, '0')}`;
+}
+
+// Row 0 is the "รอจ่าย" (awaiting dispatch) staging row convention: a
+// regular row in every other respect (capacity, pallets, allocations) that
+// just sorts first (0 < 1, 2, 3...) and displays with this label instead
+// of a number.
+export function formatRowLabel(row) {
+  return row === 0 ? 'รอจ่าย' : `แถว ${row}`;
+}

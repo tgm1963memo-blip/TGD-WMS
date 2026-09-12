@@ -1,9 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSectionsWithOccupancy, getStockAtLocation } from '../../services/warehouseLayoutService.js';
-import { getCustomers, getProducts } from '../../services/masterDataService.js';
+import { getSectionsWithOccupancy, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
 import { supabase } from '../../services/supabaseClient.js';
-import { parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
 function pctColor(pct) {
   if (pct >= 80) return '#e74c3c';
@@ -54,8 +53,8 @@ function RowBar({ location, onClick }) {
       onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', width: 56, flexShrink: 0 }}>
-        แถว {parsed?.row ?? '-'}
+      <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : '#64748b', width: 64, flexShrink: 0 }}>
+        {parsed ? formatRowLabel(parsed.row) : '-'}
       </span>
       <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
@@ -114,10 +113,9 @@ export function WarehouseLayoutWidget() {
   const [selectedId, setSelectedId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const [customerMap, setCustomerMap] = useState({});
-  const [productMap, setProductMap] = useState({});
   const [stockModal, setStockModal] = useState(null); // { locId, locCode }
-  const [stockItems, setStockItems] = useState([]);
+  const [palletCapacity, setPalletCapacity] = useState(0);
+  const [pallets, setPallets] = useState([]);
   const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
@@ -127,16 +125,6 @@ export function WarehouseLayoutWidget() {
       if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
       setLoading(false);
     });
-    Promise.all([getCustomers({ isActive: true }), getProducts({ isActive: true })]).then(
-      ([cRes, pRes]) => {
-        const cMap = {};
-        for (const c of cRes.data ?? []) cMap[c.id] = c.customer_name ?? c.customer_code ?? c.id;
-        const pMap = {};
-        for (const p of pRes.data ?? []) pMap[p.id] = p.name ?? p.sku ?? p.id;
-        setCustomerMap(cMap);
-        setProductMap(pMap);
-      }
-    );
   }, [refreshKey]);
 
   useEffect(() => {
@@ -158,18 +146,12 @@ export function WarehouseLayoutWidget() {
 
   function handleLocClick(locId, locCode) {
     setStockModal({ locId, locCode });
-    setStockItems([]);
+    setPallets([]);
+    setPalletCapacity(0);
     setStockLoading(true);
-    getStockAtLocation(locId).then(({ data, error }) => {
-      if (error) {
-        setStockItems([]);
-      } else {
-        const itemsWithAvailable = (data ?? []).map(item => ({
-          ...item,
-          qty_available: item.qty_on_hand - (item.qty_allocated || 0)
-        }));
-        setStockItems(itemsWithAvailable);
-      }
+    getPalletDetailsAtLocation(locId).then(({ data }) => {
+      setPalletCapacity(data?.capacity ?? 0);
+      setPallets(data?.pallets ?? []);
       setStockLoading(false);
     });
   }
@@ -434,64 +416,46 @@ export function WarehouseLayoutWidget() {
 
             {stockLoading ? (
               <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>กำลังโหลด...</div>
-            ) : stockItems.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>ไม่มีสินค้าใน Location นี้</div>
+            ) : palletCapacity === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>ไม่มีข้อมูล Location นี้</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {stockItems.map((item) => (
-                  <div key={item.id} style={{ background: '#f8fafb', borderRadius: 12, padding: '14px 16px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 8 }}>
-                      {item.matched_product_name ?? productMap[item.product_id] ?? item.product_name ?? item.product_id}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
-                      <div style={{ color: '#64748b' }}>ลูกค้า</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{customerMap[item.customer_id] ?? item.customer_id}</div>
-                      {item.matched_product_code && (
-                        <>
-                          <div style={{ color: '#64748b' }}>รหัสสินค้า</div>
-                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.matched_product_code}</div>
-                        </>
-                      )}
-                      {item.tracking_code && (
-                        <>
-                          <div style={{ color: '#64748b' }}>รหัสติดตาม</div>
-                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.tracking_code}</div>
-                        </>
-                      )}
-                      <div style={{ color: '#64748b' }}>จำนวนคงเหลือ</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.qty_on_hand} {item.uom}</div>
-                      <div style={{ color: '#64748b' }}>จำนวนพร้อมจ่าย</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.qty_available} {item.uom}</div>
-                      {item.weight != null && (
-                        <>
-                          <div style={{ color: '#64748b' }}>น้ำหนัก</div>
-                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.weight} kg</div>
-                        </>
-                      )}
-                      {item.tgd_lots?.lot_number && (
-                        <>
-                          <div style={{ color: '#64748b' }}>Lot</div>
-                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.tgd_lots.lot_number}</div>
-                        </>
-                      )}
-                      {item.tgd_lots?.expiry_date && (
-                        <>
-                          <div style={{ color: '#64748b' }}>วันหมดอายุ</div>
-                          <div style={{ fontWeight: 600, color: '#e07b00' }}>
-                            {new Date(item.tgd_lots.expiry_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
-                          </div>
-                        </>
-                      )}
-                      {item.pallet_id && (
-                        <>
-                          <div style={{ color: '#64748b' }}>Pallet</div>
-                          <div style={{ fontWeight: 600, color: '#334155' }}>{item.pallet_id}</div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>
+                  ใช้ไป {pallets.length}/{palletCapacity} pallet
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr>
+                        {['Pallet', 'รหัสติดตาม', 'สินค้า', 'จำนวน'].map((h) => (
+                          <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: palletCapacity }, (_, i) => i + 1).map((palletNo) => {
+                        const p = pallets.find((item) => item.palletNo === palletNo);
+                        return (
+                          <tr key={palletNo}>
+                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{palletNo}</td>
+                            {p ? (
+                              <>
+                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{p.trackingCode ?? '-'}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{p.productName ?? p.customerProductCode ?? '-'}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>
+                                  {p.remainingBoxes ?? p.boxes ?? '-'} กล่อง{p.weight != null ? ` · ${p.weight} กก.` : ''}
+                                </td>
+                              </>
+                            ) : (
+                              <td colSpan={3} style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: '#cbd5e1', fontStyle: 'italic' }}>— ว่าง —</td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>

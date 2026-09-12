@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { parseLocationCode, buildLocationCode } from '../utils/locationCodeUtils.js';
+import { parseLocationCode, buildLocationCode, formatRowLabel } from '../utils/locationCodeUtils.js';
 
 const DEFAULT_ROW_CAPACITY = 14;
 
@@ -84,42 +84,37 @@ export async function getSectionsWithOccupancy() {
 
   if (error) return { data: [], error };
 
-  const { data: stockRows } = await supabase
-    .from('tgd_stock_balances')
-    .select('location_id, qty_on_hand, qty_allocated')
-    .gt('qty_on_hand', 0);
-
   // A row now holds several pallets, not one binary occupied/empty slot, so
-  // occupancy is a COUNT per location (one qualifying row ≈ one pallet) that
-  // gets compared against that location's capacity, not a plain Set of
-  // "has stock" membership like before.
-  const usedCountMap = new Map();
-  for (const s of stockRows ?? []) {
-    if (s.location_id && (Number(s.qty_on_hand || 0) - Number(s.qty_allocated || 0)) > 0) {
-      usedCountMap.set(s.location_id, (usedCountMap.get(s.location_id) ?? 0) + 1);
-    }
+  // occupancy is a COUNT of pallets in use per location, compared against
+  // that location's capacity. tgd_customer_deposit_line_locations (one row
+  // per pallet a line's stock was placed on) is the single source of truth
+  // for this -- both the backfill from the pre-pallet-split model and every
+  // new "add storage" action write to it, so it always reflects reality
+  // without needing the old dual tgd_stock_balances/deposit-line fallback.
+  const [{ data: allocations }, { data: picks }] = await Promise.all([
+    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, boxes'),
+    supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes'),
+  ]);
+
+  const pickedByAllocationId = new Map();
+  for (const p of picks ?? []) {
+    if (!p.deposit_line_location_id) continue;
+    pickedByAllocationId.set(
+      p.deposit_line_location_id,
+      (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
+    );
   }
-  const locationIdsWithStockBalance = new Set(usedCountMap.keys());
 
-  // tgd_stock_balances isn't updated when a deposit line's location is set
-  // or changed via the handheld "Update Location" scan flow (that RPC only
-  // ever writes tgd_customer_deposit_request_lines.location_id) -- without
-  // this, a location just assigned there via a scan keeps showing as empty
-  // on this map until/unless something else independently creates a
-  // matching stock_balances row. Same fallback checkLocationHasInventory
-  // already uses to avoid warning "location free" for one of these. Only
-  // counted for a location with NO stock_balances rows at all (matching
-  // getStockAtLocation's own fallback), so the same physical stock is never
-  // counted from both sources at once.
-  const { data: depositLineRows } = await supabase
-    .from('tgd_customer_deposit_request_lines')
-    .select('location_id, actual_boxes, actual_weight')
-    .not('location_id', 'is', null)
-    .or('actual_boxes.gt.0,actual_weight.gt.0');
-
-  for (const line of depositLineRows ?? []) {
-    if (!line.location_id || locationIdsWithStockBalance.has(line.location_id)) continue;
-    usedCountMap.set(line.location_id, (usedCountMap.get(line.location_id) ?? 0) + 1);
+  const usedCountMap = new Map();
+  for (const a of allocations ?? []) {
+    if (!a.location_id) continue;
+    // A pallet with a known box count that's been fully picked out no
+    // longer occupies a slot; one with no box count at all (weight-only
+    // receipts) is conservatively always counted as occupied.
+    const remaining = a.boxes == null ? 1 : Number(a.boxes) - (pickedByAllocationId.get(a.id) ?? 0);
+    if (remaining > 0) {
+      usedCountMap.set(a.location_id, (usedCountMap.get(a.location_id) ?? 0) + 1);
+    }
   }
 
   const sections = (zones ?? []).map((zone) => {
@@ -152,94 +147,67 @@ export async function getSectionsWithOccupancy() {
   return { data: sections, error: null };
 }
 
-// Nothing links a tgd_stock_balances row back to the deposit line that put
-// it there (last_movement_id is frequently null, and even when set doesn't
-// always carry a source_line_id) -- so tracking_code/customer_product_code
-// aren't derivable from stock_balances alone. Best-effort recovers them by
-// matching the deposit line(s) at the same location for the same customer,
-// preferring the most recently received one. Not a guaranteed-correct join
-// when one customer has several lots sharing a row, but strictly additive
-// display info -- never affects quantities or availability.
-async function attachDepositLineDetails(locationId, items) {
-  const customerIds = [...new Set(items.map((i) => i.customer_id).filter(Boolean))];
-  if (!customerIds.length) return items;
+// Per-pallet breakdown of one location's row -- drives the dashboard's
+// "click a row" drill-down (see WarehouseLayoutWidget.jsx), which now shows
+// which pallet slot holds what instead of a flat stock list. A pallet only
+// shows up here while it still holds unpicked stock (or has an unknown/
+// weight-only quantity, which is conservatively treated as occupied) --
+// the caller fills in the remaining 1..capacity slots as empty.
+export async function getPalletDetailsAtLocation(locationId) {
+  if (!supabase || !locationId) return { data: { capacity: 0, pallets: [] }, error: null };
 
-  const { data: depositLines } = await supabase
-    .from('tgd_customer_deposit_request_lines')
-    .select('product_name, customer_product_code, tracking_code, created_at, tgd_customer_deposit_requests(customer_id)')
+  const { data: locationRow } = await supabase
+    .from('tgd_locations')
+    .select('capacity')
+    .eq('id', locationId)
+    .maybeSingle();
+  const capacity = Number(locationRow?.capacity) || 0;
+
+  const { data: allocations, error } = await supabase
+    .from('tgd_customer_deposit_line_locations')
+    .select(`
+      id, pallet_no, boxes, weight, line_id,
+      tgd_customer_deposit_request_lines(tracking_code, product_name, customer_product_code)
+    `)
     .eq('location_id', locationId)
-    .order('created_at', { ascending: false });
+    .order('pallet_no', { ascending: true });
 
-  const byCustomer = new Map();
-  for (const line of depositLines ?? []) {
-    const cid = line.tgd_customer_deposit_requests?.customer_id;
-    if (cid && !byCustomer.has(cid)) byCustomer.set(cid, line);
+  if (error) return { data: { capacity, pallets: [] }, error };
+
+  const allocationIds = (allocations ?? []).map((a) => a.id);
+  const pickedByAllocationId = new Map();
+  if (allocationIds.length > 0) {
+    const { data: picks } = await supabase
+      .from('tgd_customer_withdrawal_line_pallet_picks')
+      .select('deposit_line_location_id, boxes')
+      .in('deposit_line_location_id', allocationIds);
+    for (const p of picks ?? []) {
+      pickedByAllocationId.set(
+        p.deposit_line_location_id,
+        (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
+      );
+    }
   }
 
-  return items.map((item) => {
-    const match = byCustomer.get(item.customer_id);
-    if (!match) return item;
-    return {
-      ...item,
-      matched_product_name: match.product_name ?? null,
-      matched_product_code: match.customer_product_code ?? null,
-      tracking_code: match.tracking_code ?? null,
-    };
-  });
-}
+  const pallets = (allocations ?? [])
+    .map((a) => {
+      const picked = pickedByAllocationId.get(a.id) ?? 0;
+      const remainingBoxes = a.boxes != null ? Math.max(0, Number(a.boxes) - picked) : null;
+      return {
+        allocationId: a.id,
+        palletNo: a.pallet_no,
+        boxes: a.boxes,
+        weight: a.weight,
+        remainingBoxes,
+        lineId: a.line_id,
+        trackingCode: a.tgd_customer_deposit_request_lines?.tracking_code ?? null,
+        productName: a.tgd_customer_deposit_request_lines?.product_name ?? null,
+        customerProductCode: a.tgd_customer_deposit_request_lines?.customer_product_code ?? null,
+      };
+    })
+    .filter((p) => p.remainingBoxes == null || p.remainingBoxes > 0);
 
-export async function getStockAtLocation(locationId) {
-  if (!supabase || !locationId) return { data: [], error: null };
-
-  const { data, error } = await supabase
-    .from('tgd_stock_balances')
-    .select('id, qty_on_hand, qty_allocated, uom, weight, customer_id, product_id, lot_id, pallet_id, tgd_lots(lot_number, expiry_date)')
-    .eq('location_id', locationId)
-    .gt('qty_on_hand', 0);
-
-  if (error) {
-    console.error('Failed to fetch stock at location:', error);
-  }
-
-  if (data && data.length > 0) {
-    return { data: await attachDepositLineDetails(locationId, data), error };
-  }
-
-  // No tgd_stock_balances row here -- same gap getSectionsWithOccupancy
-  // works around (see its comment): fall back to deposit lines actually
-  // received at this location, so a location the map now marks occupied
-  // (via that same fallback) isn't shown as empty the moment someone
-  // clicks it. Only used when stock_balances had nothing, so a location
-  // genuinely tracked there isn't ever listed twice.
-  const { data: depositLines, error: depositError } = await supabase
-    .from('tgd_customer_deposit_request_lines')
-    .select('id, actual_boxes, actual_weight, uom, lot_no, exp_date, product_id, product_name, customer_product_code, tracking_code, tgd_customer_deposit_requests(customer_id)')
-    .eq('location_id', locationId)
-    .or('actual_boxes.gt.0,actual_weight.gt.0');
-
-  if (depositError) {
-    console.error('Failed to fetch deposit lines at location:', depositError);
-    return { data: data ?? [], error };
-  }
-
-  const mapped = (depositLines ?? []).map((line) => ({
-    id: `dep-${line.id}`,
-    qty_on_hand: Number(line.actual_boxes ?? 0),
-    qty_allocated: 0,
-    uom: line.uom || 'กล่อง',
-    weight: line.actual_weight != null ? Number(line.actual_weight) : null,
-    customer_id: line.tgd_customer_deposit_requests?.customer_id ?? null,
-    product_id: line.product_id ?? null,
-    product_name: line.product_name ?? line.customer_product_code ?? null,
-    matched_product_name: line.product_name ?? null,
-    matched_product_code: line.customer_product_code ?? null,
-    tracking_code: line.tracking_code ?? null,
-    lot_id: null,
-    pallet_id: null,
-    tgd_lots: (line.lot_no || line.exp_date) ? { lot_number: line.lot_no ?? null, expiry_date: line.exp_date ?? null } : null,
-  }));
-
-  return { data: mapped, error: null };
+  return { data: { capacity, pallets }, error: null };
 }
 
 export async function getActiveLocations() {
@@ -316,14 +284,18 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
 
   const addSideLocations = (side, config) => {
     if (!config?.active) return;
-    for (let r = 1; r <= config.rows; r++) {
+    // Row 0 is the "รอจ่าย" staging row convention (see locationCodeUtils.js's
+    // formatRowLabel) -- a real row in every other respect, just created
+    // alongside 1..rows instead of counted as one of them.
+    const startRow = config.staging ? 0 : 1;
+    for (let r = startRow; r <= config.rows; r++) {
       const code = buildLocationCode(zoneCode, side, r);
       inserts.push({
         room_id: room.id,
         zone_id: zone.id,
         name: code,
         location_code: code,
-        location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r}`,
+        location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(r)}`,
         location_type: 'SHELF',
         capacity: rowCapacity,
       });
@@ -383,7 +355,8 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
 
   const addSide = (side, config) => {
     if (!config?.active) return;
-    for (let r = 1; r <= config.rows; r++) {
+    const startRow = config.staging ? 0 : 1;
+    for (let r = startRow; r <= config.rows; r++) {
       const code = buildLocationCode(zoneCode, side, r);
       desiredCodes.add(code);
       if (!existingCodes.has(code)) {
@@ -392,7 +365,7 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
           zone_id: zoneId,
           name: code,
           location_code: code,
-          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} แถว${r}`,
+          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(r)}`,
           location_type: 'SHELF',
           capacity: rowCapacity,
         });
