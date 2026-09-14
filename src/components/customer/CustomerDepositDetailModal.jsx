@@ -113,6 +113,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [allocBoxes, setAllocBoxes] = useState('');
   const [allocWeight, setAllocWeight] = useState('');
   const [allocError, setAllocError] = useState('');
+  // Non-blocking -- addDepositLineLocationAllocation always saves; this just
+  // flags when the RPC reports the chosen pallet slot already had other
+  // active stock on it, so staff can double-check without being stuck.
+  const [allocWarning, setAllocWarning] = useState('');
   const [customerData, setCustomerData] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
@@ -538,7 +542,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   // constraints (pallet slot free, row not over capacity).
   async function handleAddAllocation() {
     if (!locationLine || !selectedLocObj?.id || !allocPalletNo) return;
-    setSubmitting(true); setAllocError('');
+    setSubmitting(true); setAllocError(''); setAllocWarning('');
     const boxesVal = allocBoxes !== '' ? Number(allocBoxes) : null;
     const weightVal = allocWeight !== '' ? Number(allocWeight) : null;
 
@@ -551,6 +555,9 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
     setLines((prev) => prev.map((l) => l.id === locationLine.id ? { ...l, location_id: selectedLocObj.id } : l));
     setActionMsg('เพิ่มการจัดเก็บเรียบร้อยแล้ว');
+    setAllocWarning(result.data?.pallet_already_in_use
+      ? `⚠ Pallet ${allocPalletNo} ที่ ${selectedLocObj.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
+      : '');
     await refreshLocationLineAllocations(locationLine);
     await refreshPalletSlots(selectedLocObj.id);
   }
@@ -823,6 +830,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               style={{ marginRight: 4 }}
                               onClick={() => {
                                 setLocationLine(line);
+                                setAllocWarning('');
                                 const existingLoc = allLocations.find((loc) => loc.id === line.location_id);
                                 const p = existingLoc ? parseLocationCode(existingLoc.code) : null;
                                 setLocZone(p?.room ?? '');
@@ -1302,6 +1310,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             )}
 
             {allocError && <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>{allocError}</p>}
+            {allocWarning && <p style={{ color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700 }}>{allocWarning}</p>}
 
             {parsedAllLocs.length === 0 ? (
               <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>ไม่พบข้อมูล Location ในระบบ</p>

@@ -524,6 +524,10 @@ function ReceivingWorkflow({ onBack, t }) {
   const [palletCapacity, setPalletCapacity] = useState(0);
   const [palletTaken, setPalletTaken] = useState(new Set());
   const [allocPalletNo, setAllocPalletNo] = useState('');
+  // Non-blocking -- addDepositLineLocationAllocation always saves; this just
+  // flags when the RPC reports the chosen pallet slot already had other
+  // active stock on it, so staff can double-check without being stuck.
+  const [palletWarning, setPalletWarning] = useState('');
 
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })), [locations]);
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
@@ -654,6 +658,7 @@ function ReceivingWorkflow({ onBack, t }) {
       setEditMfgDate(match.mfg_date ?? '');
       setEditExpDate(match.exp_date ?? '');
       setMismatchWarned(false);
+      setPalletWarning('');
     } else {
       setMatchedLine(null);
     }
@@ -702,6 +707,9 @@ function ReceivingWorkflow({ onBack, t }) {
         boxes: boxes !== '' ? Number(boxes) : null, weight: weight !== '' ? Number(weight) : null,
       });
       if (allocResult.error) { setSaving(false); setSaveError(allocResult.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
+      setPalletWarning(allocResult.data?.pallet_already_in_use
+        ? `⚠ Pallet ${allocPalletNo} ที่ ${selectedLocation.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
+        : '');
     }
     setSaving(false);
 
@@ -721,6 +729,7 @@ function ReceivingWorkflow({ onBack, t }) {
       allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
       trackingCode: matchedLine.tracking_code ?? '-',
       depositDate: new Date().toISOString(),
+      palletWarning,
     };
     setConfirmed((prev) => [confirmedItem, ...prev]);
     // `Number(boxes) || null` would turn a legitimately-entered "0" (e.g. a
@@ -980,6 +989,11 @@ function ReceivingWorkflow({ onBack, t }) {
             width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
           }}>
             <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 16, color: C.text }}>พิมพ์สติ๊กเกอร์</div>
+            {stickerItem.palletWarning && (
+              <div style={{ background: '#fffbeb', border: '1.5px solid #f59e0b', borderRadius: 12, padding: '10px 12px', marginBottom: 12, fontSize: 13, color: '#92400e', fontWeight: 700 }}>
+                {stickerItem.palletWarning}
+              </div>
+            )}
             <div style={{ background: C.blueLight, borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 13 }}>
               <div><strong>ลูกค้า:</strong> {stickerItem.customerName || '-'}</div>
               <div><strong>สินค้า:</strong> {stickerItem.line?.product_name}</div>
@@ -2107,6 +2121,10 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [allocPalletNo, setAllocPalletNo] = useState('');
   const [allocBoxes, setAllocBoxes] = useState('');
   const [allocWeight, setAllocWeight] = useState('');
+  // Non-blocking -- addDepositLineLocationAllocation always saves; this just
+  // flags when the RPC reports the chosen pallet slot already had other
+  // active stock on it, so staff can double-check without being stuck.
+  const [palletWarning, setPalletWarning] = useState('');
 
   async function refreshPendingSyncCount() {
     const queued = await listQueuedOfflineActions();
@@ -2422,6 +2440,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
     setSaving(false);
     if (result.error) { setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
+    setPalletWarning(result.data?.pallet_already_in_use
+      ? `⚠ Pallet ${palletNo} ที่ ${selectedLocation.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
+      : '');
 
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === selectedLine.customer_product_code);
     const quantityParts = [];
@@ -2632,7 +2653,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
               const hasloc = !!l.location_id;
               return (
                 <div key={l.id}
-                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); }}
+                  onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setPalletWarning(''); }}
                   style={{
                     background: hasloc ? C.greenLight : C.surface,
                     border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
@@ -2743,6 +2764,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
           {saveError && (
             <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 16, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>{saveError}</div>
+          )}
+          {palletWarning && (
+            <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1.5px solid #f59e0b', borderRadius: 14, color: '#92400e', fontSize: 13, fontWeight: 700, marginBottom: 16 }}>{palletWarning}</div>
           )}
 
           {locations.length > 0 ? (
