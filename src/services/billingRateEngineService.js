@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { listAllProductServiceRates } from './productServiceRatesService.js';
 import { listCustomerProducts } from './customerProductCatalogService.js';
+import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
   computeHandlingFeeLines, resolveStorageRateForLine,
@@ -106,7 +107,16 @@ function buildWithdrawalEventsByLine(depositLines, withdrawalLines) {
     }
     if (matchedId == null) continue;
     const bucket = eventsByLine.get(matchedId) ?? [];
-    const date = wl.picked_at ?? wl.requested_dispatch_date ?? null;
+    // dispatch_fallback_date (attached per-line by the caller, resolved from
+    // the real COMPLETED transition timestamp, falling back to
+    // requested_dispatch_date) covers the case where this specific line
+    // never recorded its own picked_at -- previously this fell back to
+    // wl.requested_dispatch_date directly, a field that was never actually
+    // present on the line object (it only exists on the parent withdrawal
+    // REQUEST), so a withdrawal line with no picked_at silently got date:
+    // null here, which computeStorageInvoiceLines' event filter then drops
+    // entirely -- the deposit line kept being billed as if never withdrawn.
+    const date = wl.picked_at ?? wl.dispatch_fallback_date ?? null;
     bucket.push({ weight: Number(wl.picked_weight ?? 0), date: date ? String(date).split('T')[0] : null });
     eventsByLine.set(matchedId, bucket);
   }
@@ -153,11 +163,45 @@ async function fetchRateEngineInputs({ customerId }) {
 
   const { productIdByCode, temperatureTypeByCode, productNameByCode } = buildCatalogMaps(catalogResult.data ?? []);
 
+  // The date a lot's 15/30/etc-day storage cycle grid is anchored to, and
+  // the date a withdrawal's goods are treated as having left storage, must
+  // reflect when those events ACTUALLY happened -- not when the customer
+  // originally planned/requested them (expected_arrival_date/
+  // requested_dispatch_date), which can differ from reality by days and
+  // shift the whole cycle grid early/late right around a period cutoff.
+  // Confirmed real gap: TGM/FROZEN Aug 2026 billed ~2,300 THB too much
+  // because several lots' receipt_date used the customer's originally-
+  // booked arrival date instead of the date the warehouse actually
+  // confirmed receipt, making a new cycle appear to start days before it
+  // really did. Resolve the real status-transition timestamp from
+  // tgd_customer_document_timeline_events the same way
+  // resolveDocumentConfirmedDates already does for the Movement Ledger
+  // report (which every other date-sensitive report/balance calc in this
+  // app already relies on for exactly this reason), falling back to
+  // last_action_at/expected_arrival_date (deposit) or
+  // requested_dispatch_date (withdrawal) only when no such event was ever
+  // recorded.
+  const [receiptDateByRequestId, dispatchDateByRequestId] = await Promise.all([
+    resolveDocumentConfirmedDates(
+      (depositResult.data ?? []).map((req) => ({
+        id: req.id,
+        fallbackDate: req.last_action_at ? String(req.last_action_at).split('T')[0] : (req.expected_arrival_date ?? null),
+      })),
+      'CUSTOMER_DEPOSIT_REQUEST',
+      'RECEIVED_CONFIRMED',
+    ),
+    resolveDocumentConfirmedDates(
+      (withdrawalResult.data ?? []).map((req) => ({ id: req.id, fallbackDate: req.requested_dispatch_date ?? null })),
+      'CUSTOMER_WITHDRAWAL_REQUEST',
+      'COMPLETED',
+    ),
+  ]);
+
   const rawDepositLines = [];
   const depositRequestIds = [];
   for (const req of (depositResult.data ?? [])) {
     depositRequestIds.push(req.id);
-    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? String(req.last_action_at).split('T')[0] : null);
+    const receiptDate = receiptDateByRequestId.get(req.id) ?? null;
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
       rawDepositLines.push({
         ...line,
@@ -171,8 +215,9 @@ async function fetchRateEngineInputs({ customerId }) {
   const withdrawalRequestIds = [];
   for (const req of (withdrawalResult.data ?? [])) {
     withdrawalRequestIds.push(req.id);
+    const dispatchFallbackDate = dispatchDateByRequestId.get(req.id) ?? null;
     for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
-      rawWithdrawalLines.push({ ...line, customer_id: req.customer_id });
+      rawWithdrawalLines.push({ ...line, customer_id: req.customer_id, dispatch_fallback_date: dispatchFallbackDate });
     }
   }
 
@@ -196,16 +241,11 @@ async function fetchRateEngineInputs({ customerId }) {
     lot_no: line.lot_no ?? null,
   }));
 
-  const requestReceiptDateById = new Map(
-    (depositResult.data ?? []).map((req) => [
-      req.id,
-      req.expected_arrival_date ?? (req.last_action_at ? String(req.last_action_at).split('T')[0] : null),
-    ]),
-  );
-
-  const requestDispatchDateById = new Map(
-    (withdrawalResult.data ?? []).map((req) => [req.id, req.requested_dispatch_date ?? null]),
-  );
+  // Same resolved-timeline-event dates used for cycle anchoring above, kept
+  // under their existing names since the rest of this function (and its
+  // callers) already reads requestReceiptDateById/requestDispatchDateById.
+  const requestReceiptDateById = receiptDateByRequestId;
+  const requestDispatchDateById = dispatchDateByRequestId;
 
   // Deposit/withdrawal requests flagged as needing ร.3 processing — each
   // bills a flat, one-time fee once the underlying document is confirmed
@@ -219,7 +259,7 @@ async function fetchRateEngineInputs({ customerId }) {
       .map((req) => ({ id: req.id, date: requestReceiptDateById.get(req.id) ?? null })),
     ...(withdrawalResult.data ?? [])
       .filter((req) => req.requires_r3_document)
-      .map((req) => ({ id: req.id, date: req.requested_dispatch_date ?? null })),
+      .map((req) => ({ id: req.id, date: requestDispatchDateById.get(req.id) ?? null })),
   ];
 
   return {
@@ -286,7 +326,7 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
     supabase
       .from('tgd_customer_withdrawal_requests')
       .select(`
-        id, customer_id,
+        id, customer_id, requested_dispatch_date,
         tgd_customer_withdrawal_request_lines(
           source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at
@@ -318,9 +358,30 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
     catalogByKey.set(`${row.customer_id}::${row.customer_product_code}`, row);
   }
 
+  // Same real-timeline-event date resolution as fetchRateEngineInputs below
+  // (see its comment for why expected_arrival_date/requested_dispatch_date
+  // alone can silently mis-anchor a lot's billing cycle) -- this KPI reuses
+  // the exact same proration engine, so it should agree with what an actual
+  // invoice draft would compute rather than drifting from it.
+  const [receiptDateByRequestId, dispatchDateByRequestId] = await Promise.all([
+    resolveDocumentConfirmedDates(
+      (depositResult.data ?? []).map((req) => ({
+        id: req.id,
+        fallbackDate: req.last_action_at ? String(req.last_action_at).split('T')[0] : (req.expected_arrival_date ?? null),
+      })),
+      'CUSTOMER_DEPOSIT_REQUEST',
+      'RECEIVED_CONFIRMED',
+    ),
+    resolveDocumentConfirmedDates(
+      (withdrawalResult.data ?? []).map((req) => ({ id: req.id, fallbackDate: req.requested_dispatch_date ?? null })),
+      'CUSTOMER_WITHDRAWAL_REQUEST',
+      'COMPLETED',
+    ),
+  ]);
+
   const rawDepositLines = [];
   for (const req of (depositResult.data ?? [])) {
-    const receiptDate = req.expected_arrival_date ?? (req.last_action_at ? String(req.last_action_at).split('T')[0] : null);
+    const receiptDate = receiptDateByRequestId.get(req.id) ?? null;
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
       rawDepositLines.push({ ...line, customer_id: req.customer_id, receipt_date: receiptDate });
     }
@@ -328,8 +389,9 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
 
   const rawWithdrawalLines = [];
   for (const req of (withdrawalResult.data ?? [])) {
+    const dispatchFallbackDate = dispatchDateByRequestId.get(req.id) ?? null;
     for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
-      rawWithdrawalLines.push({ ...line, customer_id: req.customer_id });
+      rawWithdrawalLines.push({ ...line, customer_id: req.customer_id, dispatch_fallback_date: dispatchFallbackDate });
     }
   }
 

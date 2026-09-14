@@ -43,6 +43,7 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
   getConfirmedDepositReceiptRows: vi.fn(async () => ({ data: [], error: null })),
   getConfirmedWithdrawalRows: vi.fn(async () => ({ data: [], error: null })),
   getAuthoritativeBalanceTotals: vi.fn(async () => ({ data: null, error: null })),
+  resolveDocumentConfirmedDates: vi.fn(async () => new Map()),
   summarizeMovements: (rows) => ({
     totalMovementRows: rows.length,
     totalInboundQty: 0,

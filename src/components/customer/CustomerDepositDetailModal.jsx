@@ -25,7 +25,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
-import { getActiveLocations, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
+import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
@@ -215,12 +215,9 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
   async function refreshPalletSlots(locationId) {
     const { data } = await getPalletDetailsAtLocation(locationId);
-    const capacity = data?.capacity ?? 0;
-    const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+    const { capacity, taken, firstFree } = resolvePalletSlotState(data);
     setPalletCapacity(capacity);
     setPalletTaken(taken);
-    let firstFree = '';
-    for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
     setAllocPalletNo(firstFree);
   }
 

@@ -61,6 +61,7 @@ vi.mock('../../src/services/movementLedgerReportService.js', () => ({
   getMovementLedgerRows: getMovementLedgerRowsMock,
   getConfirmedDepositReceiptRows: getConfirmedDepositReceiptRowsMock,
   getConfirmedWithdrawalRows: getConfirmedWithdrawalRowsMock,
+  resolveDocumentConfirmedDates: vi.fn(async () => new Map()),
 }));
 
 vi.mock('../../src/services/masterDataService.js', () => ({

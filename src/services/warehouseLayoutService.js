@@ -73,6 +73,33 @@ async function insertLocationsWithSchemaFallback(rows) {
   return { error: new Error('Unable to create locations because the live tgd_locations schema is not compatible.') };
 }
 
+// Sums picked boxes per deposit_line_location_id (pallet allocation) --
+// shared by every caller that needs "how much of this pallet has already
+// been picked out": getSectionsWithOccupancy and getPalletDetailsAtLocation
+// below, and listPickablePalletsForDepositLine in
+// customerWithdrawalRequestService.js (which imports this rather than
+// re-querying/re-summing the same rows itself). Pass a specific list of
+// allocation ids to scope the query (e.g. to one location's pallets);
+// omit it to sum across every allocation in the warehouse.
+export async function getPickedBoxesByAllocationId(allocationIds = null) {
+  const pickedByAllocationId = new Map();
+  if (!supabase) return pickedByAllocationId;
+  if (allocationIds && allocationIds.length === 0) return pickedByAllocationId;
+
+  let query = supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes');
+  if (allocationIds) query = query.in('deposit_line_location_id', allocationIds);
+  const { data: picks } = await query;
+
+  for (const p of picks ?? []) {
+    if (!p.deposit_line_location_id) continue;
+    pickedByAllocationId.set(
+      p.deposit_line_location_id,
+      (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
+    );
+  }
+  return pickedByAllocationId;
+}
+
 export async function getSectionsWithOccupancy() {
   if (!supabase) return { data: [], error: null };
 
@@ -91,19 +118,10 @@ export async function getSectionsWithOccupancy() {
   // for this -- both the backfill from the pre-pallet-split model and every
   // new "add storage" action write to it, so it always reflects reality
   // without needing the old dual tgd_stock_balances/deposit-line fallback.
-  const [{ data: allocations }, { data: picks }] = await Promise.all([
+  const [{ data: allocations }, pickedByAllocationId] = await Promise.all([
     supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, boxes'),
-    supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes'),
+    getPickedBoxesByAllocationId(),
   ]);
-
-  const pickedByAllocationId = new Map();
-  for (const p of picks ?? []) {
-    if (!p.deposit_line_location_id) continue;
-    pickedByAllocationId.set(
-      p.deposit_line_location_id,
-      (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
-    );
-  }
 
   const usedCountMap = new Map();
   for (const a of allocations ?? []) {
@@ -175,19 +193,7 @@ export async function getPalletDetailsAtLocation(locationId) {
   if (error) return { data: { capacity, pallets: [] }, error };
 
   const allocationIds = (allocations ?? []).map((a) => a.id);
-  const pickedByAllocationId = new Map();
-  if (allocationIds.length > 0) {
-    const { data: picks } = await supabase
-      .from('tgd_customer_withdrawal_line_pallet_picks')
-      .select('deposit_line_location_id, boxes')
-      .in('deposit_line_location_id', allocationIds);
-    for (const p of picks ?? []) {
-      pickedByAllocationId.set(
-        p.deposit_line_location_id,
-        (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
-      );
-    }
-  }
+  const pickedByAllocationId = await getPickedBoxesByAllocationId(allocationIds);
 
   const pallets = (allocations ?? [])
     .map((a) => {
@@ -208,6 +214,21 @@ export async function getPalletDetailsAtLocation(locationId) {
     .filter((p) => p.remainingBoxes == null || p.remainingBoxes > 0);
 
   return { data: { capacity, pallets }, error: null };
+}
+
+// Turns a getPalletDetailsAtLocation() result into "which pallet numbers
+// are free, and which one should be pre-selected" -- shared by every "add
+// storage" UI (ReceivingWorkflow/LocationUpdateWorkflow in HandheldPage.jsx,
+// CustomerDepositDetailModal.jsx) so each doesn't re-derive the same
+// capacity-minus-taken/first-free-slot loop by hand.
+export function resolvePalletSlotState(palletDetails) {
+  const capacity = palletDetails?.capacity ?? 0;
+  const taken = new Set((palletDetails?.pallets ?? []).map((p) => p.palletNo));
+  let firstFree = '';
+  for (let n = 1; n <= capacity; n += 1) {
+    if (!taken.has(n)) { firstFree = String(n); break; }
+  }
+  return { capacity, taken, firstFree };
 }
 
 export async function getActiveLocations() {
@@ -329,24 +350,17 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
   const existingMap = new Map((existingLocs ?? []).map((l) => [l.location_code, l]));
   const existingCodes = new Set(existingMap.keys());
 
-  let occupiedIds = new Set();
   const locIds = (existingLocs ?? []).map((l) => l.id);
-  if (locIds.length > 0) {
-    const { data: stockRows } = await supabase
-      .from('tgd_stock_balances').select('location_id').in('location_id', locIds).gt('qty_on_hand', 0);
-    occupiedIds = new Set((stockRows ?? []).map((s) => s.location_id));
-
-    // Same gap fixed elsewhere for the dashboard (tgd_stock_balances isn't
-    // updated by the handheld "Update Location" flow) -- without this, a
-    // row that's actually holding pallets only tracked via deposit lines
-    // could look "empty" here and get deleted out from under real stock.
-    const { data: depositLineRows } = await supabase
-      .from('tgd_customer_deposit_request_lines')
-      .select('location_id')
-      .in('location_id', locIds)
-      .or('actual_boxes.gt.0,actual_weight.gt.0');
-    for (const line of depositLineRows ?? []) occupiedIds.add(line.location_id);
-  }
+  // Real, pallet-split-aware occupancy (see getOccupiedPalletCountByLocationId)
+  // -- this used to check tgd_stock_balances/tgd_customer_deposit_request_lines.
+  // location_id directly, both stale since the pallet-split migration: a
+  // deposit line's location_id is now only a "most recently added" pointer,
+  // not the source of truth once it has multiple pallet allocations, so a
+  // row holding real stock under an allocation that ISN'T that pointer could
+  // silently look empty and get shrunk/deleted out from under it.
+  const occupiedPalletCountById = locIds.length > 0
+    ? await getOccupiedPalletCountByLocationId(locIds)
+    : new Map();
 
   const sideNames = { L: 'ซ้าย', R: 'ขวา' };
   const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
@@ -379,7 +393,7 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
   const toDeleteCodes = [...existingCodes].filter((code) => !desiredCodes.has(code));
   const occupiedToDelete = toDeleteCodes.filter((code) => {
     const loc = existingMap.get(code);
-    return loc && occupiedIds.has(loc.id);
+    return loc && (occupiedPalletCountById.get(loc.id) ?? 0) > 0;
   });
 
   if (occupiedToDelete.length > 0) {
@@ -419,4 +433,137 @@ export async function deleteSection(zoneId) {
     await supabase.from('tgd_rooms').delete().in('id', roomIds);
   }
   return supabase.from('tgd_zones').delete().eq('id', zoneId);
+}
+
+// Which of the given location ids currently hold at least one pallet with
+// remaining stock -- the real, pallet-split-aware occupancy check (built on
+// getPickedBoxesByAllocationId above), used anywhere a single location row
+// might be deleted or shrunk so a row still holding real stock can't be
+// silently removed out from under it. Mirrors getSectionsWithOccupancy's own
+// usedCountMap computation, just scoped to specific location ids instead of
+// every location in the warehouse. Returns Map<locationId, remaining pallet
+// count>; a location absent from the map has nothing left in it.
+export async function getOccupiedPalletCountByLocationId(locationIds) {
+  const result = new Map();
+  if (!supabase || !locationIds || locationIds.length === 0) return result;
+
+  const { data: allocations } = await supabase
+    .from('tgd_customer_deposit_line_locations')
+    .select('id, location_id, boxes')
+    .in('location_id', locationIds);
+
+  const allocationIds = (allocations ?? []).map((a) => a.id);
+  const pickedByAllocationId = await getPickedBoxesByAllocationId(allocationIds);
+
+  for (const a of allocations ?? []) {
+    const remaining = a.boxes == null ? 1 : Number(a.boxes) - (pickedByAllocationId.get(a.id) ?? 0);
+    if (remaining > 0) {
+      result.set(a.location_id, (result.get(a.location_id) ?? 0) + 1);
+    }
+  }
+  return result;
+}
+
+// Deletes exactly ONE location row -- unlike deleteSection above (which
+// wipes an entire zone's rooms/locations at once), this leaves every other
+// row in the zone untouched. Blocked if the row still holds any pallet with
+// remaining stock (see getOccupiedPalletCountByLocationId) -- staff must
+// cancel/move that stock out first (the existing "ยกเลิก" allocation flow)
+// before a row can be removed.
+export async function deleteLocation(locationId) {
+  if (!supabase || !locationId) return missing();
+
+  const occupiedCountById = await getOccupiedPalletCountByLocationId([locationId]);
+  const occupiedCount = occupiedCountById.get(locationId) ?? 0;
+  if (occupiedCount > 0) {
+    return { error: new Error(`ลบไม่ได้ Location นี้มีสินค้าอยู่ ${occupiedCount} pallet — ย้าย/ยกเลิกการจัดเก็บออกก่อน`) };
+  }
+
+  const { error } = await supabase.from('tgd_locations').delete().eq('id', locationId);
+  return { error };
+}
+
+// Edits exactly ONE location row -- its capacity and/or its own room/side/
+// row identity (i.e. moving 41-L-05 to become 42-R-03). Renaming is allowed
+// even while the row holds stock: every allocation references the location
+// by its stable UUID (tgd_customer_deposit_line_locations.location_id), not
+// by the location_code text, so changing the code can never orphan existing
+// stock. Shrinking capacity below what's actually in use IS blocked, same
+// reasoning as updateSectionSize's occupied-row guard above.
+export async function updateLocation(locationId, { capacity, zoneCode, side, row } = {}) {
+  if (!supabase || !locationId) return missing();
+
+  const { data: current, error: fetchErr } = await supabase
+    .from('tgd_locations')
+    .select('id, zone_id, room_id, location_code, location_name, capacity')
+    .eq('id', locationId)
+    .maybeSingle();
+  if (fetchErr) return { error: fetchErr };
+  if (!current) return { error: new Error('ไม่พบ Location นี้') };
+
+  const nextCapacity = capacity != null ? Number(capacity) || DEFAULT_ROW_CAPACITY : current.capacity;
+
+  if (capacity != null) {
+    const occupiedCountById = await getOccupiedPalletCountByLocationId([locationId]);
+    const occupiedCount = occupiedCountById.get(locationId) ?? 0;
+    if (nextCapacity < occupiedCount) {
+      return { error: new Error(`ลดความจุไม่ได้ Location นี้มีสินค้าอยู่ ${occupiedCount} pallet`) };
+    }
+  }
+
+  const updates = { capacity: nextCapacity };
+
+  if (zoneCode != null && side != null && row != null) {
+    const newCode = buildLocationCode(zoneCode, side, row);
+    if (newCode !== current.location_code) {
+      const { data: collision } = await supabase
+        .from('tgd_locations')
+        .select('id')
+        .eq('location_code', newCode)
+        .neq('id', locationId)
+        .maybeSingle();
+      if (collision) {
+        return { error: new Error(`รหัส Location "${newCode}" มีอยู่แล้ว`) };
+      }
+
+      // Moving to a different ROOM (e.g. 41-L-05 -> 42-R-03) needs its own
+      // zone_id/room_id, not just a new code string -- getSectionsWithOccupancy
+      // groups locations by these real FKs (via tgd_rooms -> tgd_zones), so a
+      // location whose code says "42-..." but whose zone_id/room_id still
+      // point at zone 41 would keep showing up under the WRONG room's card.
+      // Every zone has exactly one room today (see createSection's single
+      // 'R01' room per zone), so resolving the target zone's id is enough to
+      // also resolve which room to move into.
+      const { data: targetZone, error: zoneErr } = await supabase
+        .from('tgd_zones')
+        .select('id, zone_name')
+        .eq('zone_code', zoneCode)
+        .maybeSingle();
+      if (zoneErr) return { error: zoneErr };
+      if (!targetZone) return { error: new Error(`ไม่พบห้อง "${zoneCode}" ในระบบ`) };
+
+      let targetRoomId = current.room_id;
+      if (targetZone.id !== current.zone_id) {
+        const { data: targetRoom, error: roomErr } = await supabase
+          .from('tgd_rooms')
+          .select('id')
+          .eq('zone_id', targetZone.id)
+          .limit(1)
+          .maybeSingle();
+        if (roomErr) return { error: roomErr };
+        if (!targetRoom) return { error: new Error(`ห้อง "${zoneCode}" ยังไม่มีข้อมูล room`) };
+        targetRoomId = targetRoom.id;
+      }
+
+      const sideNames = { L: 'ซ้าย', R: 'ขวา' };
+      updates.location_code = newCode;
+      updates.name = newCode;
+      updates.location_name = `${targetZone.zone_name} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(Number(row))}`;
+      updates.zone_id = targetZone.id;
+      updates.room_id = targetRoomId;
+    }
+  }
+
+  const { error } = await supabase.from('tgd_locations').update(updates).eq('id', locationId);
+  return { error };
 }

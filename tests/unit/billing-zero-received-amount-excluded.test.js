@@ -19,6 +19,7 @@ function applyFilters(rows, filters) {
     filters.every(({ type, col, val, vals }) => {
       const actual = row[col];
       if (type === 'eq') return actual === val;
+      if (type === 'neq') return actual !== val;
       if (type === 'in') return vals.includes(actual);
       return true;
     })
@@ -31,6 +32,7 @@ function makeSupabaseMock(db) {
     const builder = {
       select: () => builder,
       eq: (col, val) => { filters.push({ type: 'eq', col, val }); return builder; },
+      neq: (col, val) => { filters.push({ type: 'neq', col, val }); return builder; },
       in: (col, vals) => { filters.push({ type: 'in', col, vals }); return builder; },
       or: () => builder,
       order: () => builder,

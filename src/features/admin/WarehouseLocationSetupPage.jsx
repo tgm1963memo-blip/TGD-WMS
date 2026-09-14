@@ -7,8 +7,10 @@ import {
   createSection,
   deleteSection,
   updateSectionSize,
+  deleteLocation,
+  updateLocation,
 } from '../../services/warehouseLayoutService.js';
-import { parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
 const DEFAULT_CAPACITY = 14;
 
@@ -80,7 +82,138 @@ function initEditForm(section) {
   };
 }
 
-function SectionCard({ section, onDelete, onEdit }) {
+// One row (a single tgd_locations record) within a zone's expanded "ดูรายแถว"
+// list -- edit (capacity and/or room/side/row, i.e. move to a different
+// spot entirely) or delete just this one row, without touching any other
+// row in the zone. Mirrors SectionCard's own confirm-then-delete pattern.
+function LocationRow({ location, zoneCode, onDelete, onEdit }) {
+  const parsed = parseLocationCode(location.location_code);
+  const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [form, setForm] = useState({
+    zoneCode: parsed?.room ?? zoneCode,
+    side: parsed?.side ?? 'L',
+    row: parsed?.row ?? 1,
+    capacity: location.capacity,
+  });
+
+  function openEdit() {
+    setForm({ zoneCode: parsed?.room ?? zoneCode, side: parsed?.side ?? 'L', row: parsed?.row ?? 1, capacity: location.capacity });
+    setEditError('');
+    setEditing(true);
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError('');
+    const result = await onDelete(location.id);
+    setDeleting(false);
+    if (result?.error) {
+      setDeleteError(result.error.message ?? 'ลบไม่สำเร็จ');
+      setConfirm(false);
+    }
+    // On success the parent reloads the section list and this row unmounts.
+  }
+
+  async function handleEditSave() {
+    setEditSaving(true);
+    setEditError('');
+    const result = await onEdit(location.id, {
+      capacity: Math.max(1, +form.capacity || location.capacity),
+      zoneCode: form.zoneCode.trim().toUpperCase(),
+      side: form.side,
+      row: Math.max(0, Math.min(99, +form.row || 0)),
+    });
+    setEditSaving(false);
+    if (result?.error) {
+      setEditError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+    } else {
+      setEditing(false);
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid #eef2f7', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: location.isOccupied ? '#fffbeb' : '#fff', flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#1e293b', minWidth: 100 }}>{location.location_code}</span>
+        <span style={{ fontSize: 12, color: '#64748b', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row) : '-'}</span>
+        <span style={{ fontSize: 12, color: location.isOccupied ? '#b45309' : '#94a3b8', flex: 1 }}>
+          ใช้ไป {location.usedCount}/{location.capacity} pallet
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!confirm && (
+            <button type="button" onClick={editing ? () => setEditing(false) : openEdit}
+              style={{ padding: '4px 10px', border: '1px solid #3b82f6', borderRadius: 6, background: editing ? '#eff6ff' : '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              {editing ? 'ยกเลิก' : 'แก้ไข'}
+            </button>
+          )}
+          {confirm ? (
+            <>
+              <button type="button" onClick={() => setConfirm(false)}
+                style={{ padding: '4px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11 }}>
+                ยกเลิก
+              </button>
+              <button type="button" onClick={handleDelete} disabled={deleting}
+                style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setConfirm(true)}
+              style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              ลบ
+            </button>
+          )}
+        </div>
+      </div>
+
+      {deleteError && (
+        <div style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', fontSize: 12 }}>{deleteError}</div>
+      )}
+
+      {editing && (
+        <div style={{ padding: '10px 12px', background: '#f8fafc', borderTop: '1px solid #eef2f7', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {editError && (
+            <div style={{ width: '100%', background: '#fee2e2', color: '#dc2626', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>{editError}</div>
+          )}
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+            ห้อง
+            <input className="form-control" style={{ width: 70, marginTop: 2, boxSizing: 'border-box' }}
+              value={form.zoneCode} onChange={(e) => setForm((f) => ({ ...f, zoneCode: e.target.value }))} />
+          </label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+            ฝั่ง
+            <select className="form-control" style={{ width: 70, marginTop: 2, boxSizing: 'border-box' }}
+              value={form.side} onChange={(e) => setForm((f) => ({ ...f, side: e.target.value }))}>
+              <option value="L">L</option>
+              <option value="R">R</option>
+            </select>
+          </label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+            เลขแถว (0 = รอจ่าย)
+            <input className="form-control" type="number" min={0} max={99} style={{ width: 100, marginTop: 2, boxSizing: 'border-box' }}
+              value={form.row} onChange={(e) => setForm((f) => ({ ...f, row: e.target.value }))} />
+          </label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+            ความจุ (pallet)
+            <input className="form-control" type="number" min={1} max={99} style={{ width: 80, marginTop: 2, boxSizing: 'border-box' }}
+              value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))} />
+          </label>
+          <button type="button" onClick={handleEditSave} disabled={editSaving}
+            style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700 }}>
+            {editSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocation }) {
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -88,10 +221,18 @@ function SectionCard({ section, onDelete, onEdit }) {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
+  const [rowsOpen, setRowsOpen] = useState(false);
 
   const color = pctColor(section.usedPct);
   const gridDesc = describeGrid(section.gridInfo);
   const tempBadge = TEMP_BADGE[section.temperatureType] ?? null;
+  const sortedLocations = [...(section.locations ?? [])].sort((a, b) => {
+    const pa = parseLocationCode(a.location_code);
+    const pb = parseLocationCode(b.location_code);
+    if (!pa || !pb) return 0;
+    if (pa.side !== pb.side) return pa.side.localeCompare(pb.side);
+    return pa.row - pb.row;
+  });
 
   function setEf(k, v) { setEditForm((f) => ({ ...f, [k]: v })); }
 
@@ -186,6 +327,15 @@ function SectionCard({ section, onDelete, onEdit }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {!confirm && (
+            <button
+              type="button"
+              onClick={() => setRowsOpen((v) => !v)}
+              style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 8, background: rowsOpen ? '#f1f5f9' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              {rowsOpen ? 'ซ่อนรายแถว' : 'ดูรายแถว'}
+            </button>
+          )}
           {!confirm && (
             <button
               type="button"
@@ -342,6 +492,24 @@ function SectionCard({ section, onDelete, onEdit }) {
       {editSuccess && (
         <div style={{ background: '#f0fdf4', borderTop: '1px solid #bbf7d0', padding: '8px 18px', fontSize: 13, color: '#2d9348', fontWeight: 600 }}>
           {editSuccess}
+        </div>
+      )}
+
+      {/* Per-row list -- edit/delete exactly one row without touching the rest */}
+      {rowsOpen && (
+        <div style={{ background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '14px 18px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>
+            รายแถวทั้งหมด ({sortedLocations.length})
+          </div>
+          {sortedLocations.map((loc) => (
+            <LocationRow
+              key={loc.id}
+              location={loc}
+              zoneCode={section.code}
+              onDelete={onDeleteLocation}
+              onEdit={onEditLocation}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -632,6 +800,18 @@ export function WarehouseLocationSetupPage() {
     return result;
   }
 
+  async function handleDeleteLocation(locationId) {
+    const result = await deleteLocation(locationId);
+    if (!result.error) await load();
+    return result;
+  }
+
+  async function handleEditLocation(locationId, params) {
+    const result = await updateLocation(locationId, params);
+    if (!result.error) await load();
+    return result;
+  }
+
   const totalRows = sections.reduce((s, z) => s + z.total, 0);
   const totalCapacity = sections.reduce((s, z) => s + z.totalCapacity, 0);
 
@@ -677,7 +857,14 @@ export function WarehouseLocationSetupPage() {
             ห้องที่มีอยู่ ({sections.length})
           </div>
           {sections.map((sec) => (
-            <SectionCard key={sec.id} section={sec} onDelete={handleDelete} onEdit={handleEdit} />
+            <SectionCard
+              key={sec.id}
+              section={sec}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+              onDeleteLocation={handleDeleteLocation}
+              onEditLocation={handleEditLocation}
+            />
           ))}
         </div>
       )}

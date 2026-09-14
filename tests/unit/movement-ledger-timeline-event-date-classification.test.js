@@ -87,6 +87,7 @@ function makeChain(handlers) {
   const chain = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    neq: vi.fn(() => chain),
     in: vi.fn(() => chain),
     ilike: vi.fn(() => chain),
     then: (resolve) => resolve(handlers.result),

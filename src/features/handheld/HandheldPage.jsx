@@ -29,7 +29,7 @@ import {
   removeWithdrawalLinePalletPick,
   listWithdrawalLinePalletPicks,
 } from '../../services/customerWithdrawalRequestService.js';
-import { getActiveLocations, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
+import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
@@ -571,12 +571,9 @@ function ReceivingWorkflow({ onBack, t }) {
   useEffect(() => {
     if (!selectedLocation?.id) { setPalletCapacity(0); setPalletTaken(new Set()); setAllocPalletNo(''); return; }
     getPalletDetailsAtLocation(selectedLocation.id).then(({ data }) => {
-      const capacity = data?.capacity ?? 0;
-      const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+      const { capacity, taken, firstFree } = resolvePalletSlotState(data);
       setPalletCapacity(capacity);
       setPalletTaken(taken);
-      let firstFree = '';
-      for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
       setAllocPalletNo(firstFree);
     });
   }, [selectedLocation?.id]);
@@ -2163,12 +2160,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   async function refreshPalletSlots(locationId) {
     const { data } = await getPalletDetailsAtLocation(locationId);
-    const capacity = data?.capacity ?? 0;
-    const taken = new Set((data?.pallets ?? []).map((p) => p.palletNo));
+    const { capacity, taken, firstFree } = resolvePalletSlotState(data);
     setPalletCapacity(capacity);
     setPalletTaken(taken);
-    let firstFree = '';
-    for (let n = 1; n <= capacity; n += 1) { if (!taken.has(n)) { firstFree = String(n); break; } }
     setAllocPalletNo(firstFree);
   }
 

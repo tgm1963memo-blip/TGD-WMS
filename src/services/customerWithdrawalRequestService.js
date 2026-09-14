@@ -6,6 +6,8 @@ import {
   toNullableText,
 } from './customerPortalServiceUtils.js';
 import { getDepositInventoryLines } from './customerDepositRequestService.js';
+import { getPickedBoxesByAllocationId } from './warehouseLayoutService.js';
+import { chunkArray } from './billingRateEngineService.js';
 import { buildPalletCode } from '../utils/locationCodeUtils.js';
 
 const WITHDRAWAL_HEADER_SELECT = [
@@ -509,19 +511,7 @@ export async function listPickablePalletsForDepositLine(depositLineId) {
   if (error) return { data: [], error };
 
   const allocationIds = (allocations ?? []).map((a) => a.id);
-  const pickedByAllocationId = new Map();
-  if (allocationIds.length > 0) {
-    const { data: picks } = await supabase
-      .from('tgd_customer_withdrawal_line_pallet_picks')
-      .select('deposit_line_location_id, boxes')
-      .in('deposit_line_location_id', allocationIds);
-    for (const p of (picks ?? [])) {
-      pickedByAllocationId.set(
-        p.deposit_line_location_id,
-        (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
-      );
-    }
-  }
+  const pickedByAllocationId = await getPickedBoxesByAllocationId(allocationIds);
 
   const pallets = (allocations ?? [])
     .map((a) => {
@@ -590,11 +580,7 @@ export async function listWithdrawalLinePalletCodesForLines(withdrawalLineIds = 
   const result = new Map();
   if (!supabase || !withdrawalLineIds.length) return result;
 
-  const chunkSize = 150;
-  const chunks = [];
-  for (let i = 0; i < withdrawalLineIds.length; i += chunkSize) chunks.push(withdrawalLineIds.slice(i, i + chunkSize));
-
-  const chunkResults = await Promise.all(chunks.map((chunk) => supabase
+  const chunkResults = await Promise.all(chunkArray(withdrawalLineIds, 150).map((chunk) => supabase
     .from('tgd_customer_withdrawal_line_pallet_picks')
     .select(`
       withdrawal_line_id,

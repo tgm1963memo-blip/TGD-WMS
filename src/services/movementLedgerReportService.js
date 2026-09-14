@@ -45,11 +45,23 @@ export async function resolveDocumentConfirmedDates(documents, documentType, toS
   // broad date range's document count can require several chunks and
   // sequential round trips were adding real, noticeable latency to this
   // report's load time.
+  // .neq('from_status', toStatus): excludes a same-status no-op event (an
+  // unrelated later edit/re-save of an already-confirmed document, which
+  // logs from_status === to_status === toStatus rather than a genuine
+  // transition into it) from being picked up as if it were the real
+  // confirmation moment. Confirmed real gap: a TGM deposit request genuinely
+  // received 2026-06-30 had its only RECEIVED_CONFIRMED timeline rows be 10
+  // such no-op saves dated over two months later (2026-09-11 onward, from
+  // an unrelated edit) — picking the earliest of those as "when it was
+  // received" pushed the date past the August billing period entirely,
+  // silently dropping ~200 tons / ~32,700 THB of storage billing for that
+  // one lot family instead of just miscounting a cycle.
   const chunkResults = await Promise.all(chunks.map((chunk) => supabase
     .from('tgd_customer_document_timeline_events')
     .select('document_id, created_at')
     .eq('document_type', documentType)
     .eq('to_status', toStatus)
+    .neq('from_status', toStatus)
     .in('document_id', chunk)));
 
   const earliestEventDateByDocId = new Map();

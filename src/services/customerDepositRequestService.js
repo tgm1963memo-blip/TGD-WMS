@@ -714,20 +714,6 @@ export async function addAdminDepositRequestLine(depositRequestId, {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
-// Update only the location on a deposit line. Deliberately omits every
-// other field (actualBoxes/actualWeight/lotNo/etc.) rather than echoing
-// back a caller-supplied "existing" snapshot of them -- the RPC falls back
-// to whatever is currently live on the row for any field left null
-// (coalesce(p_actual_boxes, v_line.actual_boxes), and so on), so leaving
-// them out is what actually preserves the current value. Passing a
-// snapshot instead risks silently reverting a concurrent edit (e.g. an
-// admin correcting actual_boxes) with stale data -- a real risk once a
-// caller might be replaying this from an offline queue queued hours
-// earlier (see src/features/handheld/HandheldPage.jsx's LocationUpdateWorkflow).
-export async function updateDepositLineLocation(lineId, locationId) {
-  return recordDepositLineActualReceipt(lineId, { locationId });
-}
-
 // "คงเหลือพร้อมเบิก" (remaining available-for-withdrawal) for ONE deposit
 // line, for display on the receiving/"ระบุ Location" screens alongside the
 // pallet-allocation UI -- distinct from "เหลือที่ยังไม่ระบุ location" (see
