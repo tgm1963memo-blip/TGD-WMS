@@ -1340,10 +1340,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <label className="form-field">
                   <span>เลข Pallet</span>
                   <select className="form-control" value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)} disabled={!selectedLocObj || palletCapacity === 0}>
-                    {selectedLocObj && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                    {selectedLocObj && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
+                    {/* Every pallet number stays selectable even if already in use --
+                        a duplicate is only a non-blocking warning now, not a hard
+                        restriction (see tgd_add_deposit_line_location_allocation). */}
                     {Array.from({ length: palletCapacity }, (_, i) => i + 1)
-                      .filter((n) => !palletTaken.has(n))
-                      .map((n) => <option key={n} value={n}>{n}</option>)}
+                      .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
                   </select>
                 </label>
                 {selectedLocObj && (

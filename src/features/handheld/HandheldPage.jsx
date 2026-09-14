@@ -1160,10 +1160,15 @@ function ReceivingWorkflow({ onBack, t }) {
                       <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
                         disabled={!selectedLocation || palletCapacity === 0}
                         style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
-                        {selectedLocation && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                        {selectedLocation && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
+                        {/* Every pallet number 1..capacity stays selectable, even one
+                            that already has other stock on it -- a duplicate is only
+                            ever a non-blocking warning now (see
+                            tgd_add_deposit_line_location_allocation), not a hard
+                            restriction, so hiding "taken" numbers here would make
+                            them impossible to pick even though saving them is fine. */}
                         {Array.from({ length: palletCapacity }, (_, i) => i + 1)
-                          .filter((n) => !palletTaken.has(n))
-                          .map((n) => <option key={n} value={n}>{n}</option>)}
+                          .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
                       </select>
                     </div>
                   </div>
@@ -2808,11 +2813,13 @@ function LocationUpdateWorkflow({ onBack, t }) {
                     <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
                       disabled={!selectedLocation || (isOnline && palletCapacity === 0)}
                       style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
-                      {isOnline && selectedLocation && palletCapacity === 0 && <option value="">เต็มแล้ว (0 ว่าง)</option>}
+                      {isOnline && selectedLocation && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
                       {!isOnline && selectedLocation && <option value="1">1 (ยืนยันตอนซิงค์)</option>}
+                      {/* Every pallet number stays selectable even if already in use --
+                          a duplicate is only a non-blocking warning now, not a hard
+                          restriction (see tgd_add_deposit_line_location_allocation). */}
                       {isOnline && Array.from({ length: palletCapacity }, (_, i) => i + 1)
-                        .filter((n) => !palletTaken.has(n))
-                        .map((n) => <option key={n} value={n}>{n}</option>)}
+                        .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
                     </select>
                   </div>
                 </div>
