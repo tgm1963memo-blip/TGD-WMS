@@ -420,8 +420,13 @@ export function WarehouseLayoutWidget() {
               <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>ไม่มีข้อมูล Location นี้</div>
             ) : (
               <>
+                {/* Count DISTINCT pallet numbers, not allocation rows -- a
+                    pallet can now hold more than one tracking code (a
+                    duplicate assignment is a warning, not a block), so
+                    pallets.length alone would overcount how many of the
+                    row's real physical slots are actually in use. */}
                 <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>
-                  ใช้ไป {pallets.length}/{palletCapacity} pallet
+                  ใช้ไป {new Set(pallets.map((p) => p.palletNo)).size}/{palletCapacity} pallet
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -434,16 +439,19 @@ export function WarehouseLayoutWidget() {
                     </thead>
                     <tbody>
                       {Array.from({ length: palletCapacity }, (_, i) => i + 1).map((palletNo) => {
-                        const p = pallets.find((item) => item.palletNo === palletNo);
+                        // .filter (not .find) -- more than one tracking code
+                        // can share this pallet number now, and all of them
+                        // must show, not just whichever sorts first.
+                        const items = pallets.filter((item) => item.palletNo === palletNo);
                         return (
                           <tr key={palletNo}>
                             <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{palletNo}</td>
-                            {p ? (
+                            {items.length > 0 ? (
                               <>
-                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{p.trackingCode ?? '-'}</td>
-                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{p.productName ?? p.customerProductCode ?? '-'}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.trackingCode ?? '-').join(', ')}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.productName ?? p.customerProductCode ?? '-').join(', ')}</td>
                                 <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>
-                                  {p.remainingBoxes ?? p.boxes ?? '-'} กล่อง{p.weight != null ? ` · ${p.weight} กก.` : ''}
+                                  {items.map((p) => `${p.remainingBoxes ?? p.boxes ?? '-'} กล่อง${p.weight != null ? ` · ${p.weight} กก.` : ''}`).join(' + ')}
                                 </td>
                               </>
                             ) : (

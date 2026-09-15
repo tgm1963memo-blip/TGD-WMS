@@ -86,6 +86,47 @@ describe('getSectionsWithOccupancy', () => {
     expect(data[0].locations[0].isOccupied).toBe(false);
   });
 
+  it('counts two tracking codes sharing the same pallet number as ONE used slot, not two', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/services/supabaseClient.js', () => ({
+      supabase: {
+        from: (table) => {
+          if (table === 'tgd_zones') {
+            return chainableSelect({
+              data: [{
+                id: 'zone-1', zone_code: '41', zone_name: 'ห้องเย็น 41', temperature_type: 'FROZEN', is_active: true,
+                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01', capacity: 14 }] }],
+              }],
+              error: null,
+            });
+          }
+          if (table === 'tgd_customer_deposit_line_locations') {
+            // A duplicate pallet assignment is now a non-blocking warning, not
+            // a hard error (see tgd_add_deposit_line_location_allocation), so
+            // two different tracking codes can genuinely share pallet_no 1.
+            return chainableSelect({
+              data: [
+                { id: 'alloc-1', location_id: 'loc-1', pallet_no: 1, boxes: 5 },
+                { id: 'alloc-2', location_id: 'loc-1', pallet_no: 1, boxes: 7 },
+              ],
+              error: null,
+            });
+          }
+          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
+            return chainableSelect({ data: [], error: null });
+          }
+          throw new Error(`Unexpected table: ${table}`);
+        },
+      },
+    }));
+    const { getSectionsWithOccupancy } = await import('../../src/services/warehouseLayoutService.js');
+
+    const { data } = await getSectionsWithOccupancy();
+
+    expect(data[0].used).toBe(1);
+    expect(data[0].locations[0].usedCount).toBe(1);
+  });
+
   it('leaves a location empty when it has no allocations', async () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({

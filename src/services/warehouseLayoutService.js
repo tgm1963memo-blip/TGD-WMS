@@ -112,18 +112,26 @@ export async function getSectionsWithOccupancy() {
   if (error) return { data: [], error };
 
   // A row now holds several pallets, not one binary occupied/empty slot, so
-  // occupancy is a COUNT of pallets in use per location, compared against
-  // that location's capacity. tgd_customer_deposit_line_locations (one row
-  // per pallet a line's stock was placed on) is the single source of truth
-  // for this -- both the backfill from the pre-pallet-split model and every
-  // new "add storage" action write to it, so it always reflects reality
-  // without needing the old dual tgd_stock_balances/deposit-line fallback.
+  // occupancy is a COUNT of pallet SLOTS in use per location, compared
+  // against that location's capacity. tgd_customer_deposit_line_locations
+  // (one row per pallet a line's stock was placed on) is the single source
+  // of truth for this -- both the backfill from the pre-pallet-split model
+  // and every new "add storage" action write to it, so it always reflects
+  // reality without needing the old dual tgd_stock_balances/deposit-line
+  // fallback.
   const [{ data: allocations }, pickedByAllocationId] = await Promise.all([
-    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, boxes'),
+    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes'),
     getPickedBoxesByAllocationId(),
   ]);
 
-  const usedCountMap = new Map();
+  // Count DISTINCT pallet numbers with remaining stock, not allocation rows
+  // -- a pallet slot can now hold more than one tracking code (duplicate
+  // pallet assignment is a non-blocking warning, not an error, see
+  // tgd_add_deposit_line_location_allocation), so two allocations sharing
+  // the same physical pallet must still only count as ONE used slot, not
+  // two. Confirmed real gap: a row with e.g. 3 tracking codes crammed onto
+  // 1 pallet showed as "3/12 used" on the dashboard instead of "1/12".
+  const activePalletsByLocation = new Map();
   for (const a of allocations ?? []) {
     if (!a.location_id) continue;
     // A pallet with a known box count that's been fully picked out no
@@ -131,8 +139,14 @@ export async function getSectionsWithOccupancy() {
     // receipts) is conservatively always counted as occupied.
     const remaining = a.boxes == null ? 1 : Number(a.boxes) - (pickedByAllocationId.get(a.id) ?? 0);
     if (remaining > 0) {
-      usedCountMap.set(a.location_id, (usedCountMap.get(a.location_id) ?? 0) + 1);
+      const palletSet = activePalletsByLocation.get(a.location_id) ?? new Set();
+      palletSet.add(a.pallet_no);
+      activePalletsByLocation.set(a.location_id, palletSet);
     }
+  }
+  const usedCountMap = new Map();
+  for (const [locationId, palletSet] of activePalletsByLocation) {
+    usedCountMap.set(locationId, palletSet.size);
   }
 
   const sections = (zones ?? []).map((zone) => {
