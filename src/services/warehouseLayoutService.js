@@ -5,7 +5,12 @@ import { parseLocationCode, buildLocationCode, formatRowLabel } from '../utils/l
 // created without an explicit capacity fall back to this. A row can still
 // exceed it in practice (see tgd_add_deposit_line_location_allocation's
 // pallet_over_capacity warning, non-blocking) -- this is just the default.
-const DEFAULT_ROW_CAPACITY = 16;
+// Exported so the dashboard can flag a row as over the warehouse's real
+// standard even when its own `capacity` column was raised above 16 to match
+// a pre-existing historical count (see the 20260915090000 backfill) --
+// those rows are still over the normal rule, just no longer over their own
+// (adjusted) capacity field.
+export const DEFAULT_ROW_CAPACITY = 16;
 
 function missing() {
   return { data: null, error: new Error('Supabase client not configured.') };

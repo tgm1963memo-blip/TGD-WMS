@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSectionsWithOccupancy, getPalletDetailsAtLocation } from '../../services/warehouseLayoutService.js';
+import { getSectionsWithOccupancy, getPalletDetailsAtLocation, DEFAULT_ROW_CAPACITY } from '../../services/warehouseLayoutService.js';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
@@ -41,8 +41,11 @@ function RowBar({ location, onClick }) {
   // pallet_over_capacity warning) -- staff can keep adding pallets past it,
   // so this can legitimately go above 100% and needs its own distinct color/
   // marker instead of just clamping to the same "full" red as an exactly-at-
-  // capacity row.
-  const overCapacity = capacity > 0 && used > capacity;
+  // capacity row. Also flag a row over the warehouse's real standard of 16
+  // even when its own capacity field was raised to match a pre-existing
+  // historical count (e.g. 23, 17) -- that backfill made `used > capacity`
+  // stop firing for those rows, but they're still over the normal rule.
+  const overCapacity = (capacity > 0 && used > capacity) || used > DEFAULT_ROW_CAPACITY;
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
   const color = overCapacity ? '#dc2626' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
@@ -173,8 +176,12 @@ export function WarehouseLayoutWidget() {
     const result = [];
     for (const sec of sections) {
       for (const loc of sec.locations ?? []) {
-        if (loc.capacity > 0 && (loc.usedCount ?? 0) > loc.capacity) {
-          result.push({ sectionId: sec.id, id: loc.id, code: loc.location_code, used: loc.usedCount, capacity: loc.capacity });
+        const used = loc.usedCount ?? 0;
+        // Same rule as RowBar's overCapacity: over the row's own configured
+        // capacity, OR over the warehouse's real standard of 16 even when
+        // capacity was raised to match a pre-existing historical count.
+        if ((loc.capacity > 0 && used > loc.capacity) || used > DEFAULT_ROW_CAPACITY) {
+          result.push({ sectionId: sec.id, id: loc.id, code: loc.location_code, used, capacity: loc.capacity });
         }
       }
     }
