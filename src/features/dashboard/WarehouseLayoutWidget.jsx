@@ -37,21 +37,27 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500'
 function RowBar({ location, onClick }) {
   const capacity = location.capacity || 0;
   const used = location.usedCount || 0;
+  // Capacity is advisory (see tgd_add_deposit_line_location_allocation's
+  // pallet_over_capacity warning) -- staff can keep adding pallets past it,
+  // so this can legitimately go above 100% and needs its own distinct color/
+  // marker instead of just clamping to the same "full" red as an exactly-at-
+  // capacity row.
+  const overCapacity = capacity > 0 && used > capacity;
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
-  const color = pctColor(pct);
+  const color = overCapacity ? '#dc2626' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
 
   return (
     <div
       onClick={() => onClick?.(location.id, location.location_code)}
-      title={location.location_code}
+      title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
-        borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer',
-        background: '#fff', transition: 'background 0.15s',
+        borderRadius: 8, border: overCapacity ? '1px solid #fca5a5' : '1px solid #e5e7eb', cursor: 'pointer',
+        background: overCapacity ? '#fef2f2' : '#fff', transition: 'background 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? '#fee2e2' : '#f8fafc'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = overCapacity ? '#fef2f2' : '#fff'; }}
     >
       <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : '#64748b', width: 64, flexShrink: 0 }}>
         {parsed ? formatRowLabel(parsed.row) : '-'}
@@ -59,8 +65,8 @@ function RowBar({ location, onClick }) {
       <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 700, color, width: 48, textAlign: 'right', flexShrink: 0 }}>
-        {used}/{capacity}
+      <span style={{ fontSize: 12, fontWeight: 700, color, width: overCapacity ? 68 : 48, textAlign: 'right', flexShrink: 0 }}>
+        {used}/{capacity}{overCapacity ? ' ⚠' : ''}
       </span>
     </div>
   );
@@ -158,6 +164,23 @@ export function WarehouseLayoutWidget() {
 
   const selected = sections.find((s) => s.id === selectedId) ?? sections[0];
 
+  // Flattened across every section (not just the currently selected tab) so
+  // a manager sees it the moment the dashboard loads, regardless of which
+  // section they land on -- capacity is advisory (non-blocking warning at
+  // save time), so this is the one place that surfaces every row currently
+  // over its own configured capacity in one glance.
+  const overCapacityLocations = useMemo(() => {
+    const result = [];
+    for (const sec of sections) {
+      for (const loc of sec.locations ?? []) {
+        if (loc.capacity > 0 && (loc.usedCount ?? 0) > loc.capacity) {
+          result.push({ sectionId: sec.id, id: loc.id, code: loc.location_code, used: loc.usedCount, capacity: loc.capacity });
+        }
+      }
+    }
+    return result;
+  }, [sections]);
+
   if (loading && sections.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>กำลังโหลดผังคลัง...</div>
@@ -190,6 +213,39 @@ export function WarehouseLayoutWidget() {
 
       {/* Left: grid + section list */}
       <div style={{ padding: '20px' }}>
+        {/* Over-capacity notification -- capacity is advisory only, so this
+            is the one place staff see every row that's currently past its
+            own configured limit, across every section, at a glance. */}
+        {overCapacityLocations.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: '#fef3c7', border: '1px solid #f5c451', borderRadius: 10,
+            padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#8a5300',
+          }}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>⚠</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                พบ {overCapacityLocations.length} แถวที่มี pallet เกินความจุที่ตั้งไว้
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {overCapacityLocations.map((loc) => (
+                  <button
+                    key={loc.id}
+                    type="button"
+                    onClick={() => { setSelectedId(loc.sectionId); handleLocClick(loc.id, loc.code); }}
+                    style={{
+                      border: '1px solid #f5c451', background: '#fff', borderRadius: 6,
+                      padding: '3px 8px', fontSize: 12, fontWeight: 600, color: '#8a5300', cursor: 'pointer',
+                    }}
+                  >
+                    {loc.code} ({loc.used}/{loc.capacity})
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Section tabs */}
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
           {sections.map((sec) => (
