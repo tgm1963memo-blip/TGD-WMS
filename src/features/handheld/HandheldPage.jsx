@@ -31,7 +31,7 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
-import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, listQueued as listQueuedOfflineActions, syncQueue as syncOfflineQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -707,9 +707,12 @@ function ReceivingWorkflow({ onBack, t }) {
         boxes: boxes !== '' ? Number(boxes) : null, weight: weight !== '' ? Number(weight) : null,
       });
       if (allocResult.error) { setSaving(false); setSaveError(allocResult.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
-      setPalletWarning(allocResult.data?.pallet_already_in_use
-        ? `⚠ Pallet ${allocPalletNo} ที่ ${selectedLocation.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
-        : '');
+      setPalletWarning(buildPalletAllocationWarning({
+        palletAlreadyInUse: allocResult.data?.pallet_already_in_use,
+        palletOverCapacity: allocResult.data?.pallet_over_capacity,
+        palletNo: allocPalletNo,
+        locationCode: selectedLocation.code,
+      }));
     }
     setSaving(false);
 
@@ -1157,19 +1160,22 @@ function ReceivingWorkflow({ onBack, t }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>เลข Pallet</div>
-                      <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
-                        disabled={!selectedLocation || palletCapacity === 0}
-                        style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
-                        {selectedLocation && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
-                        {/* Every pallet number 1..capacity stays selectable, even one
-                            that already has other stock on it -- a duplicate is only
-                            ever a non-blocking warning now (see
-                            tgd_add_deposit_line_location_allocation), not a hard
-                            restriction, so hiding "taken" numbers here would make
-                            them impossible to pick even though saving them is fine. */}
+                      {/* A free number input (not a strict <select>) -- both a
+                          duplicate pallet number and one past the row's
+                          configured capacity are non-blocking warnings now
+                          (see tgd_add_deposit_line_location_allocation), so
+                          staff can type in any pallet number a row genuinely
+                          needs instead of being capped at whatever capacity
+                          happens to be configured. The datalist still
+                          suggests 1..capacity, flagging occupied ones. */}
+                      <input type="number" min="1" list="pallet-options-receiving"
+                        value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
+                        disabled={!selectedLocation}
+                        style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }} />
+                      <datalist id="pallet-options-receiving">
                         {Array.from({ length: palletCapacity }, (_, i) => i + 1)
                           .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
-                      </select>
+                      </datalist>
                     </div>
                   </div>
                 ) : (
@@ -2445,9 +2451,12 @@ function LocationUpdateWorkflow({ onBack, t }) {
     setSaving(false);
     if (result.error) { setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
-    setPalletWarning(result.data?.pallet_already_in_use
-      ? `⚠ Pallet ${palletNo} ที่ ${selectedLocation.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
-      : '');
+    setPalletWarning(buildPalletAllocationWarning({
+      palletAlreadyInUse: result.data?.pallet_already_in_use,
+      palletOverCapacity: result.data?.pallet_over_capacity,
+      palletNo,
+      locationCode: selectedLocation.code,
+    }));
 
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === selectedLine.customer_product_code);
     const quantityParts = [];
@@ -2810,17 +2819,22 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 4 }}>เลข Pallet</div>
-                    <select value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
-                      disabled={!selectedLocation || (isOnline && palletCapacity === 0)}
-                      style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
-                      {isOnline && selectedLocation && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
+                    {/* A free number input (not a strict <select>) -- both a
+                        duplicate pallet number and one past the row's
+                        configured capacity are non-blocking warnings now
+                        (see tgd_add_deposit_line_location_allocation), so
+                        staff can type in any pallet number a row genuinely
+                        needs. Offline, the exact slot is only verified once
+                        the queued action syncs back online. */}
+                    <input type="number" min="1" list="pallet-options-location-update"
+                      value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)}
+                      disabled={!selectedLocation}
+                      style={{ width: '100%', boxSizing: 'border-box', background: selectedLocation ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: selectedLocation ? C.text : C.muted, outline: 'none', minHeight: 48 }} />
+                    <datalist id="pallet-options-location-update">
                       {!isOnline && selectedLocation && <option value="1">1 (ยืนยันตอนซิงค์)</option>}
-                      {/* Every pallet number stays selectable even if already in use --
-                          a duplicate is only a non-blocking warning now, not a hard
-                          restriction (see tgd_add_deposit_line_location_allocation). */}
                       {isOnline && Array.from({ length: palletCapacity }, (_, i) => i + 1)
                         .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
-                    </select>
+                    </datalist>
                   </div>
                 </div>
               ) : (

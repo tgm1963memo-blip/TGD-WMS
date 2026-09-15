@@ -12,7 +12,7 @@ import {
 } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
-const DEFAULT_CAPACITY = 14;
+const DEFAULT_CAPACITY = 16;
 
 const EMPTY_FORM = {
   zoneCode: '',

@@ -26,7 +26,7 @@ import {
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
-import { parseLocationCode, formatRowLabel, buildPalletCode } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -555,9 +555,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
     setLines((prev) => prev.map((l) => l.id === locationLine.id ? { ...l, location_id: selectedLocObj.id } : l));
     setActionMsg('เพิ่มการจัดเก็บเรียบร้อยแล้ว');
-    setAllocWarning(result.data?.pallet_already_in_use
-      ? `⚠ Pallet ${allocPalletNo} ที่ ${selectedLocObj.code} มีสินค้าอื่นอยู่แล้ว — บันทึกสำเร็จ แต่โปรดตรวจสอบ`
-      : '');
+    setAllocWarning(buildPalletAllocationWarning({
+      palletAlreadyInUse: result.data?.pallet_already_in_use,
+      palletOverCapacity: result.data?.pallet_over_capacity,
+      palletNo: allocPalletNo,
+      locationCode: selectedLocObj.code,
+    }));
     await refreshLocationLineAllocations(locationLine);
     await refreshPalletSlots(selectedLocObj.id);
   }
@@ -1339,14 +1342,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 </label>
                 <label className="form-field">
                   <span>เลข Pallet</span>
-                  <select className="form-control" value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)} disabled={!selectedLocObj || palletCapacity === 0}>
-                    {selectedLocObj && palletCapacity === 0 && <option value="">ไม่พบข้อมูลความจุ</option>}
-                    {/* Every pallet number stays selectable even if already in use --
-                        a duplicate is only a non-blocking warning now, not a hard
-                        restriction (see tgd_add_deposit_line_location_allocation). */}
+                  {/* A free number input (not a strict <select>) -- both a
+                      duplicate pallet number and one past the row's
+                      configured capacity are non-blocking warnings now (see
+                      tgd_add_deposit_line_location_allocation), so staff can
+                      type in any pallet number a row genuinely needs. */}
+                  <input className="form-control" type="number" min="1" list="pallet-options-desktop"
+                    value={allocPalletNo} onChange={(e) => setAllocPalletNo(e.target.value)} disabled={!selectedLocObj} />
+                  <datalist id="pallet-options-desktop">
                     {Array.from({ length: palletCapacity }, (_, i) => i + 1)
                       .map((n) => <option key={n} value={n}>{n}{palletTaken.has(n) ? ' (มีของอยู่)' : ''}</option>)}
-                  </select>
+                  </datalist>
                 </label>
                 {selectedLocObj && (
                   <div style={{ gridColumn: '1/-1', background: 'var(--tgd-success-light, #ecfdf5)', border: '1px solid var(--tgd-success)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>

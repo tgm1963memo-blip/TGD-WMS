@@ -1,7 +1,11 @@
 import { supabase } from './supabaseClient.js';
 import { parseLocationCode, buildLocationCode, formatRowLabel } from '../utils/locationCodeUtils.js';
 
-const DEFAULT_ROW_CAPACITY = 14;
+// Standard max pallets/row per the warehouse's own operating rule -- rows
+// created without an explicit capacity fall back to this. A row can still
+// exceed it in practice (see tgd_add_deposit_line_location_allocation's
+// pallet_over_capacity warning, non-blocking) -- this is just the default.
+const DEFAULT_ROW_CAPACITY = 16;
 
 function missing() {
   return { data: null, error: new Error('Supabase client not configured.') };

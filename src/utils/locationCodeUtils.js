@@ -36,3 +36,18 @@ export function buildPalletCode(locationCode, palletNo) {
 export function formatRowLabel(row) {
   return row === 0 ? 'รอจ่าย' : `แถว ${row}`;
 }
+
+// tgd_add_deposit_line_location_allocation always saves -- a duplicate
+// pallet number and one past the row's configured capacity are both
+// non-blocking warnings (pallet_already_in_use/pallet_over_capacity in its
+// result), not errors, so staff can still place stock exactly where it
+// physically needs to go. Shared by every "add storage" UI (both handheld
+// workflows in HandheldPage.jsx, CustomerDepositDetailModal.jsx) so the
+// warning text/logic isn't triplicated. Returns '' when neither applies.
+export function buildPalletAllocationWarning({ palletAlreadyInUse, palletOverCapacity, palletNo, locationCode }) {
+  const reasons = [];
+  if (palletAlreadyInUse) reasons.push('มีสินค้าอื่นอยู่แล้ว');
+  if (palletOverCapacity) reasons.push('เกินความจุปกติของแถวนี้');
+  if (reasons.length === 0) return '';
+  return `⚠ Pallet ${palletNo} ที่ ${locationCode} ${reasons.join(' และ ')} — บันทึกสำเร็จ แต่โปรดตรวจสอบ`;
+}
