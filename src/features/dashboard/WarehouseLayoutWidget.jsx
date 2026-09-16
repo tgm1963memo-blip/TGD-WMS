@@ -188,6 +188,23 @@ export function WarehouseLayoutWidget() {
     return result;
   }, [sections]);
 
+  // Rendered pallet-detail rows for the stock modal -- the union of every
+  // slot 1..capacity PLUS any pallet number actually in use, even past
+  // capacity. Free-text pallet entry (see HandheldPage.jsx/
+  // CustomerDepositDetailModal.jsx) lets staff save a pallet number beyond a
+  // row's capacity as a non-blocking warning, so real active stock can sit
+  // on a slot number the old Array.from({length: capacity}) loop below would
+  // never reach -- it silently vanished from this modal while still fully
+  // counted in the "used" total above it. Confirmed live: 42-R-01 (capacity
+  // 12) had active stock on pallets 13-16.
+  const modalSlotNumbers = useMemo(() => {
+    const activeNos = pallets.map((p) => p.palletNo);
+    return Array.from(new Set([
+      ...Array.from({ length: palletCapacity }, (_, i) => i + 1),
+      ...activeNos,
+    ])).sort((a, b) => a - b);
+  }, [pallets, palletCapacity]);
+
   if (loading && sections.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>กำลังโหลดผังคลัง...</div>
@@ -501,14 +518,17 @@ export function WarehouseLayoutWidget() {
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({ length: palletCapacity }, (_, i) => i + 1).map((palletNo) => {
+                      {modalSlotNumbers.map((palletNo) => {
                         // .filter (not .find) -- more than one tracking code
                         // can share this pallet number now, and all of them
                         // must show, not just whichever sorts first.
                         const items = pallets.filter((item) => item.palletNo === palletNo);
+                        const overRowCapacity = palletNo > palletCapacity;
                         return (
                           <tr key={palletNo}>
-                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{palletNo}</td>
+                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: overRowCapacity ? '#dc2626' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
+                              {palletNo}{overRowCapacity ? ' ⚠' : ''}
+                            </td>
                             {items.length > 0 ? (
                               <>
                                 <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.trackingCode ?? '-').join(', ')}</td>
