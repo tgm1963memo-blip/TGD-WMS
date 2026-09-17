@@ -259,7 +259,7 @@ export async function getActiveLocations() {
 
   const { data, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name))')
+    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name, capacity))')
     .neq('is_active', false)
     .order('zone_code');
 
@@ -271,6 +271,7 @@ export async function getActiveLocations() {
         id: l.id,
         code: l.location_code,
         name: l.location_name ?? l.location_code,
+        capacity: Number(l.capacity) || 0,
         sectionCode: zone.zone_code,
         sectionName: zone.zone_name,
         label: `${zone.zone_code} · ${l.location_code}`,

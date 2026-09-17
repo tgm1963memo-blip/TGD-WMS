@@ -9,8 +9,17 @@ import {
   updateSectionSize,
   deleteLocation,
   updateLocation,
+  getActiveLocations,
 } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
+import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
+import { listCustomerProducts, importProductLocationAssignments } from '../../services/customerProductCatalogService.js';
+import { getCustomers } from '../../services/masterDataService.js';
+import {
+  exportProductLocationAssignmentsExcel,
+  downloadProductLocationAssignmentTemplate,
+  parseProductLocationAssignmentFile,
+} from '../../utils/productLocationAssignmentExcelUtils.js';
 
 const DEFAULT_CAPACITY = 16;
 
@@ -516,6 +525,193 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
   );
 }
 
+// Renders {row, reason} pairs as a table (not a flat text list) so each
+// import/parse problem stays tied to the exact Excel row it came from --
+// the user specifically asked that import errors be called out per-line
+// rather than as one lump message covering the whole file.
+function ErrorTable({ errors }) {
+  return (
+    <div style={{ overflowX: 'auto', border: '1px solid #fecaca', borderRadius: 8 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <thead>
+          <tr style={{ background: '#fef2f2' }}>
+            <th style={{ textAlign: 'left', padding: '6px 10px', color: '#991b1b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>แถวที่</th>
+            <th style={{ textAlign: 'left', padding: '6px 10px', color: '#991b1b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>สาเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {errors.map((e, i) => (
+            <tr key={i} style={{ borderTop: '1px solid #fee2e2' }}>
+              <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: '#7f1d1d' }}>{e.row ?? '-'}</td>
+              <td style={{ padding: '6px 10px', color: '#7f1d1d' }}>{e.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Standalone Export/Import section for assigning each customer product a
+// default warehouse location via Excel -- deliberately kept separate from
+// the zone/row management above it (different data: tgd_customer_products,
+// not tgd_locations directly) and lazy-loaded only once expanded, since the
+// product catalog can run into the hundreds of rows across every customer.
+function ProductLocationAssignmentSection() {
+  const [expanded, setExpanded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [products, setProducts] = useState([]);
+  const [customersById, setCustomersById] = useState(new Map());
+  const [locations, setLocations] = useState([]);
+
+  const [parseErrors, setParseErrors] = useState([]);
+  const [previewRows, setPreviewRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  async function ensureLoaded() {
+    setLoading(true);
+    setLoadError('');
+    const [productsRes, customersRes, locationsRes] = await Promise.all([
+      listCustomerProducts(),
+      getCustomers(),
+      getActiveLocations(),
+    ]);
+    setLoading(false);
+    const firstError = productsRes.error ?? customersRes.error ?? locationsRes.error;
+    if (firstError) {
+      setLoadError(firstError.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+      return;
+    }
+    setProducts(productsRes.data ?? []);
+    setCustomersById(new Map((customersRes.data ?? []).map((c) => [c.id, c])));
+    setLocations(locationsRes.data ?? []);
+    setLoaded(true);
+  }
+
+  function handleToggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !loaded) ensureLoaded();
+  }
+
+  function handleExport() {
+    exportProductLocationAssignmentsExcel(products, customersById, locations);
+  }
+
+  function handleTemplate() {
+    downloadProductLocationAssignmentTemplate(locations);
+  }
+
+  async function handleImportFile(file) {
+    setParseErrors([]);
+    setPreviewRows([]);
+    setImportResult(null);
+    const { rows, errors } = await parseProductLocationAssignmentFile(file);
+    setParseErrors(errors);
+    setPreviewRows(rows);
+  }
+
+  async function handleConfirmImport() {
+    setImporting(true);
+    const { data, error } = await importProductLocationAssignments(previewRows);
+    setImporting(false);
+    if (error) {
+      setImportResult({ processed: 0, errors: [{ row: null, reason: error.message ?? 'Import ไม่สำเร็จ' }] });
+      return;
+    }
+    setImportResult(data);
+    if (data?.processed > 0) {
+      setPreviewRows([]);
+      await ensureLoaded();
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fff', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>จับคู่สินค้ากับ Location (Excel)</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+            Export รายการสินค้าทั้งหมดพร้อมคอลัมน์ location, แก้ไข แล้ว Import กลับเข้าระบบ
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggle}
+          style={{ padding: '6px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: expanded ? '#f1f5f9' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+        >
+          {expanded ? 'ซ่อน' : 'เปิด'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px 18px', background: '#f8fafc' }}>
+          {loading && <div style={{ color: '#94a3b8', fontSize: 13 }}>กำลังโหลดข้อมูลสินค้า...</div>}
+          {loadError && <div className="banner banner-danger" style={{ marginBottom: 12 }}>{loadError}</div>}
+
+          {loaded && (
+            <>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+                สินค้าทั้งหมด {products.length} รายการ · Location ที่ใช้ได้ {locations.length} แถว
+              </div>
+              <ExcelImportExportToolbar
+                onExport={handleExport}
+                onTemplate={handleTemplate}
+                onImportFile={handleImportFile}
+                disabled={importing}
+              />
+            </>
+          )}
+
+          {parseErrors.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#dc2626', marginBottom: 6 }}>
+                พบปัญหาในไฟล์ {parseErrors.length} รายการ (แถวเหล่านี้จะไม่ถูก import)
+              </div>
+              <ErrorTable errors={parseErrors} />
+            </div>
+          )}
+
+          {previewRows.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+                พร้อม import <strong>{previewRows.length}</strong> รายการ
+              </div>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={importing}
+                style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#fff', cursor: importing ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
+              >
+                {importing ? 'กำลัง Import...' : `ยืนยัน Import (${previewRows.length} รายการ)`}
+              </button>
+            </div>
+          )}
+
+          {importResult && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: importResult.processed > 0 ? '#2d9348' : '#dc2626', marginBottom: 6 }}>
+                Import สำเร็จ {importResult.processed ?? 0} รายการ
+              </div>
+              {importResult.errors?.length > 0 && (
+                <>
+                  <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 6 }}>
+                    ข้อผิดพลาด {importResult.errors.length} รายการ:
+                  </div>
+                  <ErrorTable errors={importResult.errors} />
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddSectionForm({ onAdd }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -840,6 +1036,8 @@ export function WarehouseLocationSetupPage() {
           </div>
         ))}
       </div>
+
+      <ProductLocationAssignmentSection />
 
       <AddSectionForm onAdd={handleAdd} />
 
