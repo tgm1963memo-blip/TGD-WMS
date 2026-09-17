@@ -3,17 +3,17 @@ import { downloadExcelWorkbookMultiSheet, readExcelFile } from './excelFileUtils
 export const PRODUCT_LOCATION_EXCEL_HEADERS = [
   'customer_code',
   'customer_name',
+  'tracking_code',
   'customer_product_code',
   'product_name',
   'location_code',
+  'note',
 ];
 
-// customer_name and product_name are reference-only -- ignored on import,
-// there purely so whoever fills in location_code can tell which product row
-// they're looking at without cross-referencing the catalog separately.
+// Only customer_code, tracking_code and location_code are used on import.
 const LOCATION_REFERENCE_HEADERS = ['location_code', 'section', 'capacity'];
 const LOCATION_REFERENCE_SHEET_NAME = 'รหัส Location ที่มีในระบบ';
-const DATA_SHEET_NAME = 'Products';
+const DATA_SHEET_NAME = 'TrackingCodes';
 
 function buildLocationReferenceRows(locations = []) {
   return locations.map((loc) => ({
@@ -23,14 +23,17 @@ function buildLocationReferenceRows(locations = []) {
   }));
 }
 
-export function mapProductToAssignmentRow(product = {}, customersById = new Map()) {
-  const customer = customersById.get(product.customer_id);
+export function mapDepositLineToAssignmentRow(line = {}, customersById = new Map()) {
+  const customer = customersById.get(line.customerId);
+  const codes = [...new Set(line.locationCodes ?? [])];
   return {
     customer_code: customer?.customer_code ?? '',
     customer_name: customer?.customer_name ?? '',
-    customer_product_code: product.customer_product_code ?? '',
-    product_name: product.product_name ?? '',
-    location_code: product.locationCode ?? '',
+    tracking_code: line.trackingCode ?? '',
+    customer_product_code: line.customerProductCode ?? '',
+    product_name: line.productName ?? '',
+    location_code: codes.length === 1 ? codes[0] : '',
+    note: codes.length > 1 ? `แบ่งเก็บ ${codes.length} location: ${codes.join(', ')}` : '',
   };
 }
 
@@ -43,9 +46,9 @@ export function exportProductLocationAssignmentsExcel(products = [], customersBy
     [
       {
         name: DATA_SHEET_NAME,
-        rows: products.map((p) => mapProductToAssignmentRow(p, customersById)),
+        rows: products.map((p) => mapDepositLineToAssignmentRow(p, customersById)),
         headers: PRODUCT_LOCATION_EXCEL_HEADERS,
-        columnWidths: [16, 28, 20, 32, 14],
+        columnWidths: [16, 28, 22, 20, 32, 14, 55],
       },
       {
         name: LOCATION_REFERENCE_SHEET_NAME,
@@ -68,13 +71,15 @@ export function downloadProductLocationAssignmentTemplate(locations = [], filena
           {
             customer_code: 'CUST-001',
             customer_name: 'ตัวอย่างชื่อลูกค้า',
+            tracking_code: 'FR260101001',
             customer_product_code: '10154-10',
             product_name: 'ตัวอย่างชื่อสินค้า',
             location_code: sampleLocationCode,
+            note: '',
           },
         ],
         headers: PRODUCT_LOCATION_EXCEL_HEADERS,
-        columnWidths: [16, 28, 20, 32, 14],
+        columnWidths: [16, 28, 22, 20, 32, 14, 55],
       },
       {
         name: LOCATION_REFERENCE_SHEET_NAME,
@@ -98,25 +103,24 @@ export function mapImportedRowsToLocationAssignments(rawRows = []) {
 
   rawRows.forEach((row) => {
     const customerCode = String(row.customer_code ?? '').trim();
-    const customerProductCode = String(row.customer_product_code ?? '').trim();
+    const trackingCode = String(row.tracking_code ?? '').trim();
 
     if (!customerCode) {
       errors.push({ row: row.__row, reason: 'customer_code ไม่ระบุ' });
       return;
     }
-    if (!customerProductCode) {
-      errors.push({ row: row.__row, reason: 'customer_product_code ไม่ระบุ' });
+    if (!trackingCode) {
+      errors.push({ row: row.__row, reason: 'tracking_code ไม่ระบุ' });
       return;
     }
 
-    // Blank is valid here -- it means "clear this product's assigned
-    // location", not "skip this row". Only a NON-blank code that fails to
-    // resolve server-side becomes an error (see the RPC).
+    // Blank location means leave this lot untouched.
     const locationCode = String(row.location_code ?? '').trim();
 
     rows.push({
+      __row: row.__row,
       customer_code: customerCode,
-      customer_product_code: customerProductCode,
+      tracking_code: trackingCode,
       location_code: locationCode,
     });
   });
@@ -126,7 +130,7 @@ export function mapImportedRowsToLocationAssignments(rawRows = []) {
 
 export async function parseProductLocationAssignmentFile(file) {
   const { headers, rows } = await readExcelFile(file);
-  const missingHeaders = ['customer_code', 'customer_product_code'].filter((key) => !headers.includes(key));
+  const missingHeaders = ['customer_code', 'tracking_code'].filter((key) => !headers.includes(key));
   if (missingHeaders.length) {
     return { rows: [], errors: [{ row: null, reason: `คอลัมน์ที่ขาดหายไป: ${missingHeaders.join(', ')}` }] };
   }

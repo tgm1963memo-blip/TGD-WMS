@@ -13,7 +13,7 @@ import {
 } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
-import { listCustomerProducts, importProductLocationAssignments } from '../../services/customerProductCatalogService.js';
+import { listDepositLinesForLocationAssignment, importDepositLineLocationAssignments } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import {
   exportProductLocationAssignmentsExcel,
@@ -552,17 +552,13 @@ function ErrorTable({ errors }) {
   );
 }
 
-// Standalone Export/Import section for assigning each customer product a
-// default warehouse location via Excel -- deliberately kept separate from
-// the zone/row management above it (different data: tgd_customer_products,
-// not tgd_locations directly) and lazy-loaded only once expanded, since the
-// product catalog can run into the hundreds of rows across every customer.
+// Lazy-loaded Excel assignments, one row per received tracking code.
 function ProductLocationAssignmentSection() {
   const [expanded, setExpanded] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [products, setProducts] = useState([]);
+  const [lines, setLines] = useState([]);
   const [customersById, setCustomersById] = useState(new Map());
   const [locations, setLocations] = useState([]);
 
@@ -574,18 +570,18 @@ function ProductLocationAssignmentSection() {
   async function ensureLoaded() {
     setLoading(true);
     setLoadError('');
-    const [productsRes, customersRes, locationsRes] = await Promise.all([
-      listCustomerProducts(),
+    const [linesRes, customersRes, locationsRes] = await Promise.all([
+      listDepositLinesForLocationAssignment(),
       getCustomers(),
       getActiveLocations(),
     ]);
     setLoading(false);
-    const firstError = productsRes.error ?? customersRes.error ?? locationsRes.error;
+    const firstError = linesRes.error ?? customersRes.error ?? locationsRes.error;
     if (firstError) {
       setLoadError(firstError.message ?? 'โหลดข้อมูลไม่สำเร็จ');
       return;
     }
-    setProducts(productsRes.data ?? []);
+    setLines(linesRes.data ?? []);
     setCustomersById(new Map((customersRes.data ?? []).map((c) => [c.id, c])));
     setLocations(locationsRes.data ?? []);
     setLoaded(true);
@@ -598,7 +594,7 @@ function ProductLocationAssignmentSection() {
   }
 
   function handleExport() {
-    exportProductLocationAssignmentsExcel(products, customersById, locations);
+    exportProductLocationAssignmentsExcel(lines, customersById, locations);
   }
 
   function handleTemplate() {
@@ -616,7 +612,7 @@ function ProductLocationAssignmentSection() {
 
   async function handleConfirmImport() {
     setImporting(true);
-    const { data, error } = await importProductLocationAssignments(previewRows);
+    const { data, error } = await importDepositLineLocationAssignments(previewRows);
     setImporting(false);
     if (error) {
       setImportResult({ processed: 0, errors: [{ row: null, reason: error.message ?? 'Import ไม่สำเร็จ' }] });
@@ -633,9 +629,9 @@ function ProductLocationAssignmentSection() {
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fff', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>จับคู่สินค้ากับ Location (Excel)</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>จับคู่รหัสติดตามกับ Location (Excel)</div>
           <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-            Export รายการสินค้าทั้งหมดพร้อมคอลัมน์ location, แก้ไข แล้ว Import กลับเข้าระบบ
+            Export ล็อตที่รับเข้าแล้วพร้อม Location เดิม แก้ไขแล้ว Import กลับ (ช่องว่าง = ไม่เปลี่ยนแปลง)
           </div>
         </div>
         <button
@@ -649,19 +645,20 @@ function ProductLocationAssignmentSection() {
 
       {expanded && (
         <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px 18px', background: '#f8fafc' }}>
-          {loading && <div style={{ color: '#94a3b8', fontSize: 13 }}>กำลังโหลดข้อมูลสินค้า...</div>}
+          {loading && <div style={{ color: '#94a3b8', fontSize: 13 }}>กำลังโหลดรหัสติดตาม...</div>}
           {loadError && <div className="banner banner-danger" style={{ marginBottom: 12 }}>{loadError}</div>}
 
           {loaded && (
             <>
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-                สินค้าทั้งหมด {products.length} รายการ · Location ที่ใช้ได้ {locations.length} แถว
+                รหัสติดตามทั้งหมด {lines.length} รายการ · Location ที่ใช้ได้ {locations.length} แถว
+                <div>ล็อตที่แบ่งเก็บหลาย Location จะแสดงใน note หากกรอก Location ใหม่ จะย้ายทุกพาเลทของล็อตไปตำแหน่งนั้น</div>
               </div>
               <ExcelImportExportToolbar
                 onExport={handleExport}
                 onTemplate={handleTemplate}
                 onImportFile={handleImportFile}
-                disabled={importing}
+                disabled={importing || loading}
               />
             </>
           )}

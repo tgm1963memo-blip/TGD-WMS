@@ -24,21 +24,18 @@ const CATALOG_SELECT = [
   'note',
   'created_at',
   'updated_at',
-  'default_location_id',
-  'location:tgd_locations(location_code)',
   'tgd_customer_product_units(id, unit_code, unit_label, weight_per_unit_kg, boxes_per_unit, display_order, is_active, note)',
 ].join(', ');
 
 // Flattens the embedded tgd_customer_product_units join into a clean
-// `units` array (active-only, ordered), and the embedded tgd_locations join
-// into a plain `locationCode` string, so callers never need to know about
-// the underlying join shape or table names.
+// `units` array (active-only, ordered) so callers never need to know about
+// the underlying join shape or table name.
 function shapeCatalogRow(row) {
-  const { tgd_customer_product_units: rawUnits, location, ...rest } = row;
+  const { tgd_customer_product_units: rawUnits, ...rest } = row;
   const units = (rawUnits ?? [])
     .filter((u) => u.is_active)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-  return { ...rest, units, locationCode: location?.location_code ?? null };
+  return { ...rest, units };
 }
 
 export async function listCustomerProducts(filters = {}) {
@@ -108,21 +105,6 @@ export async function listCustomerProductCategories(filters = {}) {
 
   const categories = [...new Set((data ?? []).map((row) => row.product_category).filter(Boolean))].sort();
   return { data: categories, error: null };
-}
-
-// Bulk-import a product<->location assignment sheet -- see
-// productLocationAssignmentExcelUtils.js and the WarehouseLocationSetupPage
-// "จับคู่สินค้ากับ Location" section. Each row resolves customer_code +
-// customer_product_code to a product and location_code (optional, blank
-// clears the assignment) to a location entirely server-side; a row that
-// doesn't resolve is skipped and reported back, never partially applied.
-export async function importProductLocationAssignments(rows) {
-  if (!supabase) return missingSupabaseClientResult();
-
-  const { data, error } = await supabase.rpc('tgd_import_product_location_assignments', {
-    p_rows: rows,
-  });
-  return { data, error };
 }
 
 export async function deactivateCustomerProduct(productId) {

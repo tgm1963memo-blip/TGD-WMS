@@ -864,3 +864,57 @@ export async function enqueueDepositRecountNotification(requestId, customerId, d
 
   return { data, error };
 }
+
+// Chunk filters to bound URL length and paginate every table to avoid the
+// PostgREST row cap, including lots with many pallet allocations.
+export async function listDepositLinesForLocationAssignment() {
+  if (!supabase) return missingSupabaseClientResult();
+  const pageSize = 1000;
+  async function collect(makeQuery) {
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await makeQuery().order('id', { ascending: true }).range(from, from + pageSize - 1);
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if (!data || data.length < pageSize) return rows;
+    }
+  }
+  try {
+    const headers = await collect(() => supabase.from('tgd_customer_deposit_requests')
+      .select('id, customer_id').in('status', ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED']));
+    const customers = new Map(headers.map((h) => [h.id, h.customer_id]));
+    const lines = [];
+    for (const ids of chunkArray(headers.map((h) => h.id), DEPOSIT_REQUEST_ID_CHUNK_SIZE)) {
+      lines.push(...await collect(() => supabase.from('tgd_customer_deposit_request_lines')
+        .select('id, deposit_request_id, tracking_code, customer_product_code, product_name')
+        .in('deposit_request_id', ids).not('tracking_code', 'is', null)));
+    }
+    const locations = new Map();
+    for (const ids of chunkArray(lines.map((l) => l.id), 150)) {
+      const allocations = await collect(() => supabase.from('tgd_customer_deposit_line_locations')
+        .select('id, line_id, tgd_locations(location_code)').in('line_id', ids));
+      for (const allocation of allocations) {
+        const code = allocation.tgd_locations?.location_code;
+        if (!code) continue;
+        if (!locations.has(allocation.line_id)) locations.set(allocation.line_id, new Set());
+        locations.get(allocation.line_id).add(code);
+      }
+    }
+    return { data: lines.map((line) => ({
+      id: line.id,
+      customerId: customers.get(line.deposit_request_id),
+      trackingCode: line.tracking_code,
+      customerProductCode: line.customer_product_code,
+      productName: line.product_name,
+      locationCodes: [...(locations.get(line.id) ?? [])].sort(),
+    })), error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+export async function importDepositLineLocationAssignments(rows) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_import_deposit_line_location_assignments', { p_rows: rows });
+  return { data, error };
+}

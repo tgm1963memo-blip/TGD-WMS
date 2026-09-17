@@ -27,7 +27,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/reports/accounting-charge-handoff-review', route_name: 'AccountingChargeHandoffReviewPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },
   { route_path: '/billing/invoice-drafts', route_name: 'InvoiceDraftListPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },
   { route_path: '/billing/invoice-drafts/:draftId', route_name: 'InvoiceDraftDetailPage', permission_area: 'accounting_review', minimum_role: 'accounting', access_level: 'read', notes: '' },
-  { route_path: '/admin/warehouse-locations', route_name: 'WarehouseLocationSetupPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
+  { route_path: '/admin/warehouse-locations', route_name: 'WarehouseLocationSetupPage', permission_area: 'admin', minimum_role: 'warehouse_admin', access_level: 'write', notes: 'Opened to warehouse_admin/warehouse_manager (and admin) so warehouse ops can manage the location layout and product-location assignments themselves' },
   { route_path: '/admin/users', route_name: 'UserManagementPage', permission_area: 'user_management', minimum_role: 'admin', access_level: 'admin', notes: '' },
   { route_path: '/admin/customer-products', route_name: 'CustomerProductCatalogAdminPage', permission_area: 'customer_catalog', minimum_role: 'admin', access_level: 'write', notes: '' },
   { route_path: '/admin/customer-request-policy', route_name: 'CustomerRequestPolicyAdminPage', permission_area: 'admin', minimum_role: 'admin', access_level: 'admin', notes: '' },
