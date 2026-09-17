@@ -9,13 +9,16 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
+import { InventoryLocationModal } from './InventoryLocationModal.jsx';
+import { canManageInventoryLocation, inventoryLocationLabel, listInventoryLocations } from '../../services/inventoryLocationService.js';
 
 const BALANCE_EXPORT_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
-  'LOT', 'รหัสติดตาม', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
+  'LOT', 'รหัสติดตาม', 'Location ปัจจุบัน / พาเลท', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
 ];
 
-function balanceExportRow(line, customerLabel) {
+function balanceExportRow(line, customerLabel, locationLabel) {
   return {
     'ลูกค้า': customerLabel,
     'รหัสสินค้า': line.customer_product_code ?? '-',
@@ -25,6 +28,7 @@ function balanceExportRow(line, customerLabel) {
     'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
     'LOT': line.lot_no ?? '-',
     'รหัสติดตาม': line.tracking_code ?? '-',
+    'Location ปัจจุบัน / พาเลท': locationLabel || 'ยังไม่กำหนด Location',
     'คงเหลือ (กล่อง)': line.actual_boxes ?? line.expected_boxes ?? 0,
     'คงเหลือ (กก.)': line.actual_weight ?? line.expected_weight ?? 0,
     'หมายเหตุลูกค้า': line.note ?? '-',
@@ -70,6 +74,12 @@ function formatDate(isoStr) {
 }
 
 export function InventoryBalancePage() {
+  const { role } = useUserRole();
+  const [locationLine, setLocationLine] = useState(null);
+  const [locationMap, setLocationMap] = useState(new Map());
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState(null);
+  const [locationRevision, setLocationRevision] = useState(0);
   const [customers, setCustomers] = useState([]);
   const [lines, setLines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,6 +136,28 @@ export function InventoryBalancePage() {
     return () => { active = false; };
   }, [asOfDate]);
 
+  useEffect(() => {
+    let active = true;
+    setLocationsLoading(true);
+    setLocationsError(null);
+    setLocationMap(new Map());
+    listInventoryLocations(lines.map(line => line.id)).then(({ data, error: failure }) => {
+      if (!active) return;
+      setLocationMap(data ?? new Map());
+      setLocationsError(failure);
+      setLocationsLoading(false);
+    });
+    return () => { active = false; };
+  }, [lines, locationRevision]);
+
+  async function refreshLocations() {
+    setLocationsLoading(true);
+    const { data, error: failure } = await listInventoryLocations(lines.map(line => line.id));
+    setLocationMap(data ?? new Map());
+    setLocationsError(failure);
+    setLocationsLoading(false);
+  }
+
   function toggleKey(key) {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
@@ -150,7 +182,8 @@ export function InventoryBalancePage() {
       (l.customer_product_code ?? '').toLowerCase().includes(q) ||
       (l.lot_no ?? '').toLowerCase().includes(q) ||
       (l.tracking_code ?? '').toLowerCase().includes(q) ||
-      (l.request?.request_no ?? '').toLowerCase().includes(q)
+      (l.request?.request_no ?? '').toLowerCase().includes(q) ||
+      inventoryLocationLabel(locationMap.get(l.id)).toLowerCase().includes(q)
     );
   });
 
@@ -215,7 +248,7 @@ export function InventoryBalancePage() {
     const rows = filtered.map((line) => {
       const customer = customers.find((c) => c.id === line.request?.customer_id);
       const customerLabel = customer?.customer_name ?? customer?.customer_code ?? line.request?.customer_id ?? '-';
-      return balanceExportRow(line, customerLabel);
+      return balanceExportRow(line, customerLabel, inventoryLocationLabel(locationMap.get(line.id)));
     });
     const stamp = asOfDate || new Date().toISOString().slice(0, 10);
     downloadExcelRows(rows, BALANCE_EXPORT_HEADERS, `stock-balance-${stamp}.xlsx`, 'Stock Balance');
@@ -276,7 +309,7 @@ export function InventoryBalancePage() {
           <input
             className="form-control"
             type="search"
-            placeholder="ชื่อสินค้า / รหัส / LOT / รหัสติดตาม / เลขที่ใบฝาก"
+            placeholder="ชื่อสินค้า / รหัส / LOT / รหัสติดตาม / ใบฝาก / Location"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
@@ -306,12 +339,16 @@ export function InventoryBalancePage() {
         <button
           type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-end' }}
           onClick={handleExportExcel}
-          disabled={filtered.length === 0}
+          disabled={filtered.length === 0 || loading || locationsLoading || !!locationsError}
           data-testid="inventory-balance-export-excel"
         >
           Export Excel
         </button>
       </div>
+
+      {locationsLoading && <p role="status">กำลังโหลด Location...</p>}
+      {locationsError && <div className="banner banner-danger" role="alert">โหลด Location ไม่สำเร็จ: {locationsError.message} <button type="button" className="btn btn-secondary btn-sm" onClick={() => setLocationRevision(value => value + 1)}>ลองโหลด Location ใหม่</button></div>}
+      {asOfDate && <p style={{ fontSize: 12 }}>Location ที่แสดงเป็นตำแหน่งปัจจุบัน ไม่ใช่ตำแหน่งย้อนหลัง หากต้องการแก้ไข กรุณาล้างวันที่เพื่อกลับมาดูยอดปัจจุบัน</p>}
 
       {/* Summary cards */}
       {!loading && !error && (
@@ -425,6 +462,7 @@ export function InventoryBalancePage() {
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รหัสติดตาม</th>
+                              <th style={{ padding: '12px', textAlign: 'left', fontSize: 11 }}>{asOfDate ? 'Location ปัจจุบัน' : 'Location / พาเลท'}</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กล่อง)</th>
                               <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กก.)</th>
                               <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุลูกค้า</th>
@@ -448,6 +486,10 @@ export function InventoryBalancePage() {
                                 </td>
                                 <td style={{ padding: '16px 12px', color: 'var(--tgd-text)', fontFamily: 'monospace', fontWeight: 600 }}>
                                   {l.tracking_code ?? '-'}
+                                </td>
+                                <td style={{ padding: '16px 12px', minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere' }}>
+                                  <div>{locationsLoading ? 'กำลังโหลด...' : locationsError ? 'โหลด Location ไม่สำเร็จ' : inventoryLocationLabel(locationMap.get(l.id)) || 'ยังไม่กำหนด Location'}</div>
+                                  {!asOfDate && canManageInventoryLocation(role) && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} disabled={locationsLoading || !!locationsError} onClick={() => setLocationLine(l)}>จัดการ Location</button>}
                                 </td>
                                 <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
                                   {l.actual_boxes?.toLocaleString() ?? (
@@ -517,6 +559,7 @@ export function InventoryBalancePage() {
         </div>
       )}
 
+      {locationLine && !asOfDate && <InventoryLocationModal key={locationLine.id} line={locationLine} onClose={() => setLocationLine(null)} onSaved={refreshLocations} />}
       <CustomerDepositDetailModal
         requestId={detailId}
         isOpen={!!detailId}
