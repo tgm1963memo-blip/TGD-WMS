@@ -19,7 +19,9 @@ import {
   updateWithdrawalLineAdminNote,
   updateWithdrawalLineSource,
   addAdminWithdrawalRequestLine,
+  setWithdrawalDispatchTime,
 } from '../../services/customerWithdrawalRequestService.js';
+import { WorkPhaseTimeControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -446,6 +448,18 @@ export function CustomerAdminWithdrawalReviewPage() {
   // narrowing this doesn't remove any capability.
   const canReject = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canCancel = canWrite && selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
+
+  async function handleRecordDispatchTime(phase, atOverride) {
+    if (!selectedId) return;
+    const { data, error } = await setWithdrawalDispatchTime(selectedId, phase, { at: atOverride ?? null });
+    if (error) {
+      setError(error.message ?? 'บันทึกเวลาไม่สำเร็จ');
+      return;
+    }
+    const atField = phase === 'START' ? 'dispatch_started_at' : 'dispatch_finished_at';
+    const byField = phase === 'START' ? 'dispatch_started_by_email' : 'dispatch_finished_by_email';
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [atField]: data.at, [byField]: data.by_email } : r)));
+  }
 
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
@@ -950,6 +964,24 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? '✔' : '-'}</div>
               </div>
+            </div>
+
+            {/* Working time (start/finish dispatch) */}
+            <div style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>เวลาปฏิบัติงาน (เบิกสินค้า)</h4>
+              <WorkPhaseTimeControl
+                canWrite={canWrite}
+                startedLabel="เริ่มเบิกสินค้า"
+                finishedLabel="เสร็จสิ้นการเบิกสินค้า"
+                startedAt={selected.dispatch_started_at}
+                startedByEmail={selected.dispatch_started_by_email}
+                finishedAt={selected.dispatch_finished_at}
+                finishedByEmail={selected.dispatch_finished_by_email}
+                onRecordStart={() => handleRecordDispatchTime('START')}
+                onRecordFinish={() => handleRecordDispatchTime('FINISH')}
+                onEditStart={(iso) => handleRecordDispatchTime('START', iso)}
+                onEditFinish={(iso) => handleRecordDispatchTime('FINISH', iso)}
+              />
             </div>
 
             {/* Print action */}

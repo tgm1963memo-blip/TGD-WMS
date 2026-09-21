@@ -17,6 +17,7 @@ import {
   listDepositLineLocationAllocations,
   addDepositLineLocationAllocation,
   removeDepositLineLocationAllocation,
+  setDepositReceivingTime,
 } from '../../services/customerDepositRequestService.js';
 import {
   listCustomerWithdrawalRequests,
@@ -28,7 +29,9 @@ import {
   recordWithdrawalLinePalletPick,
   removeWithdrawalLinePalletPick,
   listWithdrawalLinePalletPicks,
+  setWithdrawalDispatchTime,
 } from '../../services/customerWithdrawalRequestService.js';
+import { DocumentTimerCard } from './DocumentTimerCard.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
@@ -473,6 +476,7 @@ function SortDropdown({ sortType, setSortType }) {
 
 // ── Receiving workflow ────────────────────────────────────────
 function ReceivingWorkflow({ onBack, t }) {
+  const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docLineSummary, setDocLineSummary] = useState({});
@@ -927,6 +931,28 @@ function ReceivingWorkflow({ onBack, t }) {
         }
       />
 
+      <DocumentTimerCard
+        label="รับสินค้า"
+        startedAt={selectedDoc.receiving_started_at}
+        finishedAt={selectedDoc.receiving_finished_at}
+        onStart={async () => {
+          const { data, error } = await setDepositReceivingTime(selectedDoc.id, 'START', { actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, receiving_started_at: data.at } : d));
+        }}
+        onFinish={async () => {
+          const { data, error } = await setDepositReceivingTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, receiving_finished_at: data.at } : d));
+        }}
+        onEditStart={async (iso) => {
+          const { data, error } = await setDepositReceivingTime(selectedDoc.id, 'START', { at: iso, actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, receiving_started_at: data.at } : d));
+        }}
+        onEditFinish={async (iso) => {
+          const { data, error } = await setDepositReceivingTime(selectedDoc.id, 'FINISH', { at: iso, actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, receiving_finished_at: data.at } : d));
+        }}
+      />
+
       {lines.length > 0 && (
         <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>
           <div style={{
@@ -1357,6 +1383,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
 // ── Picking workflow ──────────────────────────────────────────
 function PickingWorkflow({ onBack, t }) {
+  const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docLineSummary, setDocLineSummary] = useState({});
@@ -1793,6 +1820,28 @@ function PickingWorkflow({ onBack, t }) {
             {doneCount}/{lines.length}
           </div>
         }
+      />
+
+      <DocumentTimerCard
+        label="เบิกสินค้า"
+        startedAt={selectedDoc.dispatch_started_at}
+        finishedAt={selectedDoc.dispatch_finished_at}
+        onStart={async () => {
+          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
+        }}
+        onFinish={async () => {
+          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
+        }}
+        onEditStart={async (iso) => {
+          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { at: iso, actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
+        }}
+        onEditFinish={async (iso) => {
+          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { at: iso, actorProfileId: activeProfile?.id });
+          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
+        }}
       />
 
       {lines.length > 0 && (

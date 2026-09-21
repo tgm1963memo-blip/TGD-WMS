@@ -22,6 +22,10 @@ const DEPOSIT_HEADER_SELECT = [
   'note',
   'vehicle_registration',
   'arrival_time',
+  'receiving_started_at',
+  'receiving_started_by_email',
+  'receiving_finished_at',
+  'receiving_finished_by_email',
   'requires_r3_document',
   'created_by_email',
   'created_by_role',
@@ -679,6 +683,25 @@ export async function recordDepositLineActualReceipt(lineId, {
     p_location_id: locationId || null,
     p_customer_product_code: toNullableText(customerProductCode),
     p_temperature_type: toNullableText(temperatureType),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Stamps when warehouse work on a receiving document actually started/
+// finished (phase: 'START' | 'FINISH'). `at` overrides the server's `now()`
+// for after-the-fact corrections; `actorProfileId` lets the Scan Center
+// handheld client (a shared, PIN-identified session) attribute the stamp to
+// the PIN-verified staff member instead of whoever is logged into the
+// device — the RPC only trusts it after re-resolving it server-side.
+export async function setDepositReceivingTime(requestId, phase, { at = null, actorProfileId = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_deposit_receiving_time', {
+    p_request_id: requestId,
+    p_phase: phase,
+    p_at: at,
+    p_actor_profile_id: actorProfileId,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

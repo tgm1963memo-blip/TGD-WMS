@@ -33,6 +33,11 @@ function fmtDate(v) {
   const parts = s.split('-');
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
 }
+function fmtTime(iso) {
+  if (!iso) return null;
+  try { return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return null; }
+}
 
 const NCOLS = 14;
 const TH = { border: '1px solid #ccc', padding: '4px 2px', background: '#f0f0f0', fontSize: 9, fontWeight: 700, textAlign: 'center', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' };
@@ -414,14 +419,16 @@ function CustomerWithdrawalRequestPrintDocumentPage({
         </div>
         <div style={{ display: 'flex', gap: 24, alignItems: 'center', borderTop: '1px solid #ccc', paddingTop: 6, fontSize: 10, flexWrap: 'nowrap' }}>
           {[
-            ['TRUCK NO', 100],
-            ['SEAL NO', 80],
-            ['START', 60],
-            ['FINISH', 60],
-          ].map(([label, w]) => (
+            ['TRUCK NO', 100, null],
+            ['SEAL NO', 80, null],
+            ['START', 60, fmtTime(header.dispatch_started_at)],
+            ['FINISH', 60, fmtTime(header.dispatch_finished_at)],
+          ].map(([label, w, value]) => (
             <div key={label} style={{ display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>
               <strong>{label}</strong>
-              <span style={{ borderBottom: '1px solid #000', minWidth: w, display: 'inline-block' }}>&nbsp;</span>
+              <span style={{ borderBottom: '1px solid #000', minWidth: w, display: 'inline-block', fontWeight: value ? 700 : 400 }}>
+                {value ?? ' '}
+              </span>
             </div>
           ))}
         </div>

@@ -22,6 +22,10 @@ const WITHDRAWAL_HEADER_SELECT = [
   'destination',
   'vehicle_registration',
   'note',
+  'dispatch_started_at',
+  'dispatch_started_by_email',
+  'dispatch_finished_at',
+  'dispatch_finished_by_email',
   'requires_r3_document',
   'created_by_email',
   'created_by_role',
@@ -488,6 +492,25 @@ export async function recordWithdrawalLinePick(lineId, pickedBoxes, pickedWeight
   });
 
   return { data, error };
+}
+
+// Stamps when warehouse work on a withdrawal/dispatch document actually
+// started/finished (phase: 'START' | 'FINISH'). `at` overrides the server's
+// `now()` for after-the-fact corrections; `actorProfileId` lets the Scan
+// Center handheld client attribute the stamp to the PIN-verified staff
+// member rather than whoever is logged into the shared device — mirrors
+// setDepositReceivingTime in customerDepositRequestService.js.
+export async function setWithdrawalDispatchTime(requestId, phase, { at = null, actorProfileId = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_dispatch_time', {
+    p_request_id: requestId,
+    p_phase: phase,
+    p_at: at,
+    p_actor_profile_id: actorProfileId,
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
 // Every pallet a deposit line's stock currently sits on that still has

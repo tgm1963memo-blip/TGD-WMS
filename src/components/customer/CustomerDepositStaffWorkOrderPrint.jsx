@@ -31,6 +31,11 @@ function fmtDT(iso) {
       + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   } catch { return iso; }
 }
+function fmtTime(iso) {
+  if (!iso) return '-';
+  try { return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return '-'; }
+}
 
 const META_KEY = { fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap', paddingBottom: 2 };
 // whiteSpace:normal + overflow-wrap/word-break so a long, unbroken value
@@ -161,8 +166,14 @@ function CustomerDepositStaffWorkOrderPrintPage({
           <tr>
             <td style={META_KEY}>RECEIVE DATE</td>
             <td style={META_VAL}>{fmtDate(header.expected_arrival_date)}</td>
-            <td style={{ ...META_KEY, fontSize: 10 }}>ARR TIME / START / FINISH</td>
+            <td style={META_KEY}>ARR TIME</td>
             <td style={META_VAL}>{fmt(header.arrival_time)}</td>
+          </tr>
+          <tr>
+            <td style={META_KEY}>START</td>
+            <td style={META_VAL}>{fmtTime(header.receiving_started_at)}</td>
+            <td style={META_KEY}>FINISH</td>
+            <td style={META_VAL}>{fmtTime(header.receiving_finished_at)}</td>
           </tr>
           <tr>
             <td style={META_KEY}>GOODS TEMP</td>

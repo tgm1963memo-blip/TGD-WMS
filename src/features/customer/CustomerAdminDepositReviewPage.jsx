@@ -20,7 +20,9 @@ import {
   addAdminDepositRequestLine,
   enqueueCustomerDepositNotification,
   enqueueDepositRecountNotification,
+  setDepositReceivingTime,
 } from '../../services/customerDepositRequestService.js';
+import { WorkPhaseTimeControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -243,6 +245,18 @@ export function CustomerAdminDepositReviewPage() {
     const newStatus = acceptResult.data?.status ?? 'WAREHOUSE_RECEIVING';
     setActionMsg(t('admin_work_order_opened'));
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, status: newStatus } : r)));
+  }
+
+  async function handleRecordReceivingTime(phase, atOverride) {
+    if (!selectedId) return;
+    const { data, error } = await setDepositReceivingTime(selectedId, phase, { at: atOverride ?? null });
+    if (error) {
+      setError(error.message ?? 'บันทึกเวลาไม่สำเร็จ');
+      return;
+    }
+    const atField = phase === 'START' ? 'receiving_started_at' : 'receiving_finished_at';
+    const byField = phase === 'START' ? 'receiving_started_by_email' : 'receiving_finished_by_email';
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [atField]: data.at, [byField]: data.by_email } : r)));
   }
 
   async function handleRequestRecount() {
@@ -725,6 +739,24 @@ export function CustomerAdminDepositReviewPage() {
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? '✔' : '-'}</div>
               </div>
+            </div>
+
+            {/* Working time (start/finish receiving) */}
+            <div style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>เวลาปฏิบัติงาน (รับสินค้า)</h4>
+              <WorkPhaseTimeControl
+                canWrite={canWrite}
+                startedLabel="เริ่มรับสินค้า"
+                finishedLabel="เสร็จสิ้นการรับสินค้า"
+                startedAt={selected.receiving_started_at}
+                startedByEmail={selected.receiving_started_by_email}
+                finishedAt={selected.receiving_finished_at}
+                finishedByEmail={selected.receiving_finished_by_email}
+                onRecordStart={() => handleRecordReceivingTime('START')}
+                onRecordFinish={() => handleRecordReceivingTime('FINISH')}
+                onEditStart={(iso) => handleRecordReceivingTime('START', iso)}
+                onEditFinish={(iso) => handleRecordReceivingTime('FINISH', iso)}
+              />
             </div>
 
             {/* Print actions — single set */}
