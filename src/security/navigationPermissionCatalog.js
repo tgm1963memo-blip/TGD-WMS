@@ -44,6 +44,16 @@ const ACTION_PERMISSIONS = [
     label: 'บันทึกเวลาเริ่ม/สิ้นสุดการเบิก/จ่ายสินค้า',
     defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
   },
+  {
+    functionKey: 'customer_deposit_record_receiving_temperature',
+    label: 'บันทึกอุณหภูมิสินค้า/รถขนส่งตอนรับเข้า',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
+  },
+  {
+    functionKey: 'customer_withdrawal_record_dispatch_temperature',
+    label: 'บันทึกอุณหภูมิสินค้า/รถขนส่งตอนเบิก-จ่าย',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
+  },
 ];
 
 function registerFunction(entry) {

@@ -7,7 +7,7 @@ import { ReportPrintActions } from '../reports/ReportPrintActions.jsx';
 import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOrderPrint.jsx';
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
-import { getTemperatureTypeLabel, getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { printSticker, printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
 import {
   getCustomerDepositRequest,
@@ -15,6 +15,8 @@ import {
   reviewCustomerDepositRequest,
   recordDepositLineActualReceipt,
   addAdminDepositRequestLine,
+  setDepositReceivingTime,
+  setDepositReceivingTemperature,
   recallConfirmedDepositRequest,
   enqueueCustomerDepositNotification,
   cancelCustomerDepositRequest,
@@ -34,6 +36,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from './WorkPhaseTimeControl.jsx';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -47,6 +50,7 @@ function fmtDate(v) {
 // (customer entered the wrong code, or the physical delivery didn't
 // include everything they declared).
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const DEPOSIT_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 
 // tgd_customer_document_timeline_events.action values this document type
 // actually produces (customerDocumentTimelineService.js reads the raw
@@ -125,6 +129,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [notifying, setNotifying] = useState(false);
   const [lineNotes, setLineNotes] = useState({});
   const [savingNote, setSavingNote] = useState({});
+  const [lineTemperatureTypes, setLineTemperatureTypes] = useState({});
+  const [savingTemperatureType, setSavingTemperatureType] = useState({});
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [addLineCode, setAddLineCode] = useState('');
@@ -162,8 +168,13 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       const loadedLines = lRes.data ?? [];
       setLines(loadedLines);
       const initNotes = {};
-      loadedLines.forEach((l) => { initNotes[l.id] = l.actual_note ?? ''; });
+      const initTemperatureTypes = {};
+      loadedLines.forEach((l) => {
+        initNotes[l.id] = l.actual_note ?? '';
+        initTemperatureTypes[l.id] = l.temperature_type ?? '';
+      });
       setLineNotes(initNotes);
+      setLineTemperatureTypes(initTemperatureTypes);
       setTimelineEvents(tRes.data ?? []);
       setLoading(false);
       if (hRes.data?.customer_id) {
@@ -280,6 +291,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   // request's admin/accounting status guard (blocked only once terminal).
   const canCancel = header && ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'COUNT_VARIANCE_REVIEW', 'ADMIN_RECOUNT_REQUESTED'].includes(header.status);
   const canRequestRecount = header && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(header.status);
+  const canWriteReceiving = ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'].includes(userRole);
   // Client-side mirror of tgd_recall_confirmed_deposit_request's 24-hour
   // window check — just for hiding the button once it's obviously too
   // late; the RPC re-checks this authoritatively regardless (a stale
@@ -299,6 +311,38 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const newStatus = r.data?.status ?? 'ADMIN_RECOUNT_REQUESTED';
     setActionMsg('ขอตรวจนับใหม่เรียบร้อยแล้ว — handheld สามารถนับสินค้าใหม่ได้');
     updateHeaderStatus(newStatus);
+  }
+
+  async function handleRecordReceivingTime(phase, at = null) {
+    if (!requestId) return;
+    setSubmitting(true); setError(''); setActionMsg('');
+    const r = await setDepositReceivingTime(requestId, phase, { at });
+    setSubmitting(false);
+    if (r.error) {
+      setError(r.error.message ?? 'บันทึกเวลารับเข้าไม่สำเร็จ');
+      return;
+    }
+    const atField = phase === 'START' ? 'receiving_started_at' : 'receiving_finished_at';
+    const byField = phase === 'START' ? 'receiving_started_by_email' : 'receiving_finished_by_email';
+    setHeader((prev) => prev ? {
+      ...prev,
+      [atField]: r.data?.[atField] ?? r.data?.recorded_at ?? at ?? new Date().toISOString(),
+      [byField]: r.data?.[byField] ?? r.data?.recorded_by_email ?? prev[byField],
+    } : prev);
+    setActionMsg('บันทึกเวลารับเข้าเรียบร้อยแล้ว');
+  }
+
+  async function handleSaveReceivingTemperature(field, value) {
+    if (!requestId) return;
+    setError('');
+    const r = await setDepositReceivingTemperature(requestId, field, value);
+    if (r.error) {
+      setError(r.error.message ?? 'บันทึกอุณหภูมิไม่สำเร็จ');
+      return;
+    }
+    const targetField = field === 'GOODS' ? 'goods_temp' : 'truck_temp';
+    setHeader((prev) => prev ? { ...prev, [targetField]: r.data?.value ?? value } : prev);
+    setActionMsg('บันทึกอุณหภูมิเรียบร้อยแล้ว');
   }
 
   async function handleRecallConfirmed() {
@@ -608,12 +652,29 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <div className="form-label">{t('customer_field_vehicle_registration')}</div>
                 <div>{header.vehicle_registration ?? '-'}</div>
               </div>
-              <div>
-                <div className="form-label">อุณหภูมิจัดเก็บ (ที่ลูกค้าแจ้ง)</div>
-                <div style={{ fontWeight: 600, color: header.goods_temp ? 'var(--tgd-primary)' : 'var(--tgd-muted-text)' }}>
-                  {header.goods_temp ?? '-'}
-                </div>
-              </div>
+              <WorkPhaseTimeControl
+                canWrite={canWriteReceiving}
+                startedLabel="เริ่มลงสินค้า"
+                finishedLabel="เสร็จสิ้นการลงสินค้า"
+                startedAt={header.receiving_started_at}
+                startedByEmail={header.receiving_started_by_email}
+                finishedAt={header.receiving_finished_at}
+                finishedByEmail={header.receiving_finished_by_email}
+                fallbackDate={header.expected_arrival_date}
+                onRecordStart={() => handleRecordReceivingTime('START')}
+                onRecordFinish={() => handleRecordReceivingTime('FINISH')}
+                onEditStart={(iso) => handleRecordReceivingTime('START', iso)}
+                onEditFinish={(iso) => handleRecordReceivingTime('FINISH', iso)}
+              />
+              <WorkPhaseTemperatureControl
+                canWrite={canWriteReceiving}
+                goodsLabel="อุณหภูมิสินค้า (ตอนรับเข้า)"
+                truckLabel="อุณหภูมิรถ/ตู้คอนเทนเนอร์"
+                goodsTemp={header.goods_temp}
+                truckTemp={header.truck_temp}
+                onSaveGoods={(value) => handleSaveReceivingTemperature('GOODS', value)}
+                onSaveTruck={(value) => handleSaveReceivingTemperature('TRUCK', value)}
+              />
             </div>
 
             {/* Print actions */}
@@ -731,7 +792,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       <th>{t('catalog_col_product_name')}</th>
                       <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>LOT</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กก./หน่วย</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>การจัดเก็บ</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>อุณหภูมิ</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>กล่อง</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>น้ำหนัก กก.</th>
                       <th style={{ whiteSpace: 'nowrap' }}>หมายเหตุ (Admin)</th>
@@ -751,11 +812,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       const actualWtColor = line.actual_weight == null
                         ? 'var(--tgd-muted-text)'
                         : weightVariance ? 'var(--tgd-warning, #d97706)' : 'var(--tgd-success, #16a34a)';
-                      const weightPerBox = line.weight_per_box ?? (
+                      const weightPerBoxRaw = line.weight_per_box ?? (
                         line.expected_boxes && line.expected_weight
-                          ? (Number(line.expected_weight) / Number(line.expected_boxes)).toFixed(2)
+                          ? Number(line.expected_weight) / Number(line.expected_boxes)
                           : null
                       );
+                      const weightPerBox = weightPerBoxRaw != null ? Number(weightPerBoxRaw).toFixed(2) : null;
                       return (
                         <tr key={line.id} style={hasVariance ? { background: '#fff9e6' } : {}}>
                           <td>
@@ -770,7 +832,51 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                           <td>{line.product_name ?? '-'}</td>
                           <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>
                           <td style={{ textAlign: 'right', color: 'var(--tgd-muted-text)' }}>{weightPerBox ?? '-'}</td>
-                          <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
+                          <td style={{ minWidth: 150 }}>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <select
+                                className="form-control"
+                                style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                                value={lineTemperatureTypes[line.id] ?? line.temperature_type ?? ''}
+                                onChange={(e) => setLineTemperatureTypes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                              >
+                                <option value="">--</option>
+                                {DEPOSIT_LINE_TEMPERATURE_TYPES.map((type) => (
+                                  <option key={type} value={type}>{TEMPERATURE_TYPE_LABELS[type] ?? type}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={!canWriteReceiving || savingTemperatureType[line.id]}
+                                style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                                onClick={async () => {
+                                  const nextTemperatureType = lineTemperatureTypes[line.id] ?? '';
+                                  setSavingTemperatureType((prev) => ({ ...prev, [line.id]: true }));
+                                  const r = await recordDepositLineActualReceipt(line.id, {
+                                    actualBoxes: line.actual_boxes,
+                                    actualWeight: line.actual_weight,
+                                    note: line.actual_note,
+                                    lotNo: line.lot_no,
+                                    mfgDate: line.mfg_date,
+                                    expDate: line.exp_date,
+                                    locationId: line.location_id,
+                                    temperatureType: nextTemperatureType,
+                                  });
+                                  setSavingTemperatureType((prev) => ({ ...prev, [line.id]: false }));
+                                  if (!r.error) {
+                                    const savedTemperatureType = r.data?.temperature_type ?? (nextTemperatureType || null);
+                                    setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, temperature_type: savedTemperatureType } : l));
+                                    setLineTemperatureTypes((prev) => ({ ...prev, [line.id]: savedTemperatureType ?? '' }));
+                                  } else {
+                                    setError(r.error.message ?? 'บันทึกอุณหภูมิไม่สำเร็จ');
+                                  }
+                                }}
+                              >
+                                {savingTemperatureType[line.id] ? '…' : '💾'}
+                              </button>
+                            </div>
+                          </td>
                           <td style={{ textAlign: 'right' }}>
                             <span style={{ fontWeight: 700, color: actualBoxColor }}>
                               {line.actual_boxes != null ? line.actual_boxes : <small>ยังไม่บันทึก</small>}

@@ -34,6 +34,58 @@ export function combineDateWithEditedTime(existingIso, hhmm) {
   return base.toISOString();
 }
 
+export function formatDateYYYYMMDD(value) {
+  if (!value) return null;
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly;
+    const d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (
+      d.getFullYear() === Number(year)
+      && d.getMonth() === Number(month) - 1
+      && d.getDate() === Number(day)
+    ) {
+      return `${year}-${month}-${day}`;
+    }
+    return null;
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const yyyy = String(d.getFullYear()).padStart(4, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function combineDateAndEditedTime(yyyyMmDd, hhmm) {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(yyyyMmDd ?? '').trim());
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? '').trim());
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [, hours, minutes] = timeMatch;
+  const d = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    0,
+    0,
+  );
+  if (
+    Number.isNaN(d.getTime())
+    || d.getFullYear() !== Number(year)
+    || d.getMonth() !== Number(month) - 1
+    || d.getDate() !== Number(day)
+    || d.getHours() !== Number(hours)
+    || d.getMinutes() !== Number(minutes)
+  ) {
+    return null;
+  }
+  return d.toISOString();
+}
+
 export function formatTimeHHmm(iso) {
   if (!iso) return null;
   try {

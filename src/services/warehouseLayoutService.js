@@ -90,23 +90,38 @@ async function insertLocationsWithSchemaFallback(rows) {
 // re-querying/re-summing the same rows itself). Pass a specific list of
 // allocation ids to scope the query (e.g. to one location's pallets);
 // omit it to sum across every allocation in the warehouse.
-export async function getPickedBoxesByAllocationId(allocationIds = null) {
+export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
   const pickedByAllocationId = new Map();
   if (!supabase) return pickedByAllocationId;
   if (allocationIds && allocationIds.length === 0) return pickedByAllocationId;
 
-  let query = supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes');
+  let query = supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes, weight');
   if (allocationIds) query = query.in('deposit_line_location_id', allocationIds);
   const { data: picks } = await query;
 
   for (const p of picks ?? []) {
     if (!p.deposit_line_location_id) continue;
+    const current = pickedByAllocationId.get(p.deposit_line_location_id) ?? { boxes: 0, weight: 0 };
     pickedByAllocationId.set(
       p.deposit_line_location_id,
-      (pickedByAllocationId.get(p.deposit_line_location_id) ?? 0) + Number(p.boxes || 0)
+      {
+        boxes: current.boxes + Number(p.boxes || 0),
+        weight: current.weight + Number(p.weight || 0),
+      }
     );
   }
   return pickedByAllocationId;
+}
+
+export async function getPickedBoxesByAllocationId(allocationIds = null) {
+  const pickedQuantities = await getPickedQuantitiesByAllocationId(allocationIds);
+  return new Map([...pickedQuantities.entries()].map(([id, qty]) => [id, qty.boxes]));
+}
+
+function hasRemainingAllocationStock(allocation, picked = { boxes: 0, weight: 0 }) {
+  if (allocation?.boxes != null) return Number(allocation.boxes) - Number(picked.boxes || 0) > 0;
+  if (allocation?.weight != null) return Number(allocation.weight) - Number(picked.weight || 0) > 0;
+  return true;
 }
 
 export async function getSectionsWithOccupancy() {
@@ -129,8 +144,8 @@ export async function getSectionsWithOccupancy() {
   // reality without needing the old dual tgd_stock_balances/deposit-line
   // fallback.
   const [{ data: allocations }, pickedByAllocationId] = await Promise.all([
-    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes'),
-    getPickedBoxesByAllocationId(),
+    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight'),
+    getPickedQuantitiesByAllocationId(),
   ]);
 
   // Count DISTINCT pallet numbers with remaining stock, not allocation rows
@@ -143,11 +158,10 @@ export async function getSectionsWithOccupancy() {
   const activePalletsByLocation = new Map();
   for (const a of allocations ?? []) {
     if (!a.location_id) continue;
-    // A pallet with a known box count that's been fully picked out no
-    // longer occupies a slot; one with no box count at all (weight-only
-    // receipts) is conservatively always counted as occupied.
-    const remaining = a.boxes == null ? 1 : Number(a.boxes) - (pickedByAllocationId.get(a.id) ?? 0);
-    if (remaining > 0) {
+    // A pallet that is fully picked out no longer occupies a slot. Use boxes
+    // when available, otherwise fall back to weight for weight-only/history
+    // rows before treating an unknown quantity as still occupied.
+    if (hasRemainingAllocationStock(a, pickedByAllocationId.get(a.id))) {
       const palletSet = activePalletsByLocation.get(a.location_id) ?? new Set();
       palletSet.add(a.pallet_no);
       activePalletsByLocation.set(a.location_id, palletSet);
@@ -216,25 +230,31 @@ export async function getPalletDetailsAtLocation(locationId) {
   if (error) return { data: { capacity, pallets: [] }, error };
 
   const allocationIds = (allocations ?? []).map((a) => a.id);
-  const pickedByAllocationId = await getPickedBoxesByAllocationId(allocationIds);
+  const pickedByAllocationId = await getPickedQuantitiesByAllocationId(allocationIds);
 
   const pallets = (allocations ?? [])
     .map((a) => {
-      const picked = pickedByAllocationId.get(a.id) ?? 0;
-      const remainingBoxes = a.boxes != null ? Math.max(0, Number(a.boxes) - picked) : null;
+      const picked = pickedByAllocationId.get(a.id) ?? { boxes: 0, weight: 0 };
+      const remainingBoxes = a.boxes != null ? Math.max(0, Number(a.boxes) - picked.boxes) : null;
+      const remainingWeight = a.weight != null ? Math.max(0, Number(a.weight) - picked.weight) : null;
       return {
         allocationId: a.id,
         palletNo: a.pallet_no,
         boxes: a.boxes,
         weight: a.weight,
         remainingBoxes,
+        remainingWeight,
         lineId: a.line_id,
         trackingCode: a.tgd_customer_deposit_request_lines?.tracking_code ?? null,
         productName: a.tgd_customer_deposit_request_lines?.product_name ?? null,
         customerProductCode: a.tgd_customer_deposit_request_lines?.customer_product_code ?? null,
       };
     })
-    .filter((p) => p.remainingBoxes == null || p.remainingBoxes > 0);
+    .filter((p) => {
+      if (p.boxes != null) return p.remainingBoxes > 0;
+      if (p.weight != null) return p.remainingWeight > 0;
+      return true;
+    });
 
   return { data: { capacity, pallets }, error: null };
 }

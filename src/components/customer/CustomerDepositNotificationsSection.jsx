@@ -34,6 +34,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
   const [state, setState] = useState({ rows: [], loading: true, error: null });
   const [filterText, setFilterText] = useState('');
   const [filterStatuses, setFilterStatuses] = useState([]);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -216,12 +217,21 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
     return matchText && matchStatus && matchCustomer && matchDateFrom && matchDateTo;
   });
 
+  function toggleStatusFilter(status) {
+    setFilterStatuses((prev) => (
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    ));
+  }
+
   const bulkEligibleRows = filteredRows.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
   const selectedRequestRows = filteredRows
     .filter((r) => selectedRequestIds.has(r.id))
     .sort((a, b) => new Date(a.created_at ?? 0) - new Date(b.created_at ?? 0));
   const hasCustomerMismatch = new Set(selectedRequestRows.map((r) => r.customer_id)).size > 1;
   const branding = getDocumentBrandingConfig();
+  const statusFilterSummary = filterStatuses.length
+    ? `${filterStatuses.length} สถานะ`
+    : '-- สถานะทุกรายการ --';
 
   return (
     <section className="table-card customer-deposit-notifications-section" data-testid={testId}>
@@ -230,8 +240,8 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
         <span className="form-helper">{t('receiving_customer_deposit_section_hint')}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px' }}>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 200px', maxWidth: 300 }}>
+      <div className="deposit-notifications-filter-row">
+        <label className="form-label deposit-notifications-filter-row__search">
           {'ค้นหา'}
           <input
             className="form-control"
@@ -241,7 +251,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             onChange={(e) => setFilterText(e.target.value)}
           />
         </label>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 180px', maxWidth: 240 }}>
+        <label className="form-label deposit-notifications-filter-row__customer">
           {'ลูกค้า'}
           <select
             className="form-control"
@@ -254,38 +264,45 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             ))}
           </select>
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
-          <span className="form-label" style={{ margin: 0 }}>
+        <div className="form-label deposit-notifications-status-filter">
+          <span>
             {'สถานะ (เลือกได้หลายรายการ — ใช้กรองทั้งตารางและตอนดาวน์โหลด Excel)'}
           </span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="form-control deposit-notifications-status-filter__button"
+            data-testid="deposit-notifications-status-dropdown-button"
+            aria-expanded={statusFilterOpen}
+            onClick={() => setStatusFilterOpen((open) => !open)}
+          >
+            <span>{statusFilterSummary}</span>
+            <span aria-hidden="true">v</span>
+          </button>
+          {statusFilterOpen ? (
+          <div
+            className="deposit-notifications-status-filter__menu"
+            data-testid="deposit-notifications-status-dropdown-menu"
+          >
             {WAREHOUSE_DEPOSIT_STATUSES.map((status) => {
               const active = filterStatuses.includes(status);
               return (
-                <button
+                <label
                   key={status}
-                  type="button"
-                  data-testid={`deposit-notifications-status-chip-${status}`}
-                  onClick={() => setFilterStatuses((prev) => (
-                    prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-                  ))}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 999,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    border: active ? '1px solid #2d9348' : '1px solid var(--tgd-border)',
-                    background: active ? '#2d9348' : '#fff',
-                    color: active ? '#fff' : '#334155',
-                  }}
+                  className="deposit-notifications-status-filter__option"
                 >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() => toggleStatusFilter(status)}
+                  />
                   {getDepositStatusLabel(status, t)}
-                </button>
+                </label>
               );
             })}
           </div>
+          ) : null}
         </div>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+        <label className="form-label deposit-notifications-filter-row__date">
           {'วันที่แจ้งฝาก (ตั้งแต่)'}
           <input
             className="form-control"
@@ -294,7 +311,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
             onChange={(e) => setFilterDateFrom(e.target.value)}
           />
         </label>
-        <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+        <label className="form-label deposit-notifications-filter-row__date">
           {'วันที่แจ้งฝาก (ถึง)'}
           <input
             className="form-control"
@@ -306,9 +323,9 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
         {(filterText || filterStatuses.length > 0 || filterCustomer || filterDateFrom || filterDateTo) ? (
           <button
             type="button"
-            className="btn"
-            onClick={() => { setFilterText(''); setFilterStatuses([]); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); }}
-            style={{ alignSelf: 'flex-end', background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
+            className="btn deposit-notifications-filter-row__button"
+            onClick={() => { setFilterText(''); setFilterStatuses([]); setFilterCustomer(''); setFilterDateFrom(''); setFilterDateTo(''); setStatusFilterOpen(false); }}
+            style={{ background: '#f0f4f8', border: '1px solid var(--tgd-border)' }}
           >
             {'ล้างตัวกรอง'}
           </button>
@@ -371,10 +388,21 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
       )}
 
       <div className="responsive-table">
-        <table className="data-table" data-testid="receiving-customer-deposit-table">
+        <table className="data-table receiving-customer-deposit-table" data-testid="receiving-customer-deposit-table">
+          <colgroup>
+            <col className="receiving-customer-deposit-table__select-col" />
+            <col className="receiving-customer-deposit-table__request-col" />
+            <col className="receiving-customer-deposit-table__customer-col" />
+            <col className="receiving-customer-deposit-table__status-col" />
+            <col className="receiving-customer-deposit-table__date-col" />
+            <col className="receiving-customer-deposit-table__contact-col" />
+            <col className="receiving-customer-deposit-table__phone-col" />
+            <col className="receiving-customer-deposit-table__note-col" />
+            <col className="receiving-customer-deposit-table__action-col" />
+          </colgroup>
           <thead>
             <tr>
-              <th>
+              <th className="receiving-customer-deposit-table__select-cell">
                 <input
                   type="checkbox"
                   aria-label="เลือกทั้งหมด"
@@ -395,7 +423,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
           <tbody>
             {filteredRows.length ? filteredRows.map((row) => (
               <tr key={row.id}>
-                <td>
+                <td className="receiving-customer-deposit-table__select-cell">
                   <input
                     type="checkbox"
                     aria-label={`เลือก ${row.request_no}`}
@@ -404,23 +432,23 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
                     onChange={() => toggleRequestSelected(row.id)}
                   />
                 </td>
-                <td>
+                <td className="receiving-customer-deposit-table__request-cell">
                   <a className="table-action-link" href={`/customer/deposit-request/${row.id}`} onClick={(e) => {
                     e.preventDefault();
                     setDetailId(row.id);
                   }}>{row.request_no}</a>
                 </td>
-                <td>{row.customer?.customer_name || row.customer?.name || row.customer_id || '-'}</td>
+                <td className="receiving-customer-deposit-table__customer-cell">{row.customer?.customer_name || row.customer?.name || row.customer_id || '-'}</td>
                 <td>
                   <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                     {getDepositStatusLabel(row.status, t)}
                   </span>
                 </td>
-                <td>{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
-                <td>{row.contact_name ?? '-'}</td>
-                <td>{row.contact_phone ?? '-'}</td>
-                <td>{row.note || '-'}</td>
-                <td>
+                <td className="receiving-customer-deposit-table__compact-cell">{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
+                <td className="receiving-customer-deposit-table__compact-cell">{row.contact_name ?? '-'}</td>
+                <td className="receiving-customer-deposit-table__compact-cell">{row.contact_phone ?? '-'}</td>
+                <td className="receiving-customer-deposit-table__note-cell" title={row.note || ''}>{row.note || '-'}</td>
+                <td className="receiving-customer-deposit-table__action-cell">
                   <button
                     className="btn btn-secondary btn-sm"
                     data-testid={`receiving-review-deposit-${row.id}`}

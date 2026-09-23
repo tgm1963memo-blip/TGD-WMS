@@ -40,7 +40,7 @@ export function WithdrawalRequestListPage() {
   }, []);
 
   return (
-    <section className={getPageShellClassName()}>
+    <section className={getPageShellClassName('page-shell withdrawal-list-page')}>
       <PageHeader
         title="Withdrawal Requests"
         description={t('withdrawal_list_description_golive')}

@@ -26,6 +26,7 @@ import { listAllProductServiceRates } from '../../services/productServiceRatesSe
 import {
   getDepositInventoryLines,
 } from '../../services/customerDepositRequestService.js';
+import { uploadCustomerDocumentAttachments } from '../../services/customerDocumentAttachmentService.js';
 import {
   mapWithdrawalHeaderForCopy,
   mapWithdrawalLinesForCopy,
@@ -54,6 +55,7 @@ import { useTranslation } from '../../i18n/languageProvider.jsx';
 // dispatch is never planned this far out. See DateInputDMY's BUDDHIST_ERA_OFFSET
 // comment for the sibling class of year-typo it already guards against.
 const MAX_DISPATCH_DATE_DAYS_AHEAD = 180;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 function maxDispatchDateIso() {
   const d = new Date();
   d.setDate(d.getDate() + MAX_DISPATCH_DATE_DAYS_AHEAD);
@@ -69,6 +71,10 @@ const INITIAL_HEADER = {
   note: '',
   requires_r3_document: false,
 };
+
+function formatFileSize(size) {
+  return `${(size / 1024).toFixed(1)} KB`;
+}
 
 export function CustomerWithdrawalRequestCreatePage() {
   const t = useTranslation();
@@ -91,6 +97,8 @@ export function CustomerWithdrawalRequestCreatePage() {
   // billingRateCalc.js. Mirrors the deposit create page's equivalent.
   const [auxServiceOptions, setAuxServiceOptions] = useState([]);
   const [selectedAuxServices, setSelectedAuxServices] = useState({}); // rateId -> { checked, quantity, id }
+  const [r3Attachments, setR3Attachments] = useState([]);
+  const [r3AttachmentError, setR3AttachmentError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [importNotice, setImportNotice] = useState('');
   const [importing, setImporting] = useState(false);
@@ -373,6 +381,18 @@ export function CustomerWithdrawalRequestCreatePage() {
     setSubmitError('');
   }
 
+  function handleR3Attachments(event) {
+    const selected = Array.from(event.target.files ?? []);
+    const oversized = selected.find((file) => file.size > MAX_ATTACHMENT_SIZE);
+    setR3AttachmentError(oversized ? t('customer_deposit_attachment_size_error').replace('{filename}', oversized.name) : '');
+    setR3Attachments((current) => [
+      ...current,
+      ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
+    ]);
+    if (selected.length) updateHeaderField('requires_r3_document', true);
+    event.target.value = '';
+  }
+
   async function handleImportFile(file) {
     setImporting(true);
     setSubmitError('');
@@ -474,13 +494,20 @@ export function CustomerWithdrawalRequestCreatePage() {
           }
         }
 
-        const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, allDepositLines, activeLines);
+        const {
+          availableBoxBalance,
+          availableWtBalance,
+          exceedsBoxBalance,
+          exceedsWtBalance,
+        } = getWithdrawalBalanceInfo(line, allDepositLines, activeLines);
+        const availableBoxBalanceLabel = Math.max(0, availableBoxBalance);
+        const availableWtBalanceLabel = Math.max(0, availableWtBalance);
         if (exceedsBoxBalance) {
-          setSubmitError(`รายการที่ ${displayRowNo(line)}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (มี ${maxBoxBalance} กล่อง)`);
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: จำนวนกล่องที่เบิกเกินยอดคงเหลือ (เหลือให้ใช้ ${availableBoxBalanceLabel} กล่อง)`);
           return;
         }
         if (exceedsWtBalance) {
-          setSubmitError(`รายการที่ ${displayRowNo(line)}: น้ำหนักที่เบิกเกินยอดคงเหลือ (มี ${maxWtBalance.toFixed(2)} กก.)`);
+          setSubmitError(`รายการที่ ${displayRowNo(line)}: น้ำหนักที่เบิกเกินยอดคงเหลือ (เหลือให้ใช้ ${availableWtBalanceLabel.toFixed(2)} กก.)`);
           return;
         }
       }
@@ -607,6 +634,24 @@ export function CustomerWithdrawalRequestCreatePage() {
             return;
           }
         }
+      }
+
+      if (r3Attachments.length) {
+        const attachmentResult = await uploadCustomerDocumentAttachments({
+          documentType: 'CUSTOMER_WITHDRAWAL_REQUEST',
+          documentId: requestId,
+          customerId: effectiveCustomerId,
+          files: r3Attachments,
+          uploadedByUserId: profile?.id ?? null,
+          uploadedByEmail: profile?.email ?? null,
+        });
+
+        if (attachmentResult.error) {
+          setSubmitError(attachmentResult.error.message ?? 'อัปโหลดใบ ร.3 ไม่สำเร็จ');
+          return;
+        }
+
+        setR3Attachments([]);
       }
 
       if (!shouldSubmit) {
@@ -790,6 +835,39 @@ export function CustomerWithdrawalRequestCreatePage() {
             <span>{t('customer_field_r3_document')}</span>
           </label>
         </div>
+
+        <div className="customer-attachment-panel">
+          <label className="form-field">
+            <span>แนบใบ ร.3</span>
+            <input
+              accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+              data-testid="customer-withdrawal-r3-attachment-input"
+              multiple
+              onChange={handleR3Attachments}
+              type="file"
+            />
+          </label>
+          <p className="form-helper" data-testid="customer-withdrawal-r3-attachment-demo-note">
+            ไฟล์จะถูกอัปโหลดและแนบกับใบเบิกนี้เมื่อบันทึกหรือส่งคำขอ
+          </p>
+          {r3AttachmentError ? <p className="field-error" role="alert">{r3AttachmentError}</p> : null}
+          <ul className="customer-attachment-list" data-testid="customer-withdrawal-r3-attachment-list">
+            {r3Attachments.map((file, index) => (
+              <li key={`${file.name}-${file.lastModified}`}>
+                <span>{file.name} ({file.type || 'unknown'}, {formatFileSize(file.size)})</span>
+                <button
+                  className="btn btn-secondary"
+                  data-testid="customer-withdrawal-r3-attachment-remove-button"
+                  onClick={() => setR3Attachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  type="button"
+                >
+                  {t('customer_deposit_attachment_remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {hasBalanceExceeded ? (
           <div className="banner banner-danger" role="alert" data-testid="customer-withdrawal-balance-exceeded-banner">
             มีรายการเบิกเกินยอดคงเหลือ กรุณาแก้ไขจำนวนกล่อง/น้ำหนักให้ไม่เกินยอดคงเหลือก่อนส่งคำขอ

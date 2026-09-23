@@ -20,7 +20,7 @@ export function ReceivingListPage() {
   }, []);
 
   return (
-    <section className={getPageShellClassName()}>
+    <section className={getPageShellClassName('page-shell receiving-list-page')}>
       <PageHeader
         title={t('receiving') || 'Receiving'}
         description={goLive ? t('receiving_list_description_golive') : t('receiving_customer_deposit_section_hint')}

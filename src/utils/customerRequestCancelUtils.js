@@ -173,7 +173,8 @@ export function getWithdrawalRecallEligibility(header, role) {
 
 export function formatRequestWeight(value) {
   if (value === null || value === undefined || value === '') return '-';
-  return `${value}`;
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : `${value}`;
 }
 
 // Mirrors the server's has_receipt_variance flag (round(x,3) <> round(y,3) —

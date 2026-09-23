@@ -362,7 +362,14 @@ export function CustomerWithdrawalLinesTable({
 
             const matchedDL = getMatchedDepositLine(line, sourceDepositLines);
             const weightPerBox = matchedDL?.weight_per_box ? Number(matchedDL.weight_per_box) : null;
-            const { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance } = getWithdrawalBalanceInfo(line, sourceDepositLines, lines);
+            const {
+              availableBoxBalance,
+              availableWtBalance,
+              exceedsBoxBalance,
+              exceedsWtBalance,
+            } = getWithdrawalBalanceInfo(line, sourceDepositLines, lines);
+            const availableBoxBalanceLabel = Math.max(0, availableBoxBalance);
+            const availableWtBalanceLabel = Math.max(0, availableWtBalance);
 
             const qtyMode = line.withdrawal_qty_mode || WITHDRAWAL_QTY_MODES.WEIGHT;
             const selectedProduct = catalogProducts.find((p) => p.id === line.catalog_product_id);
@@ -567,7 +574,7 @@ export function CustomerWithdrawalLinesTable({
                   />
                   {exceedsBoxBalance && (
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
-                      เกินยอดคงเหลือ (มี {maxBoxBalance} กล่อง)
+                      เกินยอดคงเหลือ (เหลือให้ใช้ {availableBoxBalanceLabel} กล่อง)
                     </div>
                   )}
                 </td>
@@ -591,7 +598,7 @@ export function CustomerWithdrawalLinesTable({
                   />
                   {exceedsWtBalance && (
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
-                      เกินยอดคงเหลือ (มี {maxWtBalance.toFixed(2)} กก.)
+                      เกินยอดคงเหลือ (เหลือให้ใช้ {availableWtBalanceLabel.toFixed(2)} กก.)
                     </div>
                   )}
                 </td>

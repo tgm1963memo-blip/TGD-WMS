@@ -82,6 +82,16 @@ describe('User management + catalog frontend wiring', () => {
     });
   });
 
+  it('adds user management filters for name, company, and email', () => {
+    const page = read(path.join(process.cwd(), 'src/features/admin/UserManagementPage.jsx'));
+
+    expect(page).toContain('user-mgmt-filter-name');
+    expect(page).toContain('user-mgmt-filter-company');
+    expect(page).toContain('user-mgmt-filter-email');
+    expect(page).toContain('filteredProfiles');
+    expect(page).toContain('data={filteredProfiles}');
+  });
+
   it('registers routes and navigation entries', () => {
     const routes = read(path.join(process.cwd(), 'src/app/routes.jsx'));
     const navigation = read(path.join(process.cwd(), 'src/app/navigation.js'));

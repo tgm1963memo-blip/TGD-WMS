@@ -55,6 +55,10 @@ describe('getWithdrawalBalanceInfo', () => {
 
     // 60 + 60 = 120 > 100 available — at least one of the two must be flagged
     // so the draft as a whole can't be submitted.
+    expect(infoA.availableBoxBalance).toBe(40);
+    expect(infoB.availableBoxBalance).toBe(40);
+    expect(infoA.availableWtBalance).toBe(200);
+    expect(infoB.availableWtBalance).toBe(200);
     expect(infoA.exceedsBoxBalance || infoB.exceedsBoxBalance).toBe(true);
     expect(infoA.exceedsWtBalance || infoB.exceedsWtBalance).toBe(true);
   });
@@ -79,6 +83,8 @@ describe('getWithdrawalBalanceInfo', () => {
     const infoA = getWithdrawalBalanceInfo(lineA, [depositLine], siblings);
     const infoB = getWithdrawalBalanceInfo(lineB, [depositLine], siblings);
 
+    expect(infoA.availableBoxBalance).toBe(50);
+    expect(infoB.availableBoxBalance).toBe(50);
     expect(infoA.exceedsBoxBalance).toBe(false);
     expect(infoB.exceedsBoxBalance).toBe(false);
   });

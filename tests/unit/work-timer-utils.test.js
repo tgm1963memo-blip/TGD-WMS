@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDurationBetween,
+  combineDateAndEditedTime,
   combineDateWithEditedTime,
+  formatDateYYYYMMDD,
   formatTimeHHmm,
 } from '../../src/utils/workTimerUtils.js';
 
@@ -52,6 +54,40 @@ describe('combineDateWithEditedTime', () => {
 
   it('returns null for a malformed time string', () => {
     expect(combineDateWithEditedTime('2026-09-19T09:37:00.000Z', 'not-a-time')).toBeNull();
+  });
+});
+
+describe('combineDateAndEditedTime', () => {
+  it('combines an explicit historical date with the edited time', () => {
+    const iso = combineDateAndEditedTime('2026-07-15', '14:30');
+    const d = new Date(iso);
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(6); // July (0-indexed)
+    expect(d.getDate()).toBe(15);
+    expect(d.getHours()).toBe(14);
+    expect(d.getMinutes()).toBe(30);
+  });
+
+  it('returns null when either date or time is malformed', () => {
+    expect(combineDateAndEditedTime('not-a-date', '14:30')).toBeNull();
+    expect(combineDateAndEditedTime('2026-07-15', 'bad-time')).toBeNull();
+    expect(combineDateAndEditedTime('2026-02-31', '14:30')).toBeNull();
+  });
+});
+
+describe('formatDateYYYYMMDD', () => {
+  it('keeps date-only document dates unchanged for historical edits', () => {
+    expect(formatDateYYYYMMDD('2026-07-15')).toBe('2026-07-15');
+  });
+
+  it('formats an ISO timestamp as YYYY-MM-DD for date inputs', () => {
+    expect(formatDateYYYYMMDD('2026-07-15T12:00:00Z')).toBe('2026-07-15');
+  });
+
+  it('returns null for a missing or invalid value', () => {
+    expect(formatDateYYYYMMDD(null)).toBeNull();
+    expect(formatDateYYYYMMDD('not-a-date')).toBeNull();
+    expect(formatDateYYYYMMDD('2026-02-31')).toBeNull();
   });
 });
 

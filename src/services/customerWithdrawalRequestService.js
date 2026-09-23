@@ -26,6 +26,8 @@ const WITHDRAWAL_HEADER_SELECT = [
   'dispatch_started_by_email',
   'dispatch_finished_at',
   'dispatch_finished_by_email',
+  'dispatch_goods_temp',
+  'dispatch_truck_temp',
   'requires_r3_document',
   'created_by_email',
   'created_by_role',
@@ -54,6 +56,7 @@ const WITHDRAWAL_LINE_SELECT = [
   'lot_no',
   'mfg_date',
   'exp_date',
+  'temperature_type',
   'requested_qty',
   'requested_boxes',
   'requested_weight',
@@ -513,6 +516,20 @@ export async function setWithdrawalDispatchTime(requestId, phase, { at = null, a
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// Records the goods/truck temperature admin reads at dispatch — field is
+// 'GOODS' | 'TRUCK', mirrors setDepositReceivingTemperature.
+export async function setWithdrawalDispatchTemperature(requestId, field, value) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_dispatch_temperature', {
+    p_request_id: requestId,
+    p_field: field,
+    p_value: toNullableText(value),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 // Every pallet a deposit line's stock currently sits on that still has
 // unpicked balance -- drives the handheld picking screen's "หยิบจาก pallet"
 // step (see PickingWorkflow in HandheldPage.jsx): auto-select when only one
@@ -662,6 +679,17 @@ export async function updateWithdrawalLineAdminNote(lineId, adminNote) {
   const { data, error } = await supabase.rpc('tgd_update_withdrawal_line_admin_note', {
     p_line_id: lineId,
     p_admin_note: toNullableText(adminNote),
+  });
+
+  return { data, error };
+}
+
+export async function updateWithdrawalLineTemperatureType(lineId, temperatureType) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_update_withdrawal_line_temperature_type', {
+    p_line_id: lineId,
+    p_temperature_type: toNullableText(temperatureType),
   });
 
   return { data, error };

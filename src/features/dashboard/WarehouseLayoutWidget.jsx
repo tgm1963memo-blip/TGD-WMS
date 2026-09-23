@@ -534,7 +534,12 @@ export function WarehouseLayoutWidget() {
                                 <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.trackingCode ?? '-').join(', ')}</td>
                                 <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.productName ?? p.customerProductCode ?? '-').join(', ')}</td>
                                 <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>
-                                  {items.map((p) => `${p.remainingBoxes ?? p.boxes ?? '-'} กล่อง${p.weight != null ? ` · ${p.weight} กก.` : ''}`).join(' + ')}
+                                  {items.map((p) => {
+                                    const boxText = p.remainingBoxes != null ? `${p.remainingBoxes} กล่อง` : null;
+                                    const weightValue = p.remainingWeight ?? p.weight;
+                                    const weightText = weightValue != null ? `${weightValue} กก.` : null;
+                                    return boxText && weightText ? `${boxText} · ${weightText}` : (boxText ?? weightText ?? '-');
+                                  }).join(' + ')}
                                 </td>
                               </>
                             ) : (

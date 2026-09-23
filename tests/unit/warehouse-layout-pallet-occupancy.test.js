@@ -86,6 +86,38 @@ describe('getSectionsWithOccupancy', () => {
     expect(data[0].locations[0].isOccupied).toBe(false);
   });
 
+  it('does not count a weight-only pallet that has been fully picked out', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/services/supabaseClient.js', () => ({
+      supabase: {
+        from: (table) => {
+          if (table === 'tgd_zones') {
+            return chainableSelect({
+              data: [{
+                id: 'zone-1', zone_code: '41', zone_name: 'Cold 41', temperature_type: 'FROZEN', is_active: true,
+                tgd_rooms: [{ id: 'room-1', tgd_locations: [{ id: 'loc-1', location_code: '41-L-01', capacity: 14 }] }],
+              }],
+              error: null,
+            });
+          }
+          if (table === 'tgd_customer_deposit_line_locations') {
+            return chainableSelect({ data: [{ id: 'alloc-1', location_id: 'loc-1', boxes: null, weight: 100 }], error: null });
+          }
+          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
+            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-1', boxes: null, weight: 100 }], error: null });
+          }
+          throw new Error(`Unexpected table: ${table}`);
+        },
+      },
+    }));
+    const { getSectionsWithOccupancy } = await import('../../src/services/warehouseLayoutService.js');
+
+    const { data } = await getSectionsWithOccupancy();
+
+    expect(data[0].used).toBe(0);
+    expect(data[0].locations[0].isOccupied).toBe(false);
+  });
+
   it('counts two tracking codes sharing the same pallet number as ONE used slot, not two', async () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
@@ -194,6 +226,49 @@ describe('getPalletDetailsAtLocation', () => {
     expect(data.pallets).toHaveLength(1);
     expect(data.pallets[0]).toMatchObject({
       palletNo: 1, boxes: 5, remainingBoxes: 5, trackingCode: 'TRK-1', productName: 'Sample Product',
+    });
+  });
+
+  it('excludes weight-only pallets that have no remaining weight', async () => {
+    vi.resetModules();
+    vi.doMock('../../src/services/supabaseClient.js', () => ({
+      supabase: {
+        from: (table) => {
+          if (table === 'tgd_locations') {
+            return chainableSelect({ data: { capacity: 14 }, error: null });
+          }
+          if (table === 'tgd_customer_deposit_line_locations') {
+            return chainableSelect({
+              data: [
+                {
+                  id: 'alloc-1', pallet_no: 1, boxes: null, weight: 100, line_id: 'line-1',
+                  tgd_customer_deposit_request_lines: { tracking_code: 'TRK-1', product_name: 'Weight Product', customer_product_code: 'WGT-001' },
+                },
+                {
+                  id: 'alloc-2', pallet_no: 2, boxes: null, weight: 30, line_id: 'line-2',
+                  tgd_customer_deposit_request_lines: { tracking_code: 'TRK-2', product_name: 'Remaining Product', customer_product_code: 'REM-001' },
+                },
+              ],
+              error: null,
+            });
+          }
+          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
+            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-1', boxes: null, weight: 100 }], error: null });
+          }
+          throw new Error(`Unexpected table: ${table}`);
+        },
+      },
+    }));
+    const { getPalletDetailsAtLocation } = await import('../../src/services/warehouseLayoutService.js');
+
+    const { data, error } = await getPalletDetailsAtLocation('loc-1');
+
+    expect(error).toBeNull();
+    expect(data.pallets).toHaveLength(1);
+    expect(data.pallets[0]).toMatchObject({
+      palletNo: 2,
+      remainingWeight: 30,
+      trackingCode: 'TRK-2',
     });
   });
 });

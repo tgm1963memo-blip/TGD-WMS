@@ -105,10 +105,25 @@ export default async function handler(req, res) {
 
   let successCount = 0;
   let failureCount = 0;
+  let skippedCount = 0;
 
   // 3. Process each email
   for (const item of queue) {
     try {
+      if (String(item.recipient_role || '').trim().toLowerCase() === 'admin') {
+        await adminClient
+          .from('tgd_customer_request_email_queue')
+          .update({
+            status: 'SKIPPED',
+            sent_at: new Date().toISOString(),
+            error_log: 'Skipped: role admin no longer receives request emails.',
+          })
+          .eq('id', item.id);
+
+        skippedCount++;
+        continue;
+      }
+
       const appUrl = cleanValue(process.env.VITE_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tgc-wms.vercel.app');
       const emailHtml = `<!DOCTYPE html>
 <html lang="th">
@@ -212,5 +227,6 @@ export default async function handler(req, res) {
     processed: queue.length,
     successCount,
     failureCount,
+    skippedCount,
   });
 }

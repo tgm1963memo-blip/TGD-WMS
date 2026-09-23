@@ -10,7 +10,12 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer })
 
   if (!isOpen) return null;
 
-  const maxWidth = { sm: 500, md: 720, lg: 980, xl: 1200 }[size] ?? 720;
+  const maxWidth = {
+    sm: 500,
+    md: 720,
+    lg: 980,
+    xl: 'calc(100vw - 48px)',
+  }[size] ?? 720;
 
   return (
     <div

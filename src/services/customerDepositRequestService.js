@@ -26,6 +26,8 @@ const DEPOSIT_HEADER_SELECT = [
   'receiving_started_by_email',
   'receiving_finished_at',
   'receiving_finished_by_email',
+  'goods_temp',
+  'truck_temp',
   'requires_r3_document',
   'created_by_email',
   'created_by_role',
@@ -702,6 +704,21 @@ export async function setDepositReceivingTime(requestId, phase, { at = null, act
     p_phase: phase,
     p_at: at,
     p_actor_profile_id: actorProfileId,
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Records the goods/truck temperature admin reads off the thermometer when
+// goods physically arrive — field is 'GOODS' | 'TRUCK', matching the two
+// rows already printed on the CDR staff work order (GOODS TEMP / TRUCK / CON. TEMP).
+export async function setDepositReceivingTemperature(requestId, field, value) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_deposit_receiving_temperature', {
+    p_request_id: requestId,
+    p_field: field,
+    p_value: toNullableText(value),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

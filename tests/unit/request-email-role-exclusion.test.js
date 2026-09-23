@@ -4,38 +4,43 @@ import { describe, expect, it } from 'vitest';
 
 const migrationPath = path.join(
   process.cwd(),
-  'supabase/migrations/20260804170000_exclude_accounting_warehouse_manager_from_request_emails.sql',
+  'supabase/migrations/20260922090000_skip_admin_role_request_emails.sql',
+);
+const databaseMigrationPath = path.join(
+  process.cwd(),
+  'database/migrations/113_skip_admin_role_request_emails.sql',
 );
 
 function readMigration() {
   return readFileSync(migrationPath, 'utf8');
 }
 
-// Regression coverage: tgd_enqueue_customer_request_notifications' internal
-// staff alert (deposit/withdrawal submitted/recount-requested/dispatch-
-// confirmed) used to go to every active admin, accounting, warehouse_admin,
-// and warehouse_manager user. Per request, warehouse_manager and accounting
-// should stop receiving these.
-describe('tgd_enqueue_customer_request_notifications: staff alert role list', () => {
+describe('customer request emails: admin role exclusion', () => {
   it('exists and is additive only', () => {
     expect(existsSync(migrationPath)).toBe(true);
+    expect(existsSync(databaseMigrationPath)).toBe(true);
     const sql = readMigration();
     expect(sql).not.toMatch(/drop\s+table/i);
     expect(sql).not.toMatch(/truncate/i);
-    expect(sql).not.toMatch(/delete\s+from/i);
   });
 
-  it('scopes the internal staff alert to admin and warehouse_admin only', () => {
+  it('marks existing pending admin-role emails as skipped', () => {
     const sql = readMigration();
-    const roleFilterMatch = sql.match(/p\.role in \(([^)]+)\)/);
-    expect(roleFilterMatch).not.toBeNull();
-    expect(roleFilterMatch[1]).toBe("'admin', 'warehouse_admin'");
+    expect(sql).toMatch(/update\s+public\.tgd_customer_request_email_queue/i);
+    expect(sql).toMatch(/status\s*=\s*'SKIPPED'/i);
+    expect(sql).toMatch(/lower\(btrim\(coalesce\(recipient_role,\s*''\)\)\)\s*=\s*'admin'/i);
   });
 
-  it('leaves the customer-facing confirmation branches (DEPOSIT_CONFIRMED/WITHDRAWAL_ACCEPTED) untouched', () => {
+  it('adds a queue trigger so future admin-role emails are skipped before sending', () => {
     const sql = readMigration();
-    expect(sql).toContain("p_notification_event = 'DEPOSIT_CONFIRMED'");
-    expect(sql).toContain("p_notification_event = 'WITHDRAWAL_ACCEPTED'");
-    expect(sql).toContain("'customer_primary'");
+    expect(sql).toMatch(/create\s+or\s+replace\s+function\s+public\.tgd_skip_admin_request_email_queue/i);
+    expect(sql).toMatch(/create\s+trigger\s+tgd_skip_admin_request_email_queue_trg/i);
+    expect(sql).toMatch(/before\s+insert\s+or\s+update\s+of\s+recipient_role,\s+status/i);
+  });
+
+  it('keeps warehouse_admin eligible while excluding only the admin role', () => {
+    const sql = readMigration();
+    expect(sql).toContain("'admin'");
+    expect(sql).not.toMatch(/warehouse_admin[^']*'SKIPPED'/i);
   });
 });

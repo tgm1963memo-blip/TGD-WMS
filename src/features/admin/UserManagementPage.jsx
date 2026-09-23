@@ -55,11 +55,39 @@ export function UserManagementPage() {
   const [deleting, setDeleting] = useState(false);
   const [customRoles, setCustomRoles] = useState([]);
   const [roleDefinitions, setRoleDefinitions] = useState([]);
+  const [filterName, setFilterName] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterEmail, setFilterEmail] = useState('');
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map((row) => [row.id, row.customer_name ?? row.customer_code])),
     [customers],
   );
+
+  const filteredProfiles = useMemo(() => {
+    const nameNeedle = filterName.trim().toLowerCase();
+    const companyNeedle = filterCompany.trim().toLowerCase();
+    const emailNeedle = filterEmail.trim().toLowerCase();
+    if (!nameNeedle && !companyNeedle && !emailNeedle) return profiles;
+
+    return profiles.filter((row) => {
+      const nameText = [
+        row.display_name,
+        row.first_name,
+        row.last_name,
+      ].filter(Boolean).join(' ').toLowerCase();
+      const companyText = String(row.customer_id ? customerMap[row.customer_id] ?? row.customer_id : '').toLowerCase();
+      const emailText = String(row.email ?? '').toLowerCase();
+
+      return (
+        (!nameNeedle || nameText.includes(nameNeedle))
+        && (!companyNeedle || companyText.includes(companyNeedle))
+        && (!emailNeedle || emailText.includes(emailNeedle))
+      );
+    });
+  }, [profiles, customerMap, filterName, filterCompany, filterEmail]);
+
+  const hasUserFilters = Boolean(filterName || filterCompany || filterEmail);
 
   // Assignable roles come from tgd_role_definitions (already sorted by
   // sort_order), not a hardcoded list — any custom role created on the
@@ -398,6 +426,60 @@ export function UserManagementPage() {
       {error ? <div className="banner banner-danger" role="alert">{error}</div> : null}
       {success ? <div className="alert-success-panel" role="status">{success}</div> : null}
 
+      <div className="table-card" style={{ marginBottom: 16 }} data-testid="user-management-filters">
+        <div className="table-card-header">
+          <h3>{language === 'th' ? 'ค้นหาผู้ใช้' : 'User filters'}</h3>
+          <span className="table-meta-text">
+            {filteredProfiles.length.toLocaleString()} / {profiles.length.toLocaleString()} {language === 'th' ? 'ผู้ใช้' : 'users'}
+          </span>
+        </div>
+        <div className="form-grid" style={{ padding: 16, alignItems: 'end' }}>
+          <label className="form-field">
+            <span>{language === 'th' ? 'ชื่อ' : 'Name'}</span>
+            <input
+              className="form-control"
+              data-testid="user-mgmt-filter-name"
+              onChange={(e) => setFilterName(e.target.value)}
+              placeholder={language === 'th' ? 'ชื่อ / ชื่อแสดง' : 'Name / display name'}
+              type="search"
+              value={filterName}
+            />
+          </label>
+          <label className="form-field">
+            <span>{language === 'th' ? 'บริษัท' : 'Company'}</span>
+            <input
+              className="form-control"
+              data-testid="user-mgmt-filter-company"
+              onChange={(e) => setFilterCompany(e.target.value)}
+              placeholder={language === 'th' ? 'ชื่อลูกค้า / บริษัท' : 'Customer / company'}
+              type="search"
+              value={filterCompany}
+            />
+          </label>
+          <label className="form-field">
+            <span>{t('user_mgmt_col_email')}</span>
+            <input
+              className="form-control"
+              data-testid="user-mgmt-filter-email"
+              onChange={(e) => setFilterEmail(e.target.value)}
+              placeholder="email@example.com"
+              type="search"
+              value={filterEmail}
+            />
+          </label>
+          <div className="action-row" style={{ marginBottom: 0 }}>
+            <button
+              className="btn btn-secondary"
+              disabled={!hasUserFilters}
+              onClick={() => { setFilterName(''); setFilterCompany(''); setFilterEmail(''); }}
+              type="button"
+            >
+              {language === 'th' ? 'ล้างตัวกรอง' : 'Clear filters'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <Modal
         isOpen={isFormOpen}
         onClose={closeForm}
@@ -577,7 +659,7 @@ export function UserManagementPage() {
 
       <DataTable
         columns={columns}
-        data={profiles}
+        data={filteredProfiles}
         emptyMessage={t('user_mgmt_empty')}
         error={null}
         loading={loading}

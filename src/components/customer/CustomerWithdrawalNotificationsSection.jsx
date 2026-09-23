@@ -223,7 +223,7 @@ export function CustomerWithdrawalNotificationsSection({
       )}
 
       <div className="responsive-table">
-        <table className="data-table" data-testid="withdrawal-customer-withdrawal-table">
+        <table className="data-table withdrawal-customer-withdrawal-table" data-testid="withdrawal-customer-withdrawal-table">
           <thead>
             <tr>
               <th>

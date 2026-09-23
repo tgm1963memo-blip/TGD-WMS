@@ -352,7 +352,19 @@ function ConfirmedChip({ item }) {
 // ── Line list item ────────────────────────────────────────────
 function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
   return (
-    <button type="button" onClick={onSelect}
+    // Use div+role instead of <button> — mobile browsers clip button height
+    // when content grows dynamically (same fix as DocCard below), which was
+    // cutting off the second line of longer two-line Thai product names.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect?.();
+        }
+      }}
       style={{
         display: 'flex', alignItems: 'center', gap: 14, width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: isDone ? C.surfaceSolid : C.card,
@@ -363,7 +375,6 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
         transition: 'transform 0.2s, box-shadow 0.2s',
         borderLeft: `5px solid ${isDone ? C.green : C.primary}`,
         opacity: isDone ? 0.7 : 1,
-        overflow: 'hidden',
       }}>
       <div style={{
         width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
@@ -392,7 +403,7 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -964,7 +975,7 @@ function ReceivingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 10px 320px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: `24px 10px ${matchedLine ? 320 : 170}px`, background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (
@@ -1855,7 +1866,7 @@ function PickingWorkflow({ onBack, t }) {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 300px', background: C.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: `24px 24px ${(autoConfirmedItem || matchedLine) ? 300 : 170}px`, background: C.bg }}>
         {linesLoading ? (
           <div style={{ textAlign: 'center', color: C.muted, fontWeight: 700, padding: 40 }}>กำลังโหลด...</div>
         ) : (

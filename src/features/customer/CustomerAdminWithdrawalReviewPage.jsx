@@ -17,11 +17,13 @@ import {
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
   updateWithdrawalLineAdminNote,
+  updateWithdrawalLineTemperatureType,
   updateWithdrawalLineSource,
   addAdminWithdrawalRequestLine,
   setWithdrawalDispatchTime,
+  setWithdrawalDispatchTemperature,
 } from '../../services/customerWithdrawalRequestService.js';
-import { WorkPhaseTimeControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -30,7 +32,12 @@ import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissio
 import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { exportCustomerWithdrawalDocumentExcel, exportCustomerWithdrawalDocumentFormExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
+import {
+  listCustomerDocumentAttachments,
+  uploadCustomerDocumentAttachments,
+} from '../../services/customerDocumentAttachmentService.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
 
 const REVIEW_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING', 'COMPLETED', 'DISPATCHED', 'REJECTED', 'CANCELLED'];
 
@@ -68,6 +75,13 @@ const BULK_PRINT_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 // worked (already accepted, either awaiting or mid-picking) — matches
 // tgd_admin_add_customer_withdrawal_request_line's own status guard.
 const ADD_LINE_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
+const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
+const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
+function formatAttachmentSize(size) {
+  if (size == null) return '-';
+  return `${(Number(size) / 1024).toFixed(1)} KB`;
+}
 
 export function CustomerAdminWithdrawalReviewPage() {
   const t = useTranslation();
@@ -107,6 +121,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [savingProductCode, setSavingProductCode] = useState({});
   const [lineLotNos, setLineLotNos] = useState({});
   const [savingLotNo, setSavingLotNo] = useState({});
+  const [lineTemperatureTypes, setLineTemperatureTypes] = useState({});
+  const [savingTemperatureType, setSavingTemperatureType] = useState({});
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [addLineCode, setAddLineCode] = useState('');
   const [addLineName, setAddLineName] = useState('');
@@ -124,10 +140,15 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [globalSearchText, setGlobalSearchText] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterStatuses, setFilterStatuses] = useState([]);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [r3Attachments, setR3Attachments] = useState([]);
+  const [r3AttachmentFiles, setR3AttachmentFiles] = useState([]);
+  const [r3AttachmentError, setR3AttachmentError] = useState('');
+  const [uploadingR3Attachment, setUploadingR3Attachment] = useState(false);
 
   const customerOptions = [...new Map(
     rows
@@ -163,6 +184,9 @@ export function CustomerAdminWithdrawalReviewPage() {
   }
 
   const { sortedData, requestSort, getSortIndicator } = useTableSort(filteredRows);
+  const statusFilterSummary = filterStatuses.length
+    ? `${filterStatuses.length} สถานะ`
+    : '-- สถานะทุกรายการ --';
 
   useEffect(() => {
     let active = true;
@@ -197,6 +221,14 @@ export function CustomerAdminWithdrawalReviewPage() {
     });
   }
 
+  function refreshR3Attachments(id) {
+    if (!id) { setR3Attachments([]); return; }
+    listCustomerDocumentAttachments('CUSTOMER_WITHDRAWAL_REQUEST', id).then((result) => {
+      setR3Attachments(result.data ?? []);
+      if (result.error) setR3AttachmentError(result.error.message ?? 'โหลดไฟล์แนบไม่สำเร็จ');
+    });
+  }
+
   async function refreshLines(id) {
     if (!id) { setLines([]); return; }
     const result = await listCustomerWithdrawalRequestLines(id);
@@ -204,22 +236,26 @@ export function CustomerAdminWithdrawalReviewPage() {
     setLines(loadedLines);
     const initNotes = {};
     const initTrackingCodes = {};
+    const initTemperatureTypes = {};
     loadedLines.forEach((l) => {
       initNotes[l.id] = l.admin_note ?? '';
       initTrackingCodes[l.id] = l.tracking_code ?? '';
+      initTemperatureTypes[l.id] = l.temperature_type ?? '';
     });
     setLineAdminNotes(initNotes);
     setLineTrackingCodes(initTrackingCodes);
+    setLineTemperatureTypes(initTemperatureTypes);
     // Every action handler that calls refreshLines() after mutating this
     // document also wants its edit/audit log refreshed — folded in here
     // instead of touching each of those call sites individually.
     refreshTimeline(id);
+    refreshR3Attachments(id);
   }
 
   useEffect(() => {
     let active = true;
     setTimelineOpen(false);
-    if (!selectedId) { setLines([]); setLinesLoading(false); setTimelineEvents([]); return undefined; }
+    if (!selectedId) { setLines([]); setLinesLoading(false); setTimelineEvents([]); setR3Attachments([]); return undefined; }
 
     // Switching to a different document while the previous one's lines are
     // still in state showed that PREVIOUS document's rows for a moment
@@ -236,17 +272,54 @@ export function CustomerAdminWithdrawalReviewPage() {
       setLinesLoading(false);
       const initNotes = {};
       const initTrackingCodes = {};
+      const initTemperatureTypes = {};
       loadedLines.forEach((l) => {
         initNotes[l.id] = l.admin_note ?? '';
         initTrackingCodes[l.id] = l.tracking_code ?? '';
+        initTemperatureTypes[l.id] = l.temperature_type ?? '';
       });
       setLineAdminNotes(initNotes);
       setLineTrackingCodes(initTrackingCodes);
+      setLineTemperatureTypes(initTemperatureTypes);
     });
     refreshTimeline(selectedId);
+    refreshR3Attachments(selectedId);
 
     return () => { active = false; };
   }, [selectedId]);
+
+  function handleR3AttachmentFiles(event) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    const oversized = selectedFiles.find((file) => file.size > MAX_R3_ATTACHMENT_SIZE);
+    setR3AttachmentError(oversized ? `${oversized.name} เกินขนาดสูงสุด 10MB` : '');
+    setR3AttachmentFiles((current) => [
+      ...current,
+      ...selectedFiles.filter((file) => file.size <= MAX_R3_ATTACHMENT_SIZE),
+    ]);
+    event.target.value = '';
+  }
+
+  async function handleUploadR3Attachments() {
+    const selected = rows.find((r) => r.id === selectedId);
+    if (!selected || !r3AttachmentFiles.length) return;
+    setUploadingR3Attachment(true);
+    setR3AttachmentError('');
+    const result = await uploadCustomerDocumentAttachments({
+      documentType: 'CUSTOMER_WITHDRAWAL_REQUEST',
+      documentId: selected.id,
+      customerId: selected.customer_id,
+      files: r3AttachmentFiles,
+      uploadedByEmail: null,
+    });
+    setUploadingR3Attachment(false);
+    if (result.error) {
+      setR3AttachmentError(result.error.message ?? 'อัปโหลดใบ ร.3 ไม่สำเร็จ');
+      return;
+    }
+    setR3AttachmentFiles([]);
+    setActionMsg('อัปโหลดใบ ร.3 เรียบร้อย');
+    refreshR3Attachments(selected.id);
+  }
 
   function openAddLine() {
     setAddLineCode('');
@@ -461,6 +534,17 @@ export function CustomerAdminWithdrawalReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [atField]: data.at, [byField]: data.by_email } : r)));
   }
 
+  async function handleSaveDispatchTemperature(field, value) {
+    if (!selectedId) return;
+    const { data, error } = await setWithdrawalDispatchTemperature(selectedId, field, value);
+    if (error) {
+      setError(error.message ?? 'บันทึกอุณหภูมิไม่สำเร็จ');
+      return;
+    }
+    const targetField = field === 'GOODS' ? 'dispatch_goods_temp' : 'dispatch_truck_temp';
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
+  }
+
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
     setSubmitting(true);
@@ -630,14 +714,14 @@ export function CustomerAdminWithdrawalReviewPage() {
 
   if (loading) {
     return (
-      <section className="page-shell customer-portal-page" data-testid="customer-admin-withdrawal-review-page">
+      <section className="page-shell customer-portal-page withdrawal-review-page" data-testid="customer-admin-withdrawal-review-page">
         <LoadingState />
       </section>
     );
   }
 
   return (
-    <section className="page-shell customer-portal-page" data-testid="customer-admin-withdrawal-review-page">
+    <section className="page-shell customer-portal-page withdrawal-review-page" data-testid="customer-admin-withdrawal-review-page">
       <PageHeader
         title={t('admin_withdrawal_review_title')}
         description={t('admin_withdrawal_review_description')}
@@ -674,6 +758,32 @@ export function CustomerAdminWithdrawalReviewPage() {
                 ))}
               </select>
             </label>
+            <div className="form-label withdrawal-review-status-filter" style={{ margin: 0, flex: '1 1 220px', maxWidth: 280 }}>
+              <span>สถานะ</span>
+              <button
+                className="form-control withdrawal-review-status-filter__button"
+                data-testid="withdrawal-review-status-dropdown-button"
+                onClick={() => setStatusFilterOpen((current) => !current)}
+                type="button"
+              >
+                <span>{statusFilterSummary}</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              {statusFilterOpen ? (
+                <div className="withdrawal-review-status-filter__menu" data-testid="withdrawal-review-status-dropdown-menu">
+                  {REVIEW_STATUSES.map((status) => (
+                    <label key={status} className="withdrawal-review-status-filter__option">
+                      <input
+                        checked={filterStatuses.includes(status)}
+                        onChange={() => toggleStatusFilter(status)}
+                        type="checkbox"
+                      />
+                      <span>{getWithdrawalStatusLabel(status, t)}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <label className="form-label" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
               {'วันที่แจ้งเบิก (ตั้งแต่)'}
               <input
@@ -703,36 +813,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               </button>
             ) : null}
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tgd-text-secondary, #475569)' }}>
-                {'สถานะ (เลือกได้หลายรายการ — ใช้กรองทั้งตารางและตอนดาวน์โหลด Excel)'}
-              </span>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {REVIEW_STATUSES.map((status) => {
-                  const active = filterStatuses.includes(status);
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      data-testid={`withdrawal-review-status-chip-${status}`}
-                      onClick={() => toggleStatusFilter(status)}
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: 999,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        border: active ? '1px solid #2d9348' : '1px solid var(--tgd-border)',
-                        background: active ? '#2d9348' : '#fff',
-                        color: active ? '#fff' : '#334155',
-                      }}
-                    >
-                      {getWithdrawalStatusLabel(status, t)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
             <button
               type="button"
               className="btn btn-outline"
@@ -964,11 +1045,6 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? '✔' : '-'}</div>
               </div>
-            </div>
-
-            {/* Working time (start/finish dispatch) */}
-            <div style={{ marginBottom: 16 }}>
-              <h4 style={{ margin: '0 0 8px' }}>เวลาปฏิบัติงาน (เบิกสินค้า)</h4>
               <WorkPhaseTimeControl
                 canWrite={canWrite}
                 startedLabel="เริ่มเบิกสินค้า"
@@ -977,11 +1053,83 @@ export function CustomerAdminWithdrawalReviewPage() {
                 startedByEmail={selected.dispatch_started_by_email}
                 finishedAt={selected.dispatch_finished_at}
                 finishedByEmail={selected.dispatch_finished_by_email}
+                fallbackDate={selected.requested_dispatch_date}
                 onRecordStart={() => handleRecordDispatchTime('START')}
                 onRecordFinish={() => handleRecordDispatchTime('FINISH')}
                 onEditStart={(iso) => handleRecordDispatchTime('START', iso)}
                 onEditFinish={(iso) => handleRecordDispatchTime('FINISH', iso)}
               />
+              <WorkPhaseTemperatureControl
+                canWrite={canWrite}
+                goodsLabel="อุณหภูมิสินค้า (ตอนเบิก/จ่าย)"
+                truckLabel="อุณหภูมิรถ/ตู้คอนเทนเนอร์"
+                goodsTemp={selected.dispatch_goods_temp}
+                truckTemp={selected.dispatch_truck_temp}
+                onSaveGoods={(value) => handleSaveDispatchTemperature('GOODS', value)}
+                onSaveTruck={(value) => handleSaveDispatchTemperature('TRUCK', value)}
+              />
+            </div>
+
+            <div className="customer-attachment-panel" style={{ marginBottom: 16 }} data-testid="admin-withdrawal-r3-attachment-panel">
+              <label className="form-field">
+                <span>แนบใบ ร.3</span>
+                <input
+                  accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+                  data-testid="admin-withdrawal-r3-attachment-input"
+                  multiple
+                  onChange={handleR3AttachmentFiles}
+                  type="file"
+                />
+              </label>
+              <p className="form-helper" style={{ marginTop: 0 }}>
+                ไฟล์จะถูกอัปโหลดและแนบกับใบเบิกนี้ทันทีเมื่อกดอัปโหลด
+              </p>
+              {r3AttachmentError ? <p className="field-error" role="alert">{r3AttachmentError}</p> : null}
+              {r3AttachmentFiles.length ? (
+                <div className="action-row" style={{ marginBottom: 8 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={uploadingR3Attachment}
+                    onClick={handleUploadR3Attachments}
+                    type="button"
+                  >
+                    {uploadingR3Attachment ? 'กำลังอัปโหลด...' : `อัปโหลดใบ ร.3 (${r3AttachmentFiles.length})`}
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={uploadingR3Attachment}
+                    onClick={() => setR3AttachmentFiles([])}
+                    type="button"
+                  >
+                    ล้างไฟล์ที่เลือก
+                  </button>
+                </div>
+              ) : null}
+              <ul className="customer-attachment-list" data-testid="admin-withdrawal-r3-attachment-list">
+                {r3AttachmentFiles.map((file, index) => (
+                  <li key={`${file.name}-${file.lastModified}`}>
+                    <span>{file.name} ({file.type || 'unknown'}, {formatAttachmentSize(file.size)})</span>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => setR3AttachmentFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      type="button"
+                    >
+                      ลบ
+                    </button>
+                  </li>
+                ))}
+                {r3Attachments.map((file) => (
+                  <li key={file.id}>
+                    <span>{file.file_name} ({file.file_mime_type || 'unknown'}, {formatAttachmentSize(file.file_size_bytes)})</span>
+                    <span className="form-helper" style={{ margin: 0 }}>
+                      {file.uploaded_at ? formatDocumentDate(file.uploaded_at) : ''}
+                    </span>
+                  </li>
+                ))}
+                {!r3AttachmentFiles.length && !r3Attachments.length ? (
+                  <li><span className="form-helper">ยังไม่มีไฟล์ใบ ร.3 แนบไว้</span></li>
+                ) : null}
+              </ul>
             </div>
 
             {/* Print action */}
@@ -1089,26 +1237,27 @@ export function CustomerAdminWithdrawalReviewPage() {
                 ) : null}
               </div>
               <div className="responsive-table">
-                <table className="data-table">
+                <table className="data-table admin-withdrawal-lines-table">
                   <thead>
                     <tr>
-                      <th>#</th>
+                      <th className="admin-withdrawal-lines-table__row-col">#</th>
                       <th>{t('catalog_col_customer_code')}</th>
-                      <th>{t('catalog_col_product_name')}</th>
+                      <th className="admin-withdrawal-lines-table__product-col">{t('catalog_col_product_name')}</th>
                       <th>รหัสติดตาม</th>
                       <th>{t('lot')}</th>
+                      <th>อุณหภูมิ</th>
                       <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
                       <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
                       <th>หมายเหตุ (Admin)</th>
-                      <th>{t('catalog_col_actions')}</th>
+                      <th className="admin-withdrawal-lines-table__action-col">{t('catalog_col_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {linesLoading ? (
-                      <tr><td colSpan={8}><LoadingState /></td></tr>
+                      <tr><td colSpan={10}><LoadingState /></td></tr>
                     ) : lines.length ? lines.map((line) => (
                       <tr key={line.id}>
-                        <td>{line.line_no}</td>
+                        <td className="admin-withdrawal-lines-table__row-cell">{line.line_no}</td>
                         <td style={{ minWidth: 130 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             <input
@@ -1139,7 +1288,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </button>
                           </div>
                         </td>
-                        <td>{line.product_name ?? '-'}</td>
+                        <td className="admin-withdrawal-lines-table__product-cell" title={line.product_name ?? ''}>{line.product_name ?? '-'}</td>
                         <td style={{ minWidth: 140 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             <input
@@ -1199,6 +1348,40 @@ export function CustomerAdminWithdrawalReviewPage() {
                               }}
                             >
                               {savingLotNo[line.id] ? '…' : '💾'}
+                            </button>
+                          </div>
+                        </td>
+                        <td style={{ minWidth: 150 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <select
+                              className="form-control"
+                              style={{ fontSize: 12, padding: '2px 6px', height: 28 }}
+                              value={lineTemperatureTypes[line.id] ?? line.temperature_type ?? ''}
+                              onChange={(e) => setLineTemperatureTypes((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            >
+                              <option value="">--</option>
+                              {WITHDRAWAL_LINE_TEMPERATURE_TYPES.map((type) => (
+                                <option key={type} value={type}>{TEMPERATURE_TYPE_LABELS[type] ?? type}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={!canWrite || savingTemperatureType[line.id]}
+                              style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
+                              onClick={async () => {
+                                const nextTemperatureType = lineTemperatureTypes[line.id] ?? '';
+                                setSavingTemperatureType((prev) => ({ ...prev, [line.id]: true }));
+                                const r = await updateWithdrawalLineTemperatureType(line.id, nextTemperatureType);
+                                setSavingTemperatureType((prev) => ({ ...prev, [line.id]: false }));
+                                if (!r.error) {
+                                  setLines((prev) => prev.map((l) => l.id === line.id ? { ...l, temperature_type: r.data?.temperature_type ?? (nextTemperatureType || null) } : l));
+                                } else {
+                                  setError(r.error.message ?? 'บันทึกอุณหภูมิไม่สำเร็จ');
+                                }
+                              }}
+                            >
+                              {savingTemperatureType[line.id] ? '…' : '💾'}
                             </button>
                           </div>
                         </td>
@@ -1266,12 +1449,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </button>
                           </div>
                         </td>
-                        <td>
+                        <td className="admin-withdrawal-lines-table__action-cell">
                           {(canWrite && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED'].includes(selected?.status))
                             || (userRole === 'admin' && !['CANCELLED', 'REJECTED'].includes(selected?.status)) ? (
                             <button
-                              className="btn btn-secondary btn-sm"
+                              className="btn btn-secondary btn-sm admin-withdrawal-lines-table__recount-btn"
                               type="button"
+                              title={t('admin_recount_button')}
+                              aria-label={t('admin_recount_button')}
                               onClick={() => {
                                 setRecountLine(line);
                                 setRecountBoxes((line.picked_boxes ?? line.requested_boxes ?? '').toString());
@@ -1281,7 +1466,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 setError('');
                               }}
                             >
-                              {t('admin_recount_button')}
+                              นับใหม่
                             </button>
                           ) : (
                             <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}>—</span>
@@ -1289,7 +1474,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={8}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

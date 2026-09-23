@@ -21,8 +21,9 @@ import {
   enqueueCustomerDepositNotification,
   enqueueDepositRecountNotification,
   setDepositReceivingTime,
+  setDepositReceivingTemperature,
 } from '../../services/customerDepositRequestService.js';
-import { WorkPhaseTimeControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -257,6 +258,17 @@ export function CustomerAdminDepositReviewPage() {
     const atField = phase === 'START' ? 'receiving_started_at' : 'receiving_finished_at';
     const byField = phase === 'START' ? 'receiving_started_by_email' : 'receiving_finished_by_email';
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [atField]: data.at, [byField]: data.by_email } : r)));
+  }
+
+  async function handleSaveReceivingTemperature(field, value) {
+    if (!selectedId) return;
+    const { data, error } = await setDepositReceivingTemperature(selectedId, field, value);
+    if (error) {
+      setError(error.message ?? 'บันทึกอุณหภูมิไม่สำเร็จ');
+      return;
+    }
+    const targetField = field === 'GOODS' ? 'goods_temp' : 'truck_temp';
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
   }
 
   async function handleRequestRecount() {
@@ -589,10 +601,21 @@ export function CustomerAdminDepositReviewPage() {
           </div>
         )}
         <div className="responsive-table">
-          <table className="data-table" data-testid="admin-deposit-review-table">
+          <table className="data-table admin-deposit-review-table" data-testid="admin-deposit-review-table">
+            <colgroup>
+              <col className="admin-deposit-review-table__select-col" />
+              <col className="admin-deposit-review-table__request-col" />
+              <col className="admin-deposit-review-table__customer-col" />
+              <col className="admin-deposit-review-table__status-col" />
+              <col className="admin-deposit-review-table__date-col" />
+              <col className="admin-deposit-review-table__contact-col" />
+              <col className="admin-deposit-review-table__phone-col" />
+              <col className="admin-deposit-review-table__note-col" />
+              <col className="admin-deposit-review-table__action-col" />
+            </colgroup>
             <thead>
               <tr>
-                <th>
+                <th className="admin-deposit-review-table__select-cell">
                   <input
                     type="checkbox"
                     aria-label="เลือกทั้งหมด"
@@ -605,13 +628,15 @@ export function CustomerAdminDepositReviewPage() {
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th onClick={() => requestSort('expected_arrival_date')} style={{ cursor: 'pointer' }}>{t('customer_field_expected_arrival_date')} {getSortIndicator('expected_arrival_date')}</th>
                 <th>{t('customer_field_contact_name')}</th>
+                <th>เบอร์โทรผู้ติดต่อ</th>
+                <th>หมายเหตุ</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
               {sortedData.length ? sortedData.map((row) => (
                 <tr key={row.id}>
-                  <td>
+                  <td className="admin-deposit-review-table__select-cell">
                     <input
                       type="checkbox"
                       aria-label={`เลือก ${row.request_no}`}
@@ -620,16 +645,18 @@ export function CustomerAdminDepositReviewPage() {
                       onChange={() => toggleRequestSelected(row.id)}
                     />
                   </td>
-                  <td>{row.request_no}</td>
-                  <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
+                  <td className="admin-deposit-review-table__request-cell">{row.request_no}</td>
+                  <td className="admin-deposit-review-table__customer-cell">{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getDepositStatusLabel(row.status, t)}
                     </span>
                   </td>
                   <td>{formatDocumentDate(row.expected_arrival_date, { dateOnly: true })}</td>
-                  <td>{row.contact_name ?? '-'}</td>
-                  <td>
+                  <td className="admin-deposit-review-table__compact-cell">{row.contact_name ?? '-'}</td>
+                  <td className="admin-deposit-review-table__compact-cell">{row.contact_phone ?? '-'}</td>
+                  <td className="admin-deposit-review-table__note-cell" title={row.note || ''}>{row.note || '-'}</td>
+                  <td className="admin-deposit-review-table__action-cell">
                     <button
                       className="btn btn-primary btn-sm"
                       data-testid={`admin-deposit-review-select-${row.id}`}
@@ -641,7 +668,7 @@ export function CustomerAdminDepositReviewPage() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={7}>{t('admin_deposit_review_empty')}</td></tr>
+                <tr><td colSpan={9}>{t('admin_deposit_review_empty')}</td></tr>
               )}
             </tbody>
           </table>
@@ -739,11 +766,6 @@ export function CustomerAdminDepositReviewPage() {
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? '✔' : '-'}</div>
               </div>
-            </div>
-
-            {/* Working time (start/finish receiving) */}
-            <div style={{ marginBottom: 16 }}>
-              <h4 style={{ margin: '0 0 8px' }}>เวลาปฏิบัติงาน (รับสินค้า)</h4>
               <WorkPhaseTimeControl
                 canWrite={canWrite}
                 startedLabel="เริ่มรับสินค้า"
@@ -752,10 +774,20 @@ export function CustomerAdminDepositReviewPage() {
                 startedByEmail={selected.receiving_started_by_email}
                 finishedAt={selected.receiving_finished_at}
                 finishedByEmail={selected.receiving_finished_by_email}
+                fallbackDate={selected.expected_arrival_date}
                 onRecordStart={() => handleRecordReceivingTime('START')}
                 onRecordFinish={() => handleRecordReceivingTime('FINISH')}
                 onEditStart={(iso) => handleRecordReceivingTime('START', iso)}
                 onEditFinish={(iso) => handleRecordReceivingTime('FINISH', iso)}
+              />
+              <WorkPhaseTemperatureControl
+                canWrite={canWrite}
+                goodsLabel="อุณหภูมิสินค้า (ตอนรับเข้า)"
+                truckLabel="อุณหภูมิรถ/ตู้คอนเทนเนอร์"
+                goodsTemp={selected.goods_temp}
+                truckTemp={selected.truck_temp}
+                onSaveGoods={(value) => handleSaveReceivingTemperature('GOODS', value)}
+                onSaveTruck={(value) => handleSaveReceivingTemperature('TRUCK', value)}
               />
             </div>
 
@@ -862,7 +894,7 @@ export function CustomerAdminDepositReviewPage() {
                         <td>{line.line_no}</td>
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
-                        <td>{line.weight_per_box ?? '-'}</td>
+                        <td>{line.weight_per_box != null ? Number(line.weight_per_box).toFixed(2) : '-'}</td>
                         <td>{getTemperatureTypeLabel(line.temperature_type)}</td>
                         <td>
                           {line.actual_boxes != null ? (

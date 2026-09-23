@@ -6,6 +6,10 @@ import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
+function fmtNum2(v) {
+  const n = Number(v);
+  return v != null && Number.isFinite(n) ? n.toFixed(2) : '-';
+}
 // overflow-wrap/word-break alone don't guarantee a break point in long,
 // unbroken Thai text (no spaces between words) — inserting a real
 // zero-width-space every few graphemes gives the browser a break
@@ -229,7 +233,7 @@ export function CustomerDepositRequestPrintDocument({
               <td style={{ ...TD_SAFE, textAlign: 'center' }}>{line.line_no}</td>
               <td style={TD_SAFE}>{fmtWrap(line.customer_product_code)}</td>
               <td style={TD_SAFE}>{fmtWrap(line.product_name, 10)}</td>
-              <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.weight_per_box ?? '-'}</td>
+              <td style={{ ...TD_SAFE, textAlign: 'right' }}>{fmtNum2(line.weight_per_box)}</td>
               <td style={{ ...TD_SAFE, textAlign: 'right' }}>{line.expected_weight ?? '-'}</td>
               <td style={{ ...TD_SAFE, textAlign: 'center' }}>
                 {line.expected_boxes ?? '-'}

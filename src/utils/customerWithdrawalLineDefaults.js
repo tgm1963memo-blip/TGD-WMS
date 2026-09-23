@@ -195,7 +195,14 @@ export function getWithdrawalBalanceInfo(line, depositLines = [], siblingLines =
   const WEIGHT_EPSILON = 0.005;
   const exceedsBoxBalance = Boolean(matchedLine) && line?.requested_boxes !== '' && Number(line?.requested_boxes) > availableBoxBalance;
   const exceedsWtBalance = Boolean(matchedLine) && line?.requested_weight !== '' && Number(line?.requested_weight) - availableWtBalance > WEIGHT_EPSILON;
-  return { maxBoxBalance, maxWtBalance, exceedsBoxBalance, exceedsWtBalance };
+  return {
+    maxBoxBalance,
+    maxWtBalance,
+    availableBoxBalance,
+    availableWtBalance,
+    exceedsBoxBalance,
+    exceedsWtBalance,
+  };
 }
 
 export function createInitialWithdrawalLines(count = WITHDRAWAL_LINE_DEFAULT_COUNT) {
