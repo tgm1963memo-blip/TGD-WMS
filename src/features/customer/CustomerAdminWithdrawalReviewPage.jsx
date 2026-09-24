@@ -33,6 +33,7 @@ import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesFo
 import { exportCustomerWithdrawalDocumentExcel, exportCustomerWithdrawalDocumentFormExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import {
+  getCustomerDocumentAttachmentUrl,
   listCustomerDocumentAttachments,
   uploadCustomerDocumentAttachments,
 } from '../../services/customerDocumentAttachmentService.js';
@@ -297,6 +298,15 @@ export function CustomerAdminWithdrawalReviewPage() {
       ...selectedFiles.filter((file) => file.size <= MAX_R3_ATTACHMENT_SIZE),
     ]);
     event.target.value = '';
+  }
+
+  async function handleOpenR3Attachment(attachment) {
+    const result = await getCustomerDocumentAttachmentUrl(attachment);
+    if (result.error || !result.data) {
+      setR3AttachmentError(result.error?.message ?? 'เปิดไฟล์แนบไม่สำเร็จ');
+      return;
+    }
+    window.open(result.data, '_blank', 'noopener');
   }
 
   async function handleUploadR3Attachments() {
@@ -1124,6 +1134,9 @@ export function CustomerAdminWithdrawalReviewPage() {
                     <span className="form-helper" style={{ margin: 0 }}>
                       {file.uploaded_at ? formatDocumentDate(file.uploaded_at) : ''}
                     </span>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleOpenR3Attachment(file)} type="button">
+                      เปิดไฟล์
+                    </button>
                   </li>
                 ))}
                 {!r3AttachmentFiles.length && !r3Attachments.length ? (

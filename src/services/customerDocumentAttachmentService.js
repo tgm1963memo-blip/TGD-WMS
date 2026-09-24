@@ -95,3 +95,14 @@ export async function listCustomerDocumentAttachments(documentType, documentId) 
 
   return { data: data ?? [], error };
 }
+
+export async function getCustomerDocumentAttachmentUrl(attachment, expiresInSeconds = 300) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!attachment?.storage_path) return { data: null, error: new Error('Missing attachment storage path.') };
+
+  const { data, error } = await supabase.storage
+    .from(attachment.storage_bucket || CUSTOMER_DOCUMENT_ATTACHMENT_BUCKET)
+    .createSignedUrl(attachment.storage_path, expiresInSeconds);
+
+  return { data: data?.signedUrl ?? null, error };
+}

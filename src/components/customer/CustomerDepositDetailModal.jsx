@@ -26,6 +26,11 @@ import {
   removeDepositLineLocationAllocation,
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
+import {
+  getCustomerDocumentAttachmentUrl,
+  listCustomerDocumentAttachments,
+  uploadCustomerDocumentAttachments,
+} from '../../services/customerDocumentAttachmentService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
@@ -51,6 +56,12 @@ function fmtDate(v) {
 // include everything they declared).
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 const DEPOSIT_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
+const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
+function formatAttachmentSize(size) {
+  if (size == null) return '-';
+  return `${(Number(size) / 1024).toFixed(1)} KB`;
+}
 
 // tgd_customer_document_timeline_events.action values this document type
 // actually produces (customerDocumentTimelineService.js reads the raw
@@ -146,6 +157,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [recalling, setRecalling] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [r3Attachments, setR3Attachments] = useState([]);
+  const [r3AttachmentFiles, setR3AttachmentFiles] = useState([]);
+  const [r3AttachmentError, setR3AttachmentError] = useState('');
+  const [uploadingR3Attachment, setUploadingR3Attachment] = useState(false);
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -157,6 +172,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setSelectedLineIds(new Set());
     setTimelineEvents([]);
     setTimelineOpen(false);
+    setR3Attachments([]);
+    setR3AttachmentFiles([]);
+    setR3AttachmentError('');
+    refreshR3Attachments(requestId);
 
     Promise.all([
       getCustomerDepositRequest(requestId),
@@ -192,6 +211,55 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
     return () => { active = false; };
   }, [requestId, isOpen]);
+
+  function refreshR3Attachments(id) {
+    if (!id) { setR3Attachments([]); return; }
+    listCustomerDocumentAttachments('CUSTOMER_DEPOSIT_REQUEST', id).then((result) => {
+      setR3Attachments(result.data ?? []);
+      if (result.error) setR3AttachmentError(result.error.message ?? 'โหลดไฟล์แนบไม่สำเร็จ');
+    });
+  }
+
+  function handleR3AttachmentFiles(event) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    const oversized = selectedFiles.find((file) => file.size > MAX_R3_ATTACHMENT_SIZE);
+    setR3AttachmentError(oversized ? `${oversized.name} เกินขนาดสูงสุด 10MB` : '');
+    setR3AttachmentFiles((current) => [
+      ...current,
+      ...selectedFiles.filter((file) => file.size <= MAX_R3_ATTACHMENT_SIZE),
+    ]);
+    event.target.value = '';
+  }
+
+  async function handleUploadR3Attachments() {
+    if (!header || !r3AttachmentFiles.length) return;
+    setUploadingR3Attachment(true);
+    setR3AttachmentError('');
+    const result = await uploadCustomerDocumentAttachments({
+      documentType: 'CUSTOMER_DEPOSIT_REQUEST',
+      documentId: header.id,
+      customerId: header.customer_id,
+      files: r3AttachmentFiles,
+    });
+    setUploadingR3Attachment(false);
+    if (result.error) {
+      setR3AttachmentError(result.error.message ?? 'อัปโหลดใบ ร.3 ไม่สำเร็จ');
+      refreshR3Attachments(header.id);
+      return;
+    }
+    setR3AttachmentFiles([]);
+    setActionMsg('อัปโหลดใบ ร.3 เรียบร้อย');
+    refreshR3Attachments(header.id);
+  }
+
+  async function handleOpenR3Attachment(attachment) {
+    const result = await getCustomerDocumentAttachmentUrl(attachment);
+    if (result.error || !result.data) {
+      setR3AttachmentError(result.error?.message ?? 'เปิดไฟล์แนบไม่สำเร็จ');
+      return;
+    }
+    window.open(result.data, '_blank', 'noopener');
+  }
 
   useEffect(() => {
     getActiveLocations().then(({ data }) => setAllLocations(data ?? []));
@@ -1000,6 +1068,78 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* R.3 attachments */}
+            <div className="customer-attachment-panel" style={{ marginBottom: 16 }} data-testid="admin-deposit-r3-attachment-panel">
+              {canWriteReceiving ? (
+                <>
+                  <label className="form-field">
+                    <span>แนบใบ ร.3</span>
+                    <input
+                      accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+                      data-testid="admin-deposit-r3-attachment-input"
+                      multiple
+                      onChange={handleR3AttachmentFiles}
+                      type="file"
+                    />
+                  </label>
+                  <p className="form-helper" style={{ marginTop: 0 }}>
+                    ไฟล์จะถูกอัปโหลดและแนบกับใบรับเข้านี้ทันทีเมื่อกดอัปโหลด (สูงสุด 10MB ต่อไฟล์)
+                  </p>
+                </>
+              ) : (
+                <div className="form-label">ใบ ร.3</div>
+              )}
+              {r3AttachmentError ? <p className="field-error" role="alert">{r3AttachmentError}</p> : null}
+              {r3AttachmentFiles.length ? (
+                <div className="action-row" style={{ marginBottom: 8 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={uploadingR3Attachment}
+                    onClick={handleUploadR3Attachments}
+                    type="button"
+                  >
+                    {uploadingR3Attachment ? 'กำลังอัปโหลด...' : `อัปโหลดใบ ร.3 (${r3AttachmentFiles.length})`}
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={uploadingR3Attachment}
+                    onClick={() => setR3AttachmentFiles([])}
+                    type="button"
+                  >
+                    ล้างไฟล์ที่เลือก
+                  </button>
+                </div>
+              ) : null}
+              <ul className="customer-attachment-list" data-testid="admin-deposit-r3-attachment-list">
+                {r3AttachmentFiles.map((file, index) => (
+                  <li key={`${file.name}-${file.lastModified}`}>
+                    <span>{file.name} ({file.type || 'unknown'}, {formatAttachmentSize(file.size)})</span>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => setR3AttachmentFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      type="button"
+                    >
+                      ลบ
+                    </button>
+                  </li>
+                ))}
+                {r3Attachments.map((file) => (
+                  <li key={file.id}>
+                    <span>{file.file_name} ({file.file_mime_type || 'unknown'}, {formatAttachmentSize(file.file_size_bytes)})</span>
+                    <span className="form-helper" style={{ margin: 0 }}>
+                      {file.uploaded_at ? formatDocumentDate(file.uploaded_at) : ''}
+                    </span>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleOpenR3Attachment(file)} type="button">
+                      เปิดไฟล์
+                    </button>
+                  </li>
+                ))}
+                {!r3AttachmentFiles.length && !r3Attachments.length ? (
+                  <li><span className="form-helper">ยังไม่มีไฟล์ใบ ร.3 แนบไว้</span></li>
+                ) : null}
+              </ul>
             </div>
 
             {/* Comment */}
