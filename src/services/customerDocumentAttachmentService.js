@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.js';
 import { missingSupabaseClientResult } from './customerPortalServiceUtils.js';
+import { compressFileForUpload } from '../utils/fileCompression.js';
 
 export const CUSTOMER_DOCUMENT_ATTACHMENT_BUCKET = 'customer-portal-attachments';
 
@@ -32,7 +33,8 @@ export async function uploadCustomerDocumentAttachments({
   const selectedFiles = Array.from(files ?? []);
   const uploadedRows = [];
 
-  for (const file of selectedFiles) {
+  for (const originalFile of selectedFiles) {
+    const file = await compressFileForUpload(originalFile);
     const storagePath = buildStoragePath({
       customerId,
       documentType,
