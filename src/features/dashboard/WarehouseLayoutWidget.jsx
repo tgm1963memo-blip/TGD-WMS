@@ -122,6 +122,147 @@ function SectionGrid({ section, onLocClick }) {
   );
 }
 
+// "มุมมองเสมือนจริง": the room drawn the way it physically sits -- the
+// highest row against the back wall at the top, counting down to row 1,
+// then the "รอจ่าย" staging row (row 0) by the door at the bottom. L and R
+// face each other across the forklift aisle, and each row is one small cell
+// per pallet slot (filled by count), so an over-capacity row shows extra red
+// cells past its configured capacity.
+function PalletCells({ capacity, used, color }) {
+  const slots = Math.max(capacity, used);
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${slots || 1}, minmax(0, 1fr))`, gap: 3, flex: 1, minWidth: 0 }}>
+      {Array.from({ length: slots }, (_, i) => {
+        const filled = i < used;
+        const over = i >= capacity;
+        const fill = !filled ? '#e2e8f0' : (over ? '#dc2626' : color);
+        return (
+          <div
+            key={i}
+            style={{
+              height: 14, borderRadius: 3, background: fill,
+              border: `1px solid ${filled ? fill : '#cbd5e1'}`,
+              outline: over ? '1px dashed #dc2626' : 'none', outlineOffset: 1,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function VirtualRow({ location, onClick }) {
+  if (!location) {
+    return <div style={{ height: 26 }} aria-hidden="true" />;
+  }
+  const capacity = location.capacity || 0;
+  const used = location.usedCount || 0;
+  const overCapacity = (capacity > 0 && used > capacity) || used > DEFAULT_ROW_CAPACITY;
+  const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
+  const color = overCapacity ? '#dc2626' : pctColor(pct);
+  const parsed = parseLocationCode(location.location_code);
+  const isStaging = parsed?.row === 0;
+  const label = parsed ? formatRowLabel(parsed.row) : '-';
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick?.(location.id, location.location_code)}
+      title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
+      aria-label={`${location.location_code} ${label} ใช้ ${used} จาก ${capacity} pallet`}
+      data-testid="virtual-row"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, height: 26, padding: '0 8px', width: '100%',
+        border: `1px solid ${overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : '#e5e7eb')}`, borderRadius: 6,
+        background: overCapacity ? '#fef2f2' : (isStaging ? '#fffbeb' : (used > 0 ? '#f8fafc' : '#fff')),
+        cursor: 'pointer', font: 'inherit', textAlign: 'left', boxSizing: 'border-box',
+      }}
+    >
+      <span style={{ width: 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isStaging ? '#b9660a' : '#475569' }}>{label}</span>
+      <PalletCells capacity={capacity} used={used} color={color} />
+      <span style={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : '#94a3b8' }}>
+        {used}/{capacity}{overCapacity ? ' ⚠' : ''}
+      </span>
+    </button>
+  );
+}
+
+function VirtualSectionGrid({ section, onLocClick }) {
+  const { locations } = section;
+
+  const rows = useMemo(() => {
+    const bySideRow = { L: new Map(), R: new Map() };
+    for (const loc of locations || []) {
+      const parsed = parseLocationCode(loc?.location_code);
+      if (parsed && bySideRow[parsed.side]) bySideRow[parsed.side].set(parsed.row, loc);
+    }
+    // Descending: highest row at the back wall (top) ... row 1, then row 0
+    // (รอจ่าย) last, by the door.
+    const rowNumbers = Array.from(new Set([...bySideRow.L.keys(), ...bySideRow.R.keys()])).sort((a, b) => b - a);
+    return {
+      hasL: bySideRow.L.size > 0,
+      hasR: bySideRow.R.size > 0,
+      list: rowNumbers.map((row) => ({ row, left: bySideRow.L.get(row) ?? null, right: bySideRow.R.get(row) ?? null })),
+    };
+  }, [locations]);
+
+  if (!locations?.length) {
+    return <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
+  }
+
+  const sideColumn = (side) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', padding: '0 4px 2px' }}>{side === 'L' ? 'ฝั่งซ้าย (L)' : 'ฝั่งขวา (R)'}</div>
+      {rows.list.map(({ row, left, right }) => (
+        <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} />
+      ))}
+    </div>
+  );
+
+  const columns = [rows.hasL ? 'minmax(0, 1fr)' : null, '90px', rows.hasR ? 'minmax(0, 1fr)' : null].filter(Boolean).join(' ');
+
+  return (
+    <div data-testid="virtual-section-grid" style={{ padding: 12 }}>
+      <div style={{ textAlign: 'center', padding: '6px 0', borderBottom: '3px solid #94a3b8', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 10 }}>
+        ผนังด้านในสุดของห้อง
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: columns, gap: 0 }}>
+        {rows.hasL ? sideColumn('L') : null}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+          margin: '22px 12px 0', borderLeft: '2px dashed #cbd5e1', borderRight: '2px dashed #cbd5e1', background: '#f1f5f9',
+        }}>
+          <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: '#64748b', letterSpacing: '0.1em' }}>
+            ทางเดินรถโฟล์คลิฟท์
+          </span>
+        </div>
+        {rows.hasR ? sideColumn('R') : null}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px minmax(0, 1fr)', alignItems: 'end', marginTop: 8 }}>
+        <div style={{ borderTop: '3px solid #94a3b8' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: '100%', height: 8, border: '3px solid #16a34a', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#166534' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
+        </div>
+        <div style={{ borderTop: '3px solid #94a3b8' }} />
+      </div>
+      <div style={{ fontSize: 12, color: '#64748b', marginTop: 10 }}>
+        แต่ละช่องเล็ก = 1 pallet · ช่องสีแดงขอบประ = pallet ที่เกินความจุ · คลิกแถวเพื่อดูรายละเอียด pallet
+      </div>
+    </div>
+  );
+}
+
+const VIEW_MODE_STORAGE_KEY = 'tgd.warehouseLayout.viewMode';
+
+function readStoredViewMode() {
+  try {
+    return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'virtual' ? 'virtual' : 'list';
+  } catch {
+    return 'list';
+  }
+}
+
 export function WarehouseLayoutWidget() {
   const navigate = useNavigate();
   const { role: userRole } = useUserRole();
@@ -132,6 +273,12 @@ export function WarehouseLayoutWidget() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [viewMode, setViewMode] = useState(readStoredViewMode);
+
+  function changeViewMode(mode) {
+    setViewMode(mode);
+    try { window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode); } catch { /* per-viewer convenience only */ }
+  }
 
   const [stockModal, setStockModal] = useState(null); // { locId, locCode }
   const [palletCapacity, setPalletCapacity] = useState(0);
@@ -316,7 +463,30 @@ export function WarehouseLayoutWidget() {
               {sec.name}
             </button>
           ))}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div role="group" aria-label="เลือกมุมมองแผนผัง" style={{ display: 'flex', padding: 3, background: '#e2e8f0', borderRadius: 20, gap: 2 }}>
+              {[
+                { mode: 'list', label: 'มุมมองรายการ' },
+                { mode: 'virtual', label: 'มุมมองเสมือนจริง' },
+              ].map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={viewMode === mode}
+                  data-testid={`layout-view-${mode}`}
+                  onClick={() => changeViewMode(mode)}
+                  style={{
+                    padding: '4px 12px', border: 'none', borderRadius: 16, cursor: 'pointer', fontSize: 12,
+                    background: viewMode === mode ? '#fff' : 'transparent',
+                    color: viewMode === mode ? '#166534' : '#475569',
+                    fontWeight: viewMode === mode ? 700 : 500,
+                    boxShadow: viewMode === mode ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => setRefreshKey((k) => k + 1)}
@@ -365,7 +535,9 @@ export function WarehouseLayoutWidget() {
         {/* Grid */}
         <div style={{ background: '#f8fafb', borderRadius: 12, padding: 14, border: '1px solid #e5e7eb', marginBottom: 20 }}>
           {selected.total > 0 ? (
-            <SectionGrid section={selected} onLocClick={handleLocClick} />
+            viewMode === 'virtual'
+              ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
+              : <SectionGrid section={selected} onLocClick={handleLocClick} />
           ) : (
             <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>
               Section นี้ยังไม่มี Location
