@@ -1,6 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSectionsWithOccupancy, getPalletDetailsAtLocation, DEFAULT_ROW_CAPACITY } from '../../services/warehouseLayoutService.js';
+import {
+  getSectionsWithOccupancy,
+  getPalletDetailsAtLocation,
+  DEFAULT_ROW_CAPACITY,
+  confirmAndResetLocations,
+  LOCATION_RESET_ROLES,
+} from '../../services/warehouseLayoutService.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
@@ -117,6 +124,10 @@ function SectionGrid({ section, onLocClick }) {
 
 export function WarehouseLayoutWidget() {
   const navigate = useNavigate();
+  const { role: userRole } = useUserRole();
+  const canResetLocations = LOCATION_RESET_ROLES.includes(userRole);
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState(null);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -153,7 +164,22 @@ export function WarehouseLayoutWidget() {
     return () => clearInterval(interval);
   }, []);
 
-  function handleLocClick(locId, locCode) {
+  async function handleResetLocation() {
+    if (!stockModal) return;
+    setResetting(true);
+    setResetMsg(null);
+    const result = await confirmAndResetLocations([stockModal.locId], stockModal.locCode);
+    setResetting(false);
+    if (result.error) { setResetMsg({ type: 'error', text: result.error.message ?? 'Reset ไม่สำเร็จ' }); return; }
+    if (result.cancelled) return;
+    const { cleared = 0, skipped_picked: skipped = 0 } = result.data ?? {};
+    setResetMsg({ type: 'ok', text: `ล้าง ${cleared} pallet แล้ว${skipped ? ` (ข้าม ${skipped} pallet ที่ถูกหยิบเบิกแล้ว)` : ''}` });
+    handleLocClick(stockModal.locId, stockModal.locCode, { keepMsg: true });
+    setRefreshKey((k) => k + 1);
+  }
+
+  function handleLocClick(locId, locCode, { keepMsg = false } = {}) {
+    if (!keepMsg) setResetMsg(null);
     setStockModal({ locId, locCode });
     setPallets([]);
     setPalletCapacity(0);
@@ -505,9 +531,27 @@ export function WarehouseLayoutWidget() {
                     duplicate assignment is a warning, not a block), so
                     pallets.length alone would overcount how many of the
                     row's real physical slots are actually in use. */}
-                <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>
-                  ใช้ไป {new Set(pallets.map((p) => p.palletNo)).size}/{palletCapacity} pallet
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                  <div style={{ fontSize: 12.5, color: '#64748b' }}>
+                    ใช้ไป {new Set(pallets.map((p) => p.palletNo)).size}/{palletCapacity} pallet
+                  </div>
+                  {canResetLocations && pallets.length > 0 ? (
+                    <button
+                      type="button"
+                      data-testid="layout-reset-location-button"
+                      disabled={resetting}
+                      onClick={handleResetLocation}
+                      style={{ padding: '5px 12px', border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', color: '#b45309', cursor: resetting ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}
+                    >
+                      {resetting ? 'กำลัง reset...' : 'Reset location'}
+                    </button>
+                  ) : null}
                 </div>
+                {resetMsg ? (
+                  <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : '#fee2e2', color: resetMsg.type === 'ok' ? '#166534' : '#b91c1c' }}>
+                    {resetMsg.text}
+                  </div>
+                ) : null}
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>

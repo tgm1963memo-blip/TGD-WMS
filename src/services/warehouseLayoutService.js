@@ -611,3 +611,43 @@ export async function updateLocation(locationId, { capacity, zoneCode, side, row
   const { error } = await supabase.from('tgd_locations').update(updates).eq('id', locationId);
   return { error };
 }
+
+// Roles tgd_reset_location_allocations accepts -- used to hide the button.
+export const LOCATION_RESET_ROLES = ['admin', 'warehouse_manager', 'warehouse_admin'];
+
+// "Reset location": clears every pallet allocation in the given locations
+// (stock balances and receiving documents are left alone). Pallets already
+// referenced by a withdrawal pick are skipped server-side. dryRun only
+// returns the counts, for the confirm prompt.
+export async function resetLocationAllocations(locationIds, { dryRun = false } = {}) {
+  if (!supabase) return { data: null, error: new Error('Supabase client is not configured.') };
+  const ids = Array.from(new Set((locationIds ?? []).filter(Boolean)));
+  if (!ids.length) return { data: { cleared: 0, skipped_picked: 0 }, error: null };
+
+  const { data, error } = await supabase.rpc('tgd_reset_location_allocations', {
+    p_location_ids: ids,
+    p_dry_run: dryRun,
+  });
+  return { data: data ?? null, error };
+}
+
+// Asks for confirmation with the real counts, then resets. Returns
+// { data, error, cancelled }.
+export async function confirmAndResetLocations(locationIds, label) {
+  const preview = await resetLocationAllocations(locationIds, { dryRun: true });
+  if (preview.error) return preview;
+  const { cleared = 0, skipped_picked: skipped = 0 } = preview.data ?? {};
+  if (!cleared) {
+    return {
+      data: preview.data,
+      error: skipped ? new Error(`${label}: มี ${skipped} pallet ที่ถูกหยิบเบิกไปแล้ว — ยกเลิกการหยิบก่อนจึงจะ reset ได้`) : null,
+      cancelled: true,
+      empty: !skipped,
+    };
+  }
+  const message = `Reset location ${label}?\n\nจะล้างการระบุ pallet ${cleared} รายการ (สินค้าจะกลับเป็น "ยังไม่ระบุ" location)`
+    + (skipped ? `\nข้าม ${skipped} pallet ที่ถูกหยิบเบิกไปแล้ว` : '')
+    + '\n\nเอกสารรับเข้าและยอดคงเหลือจะไม่ถูกลบ';
+  if (!window.confirm(message)) return { data: null, error: null, cancelled: true };
+  return resetLocationAllocations(locationIds);
+}

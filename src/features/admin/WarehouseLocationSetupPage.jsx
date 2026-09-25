@@ -10,7 +10,10 @@ import {
   deleteLocation,
   updateLocation,
   getActiveLocations,
+  confirmAndResetLocations,
+  LOCATION_RESET_ROLES,
 } from '../../services/warehouseLayoutService.js';
+import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { listDepositLinesForLocationAssignment, importDepositLineLocationAssignments } from '../../services/customerDepositRequestService.js';
@@ -95,7 +98,7 @@ function initEditForm(section) {
 // list -- edit (capacity and/or room/side/row, i.e. move to a different
 // spot entirely) or delete just this one row, without touching any other
 // row in the zone. Mirrors SectionCard's own confirm-then-delete pattern.
-function LocationRow({ location, zoneCode, onDelete, onEdit }) {
+function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
   const parsed = parseLocationCode(location.location_code);
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -154,6 +157,13 @@ function LocationRow({ location, zoneCode, onDelete, onEdit }) {
           ใช้ไป {location.usedCount}/{location.capacity} pallet
         </span>
         <div style={{ display: 'flex', gap: 6 }}>
+          {!confirm && onReset && location.usedCount > 0 && (
+            <button type="button" onClick={() => onReset([location.id], location.location_code)}
+              data-testid="location-row-reset-button"
+              style={{ padding: '4px 10px', border: '1px solid #f59e0b', borderRadius: 6, background: '#fffbeb', color: '#b45309', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              Reset
+            </button>
+          )}
           {!confirm && (
             <button type="button" onClick={editing ? () => setEditing(false) : openEdit}
               style={{ padding: '4px 10px', border: '1px solid #3b82f6', borderRadius: 6, background: editing ? '#eff6ff' : '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
@@ -222,7 +232,7 @@ function LocationRow({ location, zoneCode, onDelete, onEdit }) {
   );
 }
 
-function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocation }) {
+function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocation, onResetLocations }) {
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -336,6 +346,16 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {!confirm && onResetLocations && section.used > 0 && (
+            <button
+              type="button"
+              data-testid="section-reset-location-button"
+              onClick={() => onResetLocations((section.locations ?? []).map((l) => l.id), `ห้อง ${section.code} ทั้งห้อง`)}
+              style={{ padding: '6px 10px', border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', color: '#b45309', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              Reset location
+            </button>
+          )}
           {!confirm && (
             <button
               type="button"
@@ -517,6 +537,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               zoneCode={section.code}
               onDelete={onDeleteLocation}
               onEdit={onEditLocation}
+              onReset={onResetLocations}
             />
           ))}
         </div>
@@ -957,6 +978,9 @@ function AddSectionForm({ onAdd }) {
 }
 
 export function WarehouseLocationSetupPage() {
+  const { role: userRole } = useUserRole();
+  const canResetLocations = LOCATION_RESET_ROLES.includes(userRole);
+  const [resetMsg, setResetMsg] = useState(null);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1005,6 +1029,19 @@ export function WarehouseLocationSetupPage() {
     return result;
   }
 
+  async function handleResetLocations(locationIds, label) {
+    setResetMsg(null);
+    const result = await confirmAndResetLocations(locationIds, label);
+    if (result.error) { setResetMsg({ type: 'danger', text: result.error.message ?? 'Reset ไม่สำเร็จ' }); return; }
+    if (result.cancelled) {
+      if (result.empty) setResetMsg({ type: 'info', text: `${label}: ไม่มี pallet ที่ต้อง reset` });
+      return;
+    }
+    const { cleared = 0, skipped_picked: skipped = 0 } = result.data ?? {};
+    setResetMsg({ type: 'success', text: `Reset ${label} แล้ว — ล้าง ${cleared} pallet${skipped ? ` (ข้าม ${skipped} pallet ที่ถูกหยิบเบิกแล้ว)` : ''}` });
+    await load();
+  }
+
   const totalRows = sections.reduce((s, z) => s + z.total, 0);
   const totalCapacity = sections.reduce((s, z) => s + z.totalCapacity, 0);
 
@@ -1034,6 +1071,10 @@ export function WarehouseLocationSetupPage() {
         ))}
       </div>
 
+      {resetMsg ? (
+        <div className={`banner banner-${resetMsg.type}`} role="status" style={{ marginBottom: 12 }}>{resetMsg.text}</div>
+      ) : null}
+
       <ProductLocationAssignmentSection />
 
       <AddSectionForm onAdd={handleAdd} />
@@ -1059,6 +1100,7 @@ export function WarehouseLocationSetupPage() {
               onEdit={handleEdit}
               onDeleteLocation={handleDeleteLocation}
               onEditLocation={handleEditLocation}
+              onResetLocations={canResetLocations ? handleResetLocations : null}
             />
           ))}
         </div>
