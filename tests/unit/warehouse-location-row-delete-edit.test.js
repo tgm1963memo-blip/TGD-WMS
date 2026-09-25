@@ -54,8 +54,8 @@ describe('getOccupiedPalletCountByLocationId', () => {
           ],
           error: null,
         }],
-        tgd_customer_withdrawal_line_pallet_picks: [{
-          data: [{ deposit_line_location_id: 'alloc-2', boxes: 3 }], // alloc-2 fully picked out
+        tgd_deposit_line_location_picked: [{
+          data: [{ allocation_id: 'alloc-2', picked_boxes: 3 }], // alloc-2 fully picked out
           error: null,
         }],
       }),
@@ -75,7 +75,7 @@ describe('deleteLocation', () => {
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: makeQueuedSupabaseMock({
         tgd_customer_deposit_line_locations: [{ data: [{ id: 'alloc-1', location_id: 'loc-1', boxes: 5 }], error: null }],
-        tgd_customer_withdrawal_line_pallet_picks: [{ data: [], error: null }],
+        tgd_deposit_line_location_picked: [{ data: [], error: null }],
       }),
     }));
     const { deleteLocation } = await import('../../src/services/warehouseLayoutService.js');
@@ -91,7 +91,7 @@ describe('deleteLocation', () => {
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: makeQueuedSupabaseMock({
         tgd_customer_deposit_line_locations: [{ data: [], error: null }],
-        tgd_customer_withdrawal_line_pallet_picks: [{ data: [], error: null }],
+        tgd_deposit_line_location_picked: [{ data: [], error: null }],
         tgd_locations: [{ data: null, error: null }],
       }),
     }));
@@ -117,7 +117,7 @@ describe('updateLocation', () => {
           data: [{ id: 'a1', location_id: 'loc-1', boxes: 1 }, { id: 'a2', location_id: 'loc-1', boxes: 1 }, { id: 'a3', location_id: 'loc-1', boxes: 1 }],
           error: null,
         }],
-        tgd_customer_withdrawal_line_pallet_picks: [{ data: [], error: null }],
+        tgd_deposit_line_location_picked: [{ data: [], error: null }],
       }),
     }));
     const { updateLocation } = await import('../../src/services/warehouseLayoutService.js');

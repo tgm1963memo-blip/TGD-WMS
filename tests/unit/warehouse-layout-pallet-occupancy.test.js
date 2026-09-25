@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Regression coverage for the pallet-split occupancy model: a row's
 // occupancy is now a COUNT of pallets in use (tgd_customer_deposit_line_locations)
-// minus whatever's already been picked out (tgd_customer_withdrawal_line_pallet_picks),
+// minus whatever's already been picked out (tgd_deposit_line_location_picked),
 // not a binary tgd_stock_balances lookup. See the 20260912090000 migration and
 // warehouseLayoutService.js's getSectionsWithOccupancy/getPalletDetailsAtLocation.
 
@@ -36,7 +36,7 @@ describe('getSectionsWithOccupancy', () => {
           if (table === 'tgd_customer_deposit_line_locations') {
             return chainableSelect({ data: [{ id: 'alloc-1', location_id: 'loc-1', boxes: 5 }], error: null });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
+          if (table === 'tgd_deposit_line_location_picked') {
             return chainableSelect({ data: [], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
@@ -71,8 +71,8 @@ describe('getSectionsWithOccupancy', () => {
           if (table === 'tgd_customer_deposit_line_locations') {
             return chainableSelect({ data: [{ id: 'alloc-1', location_id: 'loc-1', boxes: 5 }], error: null });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
-            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-1', boxes: 5 }], error: null });
+          if (table === 'tgd_deposit_line_location_picked') {
+            return chainableSelect({ data: [{ allocation_id: 'alloc-1', picked_boxes: 5 }], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
         },
@@ -103,8 +103,8 @@ describe('getSectionsWithOccupancy', () => {
           if (table === 'tgd_customer_deposit_line_locations') {
             return chainableSelect({ data: [{ id: 'alloc-1', location_id: 'loc-1', boxes: null, weight: 100 }], error: null });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
-            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-1', boxes: null, weight: 100 }], error: null });
+          if (table === 'tgd_deposit_line_location_picked') {
+            return chainableSelect({ data: [{ allocation_id: 'alloc-1', picked_boxes: null, picked_weight: 100 }], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
         },
@@ -144,7 +144,7 @@ describe('getSectionsWithOccupancy', () => {
               error: null,
             });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
+          if (table === 'tgd_deposit_line_location_picked') {
             return chainableSelect({ data: [], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
@@ -210,8 +210,8 @@ describe('getPalletDetailsAtLocation', () => {
               error: null,
             });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
-            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-2', boxes: 3 }], error: null });
+          if (table === 'tgd_deposit_line_location_picked') {
+            return chainableSelect({ data: [{ allocation_id: 'alloc-2', picked_boxes: 3 }], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
         },
@@ -252,8 +252,8 @@ describe('getPalletDetailsAtLocation', () => {
               error: null,
             });
           }
-          if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
-            return chainableSelect({ data: [{ deposit_line_location_id: 'alloc-1', boxes: null, weight: 100 }], error: null });
+          if (table === 'tgd_deposit_line_location_picked') {
+            return chainableSelect({ data: [{ allocation_id: 'alloc-1', picked_boxes: null, picked_weight: 100 }], error: null });
           }
           throw new Error(`Unexpected table: ${table}`);
         },

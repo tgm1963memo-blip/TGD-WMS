@@ -90,25 +90,26 @@ async function insertLocationsWithSchemaFallback(rows) {
 // re-querying/re-summing the same rows itself). Pass a specific list of
 // allocation ids to scope the query (e.g. to one location's pallets);
 // omit it to sum across every allocation in the warehouse.
+//
+// Reads tgd_deposit_line_location_picked (migration 117), which adds
+// line-level withdrawals that never recorded a pallet pick on top of the
+// real pallet picks -- otherwise stock withdrawn through the older flow
+// kept showing on its pallet forever.
 export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
   const pickedByAllocationId = new Map();
   if (!supabase) return pickedByAllocationId;
   if (allocationIds && allocationIds.length === 0) return pickedByAllocationId;
 
-  let query = supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('deposit_line_location_id, boxes, weight');
-  if (allocationIds) query = query.in('deposit_line_location_id', allocationIds);
-  const { data: picks } = await query;
+  let query = supabase.from('tgd_deposit_line_location_picked').select('allocation_id, picked_boxes, picked_weight');
+  if (allocationIds) query = query.in('allocation_id', allocationIds);
+  const { data: rows } = await query;
 
-  for (const p of picks ?? []) {
-    if (!p.deposit_line_location_id) continue;
-    const current = pickedByAllocationId.get(p.deposit_line_location_id) ?? { boxes: 0, weight: 0 };
-    pickedByAllocationId.set(
-      p.deposit_line_location_id,
-      {
-        boxes: current.boxes + Number(p.boxes || 0),
-        weight: current.weight + Number(p.weight || 0),
-      }
-    );
+  for (const row of rows ?? []) {
+    if (!row.allocation_id) continue;
+    pickedByAllocationId.set(row.allocation_id, {
+      boxes: Number(row.picked_boxes || 0),
+      weight: Number(row.picked_weight || 0),
+    });
   }
   return pickedByAllocationId;
 }
