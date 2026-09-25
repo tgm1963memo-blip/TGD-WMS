@@ -46,7 +46,7 @@ export async function getUserProfiles(filters = {}) {
 
   let query = supabase
     .from('tgd_user_profiles')
-    .select('id, auth_user_id, email, display_name, first_name, last_name, role, customer_id, is_active, is_deleted, pin_code, created_at, updated_at, customer_custom_role_id, customer_custom_role:tgd_customer_custom_roles(role_name)')
+    .select('id, auth_user_id, email, display_name, first_name, last_name, role, customer_id, is_active, is_deleted, pin_code, receives_email_alerts, created_at, updated_at, customer_custom_role_id, customer_custom_role:tgd_customer_custom_roles(role_name)')
     .order('email', { ascending: true });
 
   if (!filters.includeDeleted) {
@@ -98,4 +98,22 @@ export async function updateOwnProfile({ firstName, lastName, displayName, pinCo
   });
   if (error) return { data: null, error };
   return { data, error: null };
+}
+
+// Turns the signed-in user's own request-email notifications on/off. Admins
+// never receive request emails regardless (see migration 118).
+export async function setMyEmailNotifications(enabled) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_set_my_email_notifications', { p_enabled: Boolean(enabled) });
+  return { data: data ?? null, error };
+}
+
+// Admin-only: turns request-email notifications on/off for another user.
+export async function adminSetUserEmailNotifications(profileId, enabled) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_admin_set_user_email_notifications', {
+    p_profile_id: profileId,
+    p_enabled: Boolean(enabled),
+  });
+  return { data: data ?? null, error };
 }

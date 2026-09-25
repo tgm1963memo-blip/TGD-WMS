@@ -4,7 +4,7 @@ import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
-import { getCurrentUserProfile } from '../../services/userProfileService.js';
+import { getCurrentUserProfile, adminSetUserEmailNotifications } from '../../services/userProfileService.js';
 import {
   CUSTOMER_PORTAL_ROLES,
   createAuthUser,
@@ -131,6 +131,22 @@ export function UserManagementPage() {
       render: (row) => (row.auth_user_id ? 'Linked' : t('user_mgmt_auth_pending')),
     },
     { key: 'is_active', header: t('user_mgmt_col_status'), render: (row) => <StatusBadge value={row.is_active} /> },
+    {
+      key: 'receives_email_alerts',
+      header: language === 'th' ? 'รับอีเมล' : 'Email',
+      render: (row) => (row.role === 'admin' ? (
+        <span className="form-helper" title="role admin ไม่รับอีเมลจากระบบ" data-testid="user-mgmt-email-locked">ปิด (admin)</span>
+      ) : (
+        <input
+          aria-label={`รับอีเมลแจ้งเตือน ${row.email ?? ''}`}
+          data-testid="user-mgmt-email-toggle"
+          type="checkbox"
+          checked={row.receives_email_alerts !== false}
+          disabled={!canManage || saving}
+          onChange={(e) => toggleEmailNotifications(row, e.target.checked)}
+        />
+      )),
+    },
     {
       key: 'actions',
       header: t('user_mgmt_col_actions'),
@@ -360,6 +376,20 @@ export function UserManagementPage() {
       return;
     }
 
+    setSuccess(t('user_mgmt_save_success'));
+    await loadData();
+  }
+
+  async function toggleEmailNotifications(row, enabled) {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    const result = await adminSetUserEmailNotifications(row.id, enabled);
+    setSaving(false);
+    if (result.error) {
+      setError(result.error.message ?? t('user_mgmt_save_error'));
+      return;
+    }
     setSuccess(t('user_mgmt_save_success'));
     await loadData();
   }

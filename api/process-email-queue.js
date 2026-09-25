@@ -118,18 +118,32 @@ export default async function handler(req, res) {
     .map((p) => String(p.email || '').trim().toLowerCase())
     .filter(Boolean));
 
+  // Users who switched email notifications off (profile settings or admin).
+  const { data: optedOutProfiles } = await adminClient
+    .from('tgd_user_profiles')
+    .select('email')
+    .eq('is_active', true)
+    .eq('receives_email_alerts', false);
+  const optedOutEmails = new Set((optedOutProfiles ?? [])
+    .map((p) => String(p.email || '').trim().toLowerCase())
+    .filter(Boolean));
+
   // 3. Process each email
   for (const item of queue) {
     try {
+      const recipientEmail = String(item.recipient_email || '').trim().toLowerCase();
       const recipientIsAdmin = String(item.recipient_role || '').trim().toLowerCase() === 'admin'
-        || adminEmails.has(String(item.recipient_email || '').trim().toLowerCase());
-      if (recipientIsAdmin) {
+        || adminEmails.has(recipientEmail);
+      const recipientOptedOut = optedOutEmails.has(recipientEmail);
+      if (recipientIsAdmin || recipientOptedOut) {
         await adminClient
           .from('tgd_customer_request_email_queue')
           .update({
             status: 'SKIPPED',
             sent_at: new Date().toISOString(),
-            error_log: 'Skipped: role admin no longer receives request emails.',
+            error_log: recipientIsAdmin
+              ? 'Skipped: role admin no longer receives request emails.'
+              : 'Skipped: recipient turned off email notifications.',
           })
           .eq('id', item.id);
 

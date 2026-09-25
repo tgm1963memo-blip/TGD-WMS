@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { getCurrentUserProfile, updateOwnProfile } from '../../services/userProfileService.js';
+import { getCurrentUserProfile, updateOwnProfile, setMyEmailNotifications } from '../../services/userProfileService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 function formatCustomerScope(customerId, t) {
@@ -19,6 +19,9 @@ export function ProfileSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [notifySaving, setNotifySaving] = useState(false);
+  const [notifyMsg, setNotifyMsg] = useState('');
+  const [notifyError, setNotifyError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -64,6 +67,20 @@ export function ProfileSettingsPage() {
         } : cur.profile,
       }));
     }
+  }
+
+  async function handleToggleEmailNotifications(enabled) {
+    setNotifySaving(true);
+    setNotifyMsg('');
+    setNotifyError('');
+    const result = await setMyEmailNotifications(enabled);
+    setNotifySaving(false);
+    if (result.error) {
+      setNotifyError(result.error.message ?? 'บันทึกไม่สำเร็จ');
+      return;
+    }
+    setState((cur) => ({ ...cur, profile: cur.profile ? { ...cur.profile, receives_email_alerts: enabled } : cur.profile }));
+    setNotifyMsg(enabled ? 'เปิดรับอีเมลแจ้งเตือนแล้ว' : 'ปิดรับอีเมลแจ้งเตือนแล้ว');
   }
 
   if (state.loading) {
@@ -166,6 +183,33 @@ export function ProfileSettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        <div className="section-card profile-settings-card" data-testid="profile-email-notifications-card">
+          <h3 className="section-card-title">การแจ้งเตือนทางอีเมล</h3>
+          {profile?.role === 'admin' ? (
+            <p className="section-card-description" data-testid="profile-email-notifications-admin-note">
+              บัญชี role admin ไม่ได้รับอีเมลแจ้งเตือนจากระบบ (ปิดไว้ถาวร)
+            </p>
+          ) : (
+            <>
+              <p className="section-card-description">
+                เปิด/ปิดอีเมลแจ้งเตือนเรื่องเอกสารฝาก/เบิกที่ระบบส่งถึงอีเมลของคุณ
+              </p>
+              {notifyMsg ? <div className="alert-success-panel" role="status">{notifyMsg}</div> : null}
+              {notifyError ? <div className="banner banner-danger" role="alert">{notifyError}</div> : null}
+              <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input
+                  data-testid="profile-email-notifications-toggle"
+                  type="checkbox"
+                  checked={profile?.receives_email_alerts !== false}
+                  disabled={notifySaving || !profile}
+                  onChange={(e) => handleToggleEmailNotifications(e.target.checked)}
+                />
+                <span>รับอีเมลแจ้งเตือนจากระบบ</span>
+              </label>
+            </>
+          )}
         </div>
 
         <div className="section-card profile-settings-card" data-testid="profile-change-password-card">
