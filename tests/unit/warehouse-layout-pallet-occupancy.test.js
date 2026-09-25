@@ -12,6 +12,7 @@ function chainableSelect(result) {
     eq: () => query,
     in: () => query,
     order: () => query,
+    range: () => query,
     maybeSingle: () => Promise.resolve(result),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
   };

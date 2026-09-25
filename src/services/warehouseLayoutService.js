@@ -95,20 +95,76 @@ async function insertLocationsWithSchemaFallback(rows) {
 // line-level withdrawals that never recorded a pallet pick on top of the
 // real pallet picks -- otherwise stock withdrawn through the older flow
 // kept showing on its pallet forever.
+const PAGE_SIZE = 1000;
+const IN_CHUNK_SIZE = 150;
+
+// Reads every row of a query past PostgREST's 1000-row cap. buildQuery must
+// return a fresh query each call (range() mutates it).
+async function fetchAllPages(buildQuery) {
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: rows, error };
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+// Runs buildQuery(idsChunk) per chunk of ids (bounded URL length) and pages
+// each chunk, concatenating the rows.
+async function fetchByIdChunks(ids, buildQuery) {
+  const rows = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + IN_CHUNK_SIZE);
+    const { data, error } = await fetchAllPages(() => buildQuery(chunk));
+    if (error) return { data: rows, error };
+    rows.push(...data);
+  }
+  return { data: rows, error: null };
+}
+
+async function fetchPalletPickRows(allocationIds) {
+  const build = (ids) => {
+    const q = supabase.from('tgd_customer_withdrawal_line_pallet_picks').select('id, deposit_line_location_id, boxes, weight').order('id');
+    return ids ? q.in('deposit_line_location_id', ids) : q;
+  };
+  return allocationIds ? fetchByIdChunks(allocationIds, build) : fetchAllPages(() => build(null));
+}
+
 export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
   const pickedByAllocationId = new Map();
   if (!supabase) return pickedByAllocationId;
   if (allocationIds && allocationIds.length === 0) return pickedByAllocationId;
 
-  let query = supabase.from('tgd_deposit_line_location_picked').select('allocation_id, picked_boxes, picked_weight');
-  if (allocationIds) query = query.in('allocation_id', allocationIds);
-  const { data: rows } = await query;
+  const build = (ids) => {
+    const q = supabase.from('tgd_deposit_line_location_picked').select('allocation_id, picked_boxes, picked_weight').order('allocation_id');
+    return ids ? q.in('allocation_id', ids) : q;
+  };
+  const { data: rows, error } = allocationIds
+    ? await fetchByIdChunks(allocationIds, build)
+    : await fetchAllPages(() => build(null));
 
-  for (const row of rows ?? []) {
-    if (!row.allocation_id) continue;
-    pickedByAllocationId.set(row.allocation_id, {
-      boxes: Number(row.picked_boxes || 0),
-      weight: Number(row.picked_weight || 0),
+  if (!error) {
+    for (const row of rows) {
+      if (!row.allocation_id) continue;
+      pickedByAllocationId.set(row.allocation_id, {
+        boxes: Number(row.picked_boxes || 0),
+        weight: Number(row.picked_weight || 0),
+      });
+    }
+    return pickedByAllocationId;
+  }
+
+  // View missing/failing (e.g. migration 117 not applied yet): fall back to
+  // the raw pallet picks so at least those still count.
+  console.warn('tgd_deposit_line_location_picked unavailable, falling back to pallet picks:', error.message ?? error);
+  const { data: picks } = await fetchPalletPickRows(allocationIds);
+  for (const p of picks ?? []) {
+    if (!p.deposit_line_location_id) continue;
+    const current = pickedByAllocationId.get(p.deposit_line_location_id) ?? { boxes: 0, weight: 0 };
+    pickedByAllocationId.set(p.deposit_line_location_id, {
+      boxes: current.boxes + Number(p.boxes || 0),
+      weight: current.weight + Number(p.weight || 0),
     });
   }
   return pickedByAllocationId;
@@ -145,7 +201,7 @@ export async function getSectionsWithOccupancy() {
   // reality without needing the old dual tgd_stock_balances/deposit-line
   // fallback.
   const [{ data: allocations }, pickedByAllocationId] = await Promise.all([
-    supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight'),
+    fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id')),
     getPickedQuantitiesByAllocationId(),
   ]);
 

@@ -31,6 +31,7 @@ function makeQueuedSupabaseMock(responsesByTable) {
       in: () => builder,
       limit: () => builder,
       order: () => builder,
+      range: () => builder,
       maybeSingle: () => Promise.resolve(result),
       delete: () => builder,
       update: vi.fn(() => builder),

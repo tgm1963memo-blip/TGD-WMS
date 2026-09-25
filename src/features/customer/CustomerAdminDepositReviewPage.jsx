@@ -412,7 +412,7 @@ export function CustomerAdminDepositReviewPage() {
       setError(result.error.message ?? 'ส่งแจ้งเตือนไม่สำเร็จ');
       return;
     }
-    setActionMsg('ส่งคำขอตรวจนับใหม่ไปยังหัวหน้า Admin แล้ว');
+    setActionMsg('ส่งคำขอตรวจนับใหม่ไปยัง Admin คลังแล้ว');
     setRecountRequestOpen(false);
     setRecountRequestComment('');
   }
@@ -1108,7 +1108,7 @@ export function CustomerAdminDepositReviewPage() {
         )}
       >
         <div className="banner banner-warning" style={{ marginBottom: 12 }}>
-          เอกสารนี้ยืนยันแล้ว — การขอตรวจนับใหม่จะส่งแจ้งเตือนให้หัวหน้า Admin อนุมัติก่อน
+          เอกสารนี้ยืนยันแล้ว — การขอตรวจนับใหม่จะส่งแจ้งเตือนให้ Admin คลังตรวจสอบก่อน
         </div>
         <p style={{ marginTop: 0, fontSize: 13 }}>
           ใบฝาก: <strong>{selected?.request_no}</strong>

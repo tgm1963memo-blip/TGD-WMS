@@ -107,10 +107,23 @@ export default async function handler(req, res) {
   let failureCount = 0;
   let skippedCount = 0;
 
+  // Admins must never get request emails, whatever label the row was queued
+  // under (e.g. 'customer_submitter' when an admin submits for a customer).
+  const { data: adminProfiles } = await adminClient
+    .from('tgd_user_profiles')
+    .select('email')
+    .eq('role', 'admin')
+    .eq('is_active', true);
+  const adminEmails = new Set((adminProfiles ?? [])
+    .map((p) => String(p.email || '').trim().toLowerCase())
+    .filter(Boolean));
+
   // 3. Process each email
   for (const item of queue) {
     try {
-      if (String(item.recipient_role || '').trim().toLowerCase() === 'admin') {
+      const recipientIsAdmin = String(item.recipient_role || '').trim().toLowerCase() === 'admin'
+        || adminEmails.has(String(item.recipient_email || '').trim().toLowerCase());
+      if (recipientIsAdmin) {
         await adminClient
           .from('tgd_customer_request_email_queue')
           .update({
