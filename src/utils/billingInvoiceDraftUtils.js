@@ -342,6 +342,12 @@ export function buildInvoiceDraftLineFromAuxiliaryLine(auxLine) {
   };
 }
 
+// Summing floats (e.g. 0.1 + 0.2) drifts past 2 decimals -- totals were
+// being saved as 283055.79999999964. Totals are money/kg, so round to 2 dp.
+function roundTo2(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
 export function calculateInvoiceDraftTotals(lines = []) {
   const totals = lines.reduce((acc, line) => {
     acc.total_qty += toNumber(line.qty);
@@ -363,11 +369,11 @@ export function calculateInvoiceDraftTotals(lines = []) {
   });
 
   return {
-    total_qty: totals.total_qty,
-    total_net_weight: totals.total_net_weight,
-    total_gross_weight: totals.total_gross_weight,
-    total_chargeable_weight: totals.total_chargeable_weight,
-    total_amount: totals.has_amount ? totals.total_amount : null,
+    total_qty: roundTo2(totals.total_qty),
+    total_net_weight: roundTo2(totals.total_net_weight),
+    total_gross_weight: roundTo2(totals.total_gross_weight),
+    total_chargeable_weight: roundTo2(totals.total_chargeable_weight),
+    total_amount: totals.has_amount ? roundTo2(totals.total_amount) : null,
   };
 }
 
