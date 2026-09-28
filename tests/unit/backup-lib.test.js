@@ -85,3 +85,19 @@ describe('backupLib', () => {
     expect(m.storage).toMatchObject({ fileCount: 2, bytes: 12 });
   });
 });
+
+describe('backupLib OneDrive archive settings', async () => {
+  const { validateArchiveSettings, archiveFileName } = await import('../../scripts/backup/backupLib.mjs');
+
+  it('requires a strong archive password only when a OneDrive copy is configured', () => {
+    expect(validateArchiveSettings({})).toBeNull();
+    expect(validateArchiveSettings({ ONEDRIVE_COPY_DIR: 'C:/x' })).toMatch(/ARCHIVE_PASSWORD/);
+    expect(validateArchiveSettings({ ONEDRIVE_COPY_DIR: 'C:/x', ARCHIVE_PASSWORD: 'short' })).toMatch(/shorter/);
+    expect(validateArchiveSettings({ ONEDRIVE_COPY_DIR: 'C:/x', ARCHIVE_PASSWORD: 'a'.repeat(24) })).toBeNull();
+    expect(validateArchiveSettings({ ONEDRIVE_COPY_DIR: 'C:/x', ARCHIVE_PASSWORD: `${'a'.repeat(20)}"q` })).toMatch(/quotes/);
+  });
+
+  it('names the archive after the run folder', () => {
+    expect(archiveFileName('2026-09-28_0200')).toBe('TGD-WMS-backup_2026-09-28_0200.7z');
+  });
+});

@@ -38,6 +38,23 @@ export function validateBackupEnv(env) {
   return null;
 }
 
+// ONEDRIVE_COPY_DIR (off-machine copy) only ever receives an encrypted
+// archive, so it needs a real ARCHIVE_PASSWORD.
+export const MIN_ARCHIVE_PASSWORD_LENGTH = 16;
+
+export function validateArchiveSettings(env) {
+  if (!env.ONEDRIVE_COPY_DIR) return null;
+  if (String(env.ARCHIVE_PASSWORD ?? '').length < MIN_ARCHIVE_PASSWORD_LENGTH) {
+    return `ONEDRIVE_COPY_DIR is set but ARCHIVE_PASSWORD is missing or shorter than ${MIN_ARCHIVE_PASSWORD_LENGTH} characters`;
+  }
+  if (/["\r\n]/.test(env.ARCHIVE_PASSWORD)) return 'ARCHIVE_PASSWORD must not contain quotes or line breaks';
+  return null;
+}
+
+export function archiveFileName(folderName) {
+  return `TGD-WMS-backup_${folderName}.7z`;
+}
+
 // Hides the password in a connection string before it is logged.
 export function redactDbUrl(url) {
   return String(url ?? '').replace(/(postgres(?:ql)?:\/\/[^:/@]+:)[^@]*@/i, '$1****@');

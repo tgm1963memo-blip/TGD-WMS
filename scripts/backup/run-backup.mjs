@@ -7,12 +7,14 @@
 // pg_dump/pg_restore/psql from <root>\tools\pgsql\bin. Exit code 0 = OK.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, statfsSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync, statfsSync, cpSync, copyFileSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import {
   backupFolderName,
   parseEnvFile,
   validateBackupEnv,
+  validateArchiveSettings,
+  archiveFileName,
   redactDbUrl,
   sha256File,
   ROW_COUNT_SQL,
@@ -129,6 +131,30 @@ async function backupStorage(env) {
   return files;
 }
 
+// Encrypted off-machine copy: the whole run folder as one AES-256 .7z with
+// encrypted file names (-mhe=on), tested, then copied into the OneDrive
+// folder under a .partial name and renamed, so OneDrive never syncs a
+// half-written file. The password stays in backup.env on this machine.
+async function archiveToOneDrive(env) {
+  const sevenZip = env.SEVEN_ZIP_PATH || 'C:/Program Files/7-Zip/7z.exe';
+  if (!existsSync(sevenZip)) throw new Error(`Missing ${sevenZip} — install 7-Zip or set SEVEN_ZIP_PATH`);
+  const name = archiveFileName(path.basename(runDir));
+  const tmpDir = path.join(ROOT, 'archive-tmp');
+  mkdirSync(tmpDir, { recursive: true });
+  const archive = path.join(tmpDir, name);
+  rmSync(archive, { force: true });
+
+  await run(sevenZip, ['a', '-t7z', '-mx=7', '-mhe=on', `-p${env.ARCHIVE_PASSWORD}`, '-y', archive, path.join(runDir, '*')], { timeout: 30 * 60 * 1000 });
+  await run(sevenZip, ['t', `-p${env.ARCHIVE_PASSWORD}`, '-y', archive], { timeout: 30 * 60 * 1000 });
+
+  mkdirSync(env.ONEDRIVE_COPY_DIR, { recursive: true });
+  const target = path.join(env.ONEDRIVE_COPY_DIR, name);
+  copyFileSync(archive, `${target}.partial`);
+  renameSync(`${target}.partial`, target);
+  rmSync(archive, { force: true });
+  log(`encrypted archive copied to ${target} (${statSync(target).size} bytes)`);
+}
+
 async function main() {
   mkdirSync(runDir, { recursive: true });
   log(`backup started -> ${runDir}`);
@@ -136,7 +162,7 @@ async function main() {
   const envPath = path.join(ROOT, 'config', 'backup.env');
   if (!existsSync(envPath)) throw new Error(`Missing ${envPath} — copy backup.env.example and fill it in`);
   const env = parseEnvFile(readFileSync(envPath, 'utf8'));
-  const envError = validateBackupEnv(env);
+  const envError = validateBackupEnv(env) ?? validateArchiveSettings(env);
   if (envError) throw new Error(envError);
 
   const dbDump = await dumpDatabase(env);
@@ -153,10 +179,23 @@ async function main() {
   });
   writeFileSync(path.join(runDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
+  // Extra copies must never fail the backup itself -- the primary copy is
+  // already complete; a failed copy is reported as a warning instead.
   if (env.EXTRA_COPY_DIR) {
-    const extra = path.join(env.EXTRA_COPY_DIR, path.basename(runDir));
-    cpSync(runDir, extra, { recursive: true });
-    log(`copied to ${extra}`);
+    try {
+      const extra = path.join(env.EXTRA_COPY_DIR, path.basename(runDir));
+      cpSync(runDir, extra, { recursive: true });
+      log(`copied to ${extra}`);
+    } catch (error) {
+      warnings.push(`EXTRA_COPY_DIR copy failed: ${error.message}`);
+    }
+  }
+  if (env.ONEDRIVE_COPY_DIR) {
+    try {
+      await archiveToOneDrive(env);
+    } catch (error) {
+      warnings.push(`OneDrive copy failed: ${String(error.message).split(env.ARCHIVE_PASSWORD).join('****')}`);
+    }
   }
 
   const { bavail, bsize } = statfsSync(ROOT);
