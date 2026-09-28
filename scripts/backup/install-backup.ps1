@@ -9,7 +9,7 @@
 #   4. create config\backup.env from the example if it does not exist yet
 #   5. restrict the folder to you, Administrators and SYSTEM (backups are not encrypted)
 #   6. register the "TGD WMS Backup" scheduled task (daily 02:00, runs even when
-#      you are logged off -- asks for your Windows password once)
+#      you are logged off; no Windows password needed)
 param(
   [string]$Root = 'C:\TGD-Backups',
   [string]$PgVersion = '17.6-1',
@@ -62,10 +62,22 @@ if (-not $SkipTask) {
   $action = New-ScheduledTaskAction -Execute $node -Argument "`"$Root\bin\run-backup.mjs`" --root `"$Root`"" -WorkingDirectory "$Root\bin"
   $trigger = New-ScheduledTaskTrigger -Daily -At $RunAt
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1) -RestartCount 2 -RestartInterval (New-TimeSpan -Minutes 15)
-  $cred = Get-Credential -UserName $me -Message 'Windows password for the account that runs the nightly backup'
+  # S4U: runs whether or not the user is logged on, without storing a
+  # Windows password (works for PIN / passwordless accounts too). It has no
+  # saved network credentials, so an EXTRA_COPY_DIR on a NAS share needs
+  # that share to allow this machine's account; local folders are fine.
+  # Registering an S4U task needs an elevated (Run as Administrator) shell.
+  # Without it, fall back to Interactive: the task still runs every night,
+  # but only while this user is logged on. Re-run elevated to upgrade.
+  $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  $logonType = if ($isAdmin) { 'S4U' } else { 'Interactive' }
+  $principal = New-ScheduledTaskPrincipal -UserId $me -LogonType $logonType -RunLevel Limited
   Register-ScheduledTask -TaskName 'TGD WMS Backup' -Action $action -Trigger $trigger -Settings $settings `
-    -User $cred.UserName -Password $cred.GetNetworkCredential().Password -RunLevel Limited -Force | Out-Null
-  Write-Host "Scheduled task 'TGD WMS Backup' registered: daily at $RunAt"
+    -Principal $principal -Force | Out-Null
+  Write-Host "Scheduled task 'TGD WMS Backup' registered: daily at $RunAt ($logonType)"
+  if (-not $isAdmin) {
+    Write-Host 'Note: runs only while you are logged on. Re-run this script in PowerShell "Run as Administrator" to make it run when logged off too.' -ForegroundColor Yellow
+  }
 }
 
 Write-Host ''

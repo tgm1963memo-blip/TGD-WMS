@@ -14,7 +14,7 @@
 ## ติดตั้ง (ครั้งเดียว)
 1. เปิด PowerShell ในโฟลเดอร์โปรเจกต์ แล้วรัน `npm run backup:install`
    - สคริปต์จะสร้างโฟลเดอร์ ดาวน์โหลด pg_dump 17 คัดลอกสคริปต์ จำกัดสิทธิ์โฟลเดอร์ และสร้าง task "TGD WMS Backup"
-   - ระหว่างติดตั้งจะถามรหัสผ่าน Windows 1 ครั้ง เพื่อให้ task รันได้แม้ไม่ได้ login อยู่
+   - task รันได้แม้ไม่ได้ login อยู่ และไม่ต้องใส่รหัสผ่าน Windows (ใช้แบบ S4U)
 2. เปิดไฟล์ `C:\TGD-Backups\config\backup.env` แล้วใส่ค่าให้ครบ
    - `SUPABASE_DB_URL`: คัดลอกจาก Supabase Dashboard → Project Settings → Database → Connection string → **Session pooler** แล้วแทน `[YOUR-PASSWORD]` ด้วยรหัสผ่านฐานข้อมูล
    - `SUPABASE_SERVICE_ROLE_KEY`: ค่าเดียวกับใน `.env.local`
