@@ -20,3 +20,14 @@ describe('effective pallet picks (line-level withdrawals count against pallets)'
     expect(src).toContain("from('tgd_deposit_line_location_picked')");
   });
 });
+
+describe('migration 121: unassigned stock is withdrawn before pallets', () => {
+  const sql = read('database/migrations/121_effective_picks_unassigned_first.sql');
+
+  it('deducts only withdrawals beyond the never-assigned quantity', () => {
+    expect(sql).toContain('line_unassigned as');
+    expect(sql).toContain('coalesce(d.actual_boxes, d.expected_boxes, 0) - coalesce(sum(a.boxes), 0)');
+    expect(sql).toContain('greatest(we.boxes - coalesce(lu.boxes, 0), 0)');
+    expect(read('supabase/migrations/20260928100000_effective_picks_unassigned_first.sql')).toBe(sql);
+  });
+});
