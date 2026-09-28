@@ -25,3 +25,6 @@ uat-evidence/
 # drops stray .pdf files at the repo root each run.
 /*.pdf
 .vercel
+
+# Filled-in backup secrets must never be committed (template: scripts/backup/backup.env.example)
+backup.env

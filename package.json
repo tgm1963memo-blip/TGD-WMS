@@ -27,6 +27,9 @@
     "uat:sync-vercel-env": "node scripts/sync-vercel-env-from-local.mjs",
     "uat:publish-env-and-deploy": "node scripts/set-local-service-role-key.mjs --from-cli && npm run uat:sync-vercel-env && vercel --prod --yes",
     "db:apply-pending": "node scripts/apply-pending-migrations.mjs",
+    "backup:install": "powershell -ExecutionPolicy Bypass -File scripts/backup/install-backup.ps1",
+    "backup:run": "node scripts/backup/run-backup.mjs",
+    "backup:restore-test": "node scripts/backup/restore-test.mjs",
     "lint": "node scripts/lint-check.mjs"
   },
   "dependencies": {
