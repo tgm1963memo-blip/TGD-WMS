@@ -655,9 +655,10 @@ export async function getConfirmedDepositReceiptRows(filters = {}) {
   return { data: rows, error: null };
 }
 
-// Withdrawal lines carry no temperature_type of their own — customers never
-// pick a temperature when requesting a withdrawal. Look it up from the
-// confirmed deposit line(s) the withdrawal was picked from, mirroring the
+// Customers never pick a temperature when requesting a withdrawal, so a
+// withdrawal line's temperature_type is usually empty (admins can set it,
+// migration 114). When empty, look it up from the confirmed deposit line(s)
+// the withdrawal was picked from, mirroring the
 // same A/B match used by tgd_get_customer_stock_balance (migration
 // 20260625000010): prefer the direct source_customer_deposit_request_id link
 // (tie-broken by lot_no), and fall back to a lot_no + customer_product_code
@@ -671,7 +672,7 @@ async function getInboundTemperatureIndex(customerIds) {
     .select(`
       id, customer_id, status,
       tgd_customer_deposit_request_lines(
-        id, deposit_request_id, lot_no, customer_product_code, product_id, temperature_type, location_id
+        id, deposit_request_id, lot_no, customer_product_code, product_id, temperature_type, location_id, tracking_code
       )
     `)
     .in('customer_id', customerIds)
@@ -690,9 +691,31 @@ async function getInboundTemperatureIndex(customerIds) {
   return index;
 }
 
+// The exact deposit line a withdrawal line came from: its direct line link,
+// else its (unique) tracking code. Only when neither matches do callers fall
+// back to the looser request/lot/product-code heuristics -- the product-code
+// fallback picked the FIRST line of that product, e.g. a FROZEN FR line for
+// the CHILLED CH260918002 withdrawal.
+function findExactSourceDepositLine(line, candidates) {
+  if (line.source_customer_deposit_request_line_id) {
+    const byLineId = candidates.find((dl) => dl.id === line.source_customer_deposit_request_line_id);
+    if (byLineId) return byLineId;
+  }
+  if (line.tracking_code) {
+    const byTracking = candidates.find((dl) => dl.tracking_code === line.tracking_code);
+    if (byTracking) return byTracking;
+  }
+  return null;
+}
+
 function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
+  if (line.temperature_type) return line.temperature_type;
+
   const candidates = inboundIndex.get(customerId) ?? [];
   if (candidates.length === 0) return null;
+
+  const exact = findExactSourceDepositLine(line, candidates);
+  if (exact?.temperature_type) return exact.temperature_type;
 
   // A: direct link via source deposit request, tie-broken by lot_no
   if (line.source_customer_deposit_request_id) {
@@ -728,6 +751,9 @@ function resolveWithdrawalTemperature(line, customerId, inboundIndex) {
 function resolveWithdrawalLocation(line, customerId, inboundIndex) {
   const candidates = inboundIndex.get(customerId) ?? [];
   if (candidates.length === 0) return null;
+
+  const exact = findExactSourceDepositLine(line, candidates);
+  if (exact) return exact.location_id ?? null;
 
   if (line.source_customer_deposit_request_id) {
     const lotHint = line.source_lot_no ?? line.lot_no ?? null;
@@ -845,8 +871,8 @@ export async function getConfirmedWithdrawalRows(filters = {}) {
       id, withdrawal_no, customer_id, status, last_action_at, requested_dispatch_date,
       ${lineRelation}(
         id, line_no, customer_product_code, internal_product_code, product_name, lot_no, product_id,
-        source_customer_deposit_request_id, source_lot_no,
-        requested_boxes, requested_weight,
+        source_customer_deposit_request_id, source_customer_deposit_request_line_id, source_lot_no,
+        requested_boxes, requested_weight, temperature_type,
         picked_boxes, picked_weight, picked_at, picked_by_email, tracking_code
       )
     `)
