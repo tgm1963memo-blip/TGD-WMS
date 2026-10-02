@@ -79,6 +79,30 @@ export function buildCatalogMaps(catalogRows = []) {
   return { productIdByCode, temperatureTypeByCode, productNameByCode };
 }
 
+// Which physical room a temperature_type is stored in. FREEZE/FREEZE_FROZEN
+// lots sit in the frozen room (see the FREEZING comment in
+// getBillingPeriodPreview), so they're the same room as FROZEN.
+function storageRoomOf(temperatureType) {
+  if (temperatureType === 'CHILLED' || temperatureType === 'AMBIENT') return temperatureType;
+  return 'FROZEN';
+}
+
+// Catalog-wins (see buildCatalogMaps) is right for a stale snapshot, but
+// one product code can genuinely be deposited into a different room per
+// lot -- confirmed real case: C003's 3200200000420 is CHILLED in the
+// catalog, yet lots FR260701120/FR260806028/FR260818023 were received
+// FROZEN and were being billed in the CHILLED draft at the CHILLED rate.
+// So the lot's own value wins whenever it puts the lot in a different room
+// than the catalog says; within the same room (e.g. FROZEN vs
+// FREEZE_FROZEN) the catalog still wins, as before.
+export function resolveLotTemperatureType(catalogTemperatureType, lotTemperatureType) {
+  if (!catalogTemperatureType) return lotTemperatureType ?? null;
+  if (!lotTemperatureType) return catalogTemperatureType;
+  return storageRoomOf(lotTemperatureType) !== storageRoomOf(catalogTemperatureType)
+    ? lotTemperatureType
+    : catalogTemperatureType;
+}
+
 // Groups, per deposit line, the withdrawal events (weight + date) that
 // reduce how much of it is still in storage — using only exactly-matched
 // withdrawal lines (direct source link or tracking code). A withdrawal line
@@ -227,9 +251,9 @@ async function fetchRateEngineInputs({ customerId }) {
     id: line.id,
     customer_id: line.customer_id,
     customer_product_id: productIdByCode.get(line.customer_product_code) ?? null,
-    // Master catalog's current classification wins; the line's own
-    // snapshot only covers products no longer present in the catalog.
-    temperature_type: temperatureTypeByCode.get(line.customer_product_code) ?? line.temperature_type ?? null,
+    // Master catalog's current classification wins unless the lot was
+    // stored in a different room (see resolveLotTemperatureType).
+    temperature_type: resolveLotTemperatureType(temperatureTypeByCode.get(line.customer_product_code), line.temperature_type),
     received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
     receipt_date: line.receipt_date,
     withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],
@@ -403,7 +427,7 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
       id: line.id,
       customer_id: line.customer_id,
       customer_product_id: catalogRow?.id ?? null,
-      temperature_type: catalogRow?.temperature_type ?? line.temperature_type ?? null,
+      temperature_type: resolveLotTemperatureType(catalogRow?.temperature_type, line.temperature_type),
       received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
       receipt_date: line.receipt_date,
       withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],

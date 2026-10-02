@@ -188,10 +188,13 @@ export function InventoryBalancePage() {
   });
 
   // Build hierarchy: customerId → productKey → lines[]
+  // temperature_type is part of the key: one product code can be stored
+  // CHILLED in some lots and FROZEN in others, and the group header shows a
+  // single temperature badge, so mixing them would mislabel half the lots.
   const customerMap = {};
   for (const line of filtered) {
     const cid = line.request?.customer_id ?? '__unknown__';
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${line.temperature_type ?? ''}`;
     if (!customerMap[cid]) customerMap[cid] = {};
     if (!customerMap[cid][pk]) customerMap[cid][pk] = [];
     customerMap[cid][pk].push(line);
