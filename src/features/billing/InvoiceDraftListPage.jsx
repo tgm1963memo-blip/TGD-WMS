@@ -94,6 +94,7 @@ export function InvoiceDraftListPage() {
   const [unratedRateError, setUnratedRateError] = useState('');
   const [autoBillThroughDate, setAutoBillThroughDate] = useState('');
   const [autoBillPreview, setAutoBillPreview] = useState(null);
+  const [storageBillTrackingCodeByDepositLineId, setStorageBillTrackingCodeByDepositLineId] = useState(new Map());
   const [autoBillLoading, setAutoBillLoading] = useState(false);
   const [autoBillError, setAutoBillError] = useState(null);
   const [autoBillSaving, setAutoBillSaving] = useState(false);
@@ -242,6 +243,9 @@ export function InvoiceDraftListPage() {
       return;
     }
     setStorageBillPreview(result.data);
+    setStorageBillTrackingCodeByDepositLineId(new Map());
+    fetchDepositLineTrackingCodes((result.data?.lines ?? []).map((line) => line.deposit_line_id))
+      .then(setStorageBillTrackingCodeByDepositLineId);
   }
 
   function openUnratedRateForm(idx) {
@@ -918,6 +922,7 @@ export function InvoiceDraftListPage() {
                 <table className="data-table" style={{ fontSize: 12 }}>
                   <thead>
                     <tr>
+                      <th>รหัสสินค้า</th>
                       <th>รายการ</th>
                       <th>ประเภท</th>
                       <th style={{ textAlign: 'right' }}>น้ำหนัก/จำนวน</th>
@@ -927,10 +932,14 @@ export function InvoiceDraftListPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {storageBillPreview.lines.length ? storageBillPreview.lines.map((line, idx) => (
+                    {storageBillPreview.lines.length ? storageBillPreview.lines.map((line, idx) => {
+                      const lotTracking = [line.lot_no, storageBillTrackingCodeByDepositLineId.get(line.deposit_line_id)].filter(Boolean).join(' / ');
+                      return (
                       <tr key={idx}>
+                        <td>{line.product_code ?? '-'}</td>
                         <td>
                           {line.product_name ?? line.product_code ?? '-'}
+                          {lotTracking ? <div style={{ fontSize: 11, color: '#555' }}>({lotTracking})</div> : null}
                           <div style={{ fontSize: 11, color: '#888' }}>{line.line_note}</div>
                         </td>
                         <td>{SOURCE_DOCUMENT_TYPE_LABELS[line.source_document_type] ?? line.source_document_type}</td>
@@ -939,8 +948,9 @@ export function InvoiceDraftListPage() {
                         <td style={{ textAlign: 'right' }}>{line.rate ?? '-'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{line.amount != null ? line.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
                       </tr>
-                    )) : (
-                      <tr><td colSpan={6} style={{ textAlign: 'center' }}>ไม่พบรายการที่คำนวณได้ในช่วงเวลานี้</td></tr>
+                      );
+                    }) : (
+                      <tr><td colSpan={7} style={{ textAlign: 'center' }}>ไม่พบรายการที่คำนวณได้ในช่วงเวลานี้</td></tr>
                     )}
                   </tbody>
                 </table>
