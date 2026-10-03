@@ -8,7 +8,7 @@ import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { fetchDepositLineTrackingCodes } from '../../services/billingInvoiceDraftService.js';
 
-const PRINT_TABLE_COLUMN_COUNT = 20;
+const PRINT_TABLE_COLUMN_COUNT = 21;
 
 function fmt(value) {
   if (value == null) return '-';
@@ -160,7 +160,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           <col style={{ width: '5%' }} /> {/* received date */}
           <col style={{ width: '5%' }} /> {/* delivery date */}
           <col style={{ width: '7%' }} /> {/* lot no */}
-          <col style={{ width: '9%' }} /> {/* customer product */}
+          <col style={{ width: '8%' }} /> {/* customer product */}
           <col style={{ width: '5%' }} /> {/* desc / internal code */}
           <col style={{ width: '4%' }} /> {/* weight/unit */}
           <col style={{ width: '4%' }} /> {/* bal fwd volume */}
@@ -176,7 +176,8 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
           <col style={{ width: '3%' }} /> {/* cycle count */}
           <col style={{ width: '4%' }} /> {/* cold storage rate */}
           <col style={{ width: '5%' }} /> {/* cold storage charge */}
-          <col style={{ width: '6%' }} /> {/* total */}
+          <col style={{ width: '5%' }} /> {/* charged weight */}
+          <col style={{ width: '5%' }} /> {/* total */}
         </colgroup>
         <thead>
           {/* Slim identifier row -- repeats on every printed page (thead
@@ -207,6 +208,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
             <th rowSpan={2} style={TH}>CYCLES<br />(งวด)</th>
             <th rowSpan={2} style={TH}>COLD STORAGE<br />RATE</th>
             <th rowSpan={2} style={TH}>COLD STORAGE<br />CHARGE</th>
+            <th rowSpan={2} style={TH}>CHARGED<br />WT(KG)</th>
             <th rowSpan={2} style={TH}>TOTAL</th>
           </tr>
           <tr>
@@ -251,6 +253,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                   <td style={{ ...TD, textAlign: 'right' }}>{row.cycleCount ?? '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.chargeUnit != null ? fmt(row.chargeUnit) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right' }}>{row.coldStorageCharge != null ? fmt(row.coldStorageCharge) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.chargedWeight ? fmt(row.chargedWeight) : '-'}</td>
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{row.total != null ? fmt(row.total) : '-'}</td>
                 </tr>
               ))}
@@ -269,6 +272,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
                 <td style={TD} />
                 <td style={TD} />
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.coldStorageCharge)}</td>
+                <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.chargedWeight)}</td>
                 <td style={{ ...TD, textAlign: 'right' }}>{fmt(lot.subtotal.total)}</td>
               </tr>
             </Fragment>
@@ -295,6 +299,7 @@ export function InvoiceDraftPrintTemplate({ draft, lines = [] }) {
               <td style={TD} />
               <td style={TD} />
               <td style={{ ...TD, textAlign: 'right' }}>{fmt(grandTotal.coldStorageCharge)}</td>
+              <td style={{ ...TD, textAlign: 'right' }}>{fmt(grandTotal.chargedWeight)}</td>
               <td style={{ ...TD, textAlign: 'right', color: '#2d9348' }}>{fmt(grandTotal.total)}</td>
             </tr>
           </tfoot>

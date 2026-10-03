@@ -157,6 +157,7 @@ function buildTableHead() {
       { content: 'CYCLES\n(งวด)', rowSpan: 2 },
       { content: 'COLD STORAGE\nRATE', rowSpan: 2 },
       { content: 'COLD STORAGE\nCHARGE', rowSpan: 2 },
+      { content: 'CHARGED\nWT(KG)', rowSpan: 2 },
       { content: 'TOTAL', rowSpan: 2 },
     ],
     ['VOL.', 'WT(KG)', 'VOL.', 'WT(KG)', 'VOL.', 'WT(KG)', 'VOL.', 'WT(KG)'],
@@ -192,6 +193,7 @@ function buildTableBody(lots, grandTotal) {
         row.cycleCount ?? '-',
         row.chargeUnit != null ? fmt(row.chargeUnit) : '-',
         row.coldStorageCharge != null ? fmt(row.coldStorageCharge) : '-',
+        row.chargedWeight ? fmt(row.chargedWeight) : '-',
         row.total != null ? fmt(row.total) : '-',
       ]);
     });
@@ -210,6 +212,7 @@ function buildTableBody(lots, grandTotal) {
       '',
       '',
       { content: fmt(lot.subtotal.coldStorageCharge), styles: { fontStyle: 'bold' } },
+      { content: fmt(lot.subtotal.chargedWeight), styles: { fontStyle: 'bold' } },
       { content: fmt(lot.subtotal.total), styles: { fontStyle: 'bold' } },
     ]);
   }
@@ -232,6 +235,7 @@ function buildTableFoot(grandTotal) {
     '',
     '',
     fmt(grandTotal.coldStorageCharge),
+    fmt(grandTotal.chargedWeight),
     { content: fmt(grandTotal.total), styles: { textColor: [45, 147, 72] } },
   ]];
 }
@@ -281,7 +285,7 @@ export async function exportInvoiceDraftPdf({ draft, lines = [] }) {
       0: { halign: 'center', cellWidth: 15 },
       1: { halign: 'center', cellWidth: 15 },
       2: { halign: 'left', cellWidth: 18 },
-      3: { halign: 'left', cellWidth: 55 },
+      3: { halign: 'left', cellWidth: 48 },
       4: { halign: 'right', cellWidth: 12 },
     },
     didDrawPage: () => drawHeaderBlock(doc, headerArgs),

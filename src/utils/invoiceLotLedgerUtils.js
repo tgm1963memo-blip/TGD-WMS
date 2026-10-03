@@ -122,6 +122,7 @@ export function buildInvoiceLotLedger(lines = []) {
         chargeUnit: null,
         cycleCount: null,
         coldStorageCharge: 0,
+        chargedWeight: 0,
         total: round2(toNum(charge)),
         remark: remark ?? null,
         _charge: toNum(charge),
@@ -146,6 +147,7 @@ export function buildInvoiceLotLedger(lines = []) {
           rate: line.rate, charge: line.amount, remark: line.source_document_no,
         });
         rows[rows.length - 1].handlingFee = round2(toNum(line.amount));
+        rows[rows.length - 1].chargedWeight = weight;
       } else {
         balanceVolume -= qty;
         balanceWeight -= weight;
@@ -155,6 +157,7 @@ export function buildInvoiceLotLedger(lines = []) {
           rate: line.rate, charge: line.amount, remark: line.source_document_no,
         });
         rows[rows.length - 1].handlingFee = round2(toNum(line.amount));
+        rows[rows.length - 1].chargedWeight = weight;
       }
     }
 
@@ -217,6 +220,12 @@ export function buildInvoiceLotLedger(lines = []) {
       lastRow.chargeUnit = storageRate;
       lastRow.cycleCount = sortedStorageLines.length;
       lastRow.coldStorageCharge = totalStorageCharge;
+      // Weight actually charged, summed over every cycle (a lot billed for
+      // 2 cycles counts its weight twice) -- unlike BALANCE, which is stock
+      // on hand. Summed across lots it equals the draft header's
+      // total_chargeable_weight, so the printed total reconciles with it.
+      lastRow.chargedWeight = round2(lastRow.chargedWeight
+        + storageLines.reduce((s, l) => s + toNum(l.chargeable_weight), 0));
       lastRow.total = round2(lastRow.handlingFee + totalStorageCharge);
       lastRow.remark = [lastRow.remark, storageNote].filter(Boolean).join(' / ') || null;
     }
@@ -232,6 +241,7 @@ export function buildInvoiceLotLedger(lines = []) {
       balanceWeight: rows[rows.length - 1].balanceWeight,
       handlingFee: round2(rows.reduce((s, r) => s + r.handlingFee, 0)),
       coldStorageCharge: round2(rows.reduce((s, r) => s + r.coldStorageCharge, 0)),
+      chargedWeight: round2(rows.reduce((s, r) => s + r.chargedWeight, 0)),
       total: round2(rows.reduce((s, r) => s + r.total, 0)),
     };
 
@@ -253,6 +263,7 @@ export function buildInvoiceLotLedger(lines = []) {
     balanceWeight: sumField('balanceWeight'),
     handlingFee: sumField('handlingFee'),
     coldStorageCharge: sumField('coldStorageCharge'),
+    chargedWeight: sumField('chargedWeight'),
     total: sumField('total'),
   };
 
