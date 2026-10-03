@@ -108,23 +108,26 @@ describe('buildInvoiceLotLedger', () => {
 
     const { lots } = buildInvoiceLotLedger(lines);
     expect(lots).toHaveLength(1);
-    expect(lots[0].rows).toHaveLength(1);
+    // One row per billed cycle, each with its own end date and charge.
+    expect(lots[0].rows).toHaveLength(2);
     // Earliest cycle's start (the true receipt date when the first-ever
-    // cycle is included) and latest cycle's end.
+    // cycle is included); each row's DELIVERY DATE is its own cycle's end.
     expect(lots[0].rows[0].receivedDate).toBe('2026-08-03');
-    expect(lots[0].rows[0].deliveryDate).toBe('2026-09-01');
-    expect(lots[0].rows[0].coldStorageCharge).toBe(708.40);
+    expect(lots[0].rows[0].deliveryDate).toBe('2026-08-17');
+    expect(lots[0].rows[1].deliveryDate).toBe('2026-09-01');
+    expect(lots[0].rows[0].coldStorageCharge).toBe(354.20);
+    expect(lots[0].subtotal.coldStorageCharge).toBe(708.40);
+    expect(lots[0].subtotal.chargedWeight).toBe(3080);
+    expect(lots[0].subtotal.cycleCount).toBe(2);
     // Real reported gap: BALANCE FORWARD/BALANCE printed a flat 0.00 for a
     // storage-only lot even though it genuinely holds real weight this
     // period -- both cycles here hold the same 1540kg, so forward == balance.
     expect(lots[0].rows[0].balanceForwardWeight).toBe(1540);
-    expect(lots[0].rows[0].balanceWeight).toBe(1540);
-    // Cycle-detail text (period days, exact date range, weight) already
-    // shown on the draft-view table should also reach the printed invoice —
-    // only the LAST cycle's own note (the one anchoring this row's ending
-    // balance), not every cycle folded into this row.
-    expect(lots[0].rows[0].remark).toContain('2026-08-18 ถึง 2026-09-01');
-    expect(lots[0].rows[0].remark).not.toContain('2026-08-03 ถึง 2026-08-17');
+    expect(lots[0].rows[1].balanceWeight).toBe(1540);
+    // Each row carries its OWN cycle's note, so the printed remark always
+    // matches that row's weight and charge.
+    expect(lots[0].rows[0].remark).toContain('2026-08-03 ถึง 2026-08-17');
+    expect(lots[0].rows[1].remark).toContain('2026-08-18 ถึง 2026-09-01');
   });
 
   // Real reported gap: a lot billed over several STORAGE cycles within one
@@ -153,24 +156,28 @@ describe('buildInvoiceLotLedger', () => {
 
     const { lots } = buildInvoiceLotLedger(lines);
     expect(lots).toHaveLength(1);
-    expect(lots[0].rows).toHaveLength(1);
-    const row = lots[0].rows[0];
-    // Forward = first cycle's weight (period-start), balance = last cycle's
-    // weight (period-end, matching the selected end date).
-    expect(row.balanceForwardWeight).toBe(1000);
-    expect(row.balanceWeight).toBe(1980);
+    const { rows, subtotal } = lots[0];
+    expect(rows).toHaveLength(3);
+    // Every row reconciles: forward (previous cycle) + received - delivery = balance.
+    for (const row of rows) {
+      expect(row.balanceForwardWeight + row.receivedWeight - row.deliveryWeight).toBe(row.balanceWeight);
+      expect(row.cycleCount).toBe(1);
+    }
     // 1000 -> 2000 is a +1000 received; 2000 -> 1980 is a -20 delivered.
-    expect(row.receivedWeight).toBe(1000);
-    expect(row.deliveryWeight).toBe(20);
-    // Must reconcile exactly: forward + received - delivery = balance.
-    expect(row.balanceForwardWeight + row.receivedWeight - row.deliveryWeight).toBe(row.balanceWeight);
-    // Shows how many cycles were bundled into this one row's charge.
-    expect(row.cycleCount).toBe(3);
-    // Only the last (chronologically) cycle's own note shows -- a lot
-    // catching up several cycles in one draft must not dump every cycle's
-    // sentence onto one row; the reconciled numbers above already
-    // summarize the whole span.
-    expect(row.remark).toBe('cycle 3 (1980kg, -20 delivered)');
+    expect(rows[1].receivedWeight).toBe(1000);
+    expect(rows[2].deliveryWeight).toBe(20);
+    // Subtotal: forward = first cycle, balance = last cycle.
+    expect(subtotal.balanceForwardWeight).toBe(1000);
+    expect(subtotal.balanceWeight).toBe(1980);
+    expect(subtotal.receivedWeight).toBe(1000);
+    expect(subtotal.deliveryWeight).toBe(20);
+    expect(subtotal.cycleCount).toBe(3);
+    // Charged weight is the sum of every cycle's weight, not balance x cycles.
+    expect(subtotal.chargedWeight).toBe(4980);
+    expect(subtotal.coldStorageCharge).toBe(2888.40);
+    expect(rows.map((r) => r.remark)).toEqual([
+      'cycle 1 (1000kg)', 'cycle 2 (2000kg, +1000 received)', 'cycle 3 (1980kg, -20 delivered)',
+    ]);
   });
 
   // Real reported gap: two DIFFERENT deposit lines (different receipt
@@ -207,12 +214,12 @@ describe('buildInvoiceLotLedger', () => {
     expect(lots).toHaveLength(2);
 
     const depA = lots.find((l) => l.rows[0].balanceForwardWeight === 400);
-    expect(depA.rows[0].cycleCount).toBe(2);
-    expect(depA.rows[0].balanceWeight).toBe(390);
+    expect(depA.subtotal.cycleCount).toBe(2);
+    expect(depA.subtotal.balanceWeight).toBe(390);
 
     const depB = lots.find((l) => l.rows[0].balanceForwardWeight === 1000);
-    expect(depB.rows[0].cycleCount).toBe(2);
-    expect(depB.rows[0].balanceWeight).toBe(990);
+    expect(depB.subtotal.cycleCount).toBe(2);
+    expect(depB.subtotal.balanceWeight).toBe(990);
   });
 
   it('groups multiple lots independently and sums a grand total across them', () => {

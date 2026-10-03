@@ -70,9 +70,9 @@ export function buildInvoiceLotLedger(lines = []) {
     // cycle is included in this draft (see computeStorageInvoiceLines --
     // cycleIndex 0 starts exactly at receiptDate), and still a reasonable
     // "received" reference otherwise (the start of what this draft covers
-    // for the lot). The latest cycle's billing_period_end is shown as
-    // DELIVERY DATE for the same lots -- it's the end of the last billed
-    // cycle, not necessarily a real physical withdrawal event, since a
+    // for the lot). Each cycle's own billing_period_end is shown as its
+    // row's DELIVERY DATE -- it's the end of that billed cycle, not
+    // necessarily a real physical withdrawal event, since a
     // storage cycle billed in full the moment it starts ("เต็มรอบทันที")
     // doesn't require the goods to actually leave by its own end date.
     const sortedStorageLines = storageLines
@@ -84,10 +84,6 @@ export function buildInvoiceLotLedger(lines = []) {
       ?? first.movement_date
       ?? sortedStorageLines[0]?.billing_period_start
       ?? null;
-
-    const storageCycleEndDate = movementLines.length === 0
-      ? sortedStorageLines[sortedStorageLines.length - 1]?.billing_period_end ?? null
-      : null;
 
     const weightPerUnitSource = groupLines.find((l) => toNum(l.qty) > 0);
     const weightPerUnit = weightPerUnitSource
@@ -162,68 +158,54 @@ export function buildInvoiceLotLedger(lines = []) {
     }
 
     // A lot billed entirely through the period-based STORAGE flow has no
-    // discrete received/delivery event to report -- each STORAGE line is
-    // only a cycle's own weight-on-hand snapshot, not a movement. Leaving
-    // BALANCE FORWARD/RECEIVED/DELIVERY/BALANCE at a flat 0.00 reads as
-    // "nothing here" even though real weight is being carried and billed,
-    // and multiple cycles landing in one draft (e.g. a period spanning
-    // several 15-day cycles) can each snapshot a DIFFERENT weight if a
-    // withdrawal or additional deposit happened between them -- picking
-    // just one cycle's number arbitrarily doesn't reconcile against the
-    // others. Instead: BALANCE FORWARD is the first cycle's weight in this
-    // period (what was on hand when the period's coverage starts), BALANCE
-    // is the last cycle's weight (on hand as of the selected end date), and
-    // RECEIVED/DELIVERY are the sum of weight increases/decreases between
-    // consecutive cycles in between -- so forward + received - delivery
-    // always reconciles exactly to the ending balance, matching a real
-    // period-summary ledger instead of one arbitrary snapshot.
-    const lastStorageWeight = sortedStorageLines.length
-      ? toNum(sortedStorageLines[sortedStorageLines.length - 1].chargeable_weight)
-      : 0;
-    let periodReceivedWeight = 0;
-    let periodDeliveryWeight = 0;
-    for (let i = 1; i < sortedStorageLines.length; i += 1) {
-      const delta = toNum(sortedStorageLines[i].chargeable_weight) - toNum(sortedStorageLines[i - 1].chargeable_weight);
-      if (delta > 0) periodReceivedWeight += delta;
-      else periodDeliveryWeight += -delta;
+    // discrete received/delivery event -- each STORAGE line is one cycle's
+    // own weight-on-hand snapshot. Print one row per cycle so each row's
+    // weight, dates, note and charge are its own: folding them into one row
+    // with only the last cycle's note made e.g. "CYCLES 2" sit next to a
+    // "ค่าฝาก 1 งวด ... 2,870 กก." remark while the charge was really
+    // (4,620 + 2,870) x rate (confirmed real case: BID-20261002-0042, lot
+    // C2-05265911). BALANCE FORWARD is the previous cycle's weight and
+    // RECEIVED/DELIVERY the increase/decrease since it, so each row still
+    // reconciles forward + received - delivery = balance.
+    const perCycleRows = rows.length === 0 && sortedStorageLines.length > 0;
+    if (perCycleRows) {
+      let previousWeight = null;
+      for (const storageLine of sortedStorageLines) {
+        const weight = toNum(storageLine.chargeable_weight);
+        const delta = previousWeight == null ? 0 : weight - previousWeight;
+        balanceVolume = 0;
+        balanceWeight = weight;
+        pushRow({
+          deliveryDate: storageLine.billing_period_end ?? null,
+          receivedVolume: 0, receivedWeight: delta > 0 ? round2(delta) : 0,
+          deliveryVolume: 0, deliveryWeight: delta < 0 ? round2(-delta) : 0,
+          remark: storageLine.line_note ?? null,
+        });
+        const row = rows[rows.length - 1];
+        row.chargeUnit = storageLine.rate ?? null;
+        row.cycleCount = 1;
+        row.coldStorageCharge = round2(toNum(storageLine.amount));
+        // Weight actually charged for this cycle -- summed across rows/lots
+        // it equals the draft header's total_chargeable_weight.
+        row.chargedWeight = weight;
+        row.total = row.coldStorageCharge;
+        previousWeight = weight;
+      }
+    } else if (rows.length === 0) {
+      pushRow({ deliveryDate: null, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
     }
 
-    if (rows.length === 0) {
-      balanceVolume = 0;
-      balanceWeight = lastStorageWeight;
-      pushRow({
-        deliveryDate: storageCycleEndDate,
-        receivedVolume: 0, receivedWeight: round2(periodReceivedWeight),
-        deliveryVolume: 0, deliveryWeight: round2(periodDeliveryWeight),
-      });
-    }
-
-    const totalStorageCharge = round2(storageLines.reduce((s, l) => s + toNum(l.amount), 0));
-    const storageRate = storageLines.find((l) => l.rate != null)?.rate ?? null;
-    // Cycle-detail text already generated per STORAGE line at draft-creation
-    // time (buildInvoiceDraftLineFromStorageLine's line_note — the period
-    // days, exact date range, and chargeable weight the customer already
-    // sees on the draft-view table) -- surface the same text here so the
-    // printed invoice carries the same detail instead of only the summed
-    // charge with no explanation of how it was derived.
-    // Show only the LAST cycle's own note -- a lot that hasn't been billed
-    // in a while can catch up many cycles at once in a single draft (real
-    // case: 11 cycles for one lot), and dumping every cycle's own sentence
-    // onto one row was an unreadable wall of text repeating the same
-    // "ค่าฝาก 1 งวด (...)" phrasing 11 times. The row's BALANCE FORWARD/
-    // RECEIVED/DELIVERY/BALANCE numbers above already summarize the whole
-    // span; the note only needs to explain the cycle actually anchoring
-    // this row's charge (the last one, matching the ending balance).
-    const storageNote = sortedStorageLines[sortedStorageLines.length - 1]?.line_note ?? null;
-    if (storageLines.length > 0) {
+    // Storage cycles on a lot that also has movement lines (or an opening
+    // balance) are folded onto its last event row, showing the last cycle's
+    // note -- a lot catching up many cycles at once (real case: 11) would
+    // otherwise repeat the same "ค่าฝาก 1 งวด (...)" sentence 11 times.
+    if (storageLines.length > 0 && !perCycleRows) {
       const lastRow = rows[rows.length - 1];
-      lastRow.chargeUnit = storageRate;
+      const storageNote = sortedStorageLines[sortedStorageLines.length - 1]?.line_note ?? null;
+      const totalStorageCharge = round2(storageLines.reduce((s, l) => s + toNum(l.amount), 0));
+      lastRow.chargeUnit = storageLines.find((l) => l.rate != null)?.rate ?? null;
       lastRow.cycleCount = sortedStorageLines.length;
       lastRow.coldStorageCharge = totalStorageCharge;
-      // Weight actually charged, summed over every cycle (a lot billed for
-      // 2 cycles counts its weight twice) -- unlike BALANCE, which is stock
-      // on hand. Summed across lots it equals the draft header's
-      // total_chargeable_weight, so the printed total reconciles with it.
       lastRow.chargedWeight = round2(lastRow.chargedWeight
         + storageLines.reduce((s, l) => s + toNum(l.chargeable_weight), 0));
       lastRow.total = round2(lastRow.handlingFee + totalStorageCharge);
@@ -240,6 +222,7 @@ export function buildInvoiceLotLedger(lines = []) {
       balanceVolume: rows[rows.length - 1].balanceVolume,
       balanceWeight: rows[rows.length - 1].balanceWeight,
       handlingFee: round2(rows.reduce((s, r) => s + r.handlingFee, 0)),
+      cycleCount: rows.reduce((s, r) => s + (r.cycleCount ?? 0), 0) || null,
       coldStorageCharge: round2(rows.reduce((s, r) => s + r.coldStorageCharge, 0)),
       chargedWeight: round2(rows.reduce((s, r) => s + r.chargedWeight, 0)),
       total: round2(rows.reduce((s, r) => s + r.total, 0)),

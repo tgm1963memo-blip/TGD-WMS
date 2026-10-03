@@ -171,9 +171,9 @@ function buildTableBody(lots, grandTotal) {
       const codeAndName = row.productName && row.productName !== row.productCode
         ? `${row.productCode ?? '-'}  ${row.productName}`
         : (row.productCode ?? row.productName ?? '-');
-      const productCell = i === 0
-        ? [codeAndName, row.remark].filter(Boolean).join('\n')
-        : '';
+      // remark is per row (each storage cycle carries its own note), so it
+      // shows on every row; the product name only on the lot's first row.
+      const productCell = [i === 0 ? codeAndName : null, row.remark].filter(Boolean).join('\n');
       body.push([
         i === 0 ? fmtDate(row.receivedDate) : '',
         fmtDate(row.deliveryDate),
@@ -209,7 +209,7 @@ function buildTableBody(lots, grandTotal) {
       { content: fmt(lot.subtotal.balanceWeight), styles: { fontStyle: 'bold' } },
       '',
       { content: fmt(lot.subtotal.handlingFee), styles: { fontStyle: 'bold' } },
-      '',
+      { content: lot.subtotal.cycleCount ?? '', styles: { fontStyle: 'bold' } },
       '',
       { content: fmt(lot.subtotal.coldStorageCharge), styles: { fontStyle: 'bold' } },
       { content: fmt(lot.subtotal.chargedWeight), styles: { fontStyle: 'bold' } },
