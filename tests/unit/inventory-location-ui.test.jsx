@@ -43,7 +43,7 @@ describe('inventory balance locations', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '42-L-01' } });
     expect(screen.getByText('FR1')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('inventory-balance-export-excel'));
-    expect(mocks.download.mock.calls[0][0][0]['Location ปัจจุบัน / พาเลท']).toBe('42-L-01-01');
+    expect(mocks.download.mock.calls[0][0][0]['Location / พาเลท']).toBe('42-L-01-01');
     fireEvent.change(screen.getByTestId('inventory-balance-as-of-date'), { target: { value: '2026-09-01' } });
     await waitFor(() => expect(screen.queryByRole('button', { name: 'จัดการ Location' })).not.toBeInTheDocument());
     expect(screen.getByText(/ไม่ใช่ตำแหน่งย้อนหลัง/)).toBeInTheDocument();

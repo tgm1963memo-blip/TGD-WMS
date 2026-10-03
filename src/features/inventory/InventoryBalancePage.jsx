@@ -9,17 +9,24 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { splitBalanceByLocation } from '../../utils/stockBalanceExportUtils.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { InventoryLocationModal } from './InventoryLocationModal.jsx';
 import { canManageInventoryLocation, inventoryLocationLabel, listInventoryLocations } from '../../services/inventoryLocationService.js';
 
 const BALANCE_EXPORT_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
-  'LOT', 'รหัสติดตาม', 'Location ปัจจุบัน / พาเลท', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
+  'LOT', 'รหัสติดตาม', 'Location / พาเลท', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
 ];
 
-function balanceExportRow(line, customerLabel, locationLabel) {
-  return {
+// One Excel row per lot x pallet location (see splitBalanceByLocation).
+function balanceExportRows(line, customerLabel, allocations) {
+  const split = splitBalanceByLocation(
+    line.actual_boxes ?? line.expected_boxes ?? 0,
+    line.actual_weight ?? line.expected_weight ?? 0,
+    allocations ?? [],
+  );
+  return split.map((part) => ({
     'ลูกค้า': customerLabel,
     'รหัสสินค้า': line.customer_product_code ?? '-',
     'ชื่อสินค้า': line.product_name ?? '-',
@@ -28,12 +35,12 @@ function balanceExportRow(line, customerLabel, locationLabel) {
     'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
     'LOT': line.lot_no ?? '-',
     'รหัสติดตาม': line.tracking_code ?? '-',
-    'Location ปัจจุบัน / พาเลท': locationLabel || 'ยังไม่กำหนด Location',
-    'คงเหลือ (กล่อง)': line.actual_boxes ?? line.expected_boxes ?? 0,
-    'คงเหลือ (กก.)': line.actual_weight ?? line.expected_weight ?? 0,
+    'Location / พาเลท': part.location,
+    'คงเหลือ (กล่อง)': part.boxes,
+    'คงเหลือ (กก.)': part.weight,
     'หมายเหตุลูกค้า': line.note ?? '-',
     'หมายเหตุ ADMIN': line.actual_note ?? '-',
-  };
+  }));
 }
 
 function TempBadge({ type }) {
@@ -248,11 +255,16 @@ export function InventoryBalancePage() {
   const pendingWithdrawalWeight = filterPendingRows(pendingWithdrawals).reduce((s, r) => s + Number(r.pending_weight ?? 0), 0);
 
   function handleExportExcel() {
-    const rows = filtered.map((line) => {
+    const naturalText = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'th', { numeric: true });
+    const labelled = filtered.map((line) => {
       const customer = customers.find((c) => c.id === line.request?.customer_id);
-      const customerLabel = customer?.customer_name ?? customer?.customer_code ?? line.request?.customer_id ?? '-';
-      return balanceExportRow(line, customerLabel, inventoryLocationLabel(locationMap.get(line.id)));
+      return { line, customerLabel: customer?.customer_name ?? customer?.customer_code ?? line.request?.customer_id ?? '-' };
     });
+    labelled.sort((a, b) => naturalText(a.customerLabel, b.customerLabel)
+      || naturalText(a.line.customer_product_code, b.line.customer_product_code)
+      || naturalText(a.line.lot_no, b.line.lot_no)
+      || naturalText(a.line.tracking_code, b.line.tracking_code));
+    const rows = labelled.flatMap(({ line, customerLabel }) => balanceExportRows(line, customerLabel, locationMap.get(line.id)));
     const stamp = asOfDate || new Date().toISOString().slice(0, 10);
     downloadExcelRows(rows, BALANCE_EXPORT_HEADERS, `stock-balance-${stamp}.xlsx`, 'Stock Balance');
   }
