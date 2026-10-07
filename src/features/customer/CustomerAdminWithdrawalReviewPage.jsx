@@ -79,6 +79,22 @@ const ADD_LINE_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
+// Bangkok calendar date as 'YYYY-MM-DD' — the date the confirm-dispatch
+// date picker compares against requested_dispatch_date (also Bangkok).
+function bangkokTodayIso() {
+  return bangkokDateIso(new Date());
+}
+
+function bangkokDateIso(value) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date(value));
+}
+
+// Earliest allowed dispatch date: the day the request was created (Bangkok)
+// — the RPC rejects anything earlier, see 20261007090000.
+function earliestDispatchDateIso(request) {
+  return request?.created_at ? bangkokDateIso(request.created_at) : '';
+}
+
 function formatAttachmentSize(size) {
   if (size == null) return '-';
   return `${(Number(size) / 1024).toFixed(1)} KB`;
@@ -106,6 +122,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelComment, setCancelComment] = useState('');
+  const [confirmDateOpen, setConfirmDateOpen] = useState(false);
+  const [confirmDate, setConfirmDate] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyNote, setNotifyNote] = useState('');
   const [recountLine, setRecountLine] = useState(null);
@@ -617,14 +635,32 @@ export function CustomerAdminWithdrawalReviewPage() {
     await refreshLines(selectedId);
   }
 
-  async function handleConfirmWithdrawal() {
+  // Confirming on a different day than the customer asked for usually means
+  // the system is being caught up after the goods already left — ask which
+  // day the dispatch really happened instead of silently stamping today.
+  function handleConfirmWithdrawalClick() {
+    if (!selected) return;
+    const today = bangkokTodayIso();
+    const requested = selected.requested_dispatch_date ? String(selected.requested_dispatch_date).slice(0, 10) : '';
+    if (requested && requested !== today) {
+      const earliest = earliestDispatchDateIso(selected);
+      const initial = requested < today ? requested : today;
+      setConfirmDate(earliest && initial < earliest ? earliest : initial);
+      setConfirmDateOpen(true);
+      return;
+    }
+    handleConfirmWithdrawal(null);
+  }
+
+  async function handleConfirmWithdrawal(effectiveDate) {
     if (!selectedId) return;
     setSubmitting(true);
     setError('');
     setActionMsg('');
 
-    const result = await reviewCustomerWithdrawalRequest(selectedId, 'CONFIRM_DISPATCH', comment);
+    const result = await reviewCustomerWithdrawalRequest(selectedId, 'CONFIRM_DISPATCH', comment, effectiveDate);
     setSubmitting(false);
+    setConfirmDateOpen(false);
     if (result.error) {
       setError(result.error.message ?? 'Confirm withdrawal failed');
       return;
@@ -991,7 +1027,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                 className="btn btn-primary"
                 data-testid="btn-confirm-withdrawal"
                 disabled={submitting || !canConfirmWithdrawal}
-                onClick={handleConfirmWithdrawal}
+                onClick={handleConfirmWithdrawalClick}
                 title={confirmWithdrawalBlockedReason}
                 type="button"
               >
@@ -1508,6 +1544,48 @@ export function CustomerAdminWithdrawalReviewPage() {
             ) : null}
           </>
         ) : null}
+      </Modal>
+
+      {/* Confirm-dispatch date modal */}
+      <Modal
+        isOpen={confirmDateOpen}
+        onClose={() => setConfirmDateOpen(false)}
+        title="เลือกวันที่ยืนยันจ่ายออก"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button
+              className="btn btn-primary"
+              data-testid="btn-confirm-withdrawal-date"
+              disabled={submitting || !confirmDate || confirmDate > bangkokTodayIso()
+                || (earliestDispatchDateIso(selected) !== '' && confirmDate < earliestDispatchDateIso(selected))}
+              onClick={() => handleConfirmWithdrawal(confirmDate)}
+              type="button"
+            >
+              {submitting ? '...' : t('admin_confirm_withdrawal')}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setConfirmDateOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>
+          วันที่ต้องการเบิก/จ่าย ({formatDocumentDate(selected?.requested_dispatch_date, { dateOnly: true })}) ไม่ตรงกับวันนี้
+          — เลือกวันที่สินค้าจ่ายออกจริง
+        </p>
+        <label className="form-field">
+          <span>วันที่ยืนยันจ่ายออก</span>
+          <input
+            className="form-control"
+            data-testid="input-confirm-withdrawal-date"
+            max={bangkokTodayIso()}
+            min={earliestDispatchDateIso(selected) || undefined}
+            onChange={(e) => setConfirmDate(e.target.value)}
+            type="date"
+            value={confirmDate}
+          />
+        </label>
       </Modal>
 
       {/* Cancel modal */}

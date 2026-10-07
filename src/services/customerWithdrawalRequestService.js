@@ -446,13 +446,17 @@ export async function submitCustomerWithdrawalRequest(requestId, comment = null)
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
-export async function reviewCustomerWithdrawalRequest(requestId, decision, comment = null) {
+// effectiveDate ('YYYY-MM-DD', Bangkok) only matters for CONFIRM_DISPATCH —
+// it backdates the confirm to the day the goods actually left (see
+// 20261007090000_withdrawal_confirm_dispatch_effective_date.sql).
+export async function reviewCustomerWithdrawalRequest(requestId, decision, comment = null, effectiveDate = null) {
   if (!supabase) return missingSupabaseClientResult();
 
   const { data, error } = await supabase.rpc('tgd_review_customer_withdrawal_request', {
     p_request_id: requestId,
     p_decision: decision,
     p_comment: toNullableText(comment),
+    p_effective_date: effectiveDate || null,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
