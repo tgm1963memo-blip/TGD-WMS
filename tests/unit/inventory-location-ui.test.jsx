@@ -18,7 +18,7 @@ vi.mock('../../src/services/customerProductCatalogService.js', () => ({ listCust
 vi.mock('../../src/services/masterDataService.js', () => ({ getCustomers: vi.fn().mockResolvedValue({ data: [{ id: 'c1', customer_name: 'Customer' }] }) }));
 vi.mock('../../src/services/warehouseLayoutService.js', () => ({ getActiveLocations: vi.fn().mockResolvedValue({ data: [{ id: 'dest', code: '42-L-02', capacity: 3 }] }) }));
 vi.mock('../../src/components/customer/CustomerDepositDetailModal.jsx', () => ({ CustomerDepositDetailModal: () => null }));
-vi.mock('../../src/utils/excelFileUtils.js', () => ({ downloadExcelRows: mocks.download }));
+vi.mock('../../src/utils/excelFileUtils.js', () => ({ downloadExcelWorkbookMultiSheet: mocks.download }));
 import { InventoryBalancePage } from '../../src/features/inventory/InventoryBalancePage.jsx';
 import { InventoryLocationModal } from '../../src/features/inventory/InventoryLocationModal.jsx';
 
@@ -43,10 +43,25 @@ describe('inventory balance locations', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '42-L-01' } });
     expect(screen.getByText('FR1')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('inventory-balance-export-excel'));
-    expect(mocks.download.mock.calls[0][0][0]['Location / พาเลท']).toBe('42-L-01-01');
+    const [summarySheet, locationSheet] = mocks.download.mock.calls[0][0];
+    expect(summarySheet.name).toBe('รวม');
+    expect(summarySheet.headers).not.toContain('Location / พาเลท');
+    expect(summarySheet.rows).toEqual([expect.objectContaining({ 'รหัสติดตาม': 'FR1', 'คงเหลือ (กล่อง)': 3, 'คงเหลือ (กก.)': 30 })]);
+    expect(locationSheet.name).toBe('แยก Location');
+    expect(locationSheet.rows[0]['Location / พาเลท']).toBe('42-L-01-01');
     fireEvent.change(screen.getByTestId('inventory-balance-as-of-date'), { target: { value: '2026-09-01' } });
     await waitFor(() => expect(screen.queryByRole('button', { name: 'จัดการ Location' })).not.toBeInTheDocument());
     expect(screen.getByText(/ไม่ใช่ตำแหน่งย้อนหลัง/)).toBeInTheDocument();
+  });
+  it('leaves the Location cell blank for balance not on a pallet', async () => {
+    mocks.list.mockResolvedValue({ data: new Map([['l1', [{ ...allocation, remainingBoxes: 1, remainingWeight: 10 }]]]), error: null });
+    render(<InventoryBalancePage />);
+    await screen.findByText('Test product');
+    await waitFor(() => expect(screen.getByTestId('inventory-balance-export-excel')).toBeEnabled());
+    fireEvent.click(screen.getByTestId('inventory-balance-export-excel'));
+    const [summarySheet, locationSheet] = mocks.download.mock.calls[0][0];
+    expect(summarySheet.rows).toHaveLength(1);
+    expect(locationSheet.rows.map((r) => [r['Location / พาเลท'], r['คงเหลือ (กล่อง)']])).toEqual([['42-L-01-01', 1], ['', 2]]);
   });
   it('shows read-only locations to staff', async () => {
     mocks.role = 'warehouse_staff';

@@ -7,26 +7,28 @@ import { getAllPendingWithdrawalTotals } from '../../services/customerWithdrawal
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
-import { downloadExcelRows } from '../../utils/excelFileUtils.js';
+import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
-import { splitBalanceByLocation } from '../../utils/stockBalanceExportUtils.js';
+import { splitBalanceByLocation, UNASSIGNED_LOCATION_LABEL } from '../../utils/stockBalanceExportUtils.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { InventoryLocationModal } from './InventoryLocationModal.jsx';
 import { canManageInventoryLocation, inventoryLocationLabel, listInventoryLocations } from '../../services/inventoryLocationService.js';
+
+const BALANCE_SUMMARY_HEADERS = [
+  'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
+  'LOT', 'รหัสติดตาม', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
+];
 
 const BALANCE_EXPORT_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
   'LOT', 'รหัสติดตาม', 'Location / พาเลท', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
 ];
 
-// One Excel row per lot x pallet location (see splitBalanceByLocation).
-function balanceExportRows(line, customerLabel, allocations) {
-  const split = splitBalanceByLocation(
-    line.actual_boxes ?? line.expected_boxes ?? 0,
-    line.actual_weight ?? line.expected_weight ?? 0,
-    allocations ?? [],
-  );
-  return split.map((part) => ({
+function lineBalanceBoxes(line) { return line.actual_boxes ?? line.expected_boxes ?? 0; }
+function lineBalanceWeight(line) { return line.actual_weight ?? line.expected_weight ?? 0; }
+
+function balanceLineFields(line, customerLabel) {
+  return {
     'ลูกค้า': customerLabel,
     'รหัสสินค้า': line.customer_product_code ?? '-',
     'ชื่อสินค้า': line.product_name ?? '-',
@@ -35,7 +37,28 @@ function balanceExportRows(line, customerLabel, allocations) {
     'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
     'LOT': line.lot_no ?? '-',
     'รหัสติดตาม': line.tracking_code ?? '-',
-    'Location / พาเลท': part.location,
+  };
+}
+
+// "รวม" sheet: one row per lot (deposit line) with its whole balance.
+function balanceSummaryRow(line, customerLabel) {
+  return {
+    ...balanceLineFields(line, customerLabel),
+    'คงเหลือ (กล่อง)': Number(lineBalanceBoxes(line)),
+    'คงเหลือ (กก.)': Number(lineBalanceWeight(line)),
+    'หมายเหตุลูกค้า': line.note ?? '-',
+    'หมายเหตุ ADMIN': line.actual_note ?? '-',
+  };
+}
+
+// "แยก Location" sheet: one row per lot x pallet location (see
+// splitBalanceByLocation). Balance not on any pallet keeps its own row but
+// with the Location cell left blank.
+function balanceExportRows(line, customerLabel, allocations) {
+  const split = splitBalanceByLocation(lineBalanceBoxes(line), lineBalanceWeight(line), allocations ?? []);
+  return split.map((part) => ({
+    ...balanceLineFields(line, customerLabel),
+    'Location / พาเลท': part.location === UNASSIGNED_LOCATION_LABEL ? '' : part.location,
     'คงเหลือ (กล่อง)': part.boxes,
     'คงเหลือ (กก.)': part.weight,
     'หมายเหตุลูกค้า': line.note ?? '-',
@@ -264,9 +287,13 @@ export function InventoryBalancePage() {
       || naturalText(a.line.customer_product_code, b.line.customer_product_code)
       || naturalText(a.line.lot_no, b.line.lot_no)
       || naturalText(a.line.tracking_code, b.line.tracking_code));
-    const rows = labelled.flatMap(({ line, customerLabel }) => balanceExportRows(line, customerLabel, locationMap.get(line.id)));
+    const summaryRows = labelled.map(({ line, customerLabel }) => balanceSummaryRow(line, customerLabel));
+    const locationRows = labelled.flatMap(({ line, customerLabel }) => balanceExportRows(line, customerLabel, locationMap.get(line.id)));
     const stamp = asOfDate || new Date().toISOString().slice(0, 10);
-    downloadExcelRows(rows, BALANCE_EXPORT_HEADERS, `stock-balance-${stamp}.xlsx`, 'Stock Balance');
+    downloadExcelWorkbookMultiSheet([
+      { name: 'รวม', rows: summaryRows, headers: BALANCE_SUMMARY_HEADERS },
+      { name: 'แยก Location', rows: locationRows, headers: BALANCE_EXPORT_HEADERS },
+    ], `stock-balance-${stamp}.xlsx`);
   }
 
   return (
