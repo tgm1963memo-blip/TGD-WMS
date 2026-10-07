@@ -371,8 +371,10 @@ export function StockCountWorkflow({ onBack }) {
   const nextUncounted = rowsInSide.find((l) => !isCounted(l.id));
 
   const page = (children) => (
-    <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div data-testid="handheld-stock-count" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    // Fixed-height page with its own scrolling body, like the other Scan
+    // Center screens -- the handheld layout doesn't scroll the document.
+    <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      <div data-testid="handheld-stock-count" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {children}
       </div>
       {scannerEl}
@@ -398,7 +400,7 @@ export function StockCountWorkflow({ onBack }) {
     return page(
       <>
         <TopBar title={`นับ ${currentLocation.code}`} subtitle={`${session?.count_no ?? ''} · นับแล้ว ${doneCount}/${pallets.length} พาเลท`} onBack={closeLocation} />
-        <div style={{ padding: '16px 12px 140px' }}>
+        <div data-testid="stock-count-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 12px 140px' }}>
           {banner}
           <button type="button" onClick={openScanner}
             style={{ width: '100%', minHeight: 52, borderRadius: 16, border: `2px dashed ${C.border}`, background: C.surface, fontSize: 15, fontWeight: 800, color: C.text, cursor: 'pointer', marginBottom: 16 }}>
@@ -473,7 +475,7 @@ export function StockCountWorkflow({ onBack }) {
   return page(
     <>
       <TopBar title="นับสต็อก" subtitle={session ? `${session.count_no} · นับแล้ว ${countedTotal}/${parsedLocations.length} Location` : 'เดินนับทีละแถว'} onBack={onBack} />
-      <div style={{ padding: '16px 12px 32px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 12px 32px' }}>
         {banner}
         {sessionLoading ? (
           <div style={{ color: C.muted, textAlign: 'center', padding: 24 }}>กำลังโหลด...</div>
