@@ -27,8 +27,11 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import {
+  DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE,
   getCustomerDocumentAttachmentUrl,
+  getCustomerDocumentAttachmentUrls,
   listCustomerDocumentAttachments,
+  listCustomerDocumentAttachmentsForDocuments,
   uploadCustomerDocumentAttachments,
 } from '../../services/customerDocumentAttachmentService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -161,6 +164,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [r3AttachmentFiles, setR3AttachmentFiles] = useState([]);
   const [r3AttachmentError, setR3AttachmentError] = useState('');
   const [uploadingR3Attachment, setUploadingR3Attachment] = useState(false);
+  const [receivingPhotos, setReceivingPhotos] = useState([]);
+  const [receivingPhotoUrls, setReceivingPhotoUrls] = useState({});
 
   useEffect(() => {
     if (!requestId || !isOpen) return;
@@ -175,6 +180,8 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setR3Attachments([]);
     setR3AttachmentFiles([]);
     setR3AttachmentError('');
+    setReceivingPhotos([]);
+    setReceivingPhotoUrls({});
     refreshR3Attachments(requestId);
 
     Promise.all([
@@ -196,6 +203,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       setLineTemperatureTypes(initTemperatureTypes);
       setTimelineEvents(tRes.data ?? []);
       setLoading(false);
+      listCustomerDocumentAttachmentsForDocuments(
+        DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE,
+        loadedLines.map((l) => l.id),
+      ).then(async (pRes) => {
+        if (!active) return;
+        const photos = pRes.data ?? [];
+        setReceivingPhotos(photos);
+        const uRes = await getCustomerDocumentAttachmentUrls(photos);
+        if (active) setReceivingPhotoUrls(uRes.data ?? {});
+      });
       if (hRes.data?.customer_id) {
         getCustomers().then((cResult) => {
           if (!active) return;
@@ -1069,6 +1086,37 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 </table>
               </div>
             </div>
+
+            {/* Receiving photos taken on the handheld, grouped per line */}
+            {receivingPhotos.length > 0 ? (
+              <div className="customer-attachment-panel" style={{ marginBottom: 16 }} data-testid="admin-deposit-receiving-photos">
+                <div className="form-label">รูปถ่ายสินค้ารับเข้า ({receivingPhotos.length})</div>
+                {lines.filter((line) => receivingPhotos.some((p) => p.document_id === line.id)).map((line) => (
+                  <div key={line.id} style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                      {line.tracking_code ? `${line.tracking_code} · ` : ''}{line.product_name ?? line.customer_product_code ?? '-'}
+                      {line.lot_no ? ` · LOT ${line.lot_no}` : ''}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {receivingPhotos.filter((p) => p.document_id === line.id).map((photo) => (
+                        <a
+                          key={photo.id}
+                          href={receivingPhotoUrls[photo.id] ?? undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${photo.uploaded_by_email ?? ''} ${photo.uploaded_at ? formatDocumentDate(photo.uploaded_at) : ''}`.trim()}
+                          style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'block' }}
+                        >
+                          {receivingPhotoUrls[photo.id] ? (
+                            <img src={receivingPhotoUrls[photo.id]} alt={photo.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          ) : null}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {/* R.3 attachments */}
             <div className="customer-attachment-panel" style={{ marginBottom: 16 }} data-testid="admin-deposit-r3-attachment-panel">

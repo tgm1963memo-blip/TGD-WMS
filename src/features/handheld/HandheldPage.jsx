@@ -32,6 +32,7 @@ import {
   setWithdrawalDispatchTime,
 } from '../../services/customerWithdrawalRequestService.js';
 import { DocumentTimerCard } from './DocumentTimerCard.jsx';
+import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
@@ -1155,6 +1156,13 @@ function ReceivingWorkflow({ onBack, t }) {
             )}
 
             <div style={{ marginBottom: 16 }} />
+
+            <ReceivingPhotoCapture
+              lineId={matchedLine.id}
+              customerId={selectedDoc?.customer_id}
+              uploadedByUserId={activeProfile?.id ?? null}
+              uploadedByEmail={activeProfile?.email ?? null}
+            />
 
             {locations.length > 0 && (
               <div style={{ marginBottom: 20 }}>
