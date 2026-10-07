@@ -10,6 +10,7 @@ import { WithdrawalRequestCreatePage } from '../features/operations/withdrawal/W
 import { WithdrawalRequestDetailPage } from '../features/operations/withdrawal/WithdrawalRequestDetailPage.jsx';
 import { HandheldPage } from '../features/handheld/HandheldPage.jsx';
 import { InventoryBalancePage } from '../features/inventory/InventoryBalancePage.jsx';
+import { StockCountReviewPage } from '../features/inventory/StockCountReviewPage.jsx';
 import { ReportsPage } from '../features/reports/ReportsPage.jsx';
 import { MovementLedgerReportPage } from '../features/reports/MovementLedgerReportPage.jsx';
 import { CustomerStorageBalanceReportPage } from '../features/reports/CustomerStorageBalanceReportPage.jsx';
@@ -76,6 +77,7 @@ export function AppRoutes() {
             <Route path="/operations/withdrawal-requests/new" element={<WithdrawalRequestCreatePage />} />
             <Route path="/operations/withdrawal-requests/:id" element={<WithdrawalRequestDetailPage />} />
             <Route path="/inventory" element={<InventoryBalancePage />} />
+            <Route path="/inventory/count" element={<StockCountReviewPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/movement-ledger" element={<MovementLedgerReportPage />} />
             <Route path="/reports/customer-storage-balance" element={<CustomerStorageBalanceReportPage />} />

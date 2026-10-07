@@ -171,3 +171,74 @@ export async function deleteCustomerDocumentAttachment(attachmentId) {
   if (!error && !data) return { data: null, error: new Error('ไม่มีสิทธิ์ลบรูปนี้') };
   return { data, error };
 }
+
+// Packaging photos on the customer product master, keyed by
+// tgd_customer_products.id (migration 20261007110000_location_stock_count.sql).
+export const PRODUCT_PACKAGING_PHOTO_DOCUMENT_TYPE = 'CUSTOMER_PRODUCT_PACKAGING_PHOTO';
+
+export function productPhotoKey(customerId, customerProductCode) {
+  return `${customerId ?? ''}::${String(customerProductCode ?? '').trim().toLowerCase()}`;
+}
+
+// Chooses which photo to show for each counted item: the product's
+// packaging photo (latest) first, else the first photo taken when that lot
+// was received. items: [{ deposit_line_id, customer_id, customer_product_code }].
+// Returns { [deposit_line_id]: attachment }.
+export function pickCountPhotoAttachments(items, productIdByKey, packagingPhotos = [], receivingPhotos = []) {
+  const latestPackagingByProduct = new Map();
+  packagingPhotos.forEach((photo) => {
+    const current = latestPackagingByProduct.get(photo.document_id);
+    if (!current || String(photo.created_at ?? '') > String(current.created_at ?? '')) {
+      latestPackagingByProduct.set(photo.document_id, photo);
+    }
+  });
+  const firstReceivingByLine = new Map();
+  receivingPhotos.forEach((photo) => {
+    const current = firstReceivingByLine.get(photo.document_id);
+    if (!current || String(photo.created_at ?? '') < String(current.created_at ?? '')) {
+      firstReceivingByLine.set(photo.document_id, photo);
+    }
+  });
+
+  const chosen = {};
+  (items ?? []).forEach((item) => {
+    if (!item?.deposit_line_id || chosen[item.deposit_line_id]) return;
+    const productId = productIdByKey?.get(productPhotoKey(item.customer_id, item.customer_product_code));
+    const photo = (productId && latestPackagingByProduct.get(productId)) || firstReceivingByLine.get(item.deposit_line_id);
+    if (photo) chosen[item.deposit_line_id] = photo;
+  });
+  return chosen;
+}
+
+// Resolves display URLs for counted items in a few round trips. products:
+// rows from listCustomerProducts (any customers). Returns
+// { [deposit_line_id]: { url, source: 'PACKAGING' | 'RECEIVING' } }.
+export async function resolveCountPhotoUrls(items, products = []) {
+  if (!supabase) return missingSupabaseClientResult();
+  const productIdByKey = new Map(
+    (products ?? []).map((p) => [productPhotoKey(p.customer_id, p.customer_product_code), p.id]),
+  );
+  const productIds = (items ?? [])
+    .map((item) => productIdByKey.get(productPhotoKey(item.customer_id, item.customer_product_code)))
+    .filter(Boolean);
+  const lineIds = (items ?? []).map((item) => item.deposit_line_id).filter(Boolean);
+
+  const [packagingResult, receivingResult] = await Promise.all([
+    listCustomerDocumentAttachmentsForDocuments(PRODUCT_PACKAGING_PHOTO_DOCUMENT_TYPE, productIds),
+    listCustomerDocumentAttachmentsForDocuments(DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE, lineIds),
+  ]);
+  const chosen = pickCountPhotoAttachments(items, productIdByKey, packagingResult.data ?? [], receivingResult.data ?? []);
+  const urlResult = await getCustomerDocumentAttachmentUrls(Object.values(chosen));
+
+  const resolved = {};
+  Object.entries(chosen).forEach(([lineId, photo]) => {
+    const url = urlResult.data?.[photo.id];
+    if (url) {
+      resolved[lineId] = {
+        url,
+        source: photo.document_type === PRODUCT_PACKAGING_PHOTO_DOCUMENT_TYPE ? 'PACKAGING' : 'RECEIVING',
+      };
+    }
+  });
+  return { data: resolved, error: packagingResult.error ?? receivingResult.error ?? urlResult.error ?? null };
+}

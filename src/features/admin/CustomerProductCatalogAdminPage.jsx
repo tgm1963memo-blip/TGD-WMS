@@ -14,6 +14,7 @@ import {
   upsertCustomerProductUnit,
 } from '../../services/customerProductUnitService.js';
 import { ProductUnitsEditor, saveProductUnits, unitsFromCatalogRow } from '../../components/customer/ProductUnitsEditor.jsx';
+import { ProductPackagingPhotos } from '../../components/customer/ProductPackagingPhotos.jsx';
 import {
   downloadCustomerProductTemplate,
   exportCustomerProductsExcel,
@@ -314,6 +315,12 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
               placeholder="เช่น 20 — ใช้เสนอจำนวนตอนแบ่งจัดเก็บหลาย pallet (เว้นว่างได้)"
             />
           </label>
+
+          {isEdit ? (
+            <ProductPackagingPhotos productId={form.productId} customerId={form.customerId} />
+          ) : (
+            <p className="form-helper" style={{ margin: '0 0 16px' }}>เพิ่มรูป Packaging ได้หลังบันทึกสินค้าแล้ว (กดแก้ไขสินค้า)</p>
+          )}
 
           <label className="form-field" style={{ margin: '0 0 20px' }}>
             <span>หมายเหตุ</span>

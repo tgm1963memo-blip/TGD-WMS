@@ -24,6 +24,7 @@ export const navigationGroups = [
     key: 'inventory_control',
     items: [
       { label: 'ยอดคงเหลือ', key: 'stock_balance', path: '/inventory' },
+      { label: 'นับสต็อก', key: 'stock_count_review', path: '/inventory/count' },
     ],
   },
   {

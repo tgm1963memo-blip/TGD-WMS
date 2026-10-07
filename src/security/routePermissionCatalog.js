@@ -15,6 +15,7 @@ export const ROUTE_PERMISSION_CATALOG = [
   { route_path: '/operations/withdrawal-requests/new', route_name: 'WithdrawalRequestCreatePage', permission_area: 'withdrawal', minimum_role: 'warehouse_admin', access_level: 'write', notes: '' },
   { route_path: '/operations/withdrawal-requests/:id', route_name: 'WithdrawalRequestDetailPage', permission_area: 'withdrawal', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
   { route_path: '/inventory', route_name: 'InventoryBalancePage', permission_area: 'reports', minimum_role: 'warehouse_admin', access_level: 'read', notes: '' },
+  { route_path: '/inventory/count', route_name: 'StockCountReviewPage', permission_area: 'reports', minimum_role: 'warehouse_admin', access_level: 'read', notes: 'Review stock counts done from the Scan Center; never changes stock' },
   { route_path: '/handheld', route_name: 'HandheldPage', permission_area: 'receiving', minimum_role: 'warehouse_staff', access_level: 'read', notes: '' },
   { route_path: '/reports', route_name: 'ReportsPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: '' },
   { route_path: '/reports/movement-ledger', route_name: 'MovementLedgerReportPage', permission_area: 'reports', minimum_role: 'viewer', access_level: 'read', notes: '' },
