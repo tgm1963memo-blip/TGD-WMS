@@ -30,6 +30,18 @@ const IDENTIFIER_TYPE_LABELS = {
   [WITHDRAWAL_IDENTIFIER_TYPES.NOTE]: 'หมายเหตุ (admin)',
 };
 
+// The catalog entry a deposit line belongs to: exact product code first,
+// product name only as a fallback. A single find() with code-OR-name
+// returned whichever same-named entry came first in the catalog, e.g. RCC019
+// "หนังไก่" for an RCF085 "หนังไก่" tracking code (FR260924029).
+function findCatalogProductForDepositLine(catalogProducts, depositLine) {
+  if (!depositLine) return null;
+  return (depositLine.customer_product_code
+    && catalogProducts.find((p) => p.customer_product_code === depositLine.customer_product_code))
+    || (depositLine.product_name && catalogProducts.find((p) => p.product_name === depositLine.product_name))
+    || null;
+}
+
 export function CustomerWithdrawalLinesTable({
   customerId,
   depositLinesMap = {},
@@ -172,11 +184,8 @@ export function CustomerWithdrawalLinesTable({
     // exactly like picking a tracking code already resolves everything.
     // Only fills it in when no product is chosen yet, so it never
     // clobbers a product the user deliberately picked first.
-    const product = (!line.customer_product_code && first)
-      ? catalogProducts.find((p) =>
-        (p.customer_product_code && p.customer_product_code === first.customer_product_code) ||
-        (p.product_name && p.product_name === first.product_name),
-      )
+    const product = !line.customer_product_code
+      ? findCatalogProductForDepositLine(catalogProducts, first)
       : null;
 
     updateLine(line.key, {
@@ -231,10 +240,7 @@ export function CustomerWithdrawalLinesTable({
       return;
     }
     const match = getProductMatchedDepositLines(line, allDepositLines).find((dl) => dl.tracking_code === trackingCode);
-    const product = match ? catalogProducts.find((p) =>
-      (p.customer_product_code && p.customer_product_code === match.customer_product_code) ||
-      (p.product_name && p.product_name === match.product_name),
-    ) : null;
+    const product = findCatalogProductForDepositLine(catalogProducts, match);
 
     updateLine(line.key, {
       source_deposit_request_id: match?.deposit_request_id ?? '',
