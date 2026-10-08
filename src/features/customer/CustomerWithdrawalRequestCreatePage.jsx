@@ -84,6 +84,9 @@ export function CustomerWithdrawalRequestCreatePage() {
   const editId = searchParams.get('editId');
   const isEditMode = Boolean(editId);
   const { customerId, canWriteCustomerRequests, isRequestProxy, profile } = useCustomerPortalProfile();
+  // Admin may key in a past date to record a backdated document (e.g. goods
+  // that moved before the paperwork was made); everyone else starts from today.
+  const canBackdate = profile?.role === 'admin';
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [header, setHeader] = useState(INITIAL_HEADER);
@@ -807,7 +810,7 @@ export function CustomerWithdrawalRequestCreatePage() {
         <div className="form-grid">
           <label className="form-field">
             <span>{t('customer_field_requested_dispatch_date')}</span>
-            <DateInputDMY className="form-control" data-testid="customer-withdrawal-dispatch-date" max={maxDispatchDateIso()} min={new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required value={header.requested_dispatch_date} />
+            <DateInputDMY className="form-control" data-testid="customer-withdrawal-dispatch-date" max={maxDispatchDateIso()} min={canBackdate ? undefined : new Date().toISOString().split('T')[0]} onChange={(e) => updateHeaderField('requested_dispatch_date', e.target.value)} required value={header.requested_dispatch_date} />
           </label>
           <label className="form-field">
             <span>{t('customer_field_pickup_contact')}</span>
