@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { triggerSuccessFeedback } from './handheldUi.jsx';
 import { formatDurationBetween, combineDateWithEditedTime, formatTimeHHmm } from '../../utils/workTimerUtils.js';
 
 // Shared by ReceivingWorkflow and PickingWorkflow in HandheldPage.jsx — both
@@ -7,7 +9,11 @@ import { formatDurationBetween, combineDateWithEditedTime, formatTimeHHmm } from
 // vs. withdrawal time-tracking RPCs. Staff can correct their own tap
 // immediately via the pencil icon (no admin approval needed) — that's the
 // same edit affordance whether the phase is already finished or only started.
-export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFinish, onEditStart, onEditFinish }) {
+//
+// overtime/onToggleOvertime are optional: when given, a "งานนี้คิด OT" switch
+// renders under the timer (staff mark the document as overtime work from
+// the floor; admin sees/overrides the same flag on the web header).
+export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFinish, onEditStart, onEditFinish, overtime = null, onToggleOvertime = null }) {
   const [editingPhase, setEditingPhase] = useState(null); // 'START' | 'FINISH' | null
   const [editValue, setEditValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +97,10 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
         </div>
       )}
 
+      {onToggleOvertime && overtime && (
+        <OvertimeSwitchRow overtime={overtime} onToggle={onToggleOvertime} />
+      )}
+
       {editingPhase && (
         <div style={{
           marginTop: 10, background: '#fff', border: '1px dashed #09111c', borderRadius: 10, padding: 10,
@@ -142,6 +152,83 @@ function TimeRow({ label, iso, onEdit }) {
       >
         ✏️
       </button>
+    </div>
+  );
+}
+
+// Tapping the switch saves immediately; the note saves on blur. Disabled
+// while offline — the flag feeds billing, so it is never queued.
+function OvertimeSwitchRow({ overtime, onToggle }) {
+  const isOnline = useOnlineStatus();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(overtime.note ?? '');
+  const [error, setError] = useState('');
+  const on = Boolean(overtime.isOvertime);
+  const disabled = busy || !isOnline;
+
+  async function save(next, nextNote) {
+    setBusy(true);
+    setError('');
+    const result = await onToggle(next, nextNote);
+    setBusy(false);
+    if (result?.error) {
+      setError(result.error.message ?? 'บันทึก OT ไม่สำเร็จ');
+      return;
+    }
+    triggerSuccessFeedback();
+  }
+
+  return (
+    <div style={{
+      marginTop: 10, borderRadius: 10, padding: '9px 11px',
+      background: on ? '#fff7ed' : '#fff', border: `1px solid ${on ? '#fdba74' : '#e2e8f0'}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 800, flex: 1, color: on ? '#c2570b' : '#334155' }}>
+          🌙 งานนี้คิด OT
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label="งานนี้คิด OT"
+          disabled={disabled}
+          onClick={() => save(!on, note)}
+          style={{
+            width: 52, height: 30, borderRadius: 999, border: 'none', padding: 3,
+            cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
+            background: on ? '#f97316' : '#cbd5e1', transition: 'background 0.2s',
+            display: 'flex', justifyContent: on ? 'flex-end' : 'flex-start',
+          }}
+        >
+          <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+        </button>
+      </div>
+      {!isOnline && (
+        <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 6 }}>ต้องออนไลน์เพื่อบันทึก OT</div>
+      )}
+      {on && (
+        <>
+          <input
+            type="text"
+            value={note}
+            disabled={disabled}
+            onChange={(e) => setNote(e.target.value)}
+            onBlur={() => { if (note !== (overtime.note ?? '')) save(true, note); }}
+            placeholder="หมายเหตุ (ไม่บังคับ)"
+            style={{
+              width: '100%', boxSizing: 'border-box', marginTop: 8, font: 'inherit', fontSize: 13,
+              padding: '7px 8px', borderRadius: 8, border: '1px solid #e2e8f0',
+            }}
+          />
+          {overtime.setByEmail && (
+            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 6 }}>
+              ติ๊กโดย {overtime.setByEmail}{overtime.setAt ? ` · ${formatTimeHHmm(overtime.setAt)} น.` : ''}
+            </div>
+          )}
+        </>
+      )}
+      {error && <div style={{ fontSize: 11.5, color: '#dc2626', marginTop: 6 }}>{error}</div>}
     </div>
   );
 }

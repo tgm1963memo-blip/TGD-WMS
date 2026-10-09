@@ -22,8 +22,9 @@ import {
   enqueueDepositRecountNotification,
   setDepositReceivingTime,
   setDepositReceivingTemperature,
+  setDepositOvertime,
 } from '../../services/customerDepositRequestService.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -179,6 +180,18 @@ export function CustomerAdminDepositReviewPage() {
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 
+  // Received weight once recorded, else the declared weight (provisional).
+  const overtimeEstimate = useOvertimeEstimate({
+    customerId: selected?.customer_id,
+    enabled: Boolean(selected?.is_overtime),
+    lines: lines.map((l) => ({
+      customer_product_code: l.customer_product_code,
+      temperature_type: l.temperature_type,
+      weight: l.actual_weight ?? l.expected_weight,
+      isActual: l.actual_weight != null,
+    })),
+  });
+
   // Sticker printing needs each line's allergen text (looked up by
   // customer_product_code, same as CustomerDepositDetailModal's catalog
   // lookup) — deposit request lines don't carry it directly.
@@ -269,6 +282,18 @@ export function CustomerAdminDepositReviewPage() {
     }
     const targetField = field === 'GOODS' ? 'goods_temp' : 'truck_temp';
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
+  }
+
+  async function handleSaveOvertime(isOvertime, note) {
+    if (!selectedId) return;
+    const { data, error } = await setDepositOvertime(selectedId, isOvertime, { note });
+    if (error) {
+      setError(error.message ?? 'บันทึก OT ไม่สำเร็จ');
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? {
+      ...r, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+    } : r)));
   }
 
   async function handleRequestRecount() {
@@ -788,6 +813,14 @@ export function CustomerAdminDepositReviewPage() {
                 truckTemp={selected.truck_temp}
                 onSaveGoods={(value) => handleSaveReceivingTemperature('GOODS', value)}
                 onSaveTruck={(value) => handleSaveReceivingTemperature('TRUCK', value)}
+              />
+              <OvertimeControl
+                canWrite={canWrite}
+                isOvertime={selected.is_overtime}
+                note={selected.overtime_note}
+                setByEmail={selected.overtime_set_by_email}
+                estimate={overtimeEstimate}
+                onSave={handleSaveOvertime}
               />
             </div>
 

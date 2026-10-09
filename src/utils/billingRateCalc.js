@@ -388,3 +388,46 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
 
   return results;
 }
+
+// OT (ค่าล่วงเวลา) for documents an admin/staff marked "คิด OT"
+// (is_overtime on tgd_customer_deposit_requests / tgd_customer_withdrawal_requests):
+// each line's actual weight x the OVERTIME rate with unit_basis PER_KG,
+// resolved per product like computeHandlingFeeLines. Lines are pre-filtered
+// by the caller to flagged documents confirmed inside the billing period;
+// each line is { id, requestId, requestType, customerId, customerProductId,
+// temperatureType, productCode, productName, lotNo, weight, date }. A line with no PER_KG OVERTIME rate is
+// skipped — FLAT/PER_HOUR OVERTIME rates bill through the aux-service path
+// instead (computeAuxiliaryServiceLines), so they are deliberately not
+// matched here to avoid charging the same OT twice.
+export function computeOvertimeWeightLines({ lines = [], rates = [] }) {
+  const results = [];
+
+  for (const line of lines) {
+    const rate = resolveServiceRate(rates, {
+      customerId: line.customerId,
+      customerProductId: line.customerProductId,
+      temperatureType: line.temperatureType,
+      serviceType: 'OVERTIME',
+      unitBasis: 'PER_KG',
+      asOfDate: line.date ?? null,
+    });
+    if (!rate) continue;
+
+    const weight = toNumber(line.weight);
+    results.push({
+      lineId: line.id,
+      sourceRequestId: line.requestId,
+      requestType: line.requestType ?? null,
+      productCode: line.productCode ?? null,
+      productName: line.productName ?? null,
+      lotNo: line.lotNo ?? null,
+      customerId: line.customerId,
+      rate,
+      weight,
+      amount: round2(weight * toNumber(rate.rate)),
+      date: line.date ?? null,
+    });
+  }
+
+  return results;
+}

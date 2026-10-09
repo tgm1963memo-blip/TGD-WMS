@@ -18,6 +18,7 @@ import {
   addDepositLineLocationAllocation,
   removeDepositLineLocationAllocation,
   setDepositReceivingTime,
+  setDepositOvertime,
 } from '../../services/customerDepositRequestService.js';
 import {
   listCustomerWithdrawalRequests,
@@ -30,6 +31,7 @@ import {
   removeWithdrawalLinePalletPick,
   listWithdrawalLinePalletPicks,
   setWithdrawalDispatchTime,
+  setWithdrawalOvertime,
 } from '../../services/customerWithdrawalRequestService.js';
 import { DocumentTimerCard } from './DocumentTimerCard.jsx';
 import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
@@ -747,6 +749,21 @@ function ReceivingWorkflow({ onBack, t }) {
         onEditFinish={async (iso) => {
           const { data, error } = await setDepositReceivingTime(selectedDoc.id, 'FINISH', { at: iso, actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, receiving_finished_at: data.at } : d));
+        }}
+        overtime={{
+          isOvertime: selectedDoc.is_overtime,
+          note: selectedDoc.overtime_note,
+          setByEmail: selectedDoc.overtime_set_by_email,
+          setAt: selectedDoc.overtime_set_at,
+        }}
+        onToggleOvertime={async (next, note) => {
+          const { data, error } = await setDepositOvertime(selectedDoc.id, next, { note, actorProfileId: activeProfile?.id });
+          if (!error) {
+            setSelectedDoc((d) => (d ? {
+              ...d, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+            } : d));
+          }
+          return { error };
         }}
       />
 
@@ -1645,6 +1662,21 @@ function PickingWorkflow({ onBack, t }) {
         onEditFinish={async (iso) => {
           const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { at: iso, actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
+        }}
+        overtime={{
+          isOvertime: selectedDoc.is_overtime,
+          note: selectedDoc.overtime_note,
+          setByEmail: selectedDoc.overtime_set_by_email,
+          setAt: selectedDoc.overtime_set_at,
+        }}
+        onToggleOvertime={async (next, note) => {
+          const { data, error } = await setWithdrawalOvertime(selectedDoc.id, next, { note, actorProfileId: activeProfile?.id });
+          if (!error) {
+            setSelectedDoc((d) => (d ? {
+              ...d, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+            } : d));
+          }
+          return { error };
         }}
       />
 

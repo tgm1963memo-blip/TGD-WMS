@@ -29,6 +29,10 @@ const DEPOSIT_HEADER_SELECT = [
   'goods_temp',
   'truck_temp',
   'requires_r3_document',
+  'is_overtime',
+  'overtime_note',
+  'overtime_set_by_email',
+  'overtime_set_at',
   'created_by_email',
   'created_by_role',
   'submitted_at',
@@ -719,6 +723,22 @@ export async function setDepositReceivingTemperature(requestId, field, value) {
     p_request_id: requestId,
     p_field: field,
     p_value: toNullableText(value),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Marks the document as overtime work ("คิด OT") — billed by weight against
+// the customer's OVERTIME PER_KG rate. Set from the admin header or the
+// Scan Center handheld (actorProfileId, same as setDepositReceivingTime).
+export async function setDepositOvertime(requestId, isOvertime, { note = null, actorProfileId = null } = {}) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_deposit_overtime', {
+    p_request_id: requestId,
+    p_is_overtime: Boolean(isOvertime),
+    p_note: toNullableText(note),
+    p_actor_profile_id: actorProfileId,
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

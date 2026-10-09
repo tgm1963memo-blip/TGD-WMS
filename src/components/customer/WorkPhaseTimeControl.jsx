@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
+import { computeOvertimeWeightLines } from '../../utils/billingRateCalc.js';
 import {
   combineDateAndEditedTime,
   formatDateYYYYMMDD,
@@ -206,4 +208,124 @@ function TemperatureRow({ label, value, canWrite, onSave }) {
       </button>
     </CompactFieldCell>
   );
+}
+
+// "คิด OT" cell — same compact shape as the cells above. Marks the whole
+// document as overtime work; billing charges it by weight against the
+// customer's OVERTIME PER_KG rate (computeOvertimeWeightLines). `estimate`
+// is the caller's useOvertimeEstimate() result, shown under the value.
+export function OvertimeControl({ canWrite, isOvertime, note, setByEmail, estimate, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draftOn, setDraftOn] = useState(false);
+  const [draftNote, setDraftNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function openEdit() {
+    setDraftOn(Boolean(isOvertime));
+    setDraftNote(note ?? '');
+    setEditing(true);
+  }
+
+  async function save() {
+    setBusy(true);
+    await onSave(draftOn, draftNote);
+    setBusy(false);
+    setEditing(false);
+  }
+
+  const bylineParts = [];
+  if (isOvertime && note) bylineParts.push(note);
+  if (setByEmail) bylineParts.push(`โดย ${setByEmail}`);
+
+  return (
+    <CompactFieldCell
+      label="คิด OT"
+      valueNode={isOvertime ? (
+        <span style={{ fontWeight: 700, color: '#c2570b' }}>
+          ✔ คิด OT
+          {estimate && <OvertimeEstimateText estimate={estimate} />}
+        </span>
+      ) : '-'}
+      byline={bylineParts.length ? bylineParts.join(' · ') : null}
+      canWrite={canWrite}
+      editing={editing}
+      onToggleEdit={() => (editing ? setEditing(false) : openEdit())}
+    >
+      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input type="radio" checked={draftOn} onChange={() => setDraftOn(true)} /> คิด
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input type="radio" checked={!draftOn} onChange={() => setDraftOn(false)} /> ไม่คิด
+        </label>
+      </div>
+      <input
+        type="text"
+        value={draftNote}
+        onChange={(e) => setDraftNote(e.target.value)}
+        placeholder="หมายเหตุ เช่น ลงงานหลัง 18:00"
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+      />
+      <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
+        บันทึก
+      </button>
+    </CompactFieldCell>
+  );
+}
+
+function OvertimeEstimateText({ estimate }) {
+  const fmt = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (estimate.loading) return <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กำลังคำนวณ...</div>;
+  if (estimate.pricedCount === 0) {
+    return <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-warning, #b45309)' }}>ไม่พบ rate OT (ต่อ กก.)</div>;
+  }
+  return (
+    <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>
+      {fmt(estimate.ratedWeight)} กก. = ฿{fmt(estimate.amount)}
+      {estimate.isProvisional ? ' (ประมาณการ)' : ''}
+      {estimate.unratedCount > 0 ? ` · ${estimate.unratedCount} รายการไม่พบ rate OT` : ''}
+    </div>
+  );
+}
+
+// Live estimate of what billing will charge for OT on one document: same
+// computeOvertimeWeightLines the billing engine uses. lines are
+// { customer_product_code, temperature_type, weight, isActual } — when any
+// line has no actual weight yet the declared weight is used and the result
+// is marked provisional.
+export function useOvertimeEstimate({ customerId, enabled, lines }) {
+  const [rates, setRates] = useState(null);
+
+  useEffect(() => {
+    if (!enabled || !customerId) return undefined;
+    let cancelled = false;
+    listAllProductServiceRates({ customerId, serviceType: 'OVERTIME', isActive: true }).then((result) => {
+      if (!cancelled) setRates(result?.data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [customerId, enabled]);
+
+  if (!enabled) return null;
+  if (!rates) return { loading: true };
+
+  const productIdByCode = new Map(
+    rates.filter((r) => r.customer_product_code).map((r) => [r.customer_product_code, r.customer_product_id]),
+  );
+  const inputs = (lines ?? []).map((line, index) => ({
+    id: index,
+    customerId,
+    customerProductId: productIdByCode.get(line.customer_product_code) ?? null,
+    temperatureType: line.temperature_type ?? null,
+    weight: Number(line.weight ?? 0),
+  }));
+  const priced = computeOvertimeWeightLines({ lines: inputs, rates });
+
+  return {
+    loading: false,
+    pricedCount: priced.length,
+    ratedWeight: priced.reduce((sum, l) => sum + l.weight, 0),
+    amount: priced.reduce((sum, l) => sum + l.amount, 0),
+    unratedCount: inputs.length - priced.length,
+    isProvisional: (lines ?? []).some((l) => !l.isActual),
+  };
 }

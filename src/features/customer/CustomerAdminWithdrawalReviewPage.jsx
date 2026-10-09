@@ -22,8 +22,9 @@ import {
   addAdminWithdrawalRequestLine,
   setWithdrawalDispatchTime,
   setWithdrawalDispatchTemperature,
+  setWithdrawalOvertime,
 } from '../../services/customerWithdrawalRequestService.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -61,6 +62,7 @@ const TIMELINE_ACTION_LABELS = {
   REVIEW_CONFIRM_DISPATCH: 'ยืนยันจ่ายออก',
   ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
   ADMIN_RECALL_COMPLETED: 'เรียกคืนเอกสารที่เสร็จสิ้นแล้ว',
+  SET_OVERTIME: 'แก้ไข OT',
 };
 
 function timelineActionLabel(action) {
@@ -394,6 +396,18 @@ export function CustomerAdminWithdrawalReviewPage() {
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 
+  // Picked weight once staff recorded it, else the requested weight (provisional).
+  const overtimeEstimate = useOvertimeEstimate({
+    customerId: selected?.customer_id,
+    enabled: Boolean(selected?.is_overtime),
+    lines: lines.map((l) => ({
+      customer_product_code: l.customer_product_code,
+      temperature_type: l.temperature_type,
+      weight: l.picked_weight ?? l.requested_weight,
+      isActual: l.picked_weight != null,
+    })),
+  });
+
   const bulkEligibleRows = sortedData.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
   const selectedRequestRows = sortedData
     .filter((r) => selectedRequestIds.has(r.id))
@@ -571,6 +585,18 @@ export function CustomerAdminWithdrawalReviewPage() {
     }
     const targetField = field === 'GOODS' ? 'dispatch_goods_temp' : 'dispatch_truck_temp';
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
+  }
+
+  async function handleSaveOvertime(isOvertime, note) {
+    if (!selectedId) return;
+    const { data, error } = await setWithdrawalOvertime(selectedId, isOvertime, { note });
+    if (error) {
+      setError(error.message ?? 'บันทึก OT ไม่สำเร็จ');
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? {
+      ...r, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+    } : r)));
   }
 
   async function handleOpenWorkOrder() {
@@ -1113,6 +1139,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                 truckTemp={selected.dispatch_truck_temp}
                 onSaveGoods={(value) => handleSaveDispatchTemperature('GOODS', value)}
                 onSaveTruck={(value) => handleSaveDispatchTemperature('TRUCK', value)}
+              />
+              <OvertimeControl
+                canWrite={canWrite}
+                isOvertime={selected.is_overtime}
+                note={selected.overtime_note}
+                setByEmail={selected.overtime_set_by_email}
+                estimate={overtimeEstimate}
+                onSave={handleSaveOvertime}
               />
             </div>
 

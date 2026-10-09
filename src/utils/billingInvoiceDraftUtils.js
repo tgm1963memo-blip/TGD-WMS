@@ -293,6 +293,48 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
   };
 }
 
+// One line per item of a document marked "คิด OT" — see
+// computeOvertimeWeightLines. deposit_line_id is left null on purpose: it
+// is what the lot billing-cycle/duplicate checks key on, and OT is a
+// per-document service, not a storage charge for the lot.
+export function buildInvoiceDraftLineFromOvertimeLine(overtimeLine) {
+  const rate = overtimeLine.rate ?? {};
+  const docLabel = overtimeLine.requestType === 'WITHDRAWAL' ? 'เบิก' : 'รับเข้า';
+  return {
+    invoice_draft_id: null,
+    source_movement_id: null,
+    source_document_no: null,
+    source_document_type: 'OVERTIME',
+    customer_id: overtimeLine.customerId,
+    product_id: null,
+    product_code: overtimeLine.productCode ?? null,
+    product_name: overtimeLine.productName ?? overtimeLine.productCode ?? null,
+    lot_no: overtimeLine.lotNo ?? null,
+    pallet_no: null,
+    movement_type: 'OVERTIME',
+    movement_date: overtimeLine.date ?? null,
+    qty: 0,
+    uom: 'กก.',
+    net_weight: overtimeLine.weight,
+    gross_weight: overtimeLine.weight,
+    chargeable_weight: overtimeLine.weight,
+    billing_status: 'READY',
+    rate: rate.rate != null ? toNumber(rate.rate) : null,
+    amount: overtimeLine.amount,
+    service_rate_id: rate.id ?? null,
+    period_days: null,
+    storage_days: null,
+    deposit_line_id: null,
+    billing_period_start: null,
+    billing_period_end: null,
+    line_note: `ค่าล่วงเวลา (OT) — ${docLabel} ${overtimeLine.date ?? '-'}, น้ำหนัก ${overtimeLine.weight} กก.`,
+    duplicate_guard_active: false,
+    // Same NOT NULL / heterogeneous-batch hazard as buildInvoiceDraftLineFromHandlingLine.
+    min_charge_applied: false,
+    free_period_applied: false,
+  };
+}
+
 // Subtotal-by-service-type breakdown for display/report purposes only —
 // deliberately NOT part of calculateInvoiceDraftTotals below, whose output
 // is spread directly into the tgd_billing_invoice_drafts insert row (i.e.

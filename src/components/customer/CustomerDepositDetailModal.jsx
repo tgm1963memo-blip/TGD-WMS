@@ -17,6 +17,7 @@ import {
   addAdminDepositRequestLine,
   setDepositReceivingTime,
   setDepositReceivingTemperature,
+  setDepositOvertime,
   recallConfirmedDepositRequest,
   enqueueCustomerDepositNotification,
   cancelCustomerDepositRequest,
@@ -44,7 +45,7 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl } from './WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from './WorkPhaseTimeControl.jsx';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -84,6 +85,7 @@ const TIMELINE_ACTION_LABELS = {
   REVIEW_CONFIRM_RECEIPT: 'ยืนยันรับเข้าคลัง',
   ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
   ADMIN_RECALL_CONFIRMED: 'เรียกคืนเอกสารที่ยืนยันแล้ว',
+  SET_OVERTIME: 'แก้ไข OT',
 };
 
 function timelineActionLabel(action) {
@@ -386,6 +388,18 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     && header.last_action_at
     && (Date.now() - new Date(header.last_action_at).getTime()) <= 24 * 60 * 60 * 1000;
 
+  // Received weight once recorded, else the declared weight (provisional).
+  const overtimeEstimate = useOvertimeEstimate({
+    customerId: header?.customer_id,
+    enabled: Boolean(header?.is_overtime),
+    lines: lines.map((l) => ({
+      customer_product_code: l.customer_product_code,
+      temperature_type: l.temperature_type,
+      weight: l.actual_weight ?? l.expected_weight,
+      isActual: l.actual_weight != null,
+    })),
+  });
+
   async function handleRequestRecount() {
     if (!requestId) return;
     if (!window.confirm('ต้องการขอให้ handheld ตรวจนับสินค้าใหม่ใช่หรือไม่?\nสถานะเอกสารจะเปลี่ยนเป็น "ขอตรวจนับใหม่" และ handheld จะสามารถอัปเดตจำนวนสินค้าได้')) return;
@@ -428,6 +442,20 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const targetField = field === 'GOODS' ? 'goods_temp' : 'truck_temp';
     setHeader((prev) => prev ? { ...prev, [targetField]: r.data?.value ?? value } : prev);
     setActionMsg('บันทึกอุณหภูมิเรียบร้อยแล้ว');
+  }
+
+  async function handleSaveOvertime(isOvertime, note) {
+    if (!requestId) return;
+    setError('');
+    const r = await setDepositOvertime(requestId, isOvertime, { note });
+    if (r.error) {
+      setError(r.error.message ?? 'บันทึก OT ไม่สำเร็จ');
+      return;
+    }
+    setHeader((prev) => prev ? {
+      ...prev, is_overtime: r.data.is_overtime, overtime_note: r.data.note, overtime_set_by_email: r.data.by_email, overtime_set_at: r.data.at,
+    } : prev);
+    setActionMsg('บันทึก OT เรียบร้อยแล้ว');
   }
 
   async function handleRecallConfirmed() {
@@ -759,6 +787,14 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 truckTemp={header.truck_temp}
                 onSaveGoods={(value) => handleSaveReceivingTemperature('GOODS', value)}
                 onSaveTruck={(value) => handleSaveReceivingTemperature('TRUCK', value)}
+              />
+              <OvertimeControl
+                canWrite={canWriteReceiving}
+                isOvertime={header.is_overtime}
+                note={header.overtime_note}
+                setByEmail={header.overtime_set_by_email}
+                estimate={overtimeEstimate}
+                onSave={handleSaveOvertime}
               />
             </div>
 

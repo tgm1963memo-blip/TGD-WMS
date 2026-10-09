@@ -4,7 +4,7 @@ import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
-  computeHandlingFeeLines, resolveStorageRateForLine,
+  computeHandlingFeeLines, computeOvertimeWeightLines, resolveStorageRateForLine,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
 
@@ -157,7 +157,7 @@ async function fetchRateEngineInputs({ customerId }) {
     supabase
       .from('tgd_customer_deposit_requests')
       .select(`
-        id, customer_id, expected_arrival_date, last_action_at, requires_r3_document,
+        id, customer_id, expected_arrival_date, last_action_at, requires_r3_document, is_overtime,
         tgd_customer_deposit_request_lines(
           id, customer_product_code, product_name, temperature_type, tracking_code, lot_no,
           actual_boxes, actual_weight, expected_boxes, expected_weight
@@ -168,7 +168,7 @@ async function fetchRateEngineInputs({ customerId }) {
     supabase
       .from('tgd_customer_withdrawal_requests')
       .select(`
-        id, customer_id, requested_dispatch_date, requires_r3_document,
+        id, customer_id, requested_dispatch_date, requires_r3_document, is_overtime,
         tgd_customer_withdrawal_request_lines(
           source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at
@@ -286,9 +286,51 @@ async function fetchRateEngineInputs({ customerId }) {
       .map((req) => ({ id: req.id, date: requestDispatchDateById.get(req.id) ?? null })),
   ];
 
+  // Lines of documents marked "คิด OT" (is_overtime) — OT is billed by weight
+  // (computeOvertimeWeightLines), so each line carries its actual weight:
+  // received weight for a deposit, picked weight for a withdrawal. Dated by
+  // the same confirmed date as ร.3 above, so a backdated confirm moves it too.
+  const overtimeLineInputs = [];
+  for (const req of (depositResult.data ?? [])) {
+    if (!req.is_overtime) continue;
+    for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
+      overtimeLineInputs.push({
+        id: line.id,
+        requestId: req.id,
+        requestType: 'DEPOSIT',
+        customerId: req.customer_id,
+        customerProductId: productIdByCode.get(line.customer_product_code) ?? null,
+        temperatureType: resolveLotTemperatureType(temperatureTypeByCode.get(line.customer_product_code), line.temperature_type),
+        productCode: line.customer_product_code ?? null,
+        productName: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
+        lotNo: line.lot_no ?? null,
+        weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
+        date: requestReceiptDateById.get(req.id) ?? null,
+      });
+    }
+  }
+  for (const req of (withdrawalResult.data ?? [])) {
+    if (!req.is_overtime) continue;
+    (req.tgd_customer_withdrawal_request_lines ?? []).forEach((line, index) => {
+      overtimeLineInputs.push({
+        id: `${req.id}:${index}`,
+        requestId: req.id,
+        requestType: 'WITHDRAWAL',
+        customerId: req.customer_id,
+        customerProductId: productIdByCode.get(line.customer_product_code) ?? null,
+        temperatureType: temperatureTypeByCode.get(line.customer_product_code) ?? null,
+        productCode: line.customer_product_code ?? null,
+        productName: productNameByCode.get(line.customer_product_code) ?? null,
+        lotNo: null,
+        weight: Number(line.picked_weight ?? 0),
+        date: requestDispatchDateById.get(req.id) ?? null,
+      });
+    });
+  }
+
   return {
     depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, error: null,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, error: null,
   };
 }
 
@@ -475,7 +517,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   if (inputs.error) return { data: null, error: inputs.error };
   const {
     depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
   } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
@@ -658,9 +700,20 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     auxLines = [...auxLines, ...computeAuxiliaryServiceLines({ selections: r3Selections })];
   }
 
+  // OT (คิด OT) by weight: flagged documents confirmed inside this period,
+  // each line's weight x the OVERTIME PER_KG rate for its product. Unlike
+  // aux services/ร.3, OT is charged per line, so it follows the same
+  // temperatureType scoping as the lot lines — a split FROZEN/CHILLED
+  // billing run then never bills the same line's OT twice.
+  const overtimeLines = computeOvertimeWeightLines({
+    lines: (overtimeLineInputs ?? []).filter((l) => l.date && l.date >= periodStart && l.date <= periodEnd
+      && (!temperatureType || l.temperatureType === temperatureType)),
+    rates,
+  });
+
   return {
     data: {
-      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], depositLines, unratedDepositLines,
+      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], overtimeLines, depositLines, unratedDepositLines,
     },
     error: null,
   };
