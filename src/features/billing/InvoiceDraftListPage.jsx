@@ -28,7 +28,8 @@ import {
 import { getAutoLotBillingPreview } from '../../services/billingRateEngineService.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { TEMPERATURE_TYPES, upsertProductServiceRate } from '../../services/productServiceRatesService.js';
-import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { listCustomerProducts, listCustomerProductCategories } from '../../services/customerProductCatalogService.js';
+import { UNCATEGORIZED_PRODUCT_CATEGORY } from '../../utils/billingRateCalc.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { canReadBillingInvoiceDrafts, canWriteBillingInvoiceDrafts } from '../../security/billingInvoiceDraftPermissions.js';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -79,6 +80,10 @@ export function InvoiceDraftListPage() {
   const [storageBillMode, setStorageBillMode] = useState('manual');
   const [storageBillCustomerId, setStorageBillCustomerId] = useState('');
   const [storageBillTemperatureType, setStorageBillTemperatureType] = useState('');
+  // Product group (Raw material / Finished Goods, ...) scope — options are the
+  // selected customer's own catalog categories (free text, per customer).
+  const [storageBillProductCategory, setStorageBillProductCategory] = useState('');
+  const [storageBillCategoryOptions, setStorageBillCategoryOptions] = useState([]);
   const [storageBillStart, setStorageBillStart] = useState('');
   const [storageBillEnd, setStorageBillEnd] = useState('');
   const [storageBillPreview, setStorageBillPreview] = useState(null);
@@ -207,6 +212,17 @@ export function InvoiceDraftListPage() {
     reloadDrafts();
   }
 
+  useEffect(() => {
+    setStorageBillProductCategory('');
+    setStorageBillCategoryOptions([]);
+    if (!storageBillCustomerId) return undefined;
+    let cancelled = false;
+    listCustomerProductCategories({ customerId: storageBillCustomerId }).then((result) => {
+      if (!cancelled) setStorageBillCategoryOptions(result?.data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [storageBillCustomerId]);
+
   function openStorageBillModal() {
     setStorageBillOpen(true);
     setStorageBillMode('manual');
@@ -235,6 +251,7 @@ export function InvoiceDraftListPage() {
       billingPeriodStart: storageBillStart,
       billingPeriodEnd: storageBillEnd,
       temperatureType: storageBillTemperatureType || undefined,
+      productCategory: storageBillProductCategory || undefined,
     });
     setStorageBillLoading(false);
     if (result.error) {
@@ -401,6 +418,7 @@ export function InvoiceDraftListPage() {
       billingPeriodStart: storageBillStart,
       billingPeriodEnd: storageBillEnd,
       temperatureType: storageBillTemperatureType || undefined,
+      productCategory: storageBillProductCategory || undefined,
     });
     setStorageBillSaving(false);
     if (result.error) {
@@ -422,6 +440,7 @@ export function InvoiceDraftListPage() {
       customerId: storageBillCustomerId,
       billThroughDate: autoBillThroughDate,
       temperatureType: storageBillTemperatureType || undefined,
+      productCategory: storageBillProductCategory || undefined,
     });
     setAutoBillLoading(false);
     if (result.error) {
@@ -453,6 +472,7 @@ export function InvoiceDraftListPage() {
       customerId: storageBillCustomerId,
       billThroughDate: autoBillThroughDate,
       temperatureType: storageBillTemperatureType || undefined,
+      productCategory: storageBillProductCategory || undefined,
     });
     setAutoBillSaving(false);
     if (result.error) {
@@ -712,7 +732,7 @@ export function InvoiceDraftListPage() {
           </div>
 
           {storageBillMode === 'manual' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 600 }}>
               ลูกค้า *
               <select
@@ -742,6 +762,23 @@ export function InvoiceDraftListPage() {
               </select>
             </label>
             <label style={{ fontSize: 12, fontWeight: 600 }}>
+              กลุ่มสินค้า
+              <select
+                className="form-control"
+                data-testid="storage-bill-product-category-select"
+                value={storageBillProductCategory}
+                disabled={!storageBillCustomerId}
+                onChange={(e) => { setStorageBillProductCategory(e.target.value); setStorageBillPreview(null); }}
+                style={{ display: 'block', width: '100%', marginTop: 4 }}
+              >
+                <option value="">— ทุกกลุ่ม —</option>
+                {storageBillCategoryOptions.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+                <option value={UNCATEGORIZED_PRODUCT_CATEGORY}>ไม่ระบุกลุ่ม</option>
+              </select>
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 600 }}>
               ช่วงเวลา (เริ่ม) *
               <input
                 type="date"
@@ -765,7 +802,7 @@ export function InvoiceDraftListPage() {
             </label>
           </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600 }}>
                 ลูกค้า *
                 <select
@@ -791,6 +828,23 @@ export function InvoiceDraftListPage() {
                   {TEMPERATURE_TYPES.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
+                </select>
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>
+                กลุ่มสินค้า
+                <select
+                  className="form-control"
+                  data-testid="storage-bill-product-category-select"
+                  value={storageBillProductCategory}
+                  disabled={!storageBillCustomerId}
+                  onChange={(e) => { setStorageBillProductCategory(e.target.value); setAutoBillPreview(null); }}
+                  style={{ display: 'block', width: '100%', marginTop: 4 }}
+                >
+                  <option value="">— ทุกกลุ่ม —</option>
+                  {storageBillCategoryOptions.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                  <option value={UNCATEGORIZED_PRODUCT_CATEGORY}>ไม่ระบุกลุ่ม</option>
                 </select>
               </label>
               <label style={{ fontSize: 12, fontWeight: 600 }}>

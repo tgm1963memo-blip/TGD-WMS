@@ -431,3 +431,38 @@ export function computeOvertimeWeightLines({ lines = [], rates = [] }) {
 
   return results;
 }
+
+// Product-group scoping for period billing (e.g. a "Raw material" bill and
+// a separate "Finished Goods" bill). The group is the catalog's free-text
+// tgd_customer_products.product_category; UNCATEGORIZED_PRODUCT_CATEGORY
+// selects products with no group set. An empty filter matches everything,
+// so an unscoped bill behaves exactly as before.
+export const UNCATEGORIZED_PRODUCT_CATEGORY = '__UNCATEGORIZED__';
+
+export function matchesProductCategory(filter, value) {
+  if (!filter) return true;
+  const normalized = String(value ?? '').trim();
+  if (filter === UNCATEGORIZED_PRODUCT_CATEGORY) return normalized === '';
+  return normalized === filter;
+}
+
+// Per-document charges (ร.3, FLAT/PER_HOUR aux services) have no product of
+// their own, so a group-scoped bill takes them only when the document's
+// heaviest product group is that bill's group — every document then lands
+// on exactly one group's bill. lines are { category, weight }; ties break
+// alphabetically so the result is stable. Blank categories count as
+// UNCATEGORIZED_PRODUCT_CATEGORY.
+export function pickDominantCategory(lines = []) {
+  const weightByCategory = new Map();
+  for (const line of lines) {
+    const category = String(line.category ?? '').trim() || UNCATEGORIZED_PRODUCT_CATEGORY;
+    weightByCategory.set(category, (weightByCategory.get(category) ?? 0) + toNumber(line.weight));
+  }
+  let best = null;
+  for (const [category, weight] of weightByCategory) {
+    if (best == null || weight > best.weight || (weight === best.weight && category < best.category)) {
+      best = { category, weight };
+    }
+  }
+  return best?.category ?? UNCATEGORIZED_PRODUCT_CATEGORY;
+}

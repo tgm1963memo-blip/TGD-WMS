@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoadingState } from '../ui/LoadingState.jsx';
 import { InvoiceDraftStatusBadge } from './InvoiceDraftStatusBadge.jsx';
-import { canApproveBillingInvoiceDraft, canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft } from '../../utils/billingInvoiceDraftUtils.js';
+import { canApproveBillingInvoiceDraft, canDeleteBillingInvoiceDraft, canRecalculateBillingInvoiceDraft, formatProductCategoryScope } from '../../utils/billingInvoiceDraftUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
@@ -121,7 +121,7 @@ export function InvoiceDraftListTable({
                 <td><InvoiceDraftStatusBadge status={draft.status} /></td>
                 <td>{draft.billing_period_start ?? '-'}</td>
                 <td>{draft.billing_period_end ?? '-'}</td>
-                <td>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</td>
+                <td>{draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}{draft.product_category ? ` · ${formatProductCategoryScope(draft.product_category)}` : ''}</td>
                 <td>{formatNumber(draft.total_qty)}</td>
                 <td>{formatFixed2(draft.total_chargeable_weight)}</td>
                 <td>{formatFixed2(draft.total_amount)}</td>
@@ -149,7 +149,7 @@ export function InvoiceDraftListTable({
             <div className="list-card-fields">
               <div>Customer: {draft.customer_name ?? '-'}</div>
               <div>Period: {draft.billing_period_start ?? '-'} – {draft.billing_period_end ?? '-'}</div>
-              <div>Storage Type: {draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}</div>
+              <div>Storage Type: {draft.temperature_type ? getTemperatureTypeShortLabel(draft.temperature_type) : 'ทุกประเภท'}{draft.product_category ? ` · ${formatProductCategoryScope(draft.product_category)}` : ''}</div>
               <div>Total Qty: {formatNumber(draft.total_qty)}</div>
               <div>Total Chargeable Weight: {formatFixed2(draft.total_chargeable_weight)}</div>
               <div>Total Amount: {formatFixed2(draft.total_amount)}</div>

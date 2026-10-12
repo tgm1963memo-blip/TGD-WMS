@@ -5,6 +5,7 @@ import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js'
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
   computeHandlingFeeLines, computeOvertimeWeightLines, resolveStorageRateForLine,
+  matchesProductCategory, pickDominantCategory,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
 
@@ -70,13 +71,17 @@ export function buildCatalogMaps(catalogRows = []) {
   const productIdByCode = new Map();
   const temperatureTypeByCode = new Map();
   const productNameByCode = new Map();
+  // Product group (Raw material / Finished Goods, ...) — catalog-only, no
+  // per-line snapshot exists, so it is always the catalog's current value.
+  const categoryByCode = new Map();
   for (const row of catalogRows) {
     if (!row.customer_product_code) continue;
     productIdByCode.set(row.customer_product_code, row.id);
     if (row.temperature_type) temperatureTypeByCode.set(row.customer_product_code, row.temperature_type);
     if (row.product_name) productNameByCode.set(row.customer_product_code, row.product_name);
+    if (row.product_category) categoryByCode.set(row.customer_product_code, row.product_category);
   }
-  return { productIdByCode, temperatureTypeByCode, productNameByCode };
+  return { productIdByCode, temperatureTypeByCode, productNameByCode, categoryByCode };
 }
 
 // Which physical room a temperature_type is stored in. FREEZE/FREEZE_FROZEN
@@ -185,7 +190,7 @@ async function fetchRateEngineInputs({ customerId }) {
   if (ratesResult.error) return { error: ratesResult.error };
   if (catalogResult.error) return { error: catalogResult.error };
 
-  const { productIdByCode, temperatureTypeByCode, productNameByCode } = buildCatalogMaps(catalogResult.data ?? []);
+  const { productIdByCode, temperatureTypeByCode, productNameByCode, categoryByCode } = buildCatalogMaps(catalogResult.data ?? []);
 
   // The date a lot's 15/30/etc-day storage cycle grid is anchored to, and
   // the date a withdrawal's goods are treated as having left storage, must
@@ -263,7 +268,24 @@ async function fetchRateEngineInputs({ customerId }) {
     // no longer has (renamed/removed since).
     product_name: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
     lot_no: line.lot_no ?? null,
+    product_category: categoryByCode.get(line.customer_product_code) ?? null,
   }));
+
+  // Each request's heaviest product group — where its per-document charges
+  // (ร.3, FLAT/PER_HOUR aux services) go when billing is split by group.
+  const requestCategoryById = new Map();
+  for (const req of (depositResult.data ?? [])) {
+    requestCategoryById.set(req.id, pickDominantCategory((req.tgd_customer_deposit_request_lines ?? []).map((line) => ({
+      category: categoryByCode.get(line.customer_product_code),
+      weight: line.actual_weight ?? line.expected_weight,
+    }))));
+  }
+  for (const req of (withdrawalResult.data ?? [])) {
+    requestCategoryById.set(req.id, pickDominantCategory((req.tgd_customer_withdrawal_request_lines ?? []).map((line) => ({
+      category: categoryByCode.get(line.customer_product_code),
+      weight: line.picked_weight,
+    }))));
+  }
 
   // Same resolved-timeline-event dates used for cycle anchoring above, kept
   // under their existing names since the rest of this function (and its
@@ -304,6 +326,7 @@ async function fetchRateEngineInputs({ customerId }) {
         productCode: line.customer_product_code ?? null,
         productName: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
         lotNo: line.lot_no ?? null,
+        productCategory: categoryByCode.get(line.customer_product_code) ?? null,
         weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
         date: requestReceiptDateById.get(req.id) ?? null,
       });
@@ -322,6 +345,7 @@ async function fetchRateEngineInputs({ customerId }) {
         productCode: line.customer_product_code ?? null,
         productName: productNameByCode.get(line.customer_product_code) ?? null,
         lotNo: null,
+        productCategory: categoryByCode.get(line.customer_product_code) ?? null,
         weight: Number(line.picked_weight ?? 0),
         date: requestDispatchDateById.get(req.id) ?? null,
       });
@@ -330,7 +354,7 @@ async function fetchRateEngineInputs({ customerId }) {
 
   return {
     depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, error: null,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, requestCategoryById, error: null,
   };
 }
 
@@ -507,7 +531,7 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
 // be billed for a given period, using the exact same rate configuration
 // admins set up on the Product Service Rates page. Read-only preview —
 // callers decide whether/how to persist these as actual invoice draft lines.
-export async function getBillingPeriodPreview({ customerId, periodStart, periodEnd, temperatureType = null }) {
+export async function getBillingPeriodPreview({ customerId, periodStart, periodEnd, temperatureType = null, productCategory = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !periodStart || !periodEnd) {
     return { data: null, error: new Error('customerId, periodStart, and periodEnd are required.') };
@@ -517,7 +541,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   if (inputs.error) return { data: null, error: inputs.error };
   const {
     depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, requestCategoryById,
   } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
@@ -527,9 +551,15 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // recorded per deposit REQUEST rather than per line/product, so they
   // have no single temperature to scope by and are always included in
   // full regardless of this filter.
-  const scopedDepositLines = temperatureType
-    ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
-    : allDepositLines;
+  //
+  // productCategory (Raw material / Finished Goods, ...) scopes the lots the
+  // same way. Per-request charges, which have no product of their own, go
+  // to the bill of the request's heaviest group instead (see
+  // requestCategoryById) so splitting by group never bills them twice.
+  const scopedDepositLines = allDepositLines.filter((dl) =>
+    (!temperatureType || dl.temperature_type === temperatureType)
+    && matchesProductCategory(productCategory, dl.product_category));
+  const requestInCategory = (id) => !productCategory || requestCategoryById.get(id) === productCategory;
 
   // A line with no real received amount (received_weight resolves to
   // actual_weight ?? expected_weight ?? 0 -- see fetchRateEngineInputs --
@@ -608,11 +638,11 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // query small regardless of how much history a customer accumulates.
   const periodDepositRequestIds = depositRequestIds.filter((id) => {
     const date = requestReceiptDateById.get(id);
-    return date && date >= periodStart && date <= periodEnd;
+    return date && date >= periodStart && date <= periodEnd && requestInCategory(id);
   });
   const periodWithdrawalRequestIds = withdrawalRequestIds.filter((id) => {
     const date = requestDispatchDateById.get(id);
-    return date && date >= periodStart && date <= periodEnd;
+    return date && date >= periodStart && date <= periodEnd && requestInCategory(id);
   });
 
   // Belt-and-braces on top of the period pre-filter above: even one
@@ -690,7 +720,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const r3Rate = resolveServiceRate(rates, { customerId, serviceType: 'R3_DOCUMENT' });
   if (r3Rate) {
     const r3Selections = (r3FlaggedDocuments ?? [])
-      .filter((doc) => doc.date && doc.date >= periodStart && doc.date <= periodEnd)
+      .filter((doc) => doc.date && doc.date >= periodStart && doc.date <= periodEnd && requestInCategory(doc.id))
       .map((doc) => ({
         sourceRequestId: doc.id,
         customerId,
@@ -707,7 +737,8 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // billing run then never bills the same line's OT twice.
   const overtimeLines = computeOvertimeWeightLines({
     lines: (overtimeLineInputs ?? []).filter((l) => l.date && l.date >= periodStart && l.date <= periodEnd
-      && (!temperatureType || l.temperatureType === temperatureType)),
+      && (!temperatureType || l.temperatureType === temperatureType)
+      && matchesProductCategory(productCategory, l.productCategory)),
     rates,
   });
 
@@ -734,7 +765,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 // can be included, so a lot already billed under the old manual date-range
 // flow (which never tagged deposit_line_id) can't be silently re-billed
 // from its original receipt date.
-export async function getAutoLotBillingPreview({ customerId, billThroughDate, temperatureType = null }) {
+export async function getAutoLotBillingPreview({ customerId, billThroughDate, temperatureType = null, productCategory = null }) {
   if (!supabase) return missingSupabaseClientResult();
   if (!customerId || !billThroughDate) {
     return { data: null, error: new Error('customerId and billThroughDate are required.') };
@@ -743,10 +774,10 @@ export async function getAutoLotBillingPreview({ customerId, billThroughDate, te
   const inputs = await fetchRateEngineInputs({ customerId });
   if (inputs.error) return { data: null, error: inputs.error };
   const { depositLines: allDepositLines, rates } = inputs;
-  // Same per-lot storage-method scoping as getBillingPeriodPreview above.
-  const scopedDepositLines = temperatureType
-    ? allDepositLines.filter((dl) => dl.temperature_type === temperatureType)
-    : allDepositLines;
+  // Same per-lot storage-method/product-group scoping as getBillingPeriodPreview above.
+  const scopedDepositLines = allDepositLines.filter((dl) =>
+    (!temperatureType || dl.temperature_type === temperatureType)
+    && matchesProductCategory(productCategory, dl.product_category));
   // Same zero-received-amount exclusion as getBillingPeriodPreview -- a line
   // recorded with actual_boxes=0/actual_weight=0 has nothing to bill and
   // isn't a real "unrated" gap either.

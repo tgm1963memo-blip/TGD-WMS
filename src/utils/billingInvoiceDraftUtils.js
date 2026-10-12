@@ -1,4 +1,5 @@
 import { BILLING_STATUS_FOUNDATION } from './billingWeightUtils.js';
+import { UNCATEGORIZED_PRODUCT_CATEGORY } from './billingRateCalc.js';
 
 export const INVOICE_DRAFT_TABLE = 'tgd_billing_invoice_drafts';
 export const INVOICE_DRAFT_LINE_TABLE = 'tgd_billing_invoice_draft_lines';
@@ -85,6 +86,7 @@ export function shapeBillingInvoiceDraftHeader(row = {}) {
     billing_period_start: row.billing_period_start ?? null,
     billing_period_end: row.billing_period_end ?? null,
     temperature_type: row.temperature_type ?? null,
+    product_category: row.product_category ?? null,
     status: row.status ?? INVOICE_DRAFT_STATUS.DRAFT,
     total_qty: toNumber(row.total_qty),
     total_net_weight: toNumber(row.total_net_weight),
@@ -631,4 +633,11 @@ export function buildInvoiceDraftCreatePayload({
     },
     lines,
   };
+}
+
+// Label for a draft's product-group scope (tgd_billing_invoice_drafts.product_category).
+export function formatProductCategoryScope(productCategory) {
+  if (!productCategory) return 'ทุกกลุ่ม';
+  if (productCategory === UNCATEGORIZED_PRODUCT_CATEGORY) return 'ไม่ระบุกลุ่ม';
+  return productCategory;
 }
