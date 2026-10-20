@@ -92,8 +92,11 @@ function bangkokDateIso(value) {
 }
 
 // Earliest allowed dispatch date: the day the request was created (Bangkok)
-// — the RPC rejects anything earlier, see 20261007090000.
-function earliestDispatchDateIso(request) {
+// — the RPC rejects anything earlier (20261007090000), except for admin, who
+// may key in a request after the fact and backdate it (20261008090000).
+// '' means no lower bound.
+function earliestDispatchDateIso(request, role) {
+  if (role === 'admin') return '';
   return request?.created_at ? bangkokDateIso(request.created_at) : '';
 }
 
@@ -669,7 +672,7 @@ export function CustomerAdminWithdrawalReviewPage() {
     const today = bangkokTodayIso();
     const requested = selected.requested_dispatch_date ? String(selected.requested_dispatch_date).slice(0, 10) : '';
     if (requested && requested !== today) {
-      const earliest = earliestDispatchDateIso(selected);
+      const earliest = earliestDispatchDateIso(selected, userRole);
       const initial = requested < today ? requested : today;
       setConfirmDate(earliest && initial < earliest ? earliest : initial);
       setConfirmDateOpen(true);
@@ -1593,7 +1596,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               className="btn btn-primary"
               data-testid="btn-confirm-withdrawal-date"
               disabled={submitting || !confirmDate || confirmDate > bangkokTodayIso()
-                || (earliestDispatchDateIso(selected) !== '' && confirmDate < earliestDispatchDateIso(selected))}
+                || (earliestDispatchDateIso(selected, userRole) !== '' && confirmDate < earliestDispatchDateIso(selected, userRole))}
               onClick={() => handleConfirmWithdrawal(confirmDate)}
               type="button"
             >
@@ -1615,7 +1618,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             className="form-control"
             data-testid="input-confirm-withdrawal-date"
             max={bangkokTodayIso()}
-            min={earliestDispatchDateIso(selected) || undefined}
+            min={earliestDispatchDateIso(selected, userRole) || undefined}
             onChange={(e) => setConfirmDate(e.target.value)}
             type="date"
             value={confirmDate}
