@@ -391,7 +391,7 @@ export function StockCountWorkflow({ onBack }) {
     <>
       {error && <div style={{ padding: '12px 16px', background: C.redLight, borderRadius: 14, color: C.red, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{error}</div>}
       {message && <div style={{ padding: '12px 16px', background: C.greenLight, borderRadius: 14, color: C.green, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{message}</div>}
-      {!isOnline && <div style={{ padding: '10px 14px', background: '#fffbeb', borderRadius: 14, color: '#92400e', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>ออฟไลน์ — กรอกต่อได้ ข้อมูลเก็บไว้ในเครื่อง แต่ต้องมีสัญญาณตอนกดบันทึก</div>}
+      {!isOnline && <div style={{ padding: '10px 14px', background: 'var(--color-warning-soft)', borderRadius: 14, color: 'var(--color-warning-strong)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>ออฟไลน์ — กรอกต่อได้ ข้อมูลเก็บไว้ในเครื่อง แต่ต้องมีสัญญาณตอนกดบันทึก</div>}
     </>
   );
 
@@ -423,9 +423,9 @@ export function StockCountWorkflow({ onBack }) {
           ))}
 
           {extras.map((x) => (
-            <div key={x.key} style={{ background: '#fffbeb', border: '2px solid #fcd34d', borderRadius: 16, padding: '12px 14px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div key={x.key} style={{ background: 'var(--color-warning-soft)', border: '2px solid #fcd34d', borderRadius: 16, padding: '12px 14px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 900, color: '#92400e', fontSize: 13 }}>พาเลทที่ไม่อยู่ในระบบ</div>
+                <div style={{ fontWeight: 900, color: 'var(--color-warning-strong)', fontSize: 13 }}>พาเลทที่ไม่อยู่ในระบบ</div>
                 <div style={{ fontWeight: 800, color: C.text, overflowWrap: 'anywhere' }}>{x.productName || x.trackingCode || '-'}</div>
                 <div style={{ fontSize: 12, color: C.textSec }}>{x.trackingCode && x.productName ? `${x.trackingCode} · ` : ''}{x.boxes || 0} กล่อง{x.weight ? ` · ${x.weight} กก.` : ''}{x.note ? ` · ${x.note}` : ''}</div>
               </div>
@@ -524,7 +524,7 @@ export function StockCountWorkflow({ onBack }) {
                     const color = !counted ? C.border : status === 'VARIANCE' ? '#f59e0b' : C.green;
                     return (
                       <button key={l.id} type="button" onClick={() => openLocation(l)} data-testid="stock-count-row"
-                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${color}`, background: counted ? (status === 'VARIANCE' ? '#fffbeb' : C.greenLight) : C.surface, cursor: 'pointer', fontWeight: 900, color: C.text }}>
+                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${color}`, background: counted ? (status === 'VARIANCE' ? 'var(--color-warning-soft)' : C.greenLight) : C.surface, cursor: 'pointer', fontWeight: 900, color: C.text }}>
                         <div style={{ fontSize: 15 }}>{counted ? (status === 'VARIANCE' ? '⚠️ ' : '✅ ') : ''}{formatRowLabel(l.parsed.row)}</div>
                         <div style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace' }}>{l.code}</div>
                       </button>

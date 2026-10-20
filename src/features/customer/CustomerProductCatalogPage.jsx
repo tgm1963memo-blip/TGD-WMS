@@ -270,8 +270,8 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
             <span>สารก่อภูมิแพ้ (Allergen)</span>
             <div style={{ display: 'flex', gap: 8, marginBottom: form.allergenHas ? 6 : 0 }}>
               {[
-                { label: 'ไม่มี', val: false, activeColor: '#059669', activeBg: '#ecfdf5' },
-                { label: 'มี', val: true, activeColor: '#ef4444', activeBg: '#fef2f2' },
+                { label: 'ไม่มี', val: false, activeColor: 'var(--color-success)', activeBg: '#ecfdf5' },
+                { label: 'มี', val: true, activeColor: '#ef4444', activeBg: 'var(--color-danger-soft)' },
               ].map(({ label, val, activeColor, activeBg }) => (
                 <button
                   key={label}
@@ -630,7 +630,7 @@ export function CustomerProductCatalogPage() {
             display: 'flex', gap: 8, alignItems: 'center',
           }}>
             <span style={{ fontSize: 16 }}>ℹ️</span>
-            <div style={{ fontSize: 12, color: '#92400e' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-warning-strong)' }}>
               สิทธิ์ดูข้อมูลเท่านั้น — ติดต่อ <strong>Customer Admin</strong> เพื่อเพิ่ม/แก้ไขสินค้า
             </div>
           </div>

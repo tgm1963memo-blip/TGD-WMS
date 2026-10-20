@@ -134,8 +134,8 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                       padding: '0 12px',
                       border: '1px solid #2563eb',
                       borderRadius: 8,
-                      background: '#eff6ff',
-                      color: '#2563eb',
+                      background: 'var(--color-accent-soft)',
+                      color: 'var(--color-accent)',
                       fontWeight: 600,
                       fontSize: 12,
                       cursor: 'pointer',
@@ -228,9 +228,9 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => set('isActive', e.target.checked)}
-                  style={{ width: 24, height: 24, accentColor: '#2563eb', cursor: 'pointer' }}
+                  style={{ width: 24, height: 24, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                 />
-                <span style={{ fontWeight: 600, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-body)', display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
                   ใช้งานอยู่
                   <span style={{fontSize: 12, color: '#6b7280'}}>(Active)</span>
                 </span>
@@ -239,7 +239,7 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
           )}
 
           <div style={{ borderTop: '1px dashed #e5e7eb', margin: '4px 0 14px', paddingTop: 14 }} data-testid="customer-notification-settings-section">
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 10px' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-body)', margin: '0 0 10px' }}>
               การแจ้งเตือนทางอีเมล
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
@@ -249,9 +249,9 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                   data-testid="customer-notify-deposit-confirmed-checkbox"
                   checked={form.notifyDepositConfirmed}
                   onChange={(e) => set('notifyDepositConfirmed', e.target.checked)}
-                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                  style={{ width: 20, height: 20, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-body)', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
                   ยืนยันรับสินค้าเข้าคลัง
                   <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อรับฝากสินค้าเข้าคลังยืนยันแล้ว</span>
                 </span>
@@ -262,9 +262,9 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                   data-testid="customer-notify-withdrawal-completed-checkbox"
                   checked={form.notifyWithdrawalCompleted}
                   onChange={(e) => set('notifyWithdrawalCompleted', e.target.checked)}
-                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                  style={{ width: 20, height: 20, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-body)', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
                   เบิกสินค้า/จัดส่งสำเร็จ
                   <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อคำขอเบิกสินค้าถูกส่งออกจากคลังแล้ว</span>
                 </span>
@@ -275,9 +275,9 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                   data-testid="customer-notify-invoice-approved-checkbox"
                   checked={form.notifyInvoiceApproved}
                   onChange={(e) => set('notifyInvoiceApproved', e.target.checked)}
-                  style={{ width: 20, height: 20, accentColor: '#2563eb', cursor: 'pointer' }}
+                  style={{ width: 20, height: 20, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-body)', display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
                   ใบแจ้งหนี้พร้อมแล้ว
                   <span style={{ fontSize: 11, color: '#6b7280' }}>เมื่อใบแจ้งหนี้ได้รับการอนุมัติแล้ว</span>
                 </span>

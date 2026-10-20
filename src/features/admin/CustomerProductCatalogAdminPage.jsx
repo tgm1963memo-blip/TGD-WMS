@@ -250,9 +250,9 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
                   onClick={() => { onFieldChange('allergenHas', false); onFieldChange('allergen', ''); }}
                   style={{
                     flex: 1, padding: '8px 0', borderRadius: 8,
-                    border: `1px solid ${!form.allergenHas ? '#059669' : 'var(--tgd-border)'}`,
+                    border: `1px solid ${!form.allergenHas ? 'var(--color-success)' : 'var(--tgd-border)'}`,
                     background: !form.allergenHas ? '#ecfdf5' : 'transparent',
-                    color: !form.allergenHas ? '#059669' : 'var(--tgd-muted-text)',
+                    color: !form.allergenHas ? 'var(--color-success)' : 'var(--tgd-muted-text)',
                     fontWeight: 700, cursor: 'pointer', fontSize: 13,
                   }}
                 >
@@ -264,7 +264,7 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
                   style={{
                     flex: 1, padding: '8px 0', borderRadius: 8,
                     border: `1px solid ${form.allergenHas ? '#ef4444' : 'var(--tgd-border)'}`,
-                    background: form.allergenHas ? '#fef2f2' : 'transparent',
+                    background: form.allergenHas ? 'var(--color-danger-soft)' : 'transparent',
                     color: form.allergenHas ? '#ef4444' : 'var(--tgd-muted-text)',
                     fontWeight: 700, cursor: 'pointer', fontSize: 13,
                   }}

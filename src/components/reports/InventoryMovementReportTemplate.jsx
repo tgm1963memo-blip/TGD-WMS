@@ -311,13 +311,13 @@ export function InventoryMovementReportTemplate({
                       <td style={cell({ textAlign: 'right',  background: '#f1f8f2', fontSize: 8 })}>{fmtNum(line.receivedWeight)}</td>
                       <td style={cell({ textAlign: 'center', background: '#fdf2f5', fontSize: 8 })}>{fmtQty(line.deliveryVolume)}</td>
                       <td style={cell({ textAlign: 'right',  background: '#fdf2f5', fontSize: 8 })}>{fmtNum(line.deliveryWeight)}</td>
-                      <td style={cell({ textAlign: 'center', background: '#fffbf0', fontSize: 8, color: Number(line.balanceVolume) < 0 ? '#dc2626' : Number(line.balanceVolume) === 0 ? '#888' : undefined })}>{fmtBalance(line.balanceVolume)}</td>
-                      <td style={cell({ textAlign: 'right',  background: '#fffbf0', fontSize: 8, color: Number(line.balanceWeight) < 0 ? '#dc2626' : Number(line.balanceWeight) === 0 ? '#888' : undefined })}>{fmtBalanceWt(line.balanceWeight)}</td>
+                      <td style={cell({ textAlign: 'center', background: '#fffbf0', fontSize: 8, color: Number(line.balanceVolume) < 0 ? 'var(--color-danger)' : Number(line.balanceVolume) === 0 ? '#888' : undefined })}>{fmtBalance(line.balanceVolume)}</td>
+                      <td style={cell({ textAlign: 'right',  background: '#fffbf0', fontSize: 8, color: Number(line.balanceWeight) < 0 ? 'var(--color-danger)' : Number(line.balanceWeight) === 0 ? '#888' : undefined })}>{fmtBalanceWt(line.balanceWeight)}</td>
                       <td style={cell({ textAlign: 'center', fontSize: 8 })}>{line.volumeUnit}</td>
                       <td style={cell({ fontSize: 8, overflowWrap: 'break-word', wordBreak: 'break-word' })}>
                         <div>{line.remark !== '-' ? line.remark : ''}</div>
                         {line.isClosed && (
-                          <div style={{ marginTop: 2, display: 'inline-block', background: '#dc2626', color: '#fff', fontSize: 7, fontWeight: 800, padding: '1px 4px', borderRadius: 3, letterSpacing: '0.05em' }}>
+                          <div style={{ marginTop: 2, display: 'inline-block', background: 'var(--color-danger)', color: '#fff', fontSize: 7, fontWeight: 800, padding: '1px 4px', borderRadius: 3, letterSpacing: '0.05em' }}>
                             CLOSED
                           </div>
                         )}

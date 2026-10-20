@@ -210,12 +210,12 @@ export function CustomerDepositLinesTable({
                         </div>
                       )}
                       {isCustomUnitMode && !canDeriveUnitWeight(selectedUnit, line.weight_per_box) && (
-                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                        <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
                           ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
                         </div>
                       )}
                       {isCustomUnitMode && !canDeriveUnitBoxes(selectedUnit, line.weight_per_box) && (
-                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                        <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
                           ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
                         </div>
                       )}

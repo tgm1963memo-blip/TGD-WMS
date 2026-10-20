@@ -5,7 +5,7 @@ export const brandConfig = {
   logoPath: '/brand/tgc-logo.svg',
   colors: {
     black: '#09090b',
-    gold: '#d6a11f',
+    gold: '#d4af37',
     goldSoft: '#fff4cc',
     red: '#c1121f',
     redSoft: '#ffe5e8',

@@ -347,7 +347,7 @@ export function CustomerDepositRequestListPage() {
           </button>
         </div>
         {selectedRequestIds.size > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--tgd-border)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: 'var(--color-surface-muted)', borderBottom: '1px solid var(--tgd-border)' }}>
             <span>{selectedRequestIds.size} รายการที่เลือก</span>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedRequestIds(new Set())}>ยกเลิกการเลือก</button>
           </div>

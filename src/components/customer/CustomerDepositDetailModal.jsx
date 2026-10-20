@@ -1142,7 +1142,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                           target="_blank"
                           rel="noopener noreferrer"
                           title={`${photo.uploaded_by_email ?? ''} ${photo.uploaded_at ? formatDocumentDate(photo.uploaded_at) : ''}`.trim()}
-                          style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'block' }}
+                          style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: 'var(--color-surface-muted)', display: 'block' }}
                         >
                           {receivingPhotoUrls[photo.id] ? (
                             <img src={receivingPhotoUrls[photo.id]} alt={photo.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1644,7 +1644,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             )}
 
             {allocError && <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>{allocError}</p>}
-            {allocWarning && <p style={{ color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700 }}>{allocWarning}</p>}
+            {allocWarning && <p style={{ color: 'var(--color-warning-strong)', background: 'var(--color-warning-soft)', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700 }}>{allocWarning}</p>}
 
             {parsedAllLocs.length === 0 ? (
               <p style={{ color: 'var(--tgd-danger)', fontSize: 13 }}>ไม่พบข้อมูล Location ในระบบ</p>

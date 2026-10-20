@@ -208,7 +208,7 @@ export function DashboardPage() {
                           </tr>
                           {isExpanded && hasBreakdown ? (
                             <tr>
-                              <td colSpan={3} style={{ padding: 0, background: '#f8fafc' }}>
+                              <td colSpan={3} style={{ padding: 0, background: 'var(--color-surface-muted)' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                   <tbody>
                                     {m.byCustomer.map((c) => (
@@ -312,7 +312,7 @@ export function DashboardPage() {
               {d.openDispatchRows > 0 && <li className="task-item">{language === 'th' ? `เอกสารตัดจ่ายออกที่รอตรวจสอบ (${d.openDispatchRows} รายการ)` : `Pending dispatch queue (${d.openDispatchRows})`}</li>}
               
               {d.openReceivingRows === 0 && d.openPutawayRows === 0 && d.openPickingRows === 0 && d.openDispatchRows === 0 && (
-                <li className="task-item" style={{ color: 'var(--tgd-text-light)', borderLeftColor: '#cbd5e1' }}>
+                <li className="task-item" style={{ color: 'var(--tgd-text-light)', borderLeftColor: 'var(--color-border-strong)' }}>
                   {language === 'th' ? 'ไม่มีงานค้างสำหรับวันนี้ 🎉' : 'No pending tasks for today 🎉'}
                 </li>
               )}
@@ -386,7 +386,7 @@ export function DashboardPage() {
                       <span style={{
                         display: 'inline-block', padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700,
                         background: doc.docType === 'deposit' ? '#dbeafe' : '#fef3c7',
-                        color: doc.docType === 'deposit' ? '#1d4ed8' : '#92400e',
+                        color: doc.docType === 'deposit' ? 'var(--color-accent-hover)' : 'var(--color-warning-strong)',
                       }}>
                         {doc.docType === 'deposit' ? 'ฝากสินค้า' : 'เบิกสินค้า'}
                       </span>

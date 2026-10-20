@@ -40,10 +40,10 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
 
   return (
     <div style={{
-      margin: '0 14px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0',
+      margin: '0 14px 14px', background: 'var(--color-surface-sunken)', border: '1px solid #e2e8f0',
       borderRadius: 14, padding: 14,
     }}>
-      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#475569', marginBottom: 10 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
         ⏱ เวลาใน{label}
       </div>
 
@@ -53,7 +53,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
           disabled={busy}
           onClick={async () => { setBusy(true); await onStart(); setBusy(false); }}
           style={{
-            width: '100%', background: '#09111c', color: '#fff', border: 'none',
+            width: '100%', background: 'var(--color-sidebar)', color: '#fff', border: 'none',
             borderRadius: 12, padding: '13px 14px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
           }}
         >
@@ -74,7 +74,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
           disabled={busy}
           onClick={async () => { setBusy(true); await onFinish(); setBusy(false); }}
           style={{
-            width: '100%', marginTop: 10, background: '#059669', color: '#fff', border: 'none',
+            width: '100%', marginTop: 10, background: 'var(--color-success)', color: '#fff', border: 'none',
             borderRadius: 12, padding: '13px 14px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
           }}
         >
@@ -90,7 +90,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
 
       {duration && (
         <div style={{
-          display: 'inline-block', marginTop: 10, background: '#ecfdf5', color: '#059669',
+          display: 'inline-block', marginTop: 10, background: '#ecfdf5', color: 'var(--color-success)',
           fontSize: 12, fontWeight: 800, borderRadius: 999, padding: '5px 12px',
         }}>
           ใช้เวลา {duration}
@@ -105,7 +105,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
         <div style={{
           marginTop: 10, background: '#fff', border: '1px dashed #09111c', borderRadius: 10, padding: 10,
         }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#475569', marginBottom: 8 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
             เวลาที่ถูกต้อง
             <input
               type="time"
@@ -122,7 +122,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
               ยกเลิก
             </button>
             <button type="button" disabled={busy} onClick={saveEdit} style={{
-              background: '#09111c', color: '#fff', border: 'none', borderRadius: 8,
+              background: 'var(--color-sidebar)', color: '#fff', border: 'none', borderRadius: 8,
               padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
             }}>
               บันทึก
@@ -140,7 +140,7 @@ function TimeRow({ label, iso, onEdit }) {
       display: 'flex', alignItems: 'center', gap: 8, background: '#fff',
       border: '1px solid #e2e8f0', borderRadius: 10, padding: '9px 11px',
     }}>
-      <span style={{ fontSize: 12, color: '#475569', width: 46, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 46, flexShrink: 0 }}>{label}</span>
       <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, flex: 1 }}>
         {formatTimeHHmm(iso) ?? '-'} น.
       </span>
@@ -183,7 +183,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
   return (
     <div style={{
       marginTop: 10, borderRadius: 10, padding: '9px 11px',
-      background: on ? '#fff7ed' : '#fff', border: `1px solid ${on ? '#fdba74' : '#e2e8f0'}`,
+      background: on ? '#fff7ed' : '#fff', border: `1px solid ${on ? '#fdba74' : 'var(--color-border)'}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 800, flex: 1, color: on ? '#c2570b' : '#334155' }}>
@@ -199,7 +199,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
           style={{
             width: 52, height: 30, borderRadius: 999, border: 'none', padding: 3,
             cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
-            background: on ? '#f97316' : '#cbd5e1', transition: 'background 0.2s',
+            background: on ? '#f97316' : 'var(--color-border-strong)', transition: 'background 0.2s',
             display: 'flex', justifyContent: on ? 'flex-end' : 'flex-start',
           }}
         >
@@ -207,7 +207,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
         </button>
       </div>
       {!isOnline && (
-        <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 6 }}>ต้องออนไลน์เพื่อบันทึก OT</div>
+        <div style={{ fontSize: 11.5, color: 'var(--color-warning)', marginTop: 6 }}>ต้องออนไลน์เพื่อบันทึก OT</div>
       )}
       {on && (
         <>
@@ -222,7 +222,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
                 style={{
                   flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 800,
                   cursor: disabled ? 'default' : 'pointer',
-                  border: `1px solid ${type === value ? '#f97316' : '#e2e8f0'}`,
+                  border: `1px solid ${type === value ? '#f97316' : 'var(--color-border)'}`,
                   background: type === value ? '#f97316' : '#fff',
                   color: type === value ? '#fff' : '#334155',
                 }}
@@ -244,13 +244,13 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
             }}
           />
           {overtime.setByEmail && (
-            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 6 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
               ติ๊กโดย {overtime.setByEmail}{overtime.setAt ? ` · ${formatTimeHHmm(overtime.setAt)} น.` : ''}
             </div>
           )}
         </>
       )}
-      {error && <div style={{ fontSize: 11.5, color: '#dc2626', marginTop: 6 }}>{error}</div>}
+      {error && <div style={{ fontSize: 11.5, color: 'var(--color-danger)', marginTop: 6 }}>{error}</div>}
     </div>
   );
 }

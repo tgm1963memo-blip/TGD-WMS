@@ -74,7 +74,7 @@ function EditablePermissionMatrix({
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
         padding: '14px 18px', borderBottom: '1px solid #f1f5f9', background: '#fafafa',
       }}>
-        <div style={{ fontSize: 13, color: '#374151' }}>
+        <div style={{ fontSize: 13, color: 'var(--color-text-body)' }}>
           เลือกฟังก์ชันที่แต่ละบทบาทเข้าใช้งานได้ — ติ๊กเพื่อเปิด/ปิดสิทธิ์อิสระ
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -98,7 +98,7 @@ function EditablePermissionMatrix({
         </div>
       </div>
 
-      <div style={{ padding: '10px 18px', fontSize: 12, color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--color-text-muted)', borderBottom: '1px solid #f1f5f9' }}>
         <span style={{ color: '#2d9348' }}>●</span> ค่าเริ่มต้น &nbsp;
         <span style={{ color: '#1d6fcf' }}>●</span> ปรับแต่งแล้ว &nbsp;|&nbsp;
         บทบาท Admin มีสิทธิ์ครบทุกฟังก์ชัน
@@ -110,8 +110,8 @@ function EditablePermissionMatrix({
           style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}
         >
           <thead>
-            <tr style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 220 }}>
+            <tr style={{ background: 'var(--color-surface-muted)', position: 'sticky', top: 0, zIndex: 1 }}>
+              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-body)', borderBottom: '2px solid #e5e7eb', minWidth: 220 }}>
                 ฟังก์ชัน
               </th>
               {matrixRoles.map((role) => (
@@ -121,7 +121,7 @@ function EditablePermissionMatrix({
                     padding: '10px 8px',
                     textAlign: 'center',
                     fontWeight: 700,
-                    color: '#374151',
+                    color: 'var(--color-text-body)',
                     borderBottom: '2px solid #e5e7eb',
                     minWidth: 96,
                     fontSize: 11,
@@ -136,19 +136,19 @@ function EditablePermissionMatrix({
           <tbody>
             {groupedFunctions.map((group) => (
               <Fragment key={group.groupKey}>
-                <tr key={`group-${group.groupKey}`} style={{ background: '#f1f5f9' }}>
+                <tr key={`group-${group.groupKey}`} style={{ background: 'var(--color-surface-sunken)' }}>
                   <td
                     colSpan={matrixRoles.length + 1}
-                    style={{ padding: '8px 14px', fontWeight: 700, color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                    style={{ padding: '8px 14px', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}
                   >
                     {GROUP_LABELS_TH[group.groupKey] ?? group.groupLabel}
                   </td>
                 </tr>
                 {group.items.map((fn) => (
                   <tr key={fn.functionKey} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '8px 14px', color: '#1e293b' }}>
+                    <td style={{ padding: '8px 14px', color: 'var(--color-text-strong)' }}>
                       <div style={{ fontWeight: 600 }}>{fn.label}</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>
                         {fn.minimumRole ? `ขั้นต่ำ: ${fn.minimumRole}` : fn.path}
                       </div>
                     </td>
@@ -161,9 +161,9 @@ function EditablePermissionMatrix({
                         return (
                           <td key={roleCode} style={{ padding: '8px', textAlign: 'center', background: '#fafafa' }}>
                             {isWriteCapable ? (
-                              <span style={{ fontSize: 11, color: '#94a3b8' }}>แก้ไขได้</span>
+                              <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>แก้ไขได้</span>
                             ) : (
-                              <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} style={{ width: 24, height: 24, accentColor: '#cbd5e1' }} />
+                              <input type="checkbox" checked disabled aria-label={`${role.display_name} ${fn.label}`} style={{ width: 24, height: 24, accentColor: 'var(--color-border-strong)' }} />
                             )}
                           </td>
                         );
@@ -186,8 +186,8 @@ function EditablePermissionMatrix({
                                 fontSize: 11,
                                 padding: '4px 6px',
                                 borderRadius: 6,
-                                border: `1px solid ${isOverride ? '#1d6fcf' : '#e5e7eb'}`,
-                                color: isOverride ? '#1d6fcf' : '#374151',
+                                border: `1px solid ${isOverride ? '#1d6fcf' : 'var(--color-border-subtle)'}`,
+                                color: isOverride ? '#1d6fcf' : 'var(--color-text-body)',
                                 background: '#fff',
                                 cursor: 'pointer',
                               }}
@@ -258,14 +258,14 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
     <div style={{
       margin: '0 0 8px',
       padding: '16px 20px',
-      background: '#f0fdf4',
+      background: 'var(--color-success-soft)',
       borderRadius: '0 0 12px 12px',
       border: '1px solid #bbf7d0',
       borderTop: 'none',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#64748b' }}>
-          <span style={{ fontWeight: 700, color: '#166534', marginRight: 10 }}>สิทธิ์ฟังก์ชัน — {role.display_name}</span>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+          <span style={{ fontWeight: 700, color: 'var(--color-success-strong)', marginRight: 10 }}>สิทธิ์ฟังก์ชัน — {role.display_name}</span>
           เลือกเมนู/ฟังก์ชันที่บทบาทนี้เข้าใช้งานได้
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -293,7 +293,7 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
 
       {groupedFunctions.map((group) => (
         <div key={group.groupKey} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>
             {GROUP_LABELS_TH[group.groupKey] ?? group.groupLabel}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
@@ -308,10 +308,10 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                       padding: '10px 14px',
                       background: '#fff', borderRadius: 8,
-                      border: `1px solid ${isCustomized ? '#93c5fd' : '#e5e7eb'}`,
+                      border: `1px solid ${isCustomized ? '#93c5fd' : 'var(--color-border-subtle)'}`,
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{fn.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-strong)' }}>{fn.label}</div>
                     <select
                       value={state}
                       onChange={(e) => setAccessState(fn.functionKey, e.target.value)}
@@ -335,7 +335,7 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                     display: 'flex', alignItems: 'center', gap: 10,
                     cursor: 'pointer', padding: '10px 14px',
                     background: '#fff', borderRadius: 8,
-                    border: `1px solid ${isCustomized ? '#93c5fd' : '#e5e7eb'}`,
+                    border: `1px solid ${isCustomized ? '#93c5fd' : 'var(--color-border-subtle)'}`,
                     userSelect: 'none',
                   }}
                 >
@@ -346,8 +346,8 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                     style={{ width: 16, height: 16, accentColor: '#2d9348', cursor: 'pointer', flexShrink: 0 }}
                   />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{fn.label}</div>
-                    <div style={{ fontSize: 10, marginTop: 1, color: isCustomized ? '#1d6fcf' : '#94a3b8' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-strong)' }}>{fn.label}</div>
+                    <div style={{ fontSize: 10, marginTop: 1, color: isCustomized ? '#1d6fcf' : 'var(--color-text-subtle)' }}>
                       {isCustomized ? 'ปรับแต่งแล้ว' : 'ค่าเริ่มต้น'}
                     </div>
                   </div>
@@ -367,7 +367,7 @@ function RoleCard({ role, userCount, customerMap, onEdit, onEditPermissions, isP
   return (
     <div style={{
       background: '#fff',
-      border: `1px solid ${isPermissionExpanded ? '#bbf7d0' : '#e5e7eb'}`,
+      border: `1px solid ${isPermissionExpanded ? '#bbf7d0' : 'var(--color-border-subtle)'}`,
       borderRadius: isPermissionExpanded ? '12px 12px 0 0' : 12,
       borderBottom: isPermissionExpanded ? 'none' : undefined,
       padding: '16px 20px',
@@ -375,16 +375,16 @@ function RoleCard({ role, userCount, customerMap, onEdit, onEditPermissions, isP
       marginBottom: isPermissionExpanded ? 0 : 8,
     }}>
       <div style={{
-        width: 40, height: 40, borderRadius: 10, background: '#f0fdf4',
+        width: 40, height: 40, borderRadius: 10, background: 'var(--color-success-soft)',
         border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center',
         justifyContent: 'center', fontSize: 18, flexShrink: 0,
       }}>
         {role.is_system ? '🔒' : '✏️'}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{role.display_name}</div>
-        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{role.description ?? ''}</div>
-        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, fontFamily: 'monospace' }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)' }}>{role.display_name}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>{role.description ?? ''}</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
           role: <strong>{role.role_code}</strong>
           {role.base_role && role.base_role !== role.role_code ? ` → ${role.base_role}` : ''}
           {userCount != null ? ` · ${userCount} ผู้ใช้` : ''}
@@ -577,7 +577,7 @@ export function RolePermissionsAdminPage() {
     padding: '8px 20px', borderRadius: 8, cursor: 'pointer', fontWeight: 600,
     fontSize: 13, border: 'none',
     background: active ? '#2d9348' : 'transparent',
-    color: active ? '#fff' : '#64748b',
+    color: active ? '#fff' : 'var(--color-text-muted)',
     transition: 'all 0.15s',
   });
 
@@ -589,7 +589,7 @@ export function RolePermissionsAdminPage() {
       />
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, background: '#f8fafc', borderRadius: 10, padding: 6, marginBottom: 20, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 6, background: 'var(--color-surface-muted)', borderRadius: 10, padding: 6, marginBottom: 20, width: 'fit-content' }}>
         {[
           { key: 'roles', label: 'บทบาท (Roles)' },
           { key: 'matrix', label: 'ตารางสิทธิ์' },
@@ -616,7 +616,7 @@ export function RolePermissionsAdminPage() {
               + สร้าง Role ใหม่
             </button>
           </div>
-          <div style={{ marginBottom: 6, fontSize: 12, color: '#94a3b8' }}>
+          <div style={{ marginBottom: 6, fontSize: 12, color: 'var(--color-text-subtle)' }}>
             🔒 System roles — แก้ไขได้แค่ชื่อแสดง &nbsp;|&nbsp; ✏️ Custom roles — แก้ไขได้เต็มรูปแบบ
           </div>
           {roles.map((r) => (
@@ -683,9 +683,9 @@ export function RolePermissionsAdminPage() {
             if (!roleUsers.length) return null;
             return (
               <div key={roleCode} style={{ marginBottom: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: '#1e293b' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--color-text-strong)' }}>
                   {def?.display_name ?? roleCode}
-                  <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>
+                  <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--color-text-subtle)', fontWeight: 400 }}>
                     ({roleUsers.length} คน)
                   </span>
                 </div>
@@ -696,23 +696,23 @@ export function RolePermissionsAdminPage() {
                       borderBottom: i < roleUsers.length - 1 ? '1px solid #f1f5f9' : 'none',
                     }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: '50%', background: '#eff6ff',
+                        width: 32, height: 32, borderRadius: '50%', background: 'var(--color-accent-soft)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 13, fontWeight: 700, color: '#1d6fcf', flexShrink: 0,
                       }}>
                         {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-strong)' }}>
                           {u.display_name ?? '(ไม่มีชื่อ)'}
                         </div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{u.email ?? ''}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>{u.email ?? ''}</div>
                       </div>
                       <div style={{ marginLeft: 'auto' }}>
                         <span style={{
                           fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20,
-                          background: u.is_active ? '#f0fdf4' : '#f1f5f9',
-                          color: u.is_active ? '#2d9348' : '#94a3b8',
+                          background: u.is_active ? 'var(--color-success-soft)' : 'var(--color-surface-sunken)',
+                          color: u.is_active ? '#2d9348' : 'var(--color-text-subtle)',
                         }}>
                           {u.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}
                         </span>
@@ -738,8 +738,8 @@ export function RolePermissionsAdminPage() {
             </h3>
             <form onSubmit={handleRoleSubmit}>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-                  Role Code * <span style={{ fontWeight: 400, color: '#94a3b8' }}>(ตัวอักษรเล็ก ไม่มีช่องว่าง)</span>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>
+                  Role Code * <span style={{ fontWeight: 400, color: 'var(--color-text-subtle)' }}>(ตัวอักษรเล็ก ไม่มีช่องว่าง)</span>
                 </label>
                 <input
                   className="form-control"
@@ -752,7 +752,7 @@ export function RolePermissionsAdminPage() {
                 />
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ชื่อแสดง *</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>ชื่อแสดง *</label>
                 <input
                   className="form-control"
                   required
@@ -763,7 +763,7 @@ export function RolePermissionsAdminPage() {
                 />
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>คำอธิบาย</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>คำอธิบาย</label>
                 <textarea
                   className="form-control"
                   rows={2}
@@ -773,7 +773,7 @@ export function RolePermissionsAdminPage() {
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>
                   สิทธิ์อ้างอิงจาก (Base Role) *
                 </label>
                 <select
@@ -786,12 +786,12 @@ export function RolePermissionsAdminPage() {
                     <option key={r} value={r}>{r} — {PRODUCTION_ROLE_DESCRIPTIONS[r]}</option>
                   ))}
                 </select>
-                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 11, color: 'var(--color-text-subtle)', margin: '4px 0 0' }}>
                   Role จะได้รับสิทธิ์เดียวกับ base role ที่เลือก
                 </p>
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>
                   จำกัดข้อมูลเฉพาะลูกค้า (ไม่บังคับ)
                 </label>
                 <select
@@ -805,7 +805,7 @@ export function RolePermissionsAdminPage() {
                     <option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>
                   ))}
                 </select>
-                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 11, color: 'var(--color-text-subtle)', margin: '4px 0 0' }}>
                   ถ้าเลือกลูกค้า ผู้ใช้ที่ได้รับ role นี้จะเห็น/ดำเนินการได้เฉพาะข้อมูลใบฝาก ใบเบิก
                   และยอดคงเหลือของลูกค้ารายนี้เท่านั้น
                 </p>

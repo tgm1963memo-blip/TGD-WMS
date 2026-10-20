@@ -1,6 +1,6 @@
 // src/features/admin/AuthReadinessPage.jsx (modified)
 import React, { useState } from 'react';
-import { PageHeader } from '../../components/layout/PageHeader.jsx';
+import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { SectionCard } from '../../components/layout/SectionCard.jsx';
 import { AuthReadinessPanel } from '../../components/security/AuthReadinessPanel.jsx';
 import { PRODUCTION_ROLE_DESCRIPTIONS, PRODUCTION_ROLES, summarizeProductionRole } from '../../security/productionRoleModel.js';

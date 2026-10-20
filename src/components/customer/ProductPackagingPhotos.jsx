@@ -59,7 +59,7 @@ export function ProductPackagingPhotos({ productId, customerId }) {
       <span>รูป Packaging (แสดงให้คนนับสต็อกดู — รูปล่าสุดจะถูกใช้)</span>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
         {photos.map((photo) => (
-          <div key={photo.id} style={{ position: 'relative', width: 88, height: 88, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--tgd-border)', background: '#f8fafc' }}>
+          <div key={photo.id} style={{ position: 'relative', width: 88, height: 88, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--tgd-border)', background: 'var(--color-surface-muted)' }}>
             {urls[photo.id] && (
               <a href={urls[photo.id]} target="_blank" rel="noopener noreferrer">
                 <img src={urls[photo.id]} alt={photo.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />

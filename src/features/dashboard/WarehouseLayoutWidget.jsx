@@ -54,7 +54,7 @@ function RowBar({ location, onClick }) {
   // stop firing for those rows, but they're still over the normal rule.
   const overCapacity = (capacity > 0 && used > capacity) || used > DEFAULT_ROW_CAPACITY;
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
-  const color = overCapacity ? '#dc2626' : pctColor(pct);
+  const color = overCapacity ? 'var(--color-danger)' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
 
   return (
@@ -64,15 +64,15 @@ function RowBar({ location, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
         borderRadius: 8, border: overCapacity ? '1px solid #fca5a5' : '1px solid #e5e7eb', cursor: 'pointer',
-        background: overCapacity ? '#fef2f2' : '#fff', transition: 'background 0.15s',
+        background: overCapacity ? 'var(--color-danger-soft)' : '#fff', transition: 'background 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? '#fee2e2' : '#f8fafc'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = overCapacity ? '#fef2f2' : '#fff'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? '#fee2e2' : 'var(--color-surface-muted)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = overCapacity ? 'var(--color-danger-soft)' : '#fff'; }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : '#64748b', width: 64, flexShrink: 0 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : 'var(--color-text-muted)', width: 64, flexShrink: 0 }}>
         {parsed ? formatRowLabel(parsed.row) : '-'}
       </span>
-      <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+      <div style={{ flex: 1, height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
       </div>
       <span style={{ fontSize: 12, fontWeight: 700, color, width: overCapacity ? 68 : 48, textAlign: 'right', flexShrink: 0 }}>
@@ -97,14 +97,14 @@ function SectionGrid({ section, onLocClick }) {
   }, [locations]);
 
   if (!locations?.length) {
-    return <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
+    return <div style={{ textAlign: 'center', padding: 24, color: 'var(--color-text-subtle)', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
   }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: bySide.L.length && bySide.R.length ? '1fr 1fr' : '1fr', gap: 20, padding: 16 }}>
       {bySide.L.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ฝั่งซ้าย (L)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-subtle)', marginBottom: 8 }}>ฝั่งซ้าย (L)</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {bySide.L.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
           </div>
@@ -112,7 +112,7 @@ function SectionGrid({ section, onLocClick }) {
       )}
       {bySide.R.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ฝั่งขวา (R)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-subtle)', marginBottom: 8 }}>ฝั่งขวา (R)</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {bySide.R.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
           </div>
@@ -135,13 +135,13 @@ function PalletCells({ capacity, used, color }) {
       {Array.from({ length: slots }, (_, i) => {
         const filled = i < used;
         const over = i >= capacity;
-        const fill = !filled ? '#e2e8f0' : (over ? '#dc2626' : color);
+        const fill = !filled ? 'var(--color-border)' : (over ? 'var(--color-danger)' : color);
         return (
           <div
             key={i}
             style={{
               height: 14, borderRadius: 3, background: fill,
-              border: `1px solid ${filled ? fill : '#cbd5e1'}`,
+              border: `1px solid ${filled ? fill : 'var(--color-border-strong)'}`,
               outline: over ? '1px dashed #dc2626' : 'none', outlineOffset: 1,
             }}
           />
@@ -159,7 +159,7 @@ function VirtualRow({ location, onClick }) {
   const used = location.usedCount || 0;
   const overCapacity = (capacity > 0 && used > capacity) || used > DEFAULT_ROW_CAPACITY;
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
-  const color = overCapacity ? '#dc2626' : pctColor(pct);
+  const color = overCapacity ? 'var(--color-danger)' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
   const isStaging = parsed?.row === 0;
   const label = parsed ? formatRowLabel(parsed.row) : '-';
@@ -173,14 +173,14 @@ function VirtualRow({ location, onClick }) {
       data-testid="virtual-row"
       style={{
         display: 'flex', alignItems: 'center', gap: 10, height: 26, padding: '0 8px', width: '100%',
-        border: `1px solid ${overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : '#e5e7eb')}`, borderRadius: 6,
-        background: overCapacity ? '#fef2f2' : (isStaging ? '#fffbeb' : (used > 0 ? '#f8fafc' : '#fff')),
+        border: `1px solid ${overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : 'var(--color-border-subtle)')}`, borderRadius: 6,
+        background: overCapacity ? 'var(--color-danger-soft)' : (isStaging ? 'var(--color-warning-soft)' : (used > 0 ? 'var(--color-surface-muted)' : '#fff')),
         cursor: 'pointer', font: 'inherit', textAlign: 'left', boxSizing: 'border-box',
       }}
     >
-      <span style={{ width: 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isStaging ? '#b9660a' : '#475569' }}>{label}</span>
+      <span style={{ width: 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isStaging ? '#b9660a' : 'var(--color-text-secondary)' }}>{label}</span>
       <PalletCells capacity={capacity} used={used} color={color} />
-      <span style={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : '#94a3b8' }}>
+      <span style={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : 'var(--color-text-subtle)' }}>
         {used}/{capacity}{overCapacity ? ' ⚠' : ''}
       </span>
     </button>
@@ -207,12 +207,12 @@ function VirtualSectionGrid({ section, onLocClick }) {
   }, [locations]);
 
   if (!locations?.length) {
-    return <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
+    return <div style={{ textAlign: 'center', padding: 24, color: 'var(--color-text-subtle)', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
   }
 
   const sideColumn = (side) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', padding: '0 4px 2px' }}>{side === 'L' ? 'ฝั่งซ้าย (L)' : 'ฝั่งขวา (R)'}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: '0 4px 2px' }}>{side === 'L' ? 'ฝั่งซ้าย (L)' : 'ฝั่งขวา (R)'}</div>
       {rows.list.map(({ row, left, right }) => (
         <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} />
       ))}
@@ -223,16 +223,16 @@ function VirtualSectionGrid({ section, onLocClick }) {
 
   return (
     <div data-testid="virtual-section-grid" style={{ padding: 12 }}>
-      <div style={{ textAlign: 'center', padding: '6px 0', borderBottom: '3px solid #94a3b8', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 10 }}>
+      <div style={{ textAlign: 'center', padding: '6px 0', borderBottom: '3px solid #94a3b8', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
         ผนังด้านในสุดของห้อง
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: columns, gap: 0 }}>
         {rows.hasL ? sideColumn('L') : null}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
-          margin: '22px 12px 0', borderLeft: '2px dashed #cbd5e1', borderRight: '2px dashed #cbd5e1', background: '#f1f5f9',
+          margin: '22px 12px 0', borderLeft: '2px dashed #cbd5e1', borderRight: '2px dashed #cbd5e1', background: 'var(--color-surface-sunken)',
         }}>
-          <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: '#64748b', letterSpacing: '0.1em' }}>
+          <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: '0.1em' }}>
             ทางเดินรถโฟล์คลิฟท์
           </span>
         </div>
@@ -242,11 +242,11 @@ function VirtualSectionGrid({ section, onLocClick }) {
         <div style={{ borderTop: '3px solid #94a3b8' }} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <div style={{ width: '100%', height: 8, border: '3px solid #16a34a', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#166534' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success-strong)' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
         </div>
         <div style={{ borderTop: '3px solid #94a3b8' }} />
       </div>
-      <div style={{ fontSize: 12, color: '#64748b', marginTop: 10 }}>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>
         แต่ละช่องเล็ก = 1 pallet · ช่องสีแดงขอบประ = pallet ที่เกินความจุ · คลิกแถวเพื่อดูรายละเอียด pallet
       </div>
     </div>
@@ -380,15 +380,15 @@ export function WarehouseLayoutWidget() {
 
   if (loading && sections.length === 0) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>กำลังโหลดผังคลัง...</div>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-subtle)' }}>กำลังโหลดผังคลัง...</div>
     );
   }
 
   if (sections.length === 0) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-subtle)' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🏭</div>
-        <div style={{ fontWeight: 600, fontSize: 15, color: '#475569', marginBottom: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
           ยังไม่มีการตั้งค่าผังคลัง
         </div>
         <div style={{ fontSize: 13, marginBottom: 18 }}>กำหนด Section และ Location ก่อนเพื่อแสดงผัง</div>
@@ -455,7 +455,7 @@ export function WarehouseLayoutWidget() {
                 border: sec.id === selected.id ? '2px solid #2d9348' : '2px solid #e5e7eb',
                 borderRadius: 20,
                 background: sec.id === selected.id ? '#2d9348' : '#fff',
-                color: sec.id === selected.id ? '#fff' : '#374151',
+                color: sec.id === selected.id ? '#fff' : 'var(--color-text-body)',
                 cursor: 'pointer', fontSize: 13, fontWeight: sec.id === selected.id ? 700 : 400,
                 transition: 'all 0.15s',
               }}
@@ -464,7 +464,7 @@ export function WarehouseLayoutWidget() {
             </button>
           ))}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-            <div role="group" aria-label="เลือกมุมมองแผนผัง" style={{ display: 'flex', padding: 3, background: '#e2e8f0', borderRadius: 20, gap: 2 }}>
+            <div role="group" aria-label="เลือกมุมมองแผนผัง" style={{ display: 'flex', padding: 3, background: 'var(--color-border)', borderRadius: 20, gap: 2 }}>
               {[
                 { mode: 'list', label: 'มุมมองรายการ' },
                 { mode: 'virtual', label: 'มุมมองเสมือนจริง' },
@@ -478,7 +478,7 @@ export function WarehouseLayoutWidget() {
                   style={{
                     padding: '4px 12px', border: 'none', borderRadius: 16, cursor: 'pointer', fontSize: 12,
                     background: viewMode === mode ? '#fff' : 'transparent',
-                    color: viewMode === mode ? '#166534' : '#475569',
+                    color: viewMode === mode ? 'var(--color-success-strong)' : 'var(--color-text-secondary)',
                     fontWeight: viewMode === mode ? 700 : 500,
                     boxShadow: viewMode === mode ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',
                   }}
@@ -493,7 +493,7 @@ export function WarehouseLayoutWidget() {
               disabled={loading}
               style={{
                 padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
-                background: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: '#64748b',
+                background: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
               }}
               title="รีเฟรชผังคลัง"
             >
@@ -504,7 +504,7 @@ export function WarehouseLayoutWidget() {
               onClick={() => navigate('/admin/warehouse-locations')}
               style={{
                 padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
-                background: '#fff', cursor: 'pointer', fontSize: 12, color: '#64748b',
+                background: '#fff', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
               }}
             >
               ⚙ ตั้งค่า Location
@@ -514,17 +514,17 @@ export function WarehouseLayoutWidget() {
 
         {/* Date + legend */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 18, color: '#1e293b' }}>{selected.name}</span>
+          <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--color-text-strong)' }}>{selected.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>
               {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
             </span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                 ว่าง
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)', display: 'inline-block' }} />
                 มีสินค้า
               </span>
@@ -539,14 +539,14 @@ export function WarehouseLayoutWidget() {
               ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
               : <SectionGrid section={selected} onLocClick={handleLocClick} />
           ) : (
-            <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>
               Section นี้ยังไม่มี Location
             </div>
           )}
         </div>
 
         {/* Section list */}
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 10 }}>รายการ Section ทั้งหมด</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)', marginBottom: 10 }}>รายการ Section ทั้งหมด</div>
         <div>
           {sections.map((sec) => {
             const color = pctColor(sec.usedPct);
@@ -557,19 +557,19 @@ export function WarehouseLayoutWidget() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 10,
-                  background: sec.id === selected.id ? '#f0fdf4' : '#fff',
-                  border: `1px solid ${sec.id === selected.id ? '#bbf7d0' : '#f1f5f9'}`,
+                  background: sec.id === selected.id ? 'var(--color-success-soft)' : '#fff',
+                  border: `1px solid ${sec.id === selected.id ? '#bbf7d0' : 'var(--color-surface-sunken)'}`,
                   marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontWeight: sec.id === selected.id ? 700 : 500, fontSize: 14, color: '#1e293b' }}>
+                  <span style={{ fontWeight: sec.id === selected.id ? 700 : 500, fontSize: 14, color: 'var(--color-text-strong)' }}>
                     {sec.name}
                   </span>
-                  <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>{sec.total} location</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginLeft: 8 }}>{sec.total} location</span>
                 </div>
-                <span style={{ fontSize: 12, color: '#94a3b8' }}>ใช้งาน</span>
-                <div style={{ width: 100, height: 6, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>ใช้งาน</span>
+                <div style={{ width: 100, height: 6, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${sec.usedPct}%`, background: color, borderRadius: 4 }} />
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 14, color, width: 36, textAlign: 'right' }}>{sec.usedPct}%</span>
@@ -680,22 +680,22 @@ export function WarehouseLayoutWidget() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>รายละเอียดสินค้าใน Location</div>
-                <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>{stockModal.locCode}</div>
+                <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--color-text-strong)' }}>รายละเอียดสินค้าใน Location</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{stockModal.locCode}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setStockModal(null)}
-                style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 18, color: '#64748b' }}
+                style={{ border: 'none', background: 'var(--color-surface-sunken)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 18, color: 'var(--color-text-muted)' }}
               >
                 ✕
               </button>
             </div>
 
             {stockLoading ? (
-              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>กำลังโหลด...</div>
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>กำลังโหลด...</div>
             ) : palletCapacity === 0 ? (
-              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>ไม่มีข้อมูล Location นี้</div>
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>ไม่มีข้อมูล Location นี้</div>
             ) : (
               <>
                 {/* Count DISTINCT pallet numbers, not allocation rows -- a
@@ -704,7 +704,7 @@ export function WarehouseLayoutWidget() {
                     pallets.length alone would overcount how many of the
                     row's real physical slots are actually in use. */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-                  <div style={{ fontSize: 12.5, color: '#64748b' }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
                     ใช้ไป {new Set(pallets.map((p) => p.palletNo)).size}/{palletCapacity} pallet
                   </div>
                   {canResetLocations && pallets.length > 0 ? (
@@ -713,14 +713,14 @@ export function WarehouseLayoutWidget() {
                       data-testid="layout-reset-location-button"
                       disabled={resetting}
                       onClick={handleResetLocation}
-                      style={{ padding: '5px 12px', border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', color: '#b45309', cursor: resetting ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}
+                      style={{ padding: '5px 12px', border: '1px solid #f59e0b', borderRadius: 8, background: 'var(--color-warning-soft)', color: 'var(--color-warning)', cursor: resetting ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}
                     >
                       {resetting ? 'กำลัง reset...' : 'Reset location'}
                     </button>
                   ) : null}
                 </div>
                 {resetMsg ? (
-                  <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : '#fee2e2', color: resetMsg.type === 'ok' ? '#166534' : '#b91c1c' }}>
+                  <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : '#fee2e2', color: resetMsg.type === 'ok' ? 'var(--color-success-strong)' : '#b91c1c' }}>
                     {resetMsg.text}
                   </div>
                 ) : null}
@@ -729,7 +729,7 @@ export function WarehouseLayoutWidget() {
                     <thead>
                       <tr>
                         {['Pallet', 'รหัสติดตาม', 'สินค้า', 'จำนวน'].map((h) => (
-                          <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                          <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-subtle)', padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -742,7 +742,7 @@ export function WarehouseLayoutWidget() {
                         const overRowCapacity = palletNo > palletCapacity;
                         return (
                           <tr key={palletNo}>
-                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: overRowCapacity ? '#dc2626' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
+                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: overRowCapacity ? 'var(--color-danger)' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
                               {palletNo}{overRowCapacity ? ' ⚠' : ''}
                             </td>
                             {items.length > 0 ? (
@@ -759,7 +759,7 @@ export function WarehouseLayoutWidget() {
                                 </td>
                               </>
                             ) : (
-                              <td colSpan={3} style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: '#cbd5e1', fontStyle: 'italic' }}>— ว่าง —</td>
+                              <td colSpan={3} style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: 'var(--color-border-strong)', fontStyle: 'italic' }}>— ว่าง —</td>
                             )}
                           </tr>
                         );

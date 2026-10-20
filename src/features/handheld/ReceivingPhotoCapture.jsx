@@ -11,8 +11,8 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024; // before compression; compressed to JPEG ≤2400px on upload
 
 const S = {
-  text: '#0f172a', textSec: '#475569', muted: '#94a3b8', border: '#e2e8f0',
-  inputBg: '#f8fafc', red: '#dc2626', redLight: '#fef2f2', primary: '#09111c',
+  text: 'var(--color-text)', textSec: 'var(--color-text-secondary)', muted: 'var(--color-text-subtle)', border: 'var(--color-border)',
+  inputBg: 'var(--color-surface-muted)', red: 'var(--color-danger)', redLight: 'var(--color-danger-soft)', primary: 'var(--color-sidebar)',
 };
 
 // Photos are uploaded the moment they're taken (not on "ยืนยันรับสินค้า"), keyed

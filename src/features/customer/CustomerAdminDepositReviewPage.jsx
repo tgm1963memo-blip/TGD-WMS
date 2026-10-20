@@ -575,7 +575,7 @@ export function CustomerAdminDepositReviewPage() {
           </div>
         </div>
         {selectedRequestIds.size > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--tgd-border)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 20px', background: 'var(--color-surface-muted)', borderBottom: '1px solid var(--tgd-border)' }}>
             <span>{selectedRequestIds.size} รายการที่เลือก</span>
             {hasCustomerMismatch && (
               <span className="banner banner-danger" style={{ padding: '2px 8px' }}>ไม่สามารถรวมเอกสารจากลูกค้าต่างกันได้</span>

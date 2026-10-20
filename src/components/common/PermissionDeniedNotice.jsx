@@ -32,5 +32,5 @@ const containerStyle = {
   color: '#8f0d18',
   padding: '16px',
   margin: '8px 0',
-  fontFamily: 'Inter, sans-serif',
+  fontFamily: 'var(--font-sans)',
 };

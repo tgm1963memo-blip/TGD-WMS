@@ -345,10 +345,10 @@ export function CustomerStockBalancePage() {
                   </div>
 
                   {isExpanded && (
-                    <div style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e2e8f0' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
-                          <tr style={{ background: '#f1f5f9' }}>
+                          <tr style={{ background: 'var(--color-surface-sunken)' }}>
                             <th style={{ padding: '8px 16px 8px 32px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>เลขที่ใบฝาก</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>วันที่รับเข้า</th>
                             <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11 }}>LOT</th>

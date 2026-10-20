@@ -100,7 +100,7 @@ export function OpeningBalanceImportPage() {
               <tr key={col}>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', fontFamily: 'monospace' }}>{col}</td>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)' }}>{desc}</td>
-                <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'center', color: req ? '#dc2626' : '#888' }}>{req || '-'}</td>
+                <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'center', color: req ? 'var(--color-danger)' : '#888' }}>{req || '-'}</td>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', color: '#555' }}>{ex}</td>
               </tr>
             ))}
@@ -114,7 +114,7 @@ export function OpeningBalanceImportPage() {
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>ลูกค้า <span style={{ color: '#dc2626' }}>*</span></label>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>ลูกค้า <span style={{ color: 'var(--color-danger)' }}>*</span></label>
             <select
               className="form-input"
               value={customerId}

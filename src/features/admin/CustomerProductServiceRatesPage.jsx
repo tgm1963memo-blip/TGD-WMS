@@ -53,14 +53,14 @@ const EMPTY_FORM = {
 };
 
 const SERVICE_COLORS = {
-  STORAGE:      { bg: '#eff6ff', color: '#1d6fcf' },
-  HANDLING_IN:  { bg: '#f0fdf4', color: '#0e7a3a' },
+  STORAGE:      { bg: 'var(--color-accent-soft)', color: '#1d6fcf' },
+  HANDLING_IN:  { bg: 'var(--color-success-soft)', color: '#0e7a3a' },
   HANDLING_OUT: { bg: '#fff7ed', color: '#c2570b' },
   LABEL:        { bg: '#fdf4ff', color: '#7c3aed' },
   FREEZING:     { bg: '#f0f9ff', color: '#0369a1' },
   OVERTIME:         { bg: '#fff7ed', color: '#c2570b' },
-  OVERTIME_HOLIDAY: { bg: '#fef2f2', color: '#b91c1c' },
-  OTHER:        { bg: '#f8fafc', color: '#475569' },
+  OVERTIME_HOLIDAY: { bg: 'var(--color-danger-soft)', color: '#b91c1c' },
+  OTHER:        { bg: 'var(--color-surface-muted)', color: '#475569' },
 };
 
 function ServiceBadge({ type }) {
@@ -357,7 +357,7 @@ export function CustomerProductServiceRatesPage() {
 
       {/* Filters */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           ลูกค้า
           <select
             className="form-control"
@@ -371,7 +371,7 @@ export function CustomerProductServiceRatesPage() {
             ))}
           </select>
         </label>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           สินค้า
           <select
             className="form-control"
@@ -386,7 +386,7 @@ export function CustomerProductServiceRatesPage() {
             ))}
           </select>
         </label>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           ประเภทค่าบริการ
           <select
             className="form-control"
@@ -400,7 +400,7 @@ export function CustomerProductServiceRatesPage() {
             ))}
           </select>
         </label>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           สถานะ
           <select
             className="form-control"
@@ -418,19 +418,19 @@ export function CustomerProductServiceRatesPage() {
       {/* Product info strip — only when filtered down to exactly one product */}
       {selectedProduct && (
         <div style={{
-          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
+          background: 'var(--color-success-soft)', border: '1px solid #bbf7d0', borderRadius: 10,
           padding: '10px 16px', marginBottom: 14,
           display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
         }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>{selectedProduct.product_name}</span>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>{selectedProduct.customer_product_code}</span>
+          <span style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>{selectedProduct.customer_product_code}</span>
           <span style={{ fontSize: 12, color: '#2d9348' }}>
             {selectedProduct.uom ? `หน่วย: ${selectedProduct.uom}` : ''}
             {selectedProduct.pack_weight_kg ? `  น้ำหนัก: ${selectedProduct.pack_weight_kg} กก./หน่วย` : ''}
             {selectedProduct.temperature_type ? `  อุณหภูมิ: ${TEMPERATURE_TYPES.find(t => t.value === selectedProduct.temperature_type)?.label || selectedProduct.temperature_type}` : ''}
           </span>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', marginLeft: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', marginLeft: 8 }}>
             ฐานคิดค่าฝาก:
             <select
               className="form-control"
@@ -442,7 +442,7 @@ export function CustomerProductServiceRatesPage() {
               <option value="WEIGHT">น้ำหนัก (WEIGHT)</option>
               <option value="PALLET">พาเลท (PALLET)</option>
             </select>
-            {basisSaving && <span style={{ fontSize: 11, color: '#94a3b8' }}>กำลังบันทึก...</span>}
+            {basisSaving && <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>กำลังบันทึก...</span>}
           </label>
         </div>
       )}
@@ -460,7 +460,7 @@ export function CustomerProductServiceRatesPage() {
           templateTestId="storage-rate-template-button"
           importTestId="storage-rate-import-input"
         />
-        {importBusy && <span style={{ fontSize: 12, color: '#94a3b8' }}>กำลังนำเข้า...</span>}
+        {importBusy && <span style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>กำลังนำเข้า...</span>}
       </div>
 
       {error && <div className="banner banner-danger" style={{ marginBottom: 12 }}>{error}</div>}
@@ -488,22 +488,22 @@ export function CustomerProductServiceRatesPage() {
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="storage-rate-table">
           <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+            <tr style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e5e7eb' }}>
               {['ลูกค้า', 'วิธีการจัดเก็บ', 'ประเภทค่าบริการ', 'อัตรา', 'หน่วย', 'หมายเหตุ', 'สถานะ', ''].map((h) => (
-                <th key={h} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#374151', textAlign: 'left' }}>{h}</th>
+                <th key={h} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: 'var(--color-text-body)', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {ratesLoading ? (
               <tr>
-                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 13 }}>
                   กำลังโหลด...
                 </td>
               </tr>
             ) : rates.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 13 }}>
                   ยังไม่มีอัตราค่าบริการ — กด "+ เพิ่มอัตราค่าบริการ" เพื่อเริ่มต้น
                 </td>
               </tr>
@@ -513,7 +513,7 @@ export function CustomerProductServiceRatesPage() {
                 <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '10px 14px', fontSize: 13 }}>
                     <div style={{ fontWeight: 600 }}>{row.customer_name ?? '-'}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_code ?? ''}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>{row.customer_code ?? ''}</div>
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 13 }}>
                     {row.is_all_items ? (
@@ -525,19 +525,19 @@ export function CustomerProductServiceRatesPage() {
                     ) : (
                       <>
                         <div style={{ fontWeight: 600 }}>{row.product_name ?? '-'}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{row.customer_product_code ?? ''}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>{row.customer_product_code ?? ''}</div>
                       </>
                     )}
                   </td>
                   <td style={{ padding: '10px 14px' }}><ServiceBadge type={row.service_type} /></td>
-                  <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                  <td style={{ padding: '10px 14px', fontWeight: 700, fontSize: 15, color: 'var(--color-text-strong)' }}>
                     {Number(row.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} {row.currency}
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>
+                  <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
                     {ub?.label ?? row.unit_basis}
                     {row.period_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ทุก {row.period_days} วัน</div> : null}
-                    {row.max_quantity ? <div style={{ fontSize: 11, color: '#94a3b8' }}>สูงสุด {row.max_quantity}</div> : null}
-                    {row.min_charge_amount ? <div style={{ fontSize: 11, color: '#b45309' }}>ขั้นต่ำ {row.min_charge_amount} ฿</div> : null}
+                    {row.max_quantity ? <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>สูงสุด {row.max_quantity}</div> : null}
+                    {row.min_charge_amount ? <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>ขั้นต่ำ {row.min_charge_amount} ฿</div> : null}
                     {row.free_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ฟรี {row.free_days} วันแรก</div> : null}
                     {row.discount_percent ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ส่วนลด {row.discount_percent}%</div> : null}
                     {(row.contract_start_date || row.contract_end_date) ? (
@@ -546,15 +546,15 @@ export function CustomerProductServiceRatesPage() {
                       </div>
                     ) : null}
                   </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8' }}>
+                  <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-subtle)' }}>
                     {row.note ?? '-'}
                     {row.contract_note ? <div style={{ fontStyle: 'italic', marginTop: 2 }}>{row.contract_note}</div> : null}
                   </td>
                   <td style={{ padding: '10px 14px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                      background: row.is_active ? '#f0fdf4' : '#f1f5f9',
-                      color: row.is_active ? '#2d9348' : '#94a3b8',
+                      background: row.is_active ? 'var(--color-success-soft)' : 'var(--color-surface-sunken)',
+                      color: row.is_active ? '#2d9348' : 'var(--color-text-subtle)',
                     }}>
                       {row.is_active ? 'ใช้งาน' : 'ปิด'}
                     </span>
@@ -566,7 +566,7 @@ export function CustomerProductServiceRatesPage() {
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      style={{ color: '#dc2626', borderColor: '#fecaca' }}
+                      style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger-border)' }}
                       disabled={deletingId === row.id}
                       onClick={() => handleDelete(row)}
                     >
@@ -595,7 +595,7 @@ export function CustomerProductServiceRatesPage() {
             <form onSubmit={handleSubmit}>
               {!form.rateId && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     ลูกค้า *
                     <select
                       className="form-control"
@@ -610,7 +610,7 @@ export function CustomerProductServiceRatesPage() {
                       ))}
                     </select>
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     {form.serviceType === 'STORAGE' ? 'วิธีการจัดเก็บ *' : 'สินค้า *'}
                     <select
                       className="form-control"
@@ -633,7 +633,7 @@ export function CustomerProductServiceRatesPage() {
                         <option key={p.id} value={p.id}>{p.customer_product_code} — {p.product_name}</option>
                       ))}
                     </select>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>
                       {form.serviceType === 'STORAGE'
                         ? 'ค่าฝากสินค้าคิดตามวิธีการจัดเก็บเท่านั้น ไม่สามารถกำหนดรายสินค้าหรือ "ทุกรายการ" ได้'
                         : 'เลือกประเภท (แช่แข็ง/แช่เย็น) เพื่อกำหนดอัตราให้ทุกสินค้าในประเภทนั้นของลูกค้านี้ โดยไม่ต้องเลือกทีละรายการ'}
@@ -643,7 +643,7 @@ export function CustomerProductServiceRatesPage() {
               )}
 
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>
                   ประเภทค่าบริการ *
                 </label>
                 <input
@@ -663,7 +663,7 @@ export function CustomerProductServiceRatesPage() {
                   ))}
                 </datalist>
                 {form.serviceType && !SERVICE_TYPES.some((s) => s.value === form.serviceType) && (
-                  <p style={{ fontSize: 11, color: '#b45309', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-warning)', margin: '4px 0 0' }}>
                     ⚠ "{form.serviceType}" เป็นประเภทที่กำหนดเอง (custom) — ใบแจ้งหนี้ที่คำนวณอัตโนมัติจากรายการเคลื่อนไหว
                     (รับเข้า/เบิกออก/ค่าฝาก) จะ<strong>ไม่นำอัตรานี้มาคำนวณให้เอง</strong> ต้องเลือกด้วยตนเองเป็นบริการเสริมต่อคำขอ —
                     ถ้าต้องการให้คิดค่าบริการรับเข้า/นำออกอัตโนมัติ กรุณาเลือก "ค่านำเข้า (Handling In)" หรือ
@@ -673,7 +673,7 @@ export function CustomerProductServiceRatesPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                   อัตรา (฿) *
                   <input
                     className="form-control"
@@ -687,7 +687,7 @@ export function CustomerProductServiceRatesPage() {
                     style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                   />
                 </label>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                   หน่วยคิด *
                   <select
                     className="form-control"
@@ -704,7 +704,7 @@ export function CustomerProductServiceRatesPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                   รอบคิดค่าบริการ (วัน)
                   <input
                     className="form-control"
@@ -716,9 +716,9 @@ export function CustomerProductServiceRatesPage() {
                     onChange={(e) => setForm((f) => ({ ...f, periodDays: e.target.value }))}
                     style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                   />
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>เช่น 15 = คิดค่าฝากซ้ำทุก 15 วัน</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>เช่น 15 = คิดค่าฝากซ้ำทุก 15 วัน</span>
                 </label>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                   จำนวนสูงสุดต่อครั้ง
                   <input
                     className="form-control"
@@ -730,11 +730,11 @@ export function CustomerProductServiceRatesPage() {
                     onChange={(e) => setForm((f) => ({ ...f, maxQuantity: e.target.value }))}
                     style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                   />
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>เช่น 12 = เสียบปลั๊กไม่เกิน 12 ชม./ครั้ง</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>เช่น 12 = เสียบปลั๊กไม่เกิน 12 ชม./ครั้ง</span>
                 </label>
               </div>
 
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 14 }}>
                 หมายเหตุ
                 <input
                   className="form-control"
@@ -746,12 +746,12 @@ export function CustomerProductServiceRatesPage() {
               </label>
 
               <div style={{ borderTop: '1px dashed #e5e7eb', margin: '4px 0 14px', paddingTop: 14 }} data-testid="rate-contract-terms-section">
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 10px' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-body)', margin: '0 0 10px' }}>
                   เงื่อนไขสัญญา (ไม่บังคับ)
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     วันเริ่มสัญญา
                     <input
                       className="form-control"
@@ -762,7 +762,7 @@ export function CustomerProductServiceRatesPage() {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     วันสิ้นสุดสัญญา
                     <input
                       className="form-control"
@@ -772,12 +772,12 @@ export function CustomerProductServiceRatesPage() {
                       onChange={(e) => setForm((f) => ({ ...f, contractEndDate: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>เว้นว่างทั้งคู่ = ใช้ได้ตลอดไป ไม่มีวันหมดอายุ</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>เว้นว่างทั้งคู่ = ใช้ได้ตลอดไป ไม่มีวันหมดอายุ</span>
                   </label>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     ค่าฝากขั้นต่ำ (฿)
                     <input
                       className="form-control"
@@ -791,7 +791,7 @@ export function CustomerProductServiceRatesPage() {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     ฟรีค่าฝาก (วัน)
                     <input
                       className="form-control"
@@ -805,7 +805,7 @@ export function CustomerProductServiceRatesPage() {
                       style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
                     />
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     ส่วนลด (%)
                     <input
                       className="form-control"
@@ -822,7 +822,7 @@ export function CustomerProductServiceRatesPage() {
                   </label>
                 </div>
 
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block' }}>
                   หมายเหตุเงื่อนไขสัญญา
                   <textarea
                     className="form-control"

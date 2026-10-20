@@ -40,15 +40,15 @@ const EMPTY_FORM = {
 };
 
 const TEMP_OPTIONS = [
-  { value: 'FROZEN', label: 'FROZEN — แช่แข็ง', color: '#1d6fcf', bg: '#eff6ff' },
-  { value: 'CHILLED', label: 'CHILLED — แช่เย็น', color: '#0e7a3a', bg: '#f0fdf4' },
-  { value: 'AMBIENT', label: 'AMBIENT — อุณหภูมิห้อง', color: '#c97d00', bg: '#fffbeb' },
+  { value: 'FROZEN', label: 'FROZEN — แช่แข็ง', color: '#1d6fcf', bg: 'var(--color-accent-soft)' },
+  { value: 'CHILLED', label: 'CHILLED — แช่เย็น', color: '#0e7a3a', bg: 'var(--color-success-soft)' },
+  { value: 'AMBIENT', label: 'AMBIENT — อุณหภูมิห้อง', color: '#c97d00', bg: 'var(--color-warning-soft)' },
 ];
 
 const TEMP_BADGE = {
-  FROZEN: { label: 'แช่แข็ง', color: '#1d6fcf', bg: '#eff6ff' },
-  CHILLED: { label: 'แช่เย็น', color: '#0e7a3a', bg: '#f0fdf4' },
-  AMBIENT: { label: 'อุณหภูมิห้อง', color: '#c97d00', bg: '#fffbeb' },
+  FROZEN: { label: 'แช่แข็ง', color: '#1d6fcf', bg: 'var(--color-accent-soft)' },
+  CHILLED: { label: 'แช่เย็น', color: '#0e7a3a', bg: 'var(--color-success-soft)' },
+  AMBIENT: { label: 'อุณหภูมิห้อง', color: '#c97d00', bg: 'var(--color-warning-soft)' },
 };
 
 function pctColor(pct) {
@@ -150,23 +150,23 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
 
   return (
     <div style={{ border: '1px solid #eef2f7', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: location.isOccupied ? '#fffbeb' : '#fff', flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#1e293b', minWidth: 100 }}>{location.location_code}</span>
-        <span style={{ fontSize: 12, color: '#64748b', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row) : '-'}</span>
-        <span style={{ fontSize: 12, color: location.isOccupied ? '#b45309' : '#94a3b8', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: location.isOccupied ? 'var(--color-warning-soft)' : '#fff', flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: 'var(--color-text-strong)', minWidth: 100 }}>{location.location_code}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row) : '-'}</span>
+        <span style={{ fontSize: 12, color: location.isOccupied ? 'var(--color-warning)' : 'var(--color-text-subtle)', flex: 1 }}>
           ใช้ไป {location.usedCount}/{location.capacity} pallet
         </span>
         <div style={{ display: 'flex', gap: 6 }}>
           {!confirm && onReset && location.usedCount > 0 && (
             <button type="button" onClick={() => onReset([location.id], location.location_code)}
               data-testid="location-row-reset-button"
-              style={{ padding: '4px 10px', border: '1px solid #f59e0b', borderRadius: 6, background: '#fffbeb', color: '#b45309', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              style={{ padding: '4px 10px', border: '1px solid #f59e0b', borderRadius: 6, background: 'var(--color-warning-soft)', color: 'var(--color-warning)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
               Reset
             </button>
           )}
           {!confirm && (
             <button type="button" onClick={editing ? () => setEditing(false) : openEdit}
-              style={{ padding: '4px 10px', border: '1px solid #3b82f6', borderRadius: 6, background: editing ? '#eff6ff' : '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              style={{ padding: '4px 10px', border: '1px solid #3b82f6', borderRadius: 6, background: editing ? 'var(--color-accent-soft)' : '#fff', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
               {editing ? 'ยกเลิก' : 'แก้ไข'}
             </button>
           )}
@@ -177,13 +177,13 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
                 ยกเลิก
               </button>
               <button type="button" onClick={handleDelete} disabled={deleting}
-                style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: 'var(--color-danger)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                 {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
               </button>
             </>
           ) : (
             <button type="button" onClick={() => setConfirm(true)}
-              style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+              style={{ padding: '4px 10px', border: 'none', borderRadius: 6, background: '#fee2e2', color: 'var(--color-danger)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
               ลบ
             </button>
           )}
@@ -191,20 +191,20 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
       </div>
 
       {deleteError && (
-        <div style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', fontSize: 12 }}>{deleteError}</div>
+        <div style={{ padding: '6px 12px', background: '#fee2e2', color: 'var(--color-danger)', fontSize: 12 }}>{deleteError}</div>
       )}
 
       {editing && (
-        <div style={{ padding: '10px 12px', background: '#f8fafc', borderTop: '1px solid #eef2f7', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ padding: '10px 12px', background: 'var(--color-surface-muted)', borderTop: '1px solid #eef2f7', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {editError && (
-            <div style={{ width: '100%', background: '#fee2e2', color: '#dc2626', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>{editError}</div>
+            <div style={{ width: '100%', background: '#fee2e2', color: 'var(--color-danger)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>{editError}</div>
           )}
-          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
             ห้อง
             <input className="form-control" style={{ width: 70, marginTop: 2, boxSizing: 'border-box' }}
               value={form.zoneCode} onChange={(e) => setForm((f) => ({ ...f, zoneCode: e.target.value }))} />
           </label>
-          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
             ฝั่ง
             <select className="form-control" style={{ width: 70, marginTop: 2, boxSizing: 'border-box' }}
               value={form.side} onChange={(e) => setForm((f) => ({ ...f, side: e.target.value }))}>
@@ -212,18 +212,18 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
               <option value="R">R</option>
             </select>
           </label>
-          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
             เลขแถว (0 = รอจ่าย)
             <input className="form-control" type="number" min={0} max={99} style={{ width: 100, marginTop: 2, boxSizing: 'border-box' }}
               value={form.row} onChange={(e) => setForm((f) => ({ ...f, row: e.target.value }))} />
           </label>
-          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
             ความจุ (pallet)
             <input className="form-control" type="number" min={1} max={99} style={{ width: 80, marginTop: 2, boxSizing: 'border-box' }}
               value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))} />
           </label>
           <button type="button" onClick={handleEditSave} disabled={editSaving}
-            style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700 }}>
+            style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: 'var(--color-accent)', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700 }}>
             {editSaving ? 'กำลังบันทึก...' : 'บันทึก'}
           </button>
         </div>
@@ -313,7 +313,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
       <div style={{ background: '#fff', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{
           width: 48, height: 48, borderRadius: 10,
-          background: '#f0fdf4', border: '1.5px solid #bbf7d0',
+          background: 'var(--color-success-soft)', border: '1.5px solid #bbf7d0',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontWeight: 800, fontSize: 12, color: '#2d9348', flexShrink: 0,
           textAlign: 'center', lineHeight: 1.2,
@@ -322,7 +322,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{section.name}</span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-text-strong)' }}>{section.name}</span>
             {tempBadge && (
               <span style={{
                 fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
@@ -332,13 +332,13 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               </span>
             )}
           </div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
             {section.total} แถว · ความจุ {sectionCapacity(section)} pallet/แถว (รวม {section.totalCapacity} pallet)
             {gridDesc ? ` · ${gridDesc}` : ''}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 80, height: 6, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: 80, height: 6, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${section.usedPct}%`, background: color, borderRadius: 4 }} />
           </div>
           <span style={{ fontSize: 12, fontWeight: 700, color, width: 70, textAlign: 'right' }}>
@@ -351,7 +351,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               type="button"
               data-testid="section-reset-location-button"
               onClick={() => onResetLocations((section.locations ?? []).map((l) => l.id), `ห้อง ${section.code} ทั้งห้อง`)}
-              style={{ padding: '6px 10px', border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', color: '#b45309', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '6px 10px', border: '1px solid #f59e0b', borderRadius: 8, background: 'var(--color-warning-soft)', color: 'var(--color-warning)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               Reset location
             </button>
@@ -360,7 +360,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
             <button
               type="button"
               onClick={() => setRowsOpen((v) => !v)}
-              style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 8, background: rowsOpen ? '#f1f5f9' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 8, background: rowsOpen ? 'var(--color-surface-sunken)' : '#fff', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               {rowsOpen ? 'ซ่อนรายแถว' : 'ดูรายแถว'}
             </button>
@@ -369,7 +369,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
             <button
               type="button"
               onClick={editing ? cancelEdit : openEdit}
-              style={{ padding: '6px 10px', border: '1px solid #3b82f6', borderRadius: 8, background: editing ? '#eff6ff' : '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '6px 10px', border: '1px solid #3b82f6', borderRadius: 8, background: editing ? 'var(--color-accent-soft)' : '#fff', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               {editing ? 'ยกเลิก' : 'แก้ไข'}
             </button>
@@ -387,7 +387,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                style={{ padding: '6px 12px', border: 'none', borderRadius: 8, background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                style={{ padding: '6px 12px', border: 'none', borderRadius: 8, background: 'var(--color-danger)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
               >
                 {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
               </button>
@@ -396,7 +396,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
             <button
               type="button"
               onClick={() => setConfirm(true)}
-              style={{ padding: '6px 10px', border: 'none', borderRadius: 8, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '6px 10px', border: 'none', borderRadius: 8, background: '#fee2e2', color: 'var(--color-danger)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               ลบ
             </button>
@@ -406,16 +406,16 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
 
       {/* Edit panel */}
       {editing && (
-        <div style={{ background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '16px 18px' }}>
+        <div style={{ background: 'var(--color-surface-muted)', borderTop: '1px solid #e5e7eb', padding: '16px 18px' }}>
           {editError && (
-            <div style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ background: '#fee2e2', color: 'var(--color-danger)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
               {editError}
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
             {/* Left side */}
             <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-strong)', marginBottom: 10 }}>
                 <input
                   type="checkbox"
                   checked={editForm.leftActive}
@@ -426,7 +426,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               </label>
               {editForm.leftActive && (
                 <>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     จำนวนแถว
                     <input
                       className="form-control"
@@ -451,7 +451,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
             </div>
             {/* Right side */}
             <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-strong)', marginBottom: 10 }}>
                 <input
                   type="checkbox"
                   checked={editForm.rightActive}
@@ -462,7 +462,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               </label>
               {editForm.rightActive && (
                 <>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                     จำนวนแถว
                     <input
                       className="form-control"
@@ -486,7 +486,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               )}
             </div>
           </div>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 14, maxWidth: 220 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', marginBottom: 14, maxWidth: 220 }}>
             ความจุต่อแถว (pallet)
             <input
               className="form-control"
@@ -496,20 +496,20 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               onChange={(e) => setEf('capacity', e.target.value)}
               style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
             />
-            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 13, color: '#64748b' }}>
-              รวม <strong style={{ color: '#1e293b' }}>{editTotal}</strong> แถว
-              {editForm.leftActive && <span style={{ color: '#94a3b8', marginLeft: 6 }}>L: {efLR}</span>}
-              {editForm.leftActive && editForm.rightActive && <span style={{ color: '#94a3b8' }}> / </span>}
-              {editForm.rightActive && <span style={{ color: '#94a3b8' }}>R: {efRR}</span>}
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+              รวม <strong style={{ color: 'var(--color-text-strong)' }}>{editTotal}</strong> แถว
+              {editForm.leftActive && <span style={{ color: 'var(--color-text-subtle)', marginLeft: 6 }}>L: {efLR}</span>}
+              {editForm.leftActive && editForm.rightActive && <span style={{ color: 'var(--color-text-subtle)' }}> / </span>}
+              {editForm.rightActive && <span style={{ color: 'var(--color-text-subtle)' }}>R: {efRR}</span>}
             </div>
             <button
               type="button"
               onClick={handleEditSave}
               disabled={editSaving}
-              style={{ marginLeft: 'auto', padding: '8px 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
+              style={{ marginLeft: 'auto', padding: '8px 20px', border: 'none', borderRadius: 8, background: 'var(--color-accent)', color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
             >
               {editSaving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
@@ -519,15 +519,15 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
 
       {/* Success message below card */}
       {editSuccess && (
-        <div style={{ background: '#f0fdf4', borderTop: '1px solid #bbf7d0', padding: '8px 18px', fontSize: 13, color: '#2d9348', fontWeight: 600 }}>
+        <div style={{ background: 'var(--color-success-soft)', borderTop: '1px solid #bbf7d0', padding: '8px 18px', fontSize: 13, color: '#2d9348', fontWeight: 600 }}>
           {editSuccess}
         </div>
       )}
 
       {/* Per-row list -- edit/delete exactly one row without touching the rest */}
       {rowsOpen && (
-        <div style={{ background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '14px 18px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>
+        <div style={{ background: 'var(--color-surface-muted)', borderTop: '1px solid #e5e7eb', padding: '14px 18px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10 }}>
             รายแถวทั้งหมด ({sortedLocations.length})
           </div>
           {sortedLocations.map((loc) => (
@@ -555,9 +555,9 @@ function ErrorTable({ errors }) {
     <div style={{ overflowX: 'auto', border: '1px solid #fecaca', borderRadius: 8 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
-          <tr style={{ background: '#fef2f2' }}>
-            <th style={{ textAlign: 'left', padding: '6px 10px', color: '#991b1b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>แถวที่</th>
-            <th style={{ textAlign: 'left', padding: '6px 10px', color: '#991b1b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>สาเหตุ</th>
+          <tr style={{ background: 'var(--color-danger-soft)' }}>
+            <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--color-danger-strong)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>แถวที่</th>
+            <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--color-danger-strong)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>สาเหตุ</th>
           </tr>
         </thead>
         <tbody>
@@ -650,28 +650,28 @@ function ProductLocationAssignmentSection() {
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fff', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>จับคู่รหัสติดตามกับ Location (Excel)</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)' }}>จับคู่รหัสติดตามกับ Location (Excel)</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
             Export ล็อตที่รับเข้าแล้วพร้อม Location เดิม แก้ไขแล้ว Import กลับ (ช่องว่าง = ไม่เปลี่ยนแปลง)
           </div>
         </div>
         <button
           type="button"
           onClick={handleToggle}
-          style={{ padding: '6px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: expanded ? '#f1f5f9' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          style={{ padding: '6px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: expanded ? 'var(--color-surface-sunken)' : '#fff', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
         >
           {expanded ? 'ซ่อน' : 'เปิด'}
         </button>
       </div>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px 18px', background: '#f8fafc' }}>
-          {loading && <div style={{ color: '#94a3b8', fontSize: 13 }}>กำลังโหลดรหัสติดตาม...</div>}
+        <div style={{ borderTop: '1px solid #e5e7eb', padding: '16px 18px', background: 'var(--color-surface-muted)' }}>
+          {loading && <div style={{ color: 'var(--color-text-subtle)', fontSize: 13 }}>กำลังโหลดรหัสติดตาม...</div>}
           {loadError && <div className="banner banner-danger" style={{ marginBottom: 12 }}>{loadError}</div>}
 
           {loaded && (
             <>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>
                 รหัสติดตามทั้งหมด {lines.length} รายการ · Location ที่ใช้ได้ {locations.length} แถว
                 <div>ล็อตที่แบ่งเก็บหลาย Location จะแสดงใน note หากกรอก Location ใหม่ จะย้ายทุกพาเลทของล็อตไปตำแหน่งนั้น</div>
               </div>
@@ -686,7 +686,7 @@ function ProductLocationAssignmentSection() {
 
           {parseErrors.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#dc2626', marginBottom: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-danger)', marginBottom: 6 }}>
                 พบปัญหาในไฟล์ {parseErrors.length} รายการ (แถวเหล่านี้จะไม่ถูก import)
               </div>
               <ErrorTable errors={parseErrors} />
@@ -695,14 +695,14 @@ function ProductLocationAssignmentSection() {
 
           {previewRows.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-strong)', marginBottom: 8 }}>
                 พร้อม import <strong>{previewRows.length}</strong> รายการ
               </div>
               <button
                 type="button"
                 onClick={handleConfirmImport}
                 disabled={importing}
-                style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#fff', cursor: importing ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
+                style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: 'var(--color-accent)', color: '#fff', cursor: importing ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}
               >
                 {importing ? 'กำลัง Import...' : `ยืนยัน Import (${previewRows.length} รายการ)`}
               </button>
@@ -711,12 +711,12 @@ function ProductLocationAssignmentSection() {
 
           {importResult && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: importResult.processed > 0 ? '#2d9348' : '#dc2626', marginBottom: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: importResult.processed > 0 ? '#2d9348' : 'var(--color-danger)', marginBottom: 6 }}>
                 Import สำเร็จ {importResult.processed ?? 0} รายการ
               </div>
               {importResult.errors?.length > 0 && (
                 <>
-                  <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 6 }}>
                     ข้อผิดพลาด {importResult.errors.length} รายการ:
                   </div>
                   <ErrorTable errors={importResult.errors} />
@@ -778,25 +778,25 @@ function AddSectionForm({ onAdd }) {
 
   return (
     <form onSubmit={handleSubmit} style={{
-      background: '#f8fafc',
+      background: 'var(--color-surface-muted)',
       border: '2px dashed #cbd5e1',
       borderRadius: 12,
       padding: '20px',
       marginBottom: 16,
     }}>
-      <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)', marginBottom: 14 }}>
         + เพิ่มห้องใหม่
       </div>
 
       {error && (
-        <div style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
+        <div style={{ background: '#fee2e2', color: 'var(--color-danger)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
           {error}
         </div>
       )}
 
       {/* Room code + name */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 14 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           รหัสห้อง *
           <input
             className="form-control"
@@ -806,9 +806,9 @@ function AddSectionForm({ onAdd }) {
             placeholder="เช่น H1 หรือ A"
             style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
           />
-          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้เป็นส่วนแรกของรหัส Location</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 400 }}>ใช้เป็นส่วนแรกของรหัส Location</span>
         </label>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
           ชื่อห้อง *
           <input
             className="form-control"
@@ -823,7 +823,7 @@ function AddSectionForm({ onAdd }) {
 
       {/* Temperature type */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>ประเภทการจัดเก็บ</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', marginBottom: 6 }}>ประเภทการจัดเก็บ</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {TEMP_OPTIONS.map((opt) => {
             const active = form.temperatureType === opt.value;
@@ -834,9 +834,9 @@ function AddSectionForm({ onAdd }) {
                 onClick={() => set('temperatureType', opt.value)}
                 style={{
                   padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: active ? 700 : 400,
-                  border: `2px solid ${active ? opt.color : '#e5e7eb'}`,
+                  border: `2px solid ${active ? opt.color : 'var(--color-border-subtle)'}`,
                   background: active ? opt.bg : '#fff',
-                  color: active ? opt.color : '#374151',
+                  color: active ? opt.color : 'var(--color-text-body)',
                   transition: 'all 0.15s',
                 }}
               >
@@ -851,7 +851,7 @@ function AddSectionForm({ onAdd }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 14 }}>
         {/* Left Side */}
         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-strong)', marginBottom: 12 }}>
             <input
               type="checkbox"
               checked={form.sideLeft}
@@ -862,7 +862,7 @@ function AddSectionForm({ onAdd }) {
           </label>
           {form.sideLeft && (
             <>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                 จำนวนแถว
                 <input
                   className="form-control"
@@ -888,7 +888,7 @@ function AddSectionForm({ onAdd }) {
 
         {/* Right Side */}
         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, padding: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-strong)', marginBottom: 12 }}>
             <input
               type="checkbox"
               checked={form.sideRight}
@@ -899,7 +899,7 @@ function AddSectionForm({ onAdd }) {
           </label>
           {form.sideRight && (
             <>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)' }}>
                 จำนวนแถว
                 <input
                   className="form-control"
@@ -924,7 +924,7 @@ function AddSectionForm({ onAdd }) {
         </div>
       </div>
 
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 14, maxWidth: 220 }}>
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', marginBottom: 14, maxWidth: 220 }}>
         ความจุต่อแถว (pallet)
         <input
           className="form-control"
@@ -934,27 +934,27 @@ function AddSectionForm({ onAdd }) {
           onChange={(e) => set('capacity', e.target.value)}
           style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
         />
-        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
       </label>
 
       {/* Preview */}
       <div style={{
-        background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
+        background: 'var(--color-success-soft)', border: '1px solid #bbf7d0', borderRadius: 8,
         padding: '10px 14px', marginBottom: 14, fontSize: 13,
         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       }}>
         <span style={{ fontWeight: 700, color: '#2d9348' }}>ตัวอย่างรหัส Location:</span>
         {form.zoneCode.trim() && totalSides > 0 ? (
-          <span style={{ fontFamily: 'monospace', color: '#1e293b', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
+          <span style={{ fontFamily: 'monospace', color: 'var(--color-text-strong)', background: '#fff', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>
             {form.zoneCode.trim().toUpperCase()}-{form.sideLeft ? 'L' : 'R'}-01
           </span>
         ) : (
-          <span style={{ color: '#94a3b8' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
+          <span style={{ color: 'var(--color-text-subtle)' }}>กรอกรหัส Section และเลือกฝั่งก่อน</span>
         )}
-        <span style={{ color: '#64748b' }}>
-          รวม <strong style={{ color: '#1e293b', fontSize: 15 }}>{totalSides > 0 ? total : 0}</strong> แถว
+        <span style={{ color: 'var(--color-text-muted)' }}>
+          รวม <strong style={{ color: 'var(--color-text-strong)', fontSize: 15 }}>{totalSides > 0 ? total : 0}</strong> แถว
           {totalSides > 0 && total > 0 && (
-            <span style={{ color: '#94a3b8', marginLeft: 6 }}>
+            <span style={{ color: 'var(--color-text-subtle)', marginLeft: 6 }}>
               (
                 {form.sideLeft ? `L: ${leftRows}` : ''}
                 {form.sideLeft && form.sideRight ? ' / ' : ''}
@@ -1055,18 +1055,18 @@ export function WarehouseLocationSetupPage() {
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         {[
-          { label: 'ห้องทั้งหมด', value: sections.length, color: '#2563eb' },
+          { label: 'ห้องทั้งหมด', value: sections.length, color: 'var(--color-accent)' },
           { label: 'แถวทั้งหมด', value: totalRows, color: '#2d9348' },
           { label: 'ความจุรวม (pallet)', value: totalCapacity, color: '#0e7a3a' },
           { label: 'Pallet ที่ใช้', value: sections.reduce((s, z) => s + z.used, 0), color: '#f0a500' },
-          { label: 'Pallet ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: '#94a3b8' },
+          { label: 'Pallet ว่าง', value: sections.reduce((s, z) => s + z.empty, 0), color: 'var(--color-text-subtle)' },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
             padding: '14px 18px', minWidth: 130,
           }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{stat.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>{stat.label}</div>
           </div>
         ))}
       </div>
@@ -1080,16 +1080,16 @@ export function WarehouseLocationSetupPage() {
       <AddSectionForm onAdd={handleAdd} />
 
       {loading ? (
-        <div style={{ color: '#94a3b8', padding: 24, textAlign: 'center' }}>กำลังโหลด...</div>
+        <div style={{ color: 'var(--color-text-subtle)', padding: 24, textAlign: 'center' }}>กำลังโหลด...</div>
       ) : error ? (
         <div className="banner banner-danger">{error.message}</div>
       ) : sections.length === 0 ? (
-        <div style={{ color: '#94a3b8', textAlign: 'center', padding: 32, background: '#f8fafc', borderRadius: 12 }}>
+        <div style={{ color: 'var(--color-text-subtle)', textAlign: 'center', padding: 32, background: 'var(--color-surface-muted)', borderRadius: 12 }}>
           ยังไม่มีห้อง — เพิ่มด้านบนเพื่อตั้งค่าผังคลัง
         </div>
       ) : (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)', marginBottom: 12 }}>
             ห้องที่มีอยู่ ({sections.length})
           </div>
           {sections.map((sec) => (

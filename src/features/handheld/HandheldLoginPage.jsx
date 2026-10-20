@@ -97,17 +97,17 @@ export function HandheldLoginPage() {
       <div data-testid="handheld-login-page" style={containerStyle}>
         <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#d4af37', letterSpacing: '-0.01em', marginBottom: 2 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--color-gold)', letterSpacing: '-0.01em', marginBottom: 2 }}>
               TGC Cold Storage
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Handheld</div>
-            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 500 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 8 }}>Handheld</div>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 13, fontWeight: 500 }}>
               {language === 'th' ? 'เลือกชื่อของคุณเพื่อเข้าสู่ระบบ' : 'Select your name to continue'}
             </div>
           </div>
 
           {staffLoading ? (
-            <div style={{ textAlign: 'center', color: '#64748b', paddingTop: 48 }}>
+            <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', paddingTop: 48 }}>
               กำลังโหลดรายชื่อพนักงาน…
             </div>
           ) : staffError ? (
@@ -115,7 +115,7 @@ export function HandheldLoginPage() {
               {staffError}
             </div>
           ) : staffList.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94a3b8', paddingTop: 48, fontSize: 14 }}>
+            <div style={{ textAlign: 'center', color: 'var(--color-text-subtle)', paddingTop: 48, fontSize: 14 }}>
               ไม่พบพนักงานที่มี PIN ในระบบ<br />กรุณาติดต่อผู้ดูแลระบบ
             </div>
           ) : (
@@ -130,7 +130,7 @@ export function HandheldLoginPage() {
                     alignItems: 'center',
                     gap: 16,
                     padding: '20px 24px',
-                    background: '#f8fafc',
+                    background: 'var(--color-surface-muted)',
                     border: '2px solid #e2e8f0',
                     borderRadius: 20,
                     cursor: 'pointer',
@@ -139,14 +139,14 @@ export function HandheldLoginPage() {
                     minHeight: 80,
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; e.currentTarget.style.background = '#f1f5f9'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-text)'; e.currentTarget.style.background = 'var(--color-surface-sunken)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-surface-muted)'; }}
                 >
                   <div style={{
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    background: '#0f172a',
+                    background: 'var(--color-text)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
@@ -159,14 +159,14 @@ export function HandheldLoginPage() {
                     {getInitials(staff.displayName)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.3 }}>
                       {staff.displayName}
                     </div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
                       {ROLE_LABELS[staff.role] ?? staff.role}
                     </div>
                   </div>
-                  <div style={{ color: '#cbd5e1', fontSize: 20 }}>›</div>
+                  <div style={{ color: 'var(--color-border-strong)', fontSize: 20 }}>›</div>
                 </button>
               ))}
             </div>
@@ -190,7 +190,7 @@ export function HandheldLoginPage() {
             left: 24,
             background: 'transparent',
             border: 'none',
-            color: '#64748b',
+            color: 'var(--color-text-muted)',
             fontSize: 15,
             fontWeight: 600,
             cursor: 'pointer',
@@ -208,7 +208,7 @@ export function HandheldLoginPage() {
             width: 64,
             height: 64,
             borderRadius: '50%',
-            background: '#0f172a',
+            background: 'var(--color-text)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
@@ -220,10 +220,10 @@ export function HandheldLoginPage() {
           }}>
             {getInitials(selectedStaff?.displayName)}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', marginBottom: 4 }}>
             {selectedStaff?.displayName}
           </div>
-          <div style={{ color: '#64748b', fontSize: 13, fontWeight: 500 }}>
+          <div style={{ color: 'var(--color-text-muted)', fontSize: 13, fontWeight: 500 }}>
             {language === 'th' ? 'กรอกรหัส PIN ของคุณ' : 'Enter your PIN'}
           </div>
         </div>
@@ -235,7 +235,7 @@ export function HandheldLoginPage() {
               width: 20,
               height: 20,
               borderRadius: '50%',
-              background: i < pin.length ? '#0f172a' : '#f1f5f9',
+              background: i < pin.length ? 'var(--color-text)' : 'var(--color-surface-sunken)',
               transition: 'all 0.2s',
             }} />
           ))}
@@ -256,13 +256,13 @@ export function HandheldLoginPage() {
               onClick={() => handleKeyPress(num.toString())}
               disabled={isLoading}
               style={{
-                background: '#f8fafc',
+                background: 'var(--color-surface-muted)',
                 border: 'none',
                 borderRadius: 16,
                 padding: '24px 0',
                 fontSize: 24,
                 fontWeight: 600,
-                color: '#0f172a',
+                color: 'var(--color-text)',
                 cursor: 'pointer',
                 touchAction: 'manipulation',
               }}
@@ -278,7 +278,7 @@ export function HandheldLoginPage() {
               background: 'transparent',
               border: 'none',
               fontSize: 20,
-              color: '#64748b',
+              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               fontWeight: 700,
             }}
@@ -290,13 +290,13 @@ export function HandheldLoginPage() {
             onClick={() => handleKeyPress('0')}
             disabled={isLoading}
             style={{
-              background: '#f8fafc',
+              background: 'var(--color-surface-muted)',
               border: 'none',
               borderRadius: 16,
               padding: '24px 0',
               fontSize: 24,
               fontWeight: 600,
-              color: '#0f172a',
+              color: 'var(--color-text)',
               cursor: 'pointer',
               touchAction: 'manipulation',
             }}
@@ -308,8 +308,8 @@ export function HandheldLoginPage() {
             onClick={handleSubmit}
             disabled={isLoading || !pin}
             style={{
-              background: pin ? '#0f172a' : '#f1f5f9',
-              color: pin ? '#ffffff' : '#94a3b8',
+              background: pin ? 'var(--color-text)' : 'var(--color-surface-sunken)',
+              color: pin ? '#ffffff' : 'var(--color-text-subtle)',
               border: 'none',
               borderRadius: 16,
               fontSize: 18,

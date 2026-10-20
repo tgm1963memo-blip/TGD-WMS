@@ -518,7 +518,7 @@ export function CustomerWithdrawalLinesTable({
                   </select>
                   {!weightPerBox && (
                     <div
-                      style={{ fontSize: 11, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 11, color: 'var(--color-warning)', marginTop: 4, whiteSpace: 'nowrap' }}
                       title="ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุทั้งสองค่า"
                     >
                       ⚠ ระบุทั้งสองค่า
@@ -547,12 +547,12 @@ export function CustomerWithdrawalLinesTable({
                         </div>
                       )}
                       {!canDeriveUnitWeight(selectedUnit, weightPerBox) && (
-                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                        <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
                           ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
                         </div>
                       )}
                       {!canDeriveUnitBoxes(selectedUnit, weightPerBox) && (
-                        <div style={{ color: '#b45309', fontSize: 11, marginTop: 2 }}>
+                        <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
                           ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
                         </div>
                       )}
@@ -570,7 +570,7 @@ export function CustomerWithdrawalLinesTable({
                     min="0"
                     type="number"
                     placeholder="กล่อง"
-                    style={exceedsBoxBalance ? { borderColor: '#dc2626', backgroundColor: '#fef2f2' } : {}}
+                    style={exceedsBoxBalance ? { borderColor: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' } : {}}
                     value={line.requested_boxes}
                     onChange={(e) => {
                       const boxes = e.target.value;
@@ -579,7 +579,7 @@ export function CustomerWithdrawalLinesTable({
                     }}
                   />
                   {exceedsBoxBalance && (
-                    <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-danger)', fontWeight: 600, marginTop: 4 }}>
                       เกินยอดคงเหลือ (เหลือให้ใช้ {availableBoxBalanceLabel} กล่อง)
                     </div>
                   )}
@@ -594,7 +594,7 @@ export function CustomerWithdrawalLinesTable({
                     step="0.01"
                     type="number"
                     placeholder="กก."
-                    style={exceedsWtBalance ? { borderColor: '#dc2626', backgroundColor: '#fef2f2' } : {}}
+                    style={exceedsWtBalance ? { borderColor: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' } : {}}
                     value={line.requested_weight}
                     onChange={(e) => {
                       const weight = e.target.value;
@@ -603,7 +603,7 @@ export function CustomerWithdrawalLinesTable({
                     }}
                   />
                   {exceedsWtBalance && (
-                    <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-danger)', fontWeight: 600, marginTop: 4 }}>
                       เกินยอดคงเหลือ (เหลือให้ใช้ {availableWtBalanceLabel.toFixed(2)} กก.)
                     </div>
                   )}

@@ -98,7 +98,7 @@ export function SearchableSelect({
           title="ล้างค่า"
           style={{
             position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
-            border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer',
+            border: 'none', background: 'transparent', color: 'var(--color-text-subtle)', cursor: 'pointer',
             fontSize: 15, lineHeight: 1, padding: 4,
           }}
         >×</button>
@@ -113,7 +113,7 @@ export function SearchableSelect({
           }}
         >
           {filtered.length === 0 ? (
-            <div style={{ padding: '8px 12px', fontSize: 12, color: '#94a3b8' }}>{noOptionsText}</div>
+            <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-text-subtle)' }}>{noOptionsText}</div>
           ) : (
             filtered.map((opt, idx) => (
               <div
@@ -122,8 +122,8 @@ export function SearchableSelect({
                 onMouseEnter={() => setHighlight(idx)}
                 style={{
                   padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                  background: idx === highlight ? '#f1f5f9' : '#fff',
-                  color: '#0f172a', fontWeight: String(opt.value) === String(value) ? 700 : 400,
+                  background: idx === highlight ? 'var(--color-surface-sunken)' : '#fff',
+                  color: 'var(--color-text)', fontWeight: String(opt.value) === String(value) ? 700 : 400,
                   whiteSpace: 'normal', wordBreak: 'break-word',
                 }}
               >

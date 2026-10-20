@@ -371,6 +371,7 @@ Object.assign(TRANSLATION_CATALOG, {
   'nav.putaway': { th: 'จัดเก็บ', en: 'Putaway' },
   'nav.handheldReceiving': { th: 'รับเข้าด้วย Handheld', en: 'Handheld Receiving' },
   'nav.inventoryControl': { th: 'ควบคุมสินค้าคงคลัง', en: 'INVENTORY CONTROL' },
+  'nav.stockCountReview': { th: 'นับสต็อก', en: 'Stock Count' },
   'nav.stockBalance': { th: 'ยอดคงเหลือ', en: 'Stock Balance' },
   'nav.transfer': { th: 'โอนย้าย', en: 'Transfer' },
   'nav.adjustment': { th: 'ปรับปรุงสต็อก', en: 'Adjustment' },

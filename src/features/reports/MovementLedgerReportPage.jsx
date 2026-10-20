@@ -522,9 +522,9 @@ export function MovementLedgerReportPage() {
       </DashboardSection>
 
       {!goLive ? (
-        <section className="safety-panel" style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+        <section className="safety-panel" style={{ padding: 16, background: 'var(--color-danger-soft)', border: '1px solid #fecaca', borderRadius: 8 }}>
           <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Production remains HOLD</h3>
-          <ul style={{ paddingLeft: 20, fontSize: 14, color: '#991b1b', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <ul style={{ paddingLeft: 20, fontSize: 14, color: 'var(--color-danger-strong)', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <li>No Production migration applied</li>
             <li>UI polish does not change stock movement behavior</li>
             <li>UI polish does not change stock balance calculation</li>

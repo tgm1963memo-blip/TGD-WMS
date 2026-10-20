@@ -326,7 +326,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                   </label>
                   <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>
                     {group.soNumbers.length} SO
-                    {hasUnmatched ? <span style={{ color: '#dc2626', marginLeft: 8 }}>มีรหัสที่ไม่พบในแคตตาล็อก</span> : null}
+                    {hasUnmatched ? <span style={{ color: 'var(--color-danger)', marginLeft: 8 }}>มีรหัสที่ไม่พบในแคตตาล็อก</span> : null}
                   </span>
                 </div>
                 <div className="table-responsive">
@@ -347,7 +347,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                         const unit = p.stockMode === 'weight' ? 'กก.' : 'กล่อง';
                         const hasShortage = p.matched && p.stockShortfall > 0;
                         return (
-                          <tr key={p.productCode} style={!p.matched ? { background: '#fef2f2' } : (hasShortage ? { background: '#fffbeb' } : undefined)}>
+                          <tr key={p.productCode} style={!p.matched ? { background: 'var(--color-danger-soft)' } : (hasShortage ? { background: 'var(--color-warning-soft)' } : undefined)}>
                             <td style={{ textAlign: 'center' }}>
                               <input
                                 type="checkbox"
@@ -361,13 +361,13 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                             <td>{p.requestedBoxes ?? p.requestedWeight ?? p.qty} {p.requestedWeight != null ? 'กก.' : 'กล่อง'}</td>
                             <td style={{ fontWeight: 600 }}>
                               {!p.matched ? (
-                                <span style={{ color: '#dc2626' }}>ไม่พบในแคตตาล็อก</span>
+                                <span style={{ color: 'var(--color-danger)' }}>ไม่พบในแคตตาล็อก</span>
                               ) : p.stockShortfall === 0 ? (
                                 <span style={{ color: '#16a34a' }}>พร้อมเบิก</span>
                               ) : p.stockAvailableQty === 0 ? (
-                                <span style={{ color: '#dc2626' }}>ของไม่เพียงพอ (คงเหลือ 0 {unit})</span>
+                                <span style={{ color: 'var(--color-danger)' }}>ของไม่เพียงพอ (คงเหลือ 0 {unit})</span>
                               ) : (
-                                <span style={{ color: '#b45309' }}>
+                                <span style={{ color: 'var(--color-warning)' }}>
                                   เบิกได้บางส่วน (มี {p.stockAvailableQty} จาก {p.requestedBoxes ?? p.requestedWeight} {unit})
                                 </span>
                               )}
@@ -423,7 +423,7 @@ export function CustomerSalesOrderImportModal({ isOpen, onClose, customerId, onI
                   </>
                 )}
                 {r.lineErrors?.length > 0 && (
-                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: '#dc2626', fontSize: 12 }}>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: 'var(--color-danger)', fontSize: 12 }}>
                     {r.lineErrors.map((msg, i) => <li key={i}>{msg}</li>)}
                   </ul>
                 )}

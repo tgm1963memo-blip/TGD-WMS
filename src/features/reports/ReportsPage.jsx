@@ -11,7 +11,7 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
 import UserRoleDemoSelector from '../../components/common/UserRoleDemoSelector.jsx';
 import LanguageToggle from '../../components/common/LanguageToggle.jsx';
-import { PageHeader } from '../../components/layout/PageHeader.jsx';
+import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { SectionCard } from '../../components/layout/SectionCard.jsx';
 import { brandConfig } from '../../config/brandConfig.js';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';

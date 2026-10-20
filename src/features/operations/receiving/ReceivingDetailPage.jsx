@@ -164,13 +164,13 @@ export function ReceivingDetailPage() {
       </nav>
 
       {postError ? (
-        <section role="alert" style={{ ...cardStyle, borderColor: '#fecaca', color: '#991b1b' }}>
+        <section role="alert" style={{ ...cardStyle, borderColor: 'var(--color-danger-border)', color: 'var(--color-danger-strong)' }}>
           {postError}
         </section>
       ) : null}
 
       {postMessage ? (
-        <section role="status" style={{ ...cardStyle, borderColor: '#bbf7d0', color: '#166534' }}>
+        <section role="status" style={{ ...cardStyle, borderColor: '#bbf7d0', color: 'var(--color-success-strong)' }}>
           {postMessage}
         </section>
       ) : null}
@@ -211,7 +211,7 @@ export function ReceivingDetailPage() {
             disabled={postButtonDisabled}
             onClick={handleConfirmPost}
             style={{
-              background: isPosting ? '#94a3b8' : '#b45309',
+              background: isPosting ? 'var(--color-text-subtle)' : 'var(--color-warning)',
               border: 0,
               borderRadius: 8,
               color: '#ffffff',
@@ -225,7 +225,7 @@ export function ReceivingDetailPage() {
           </button>
         ) : null}
         {isConfirmed ? (
-          <p style={{ color: '#166534', fontWeight: 600, marginBottom: 0 }}>
+          <p style={{ color: 'var(--color-success-strong)', fontWeight: 600, marginBottom: 0 }}>
             Status: CONFIRMED
           </p>
         ) : null}

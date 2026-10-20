@@ -56,7 +56,7 @@ function RequestTimelineCell({ documentType, documentId }) {
         <span style={{
           display: 'inline-block', fontSize: 11, fontWeight: 600,
           padding: '2px 8px', borderRadius: 20,
-          background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0',
+          background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid #bbf7d0',
           whiteSpace: 'nowrap',
         }}>
           {events.length}. {latestLabel}
@@ -67,7 +67,7 @@ function RequestTimelineCell({ documentType, documentId }) {
             onClick={() => setExpanded((v) => !v)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 11, color: '#64748b', padding: '2px 4px',
+              fontSize: 11, color: 'var(--color-text-muted)', padding: '2px 4px',
               textDecoration: 'underline', whiteSpace: 'nowrap',
             }}
           >
@@ -83,7 +83,7 @@ function RequestTimelineCell({ documentType, documentId }) {
             <li key={event.id} style={{
               fontSize: 11,
               fontWeight: idx === events.length - 1 ? 700 : 400,
-              color: idx === events.length - 1 ? '#059669' : '#475569',
+              color: idx === events.length - 1 ? 'var(--color-success)' : 'var(--color-text-secondary)',
             }}>
               {event.action} ({event.to_status ?? event.from_status ?? '-'})
             </li>

@@ -584,7 +584,7 @@ export function InvoiceDraftListPage() {
       ) : null}
 
       {recalculateMsg ? (
-        <div className="section-card" role="status" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-success)', background: '#f0fdf4' }}>
+        <div className="section-card" role="status" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--tgd-success)', background: 'var(--color-success-soft)' }}>
           {recalculateMsg}
         </div>
       ) : null}
@@ -908,7 +908,7 @@ export function InvoiceDraftListPage() {
                           <td>{lot.lotNo ?? '-'}</td>
                           <td>{lot.customerProductCode ?? '-'}</td>
                           <td colSpan={4}>
-                            <span style={{ color: '#b45309', marginRight: 8 }}>
+                            <span style={{ color: 'var(--color-warning)', marginRight: 8 }}>
                               ล็อตนี้ยังไม่เคยตั้งค่า — ระบุวันที่ "คิดค่าฝากไปแล้วถึงวันที่"
                             </span>
                             <input
@@ -1110,7 +1110,7 @@ export function InvoiceDraftListPage() {
               ) : null}
 
               {storageBillPreview.totalsByType && Object.keys(storageBillPreview.totalsByType).length > 0 ? (
-                <div style={{ textAlign: 'right', fontSize: 12, color: '#475569', marginBottom: 4 }} data-testid="storage-bill-totals-by-type">
+                <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }} data-testid="storage-bill-totals-by-type">
                   {Object.entries(storageBillPreview.totalsByType).map(([type, amount]) => (
                     <span key={type} style={{ marginLeft: 16 }}>
                       {SOURCE_DOCUMENT_TYPE_LABELS[type] ?? type}: {amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท

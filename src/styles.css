@@ -35,9 +35,70 @@
   --tgd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --tgd-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --tgd-shadow-card: 0 10px 30px -5px rgba(15, 23, 42, 0.06);
+
+  /* Semantic tokens (see DESIGN.md). New code uses these; the --tgm-* /
+   * --tgd-* names above stay as the brand/shell layer they alias. */
+  --color-gold: var(--tgd-primary-gold);
+  --color-gold-hover: var(--tgd-primary-gold-hover);
+  --color-gold-soft: var(--tgm-gold-soft);
+  --color-sidebar: var(--tgd-sidebar-bg);
+  --color-bg: var(--tgd-main-bg);
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-sunken: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-subtle: #e5e7eb;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-strong: #1e293b;
+  --color-text-body: #374151;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-soft: #eff6ff;
+  --color-danger: #dc2626;
+  --color-danger-strong: #991b1b;
+  --color-danger-soft: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-warning: #b45309;
+  --color-warning-strong: #92400e;
+  --color-warning-soft: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-success: #059669;
+  --color-success-strong: #166534;
+  --color-success-soft: #f0fdf4;
+  --color-info: var(--tgd-info);
+
+  --font-sans: 'IBM Plex Sans Thai', 'Leelawadee UI', 'Sarabun', Tahoma, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
   color: var(--tgd-main-text);
   background: var(--tgd-main-bg);
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -45,6 +106,9 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Weights, money and quantities line up down a column. */
+table { font-variant-numeric: tabular-nums; }
 
 *:focus-visible {
   outline: 2px solid var(--tgd-accent);
@@ -106,8 +170,8 @@ a:hover { text-decoration: underline; }
 .app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
 .banner { padding: 8px 16px; font-size: 12px; font-weight: 600; text-align: center; flex-shrink: 0; }
-.banner-warning { background-color: #fff3cd; color: #856404; border-bottom: 1px solid #ffeeba; }
-.banner-danger { background-color: #f8d7da; color: #721c24; border-bottom: 1px solid #f5c6cb; }
+.banner-warning { background-color: var(--color-warning-soft); color: var(--color-warning-strong); border-bottom: 1px solid var(--color-warning-border); }
+.banner-danger { background-color: var(--color-danger-soft); color: var(--color-danger-strong); border-bottom: 1px solid var(--color-danger-border); }
 .banner-success { background-color: #d4edda; color: #155724; border-bottom: 1px solid #c3e6cb; }
 .banner-info { background-color: #e7f1ff; color: #1e40af; border-bottom: 1px solid #bfdbfe; }
 .uat-safety-banner { letter-spacing: 0.02em; text-transform: uppercase; }
@@ -230,10 +294,10 @@ a:hover { text-decoration: underline; }
 .language-toggle-btn { white-space: nowrap; }
 
 .badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; font-size: 10px; font-weight: 600; height: 18px; border-radius: 999px; white-space: nowrap; word-break: keep-all; max-width: max-content; line-height: 1; text-transform: uppercase; }
-.badge-success { background-color: #d1e7dd; color: var(--tgd-success); }
-.badge-warning { background-color: #fff3cd; color: #856404; }
-.badge-danger { background-color: #f8d7da; color: var(--tgd-danger); }
-.badge-neutral { background-color: #e9ecef; color: #495057; }
+.badge-success { background-color: var(--color-success-soft); color: var(--color-success-strong); }
+.badge-warning { background-color: var(--color-warning-soft); color: var(--color-warning-strong); }
+.badge-danger { background-color: var(--color-danger-soft); color: var(--color-danger-strong); }
+.badge-neutral { background-color: var(--color-surface-sunken); color: var(--color-text-secondary); }
 
 .production-hold-banner, .sidebar-hold-banner {
   align-items: center;
@@ -371,15 +435,9 @@ button, .btn {
 
 .btn-primary { background-color: var(--tgd-sidebar-bg); color: var(--tgm-white); border-color: var(--tgd-sidebar-bg); }
 .btn-primary:hover { background-color: var(--tgm-dark); }
-.btn-accent { background-color: var(--tgd-primary-gold); color: var(--tgm-black); border-color: var(--tgd-primary-gold); }
-.btn-accent:hover { background-color: var(--tgd-primary-gold-hover); }
 .btn-outline { background-color: transparent; color: var(--tgd-main-text); border-color: var(--tgd-border); }
 .btn-outline:hover { background-color: var(--tgd-main-bg); }
-.btn-danger { background-color: var(--tgd-danger); color: var(--tgm-white); }
-.btn-danger:hover { background-color: #c82333; }
 .btn-block { display: flex; width: 100%; }
-.btn-primary-gold { background: var(--tgd-primary-gold); border: 0; border-radius: 4px; color: var(--tgm-black); cursor: pointer; font-weight: 600; height: 28px; padding: 0 10px; transition: background 0.15s; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
-.btn-primary-gold:hover { background: var(--tgd-primary-gold-hover); }
 
 .form-group { margin-bottom: 6px; }
 label, .form-label { font-size: 11px; font-weight: 600; margin-bottom: 2px; display: block; color: var(--tgd-main-text); }
@@ -611,7 +669,8 @@ td, .table-cell, .table td { padding: 6px 8px; font-size: 12px; color: var(--tgd
   color: #111827;
   font-size: 12px;
   line-height: 1.45;
-  /* The app's global font (Inter, on body) has zero Thai glyph coverage,
+  /* Print documents don't use the on-screen font (--font-sans) and have
+     historically had no reliable Thai glyph coverage,
      so every Thai character in a print document was silently falling back
      through the browser's generic OS font-substitution chain — which font
      that resolves to (and its exact character widths) isn't guaranteed to
@@ -1079,16 +1138,16 @@ table .status-badge,
   margin-top: 0;
 }
 
-.status-badge--draft { background: #e9ecef; color: #495057; }
-.status-badge--open { background: #cff4fc; color: #055160; }
-.status-badge--confirmed { background: #d1e7dd; color: #0f5132; }
-.status-badge--blocked { background: #f8d7da; color: #842029; }
-.status-badge--hold { background: #fff3cd; color: #664d03; }
-.status-badge--pass { background: #d1e7dd; color: #198754; }
-.status-badge--fail { background: #f8d7da; color: #dc3545; }
+.status-badge--draft { background-color: var(--color-surface-sunken); color: var(--color-text-secondary); }
+.status-badge--open { background-color: var(--color-accent-soft); color: var(--color-accent-hover); }
+.status-badge--confirmed { background-color: var(--color-success-soft); color: var(--color-success-strong); }
+.status-badge--blocked { background-color: var(--color-danger-soft); color: var(--color-danger-strong); }
+.status-badge--hold { background-color: var(--color-warning-soft); color: var(--color-warning-strong); }
+.status-badge--pass { background-color: var(--color-success-soft); color: var(--color-success-strong); }
+.status-badge--fail { background-color: var(--color-danger-soft); color: var(--color-danger-strong); }
 .status-badge--uat { background: var(--tgd-navy-soft); color: var(--tgd-navy); }
-.status-badge--success { background: #d1e7dd; color: #0f5132; }
-.status-badge--warning { background: #fff3cd; color: #664d03; }
+.status-badge--success { background-color: var(--color-success-soft); color: var(--color-success-strong); }
+.status-badge--warning { background-color: var(--color-warning-soft); color: var(--color-warning-strong); }
 
 .warning-panel {
   background: #fffbeb;
@@ -1138,7 +1197,7 @@ table .status-badge,
 
 .uat-diagnostics-card h4,
 .diagnostic-panel h4 {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
   margin: 0 0 8px;
@@ -1203,24 +1262,39 @@ table .status-badge,
 .btn-danger {
   background: var(--tgd-danger);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   min-height: 34px;
   padding: 6px 14px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-danger);
 }
 
 .btn-primary,
 .btn-primary-gold {
   background: var(--tgd-navy);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   min-height: 34px;
   padding: 6px 14px;
+}
+
+/* .btn-primary-gold is navy despite its name (kept for the markup that uses
+ * it); these layout rules were only ever declared for it. */
+.btn-primary-gold {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .btn-primary:hover:not(:disabled),

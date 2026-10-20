@@ -772,7 +772,7 @@ export function CustomerWithdrawalRequestCreatePage() {
               {auxServiceOptions.map((opt) => {
                 const sel = selectedAuxServices[opt.id] ?? { checked: false, quantity: 1 };
                 return (
-                  <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: sel.checked ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
+                  <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: sel.checked ? 'var(--color-success-soft)' : 'var(--color-surface-muted)', borderRadius: 8 }}>
                     <input
                       type="checkbox"
                       checked={sel.checked}
