@@ -1,3 +1,4 @@
+import { KeyRound, Pause, Pencil, Play, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
@@ -159,7 +160,7 @@ export function UserManagementPage() {
             aria-label={t('edit')}
             type="button"
           >
-            ✎
+            <Pencil size={14} aria-hidden="true" />
           </button>
           {row.auth_user_id ? (
             <button
@@ -170,7 +171,7 @@ export function UserManagementPage() {
               aria-label="รีเซตรหัสผ่าน"
               type="button"
             >
-              🔑
+              <KeyRound size={14} aria-hidden="true" />
             </button>
           ) : null}
           <button
@@ -181,7 +182,7 @@ export function UserManagementPage() {
             aria-label={row.is_active ? t('user_mgmt_deactivate') : t('user_mgmt_activate')}
             type="button"
           >
-            {row.is_active ? '⏸' : '▶'}
+            {row.is_active ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
           </button>
           <button
             className="btn btn-danger icon-btn"
@@ -191,7 +192,7 @@ export function UserManagementPage() {
             aria-label="ลบผู้ใช้"
             type="button"
           >
-            🗑
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         </div>
       ),

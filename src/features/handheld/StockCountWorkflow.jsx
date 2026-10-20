@@ -1,3 +1,5 @@
+import { AlertTriangle, Camera, Check, CheckCircle2, Circle, Hourglass, Package, Pencil, Play, X } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { C, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
 import { useHandheldAuth } from './HandheldContext.jsx';
@@ -84,7 +86,7 @@ function PalletCard({ pallet, locationCode, photo, entry, onChange, highlighted,
       onChange({ ...entry, mode: next });
     }
   };
-  const btn = (key, label, color) => ({
+  const btn = (key, color) => ({
     flex: 1, minHeight: 52, borderRadius: 14, fontSize: 15, fontWeight: 900, cursor: 'pointer',
     border: `2px solid ${mode === key ? color : C.border}`,
     background: mode === key ? color : C.surface,
@@ -103,7 +105,7 @@ function PalletCard({ pallet, locationCode, photo, entry, onChange, highlighted,
         {photo ? (
           <img src={photo.url} alt={pallet.product_name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }} />
         ) : (
-          <div style={{ color: C.muted, fontSize: 14, fontWeight: 700 }}>📦 ยังไม่มีรูปสินค้า</div>
+          <div style={{ color: C.muted, fontSize: 14, fontWeight: 700 }}><IconLabel icon={Package} size={16} gap={6}>ยังไม่มีรูปสินค้า</IconLabel></div>
         )}
         {photo && (
           <span style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(9,17,28,0.75)', color: '#fff', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 700 }}>
@@ -132,9 +134,9 @@ function PalletCard({ pallet, locationCode, photo, entry, onChange, highlighted,
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" style={btn('match', C.green)} onClick={() => setMode('match')}>✓ ตรง</button>
-          <button type="button" style={btn('diff', C.amber)} onClick={() => setMode('diff')}>✎ ไม่ตรง</button>
-          <button type="button" style={btn('missing', C.red)} onClick={() => setMode('missing')}>✕ ไม่พบ</button>
+          <button type="button" style={btn('match', C.green)} onClick={() => setMode('match')}><IconLabel icon={Check} size={18} gap={6}>ตรง</IconLabel></button>
+          <button type="button" style={btn('diff', C.amber)} onClick={() => setMode('diff')}><IconLabel icon={Pencil} size={18} gap={6}>ไม่ตรง</IconLabel></button>
+          <button type="button" style={btn('missing', C.red)} onClick={() => setMode('missing')}><IconLabel icon={X} size={18} gap={6}>ไม่พบ</IconLabel></button>
         </div>
 
         {mode === 'diff' && (
@@ -404,7 +406,7 @@ export function StockCountWorkflow({ onBack }) {
           {banner}
           <button type="button" onClick={openScanner}
             style={{ width: '100%', minHeight: 52, borderRadius: 16, border: `2px dashed ${C.border}`, background: C.surface, fontSize: 15, fontWeight: 800, color: C.text, cursor: 'pointer', marginBottom: 16 }}>
-            📷 สแกน QR บนกล่อง เพื่อหาพาเลท
+            <IconLabel icon={Camera} size={18} gap={8}>สแกน QR บนกล่อง เพื่อหาพาเลท</IconLabel>
           </button>
 
           {palletsLoading && <div style={{ color: C.muted, textAlign: 'center', padding: 24 }}>กำลังโหลดพาเลท...</div>}
@@ -430,7 +432,7 @@ export function StockCountWorkflow({ onBack }) {
                 <div style={{ fontSize: 12, color: C.textSec }}>{x.trackingCode && x.productName ? `${x.trackingCode} · ` : ''}{x.boxes || 0} กล่อง{x.weight ? ` · ${x.weight} กก.` : ''}{x.note ? ` · ${x.note}` : ''}</div>
               </div>
               <button type="button" aria-label="ลบ" onClick={() => setExtras((prev) => prev.filter((e) => e.key !== x.key))}
-                style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.red, cursor: 'pointer' }}>✕</button>
+                style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.red, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
           ))}
 
@@ -464,7 +466,7 @@ export function StockCountWorkflow({ onBack }) {
         <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 720, boxSizing: 'border-box', background: C.surface, borderTop: `1px solid ${C.borderLight}`, padding: '14px 12px 24px', boxShadow: '0 -10px 40px rgba(0,0,0,0.08)' }}>
           <button type="button" disabled={busy || palletsLoading} onClick={handleSaveRow} data-testid="stock-count-save-row"
             style={{ width: '100%', padding: 18, borderRadius: 18, border: 'none', fontSize: 18, fontWeight: 900, cursor: 'pointer', color: '#fff', background: allDone ? C.green : C.muted }}>
-            {busy ? '⏳ กำลังบันทึก...' : `บันทึกแถวนี้ (${doneCount}/${pallets.length})`}
+            {busy ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังบันทึก...</IconLabel> : `บันทึกแถวนี้ (${doneCount}/${pallets.length})`}
           </button>
         </div>
       </>,
@@ -484,7 +486,7 @@ export function StockCountWorkflow({ onBack }) {
             <div style={{ fontSize: 15, color: C.textSec, fontWeight: 700, marginBottom: 16 }}>ยังไม่มีรอบนับที่เปิดอยู่</div>
             <button type="button" disabled={busy || !isOnline} onClick={handleStart} data-testid="stock-count-start"
               style={{ width: '100%', padding: 18, borderRadius: 18, border: 'none', background: C.primary, color: C.gold, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>
-              ▶ เริ่มรอบนับใหม่
+              <IconLabel icon={Play} size={20} gap={8}>เริ่มรอบนับใหม่</IconLabel>
             </button>
           </div>
         ) : (
@@ -515,7 +517,7 @@ export function StockCountWorkflow({ onBack }) {
                   </button>
                 )}
                 <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 8 }}>
-                  <span>⚪ ยังไม่นับ</span><span>✅ ตรง</span><span>⚠️ มีผลต่าง</span>
+                  <IconLabel icon={Circle} size={12} gap={4} iconProps={{ color: C.border }}>ยังไม่นับ</IconLabel><IconLabel icon={CheckCircle2} size={14} gap={4} iconProps={{ color: C.green }}>ตรง</IconLabel><IconLabel icon={AlertTriangle} size={14} gap={4} iconProps={{ color: '#f59e0b' }}>มีผลต่าง</IconLabel>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 8 }}>
                   {rowsInSide.map((l) => {
@@ -525,7 +527,7 @@ export function StockCountWorkflow({ onBack }) {
                     return (
                       <button key={l.id} type="button" onClick={() => openLocation(l)} data-testid="stock-count-row"
                         style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${color}`, background: counted ? (status === 'VARIANCE' ? 'var(--color-warning-soft)' : C.greenLight) : C.surface, cursor: 'pointer', fontWeight: 900, color: C.text }}>
-                        <div style={{ fontSize: 15 }}>{counted ? (status === 'VARIANCE' ? '⚠️ ' : '✅ ') : ''}{formatRowLabel(l.parsed.row)}</div>
+                        <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{counted ? (status === 'VARIANCE' ? <AlertTriangle size={15} aria-hidden="true" color="#f59e0b" /> : <CheckCircle2 size={15} aria-hidden="true" color={C.green} />) : null}{formatRowLabel(l.parsed.row)}</div>
                         <div style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace' }}>{l.code}</div>
                       </button>
                     );
@@ -536,7 +538,7 @@ export function StockCountWorkflow({ onBack }) {
 
             <button type="button" disabled={busy || !isOnline} onClick={handleSubmitSession} data-testid="stock-count-submit"
               style={{ width: '100%', marginTop: 28, padding: 16, borderRadius: 16, border: `2px solid ${C.green}`, background: C.surface, color: C.green, fontSize: 16, fontWeight: 900, cursor: 'pointer' }}>
-              ✓ ส่งผลการนับ ({countedTotal} Location)
+              <IconLabel icon={Check} size={18} gap={8}>ส่งผลการนับ ({countedTotal} Location)</IconLabel>
             </button>
           </>
         )}

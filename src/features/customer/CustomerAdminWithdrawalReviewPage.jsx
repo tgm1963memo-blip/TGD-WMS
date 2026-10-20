@@ -1,3 +1,5 @@
+import { AlertTriangle, Check, Plus, Save, ScrollText } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
@@ -1118,7 +1120,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               </div>
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
-                <div>{selected.requires_r3_document ? '✔' : '-'}</div>
+                <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>
               </div>
               <WorkPhaseTimeControl
                 canWrite={canWrite}
@@ -1258,7 +1260,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                 style={{ marginLeft: 8 }}
                 onClick={() => setTimelineOpen((v) => !v)}
               >
-                📜 {timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}
+                <IconLabel icon={ScrollText} size={14} gap={6}>{timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}</IconLabel>
               </button>
             </div>
 
@@ -1319,7 +1321,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                     className="btn btn-secondary btn-sm"
                     onClick={openAddLine}
                   >
-                    ➕ เพิ่มรายการ
+                    <IconLabel icon={Plus} size={14} gap={6}>เพิ่มรายการ</IconLabel>
                   </button>
                 ) : null}
               </div>
@@ -1355,7 +1357,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                               value={lineProductCodes[line.id] ?? line.customer_product_code ?? ''}
                               onChange={(e) => setLineProductCodes((prev) => ({ ...prev, [line.id]: e.target.value }))}
                             />
-                            <button
+                            <button aria-label="บันทึกรหัสสินค้า"
                               type="button"
                               className="btn btn-secondary btn-sm"
                               disabled={!canWrite || savingProductCode[line.id]}
@@ -1371,7 +1373,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 }
                               }}
                             >
-                              {savingProductCode[line.id] ? '…' : '💾'}
+                              {savingProductCode[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                             </button>
                           </div>
                         </td>
@@ -1386,7 +1388,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                               value={lineTrackingCodes[line.id] ?? line.tracking_code ?? ''}
                               onChange={(e) => setLineTrackingCodes((prev) => ({ ...prev, [line.id]: e.target.value }))}
                             />
-                            <button
+                            <button aria-label="บันทึกรหัสติดตาม"
                               type="button"
                               className="btn btn-secondary btn-sm"
                               disabled={!canWrite || savingTrackingCode[line.id]}
@@ -1404,7 +1406,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 }
                               }}
                             >
-                              {savingTrackingCode[line.id] ? '…' : '💾'}
+                              {savingTrackingCode[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                             </button>
                           </div>
                         </td>
@@ -1418,7 +1420,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                               value={lineLotNos[line.id] ?? line.lot_no ?? ''}
                               onChange={(e) => setLineLotNos((prev) => ({ ...prev, [line.id]: e.target.value }))}
                             />
-                            <button
+                            <button aria-label="บันทึก LOT"
                               type="button"
                               className="btn btn-secondary btn-sm"
                               disabled={!canWrite || savingLotNo[line.id]}
@@ -1434,7 +1436,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 }
                               }}
                             >
-                              {savingLotNo[line.id] ? '…' : '💾'}
+                              {savingLotNo[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                             </button>
                           </div>
                         </td>
@@ -1451,7 +1453,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 <option key={type} value={type}>{TEMPERATURE_TYPE_LABELS[type] ?? type}</option>
                               ))}
                             </select>
-                            <button
+                            <button aria-label="บันทึกอุณหภูมิ"
                               type="button"
                               className="btn btn-secondary btn-sm"
                               disabled={!canWrite || savingTemperatureType[line.id]}
@@ -1468,7 +1470,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 }
                               }}
                             >
-                              {savingTemperatureType[line.id] ? '…' : '💾'}
+                              {savingTemperatureType[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                             </button>
                           </div>
                         </td>
@@ -1518,7 +1520,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                               value={lineAdminNotes[line.id] ?? line.admin_note ?? ''}
                               onChange={(e) => setLineAdminNotes((prev) => ({ ...prev, [line.id]: e.target.value }))}
                             />
-                            <button
+                            <button aria-label="บันทึกหมายเหตุ"
                               type="button"
                               className="btn btn-secondary btn-sm"
                               disabled={!canWrite || savingAdminNote[line.id]}
@@ -1532,7 +1534,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                                 }
                               }}
                             >
-                              {savingAdminNote[line.id] ? '…' : '💾'}
+                              {savingAdminNote[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                             </button>
                           </div>
                         </td>
@@ -1577,7 +1579,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             {/* Warning when confirm dispatch is blocked */}
             {confirmWithdrawalBlockedReason ? (
               <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
-                ⚠️ {confirmWithdrawalBlockedReason}
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{confirmWithdrawalBlockedReason}
               </div>
             ) : null}
           </>

@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
@@ -664,7 +665,7 @@ export function CustomerProductServiceRatesPage() {
                 </datalist>
                 {form.serviceType && !SERVICE_TYPES.some((s) => s.value === form.serviceType) && (
                   <p style={{ fontSize: 11, color: 'var(--color-warning)', margin: '4px 0 0' }}>
-                    ⚠ "{form.serviceType}" เป็นประเภทที่กำหนดเอง (custom) — ใบแจ้งหนี้ที่คำนวณอัตโนมัติจากรายการเคลื่อนไหว
+                    <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />"{form.serviceType}" เป็นประเภทที่กำหนดเอง (custom) — ใบแจ้งหนี้ที่คำนวณอัตโนมัติจากรายการเคลื่อนไหว
                     (รับเข้า/เบิกออก/ค่าฝาก) จะ<strong>ไม่นำอัตรานี้มาคำนวณให้เอง</strong> ต้องเลือกด้วยตนเองเป็นบริการเสริมต่อคำขอ —
                     ถ้าต้องการให้คิดค่าบริการรับเข้า/นำออกอัตโนมัติ กรุณาเลือก "ค่านำเข้า (Handling In)" หรือ
                     "ค่านำออก (Handling Out)" จากรายการแทน

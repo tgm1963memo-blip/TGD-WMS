@@ -1,3 +1,5 @@
+import { ArrowLeft, Check, PartyPopper } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -181,7 +183,7 @@ export function StockCountReviewPage() {
       ) : (
         <>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>← รายการรอบนับ</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}><IconLabel icon={ArrowLeft} size={14} gap={4}>รายการรอบนับ</IconLabel></button>
             <h3 style={{ margin: 0 }}>{selected.count_no}</h3>
             <Badge label={LOCATION_COUNT_STATUS_LABELS[selected.status] ?? selected.status} color={STATUS_COLORS[selected.status] ?? '#64748b'} />
             <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>
@@ -258,7 +260,7 @@ export function StockCountReviewPage() {
                       </tr>
                     );
                   }) : (
-                    <tr><td colSpan={9}>{varianceOnly ? 'ไม่มีรายการที่ไม่ตรง 🎉' : 'ยังไม่มีผลการนับ'}</td></tr>
+                    <tr><td colSpan={9}>{varianceOnly ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>ไม่มีรายการที่ไม่ตรง<PartyPopper size={16} aria-hidden="true" /></span> : 'ยังไม่มีผลการนับ'}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -273,7 +275,7 @@ export function StockCountReviewPage() {
                     <span>หมายเหตุการตรวจ</span>
                     <input className="form-control" value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} placeholder="เช่น แก้ยอดพาเลท 42-R-11-02 แล้ว" />
                   </label>
-                  <button type="button" className="btn btn-primary" disabled={busy} onClick={() => changeStatus('REVIEWED')} data-testid="stock-count-mark-reviewed">✓ ตรวจแล้ว</button>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={() => changeStatus('REVIEWED')} data-testid="stock-count-mark-reviewed"><IconLabel icon={Check} size={14} gap={6}>ตรวจแล้ว</IconLabel></button>
                 </>
               )}
               {selected.status === 'OPEN' && (

@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   PRODUCT_PACKAGING_PHOTO_DOCUMENT_TYPE,
@@ -67,7 +68,7 @@ export function ProductPackagingPhotos({ productId, customerId }) {
             )}
             <button type="button" aria-label="ลบรูป" onClick={() => handleDelete(photo)}
               style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 11, border: 'none', background: 'rgba(15,23,42,0.7)', color: '#fff', fontSize: 12, lineHeight: '22px', padding: 0, cursor: 'pointer' }}>
-              ✕
+              <X size={12} aria-hidden="true" />
             </button>
           </div>
         ))}

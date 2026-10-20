@@ -1,3 +1,5 @@
+import { Undo2 } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -246,7 +248,7 @@ export function CustomerDepositRequestListPage() {
             title="ดึงเอกสารกลับมาเป็นร่างเพื่อแก้ไข ก่อนที่เจ้าหน้าที่จะเปิดใบงาน"
             type="button"
           >
-            {recallingId === row.id ? 'กำลังเรียกกลับ...' : '↩ เรียกเอกสารกลับ'}
+            {recallingId === row.id ? 'กำลังเรียกกลับ...' : <IconLabel icon={Undo2} size={14} gap={6}>เรียกเอกสารกลับ</IconLabel>}
           </button>
         ) : null}
         {canWriteCustomerRequests && DELETABLE_STATUSES.has(row.status) ? (

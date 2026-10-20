@@ -1,3 +1,5 @@
+import { AlertTriangle, RefreshCw, Settings, Warehouse, X } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -76,7 +78,7 @@ function RowBar({ location, onClick }) {
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
       </div>
       <span style={{ fontSize: 12, fontWeight: 700, color, width: overCapacity ? 68 : 48, textAlign: 'right', flexShrink: 0 }}>
-        {used}/{capacity}{overCapacity ? ' ⚠' : ''}
+        {used}/{capacity}{overCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
       </span>
     </div>
   );
@@ -181,7 +183,7 @@ function VirtualRow({ location, onClick }) {
       <span style={{ width: 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isStaging ? '#b9660a' : 'var(--color-text-secondary)' }}>{label}</span>
       <PalletCells capacity={capacity} used={used} color={color} />
       <span style={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : 'var(--color-text-subtle)' }}>
-        {used}/{capacity}{overCapacity ? ' ⚠' : ''}
+        {used}/{capacity}{overCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
       </span>
     </button>
   );
@@ -387,7 +389,7 @@ export function WarehouseLayoutWidget() {
   if (sections.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-subtle)' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🏭</div>
+        <div style={{ fontSize: 40, marginBottom: 12 }}><Warehouse size={40} aria-hidden="true" /></div>
         <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
           ยังไม่มีการตั้งค่าผังคลัง
         </div>
@@ -419,7 +421,7 @@ export function WarehouseLayoutWidget() {
             background: '#fef3c7', border: '1px solid #f5c451', borderRadius: 10,
             padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#8a5300',
           }}>
-            <span style={{ fontSize: 16, lineHeight: 1 }}>⚠</span>
+            <span style={{ fontSize: 16, lineHeight: 1, display: 'flex' }}><AlertTriangle size={16} aria-hidden="true" /></span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, marginBottom: 6 }}>
                 พบ {overCapacityLocations.length} แถวที่มี pallet เกินความจุที่ตั้งไว้
@@ -497,7 +499,7 @@ export function WarehouseLayoutWidget() {
               }}
               title="รีเฟรชผังคลัง"
             >
-              {loading ? '⟳ กำลังโหลด...' : '⟳ รีเฟรช'}
+              {loading ? <IconLabel icon={RefreshCw} size={14} gap={4}>กำลังโหลด...</IconLabel> : <IconLabel icon={RefreshCw} size={14} gap={4}>รีเฟรช</IconLabel>}
             </button>
             <button
               type="button"
@@ -507,7 +509,7 @@ export function WarehouseLayoutWidget() {
                 background: '#fff', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
               }}
             >
-              ⚙ ตั้งค่า Location
+              <IconLabel icon={Settings} size={14} gap={4}>ตั้งค่า Location</IconLabel>
             </button>
           </div>
         </div>
@@ -655,7 +657,7 @@ export function WarehouseLayoutWidget() {
             color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
           }}
         >
-          ⚙ ตั้งค่า Location
+          <IconLabel icon={Settings} size={14} gap={4}>ตั้งค่า Location</IconLabel>
         </button>
       </div>
 
@@ -686,9 +688,10 @@ export function WarehouseLayoutWidget() {
               <button
                 type="button"
                 onClick={() => setStockModal(null)}
+                aria-label="ปิด"
                 style={{ border: 'none', background: 'var(--color-surface-sunken)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 18, color: 'var(--color-text-muted)' }}
               >
-                ✕
+                <X size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -743,7 +746,7 @@ export function WarehouseLayoutWidget() {
                         return (
                           <tr key={palletNo}>
                             <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: overRowCapacity ? 'var(--color-danger)' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
-                              {palletNo}{overRowCapacity ? ' ⚠' : ''}
+                              {palletNo}{overRowCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
                             </td>
                             {items.length > 0 ? (
                               <>

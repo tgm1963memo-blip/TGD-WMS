@@ -1,6 +1,7 @@
 // Shared Scan Center (handheld) building blocks: theme tokens, feedback,
 // camera scanner and top bar. Used by HandheldPage and the workflows split
 // out of it (e.g. StockCountWorkflow).
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 
@@ -199,8 +200,9 @@ export function TopBar({ title, subtitle, onBack, badge }) {
             color: '#ffffff', fontSize: 20, cursor: 'pointer',
             width: 40, height: 40, borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-          ←
+          }}
+          aria-label="ย้อนกลับ">
+          <ArrowLeft size={20} aria-hidden="true" />
         </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>

@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
@@ -113,6 +114,7 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
           <button
             type="button"
             onClick={onClose}
+            aria-label="ปิด"
             style={{
               background: 'none', border: 'none', fontSize: 22,
               cursor: 'pointer', color: 'var(--tgd-muted-text)',
@@ -120,7 +122,7 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            ✕
+            <X size={22} aria-hidden="true" />
           </button>
         </div>
 

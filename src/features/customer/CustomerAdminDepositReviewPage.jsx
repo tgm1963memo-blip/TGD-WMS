@@ -1,3 +1,5 @@
+import { AlertTriangle, Check, Plus, Printer } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -789,7 +791,7 @@ export function CustomerAdminDepositReviewPage() {
               </div>
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
-                <div>{selected.requires_r3_document ? '✔' : '-'}</div>
+                <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>
               </div>
               <WorkPhaseTimeControl
                 canWrite={canWrite}
@@ -872,7 +874,7 @@ export function CustomerAdminDepositReviewPage() {
                       onClick={openAddLine}
                       title="สำหรับกรณีลูกค้าฝากสินค้าเข้ามาผิดรายการ (ไม่ตรงกับที่แจ้งไว้)"
                     >
-                      ➕ เพิ่มรายการ
+                      <IconLabel icon={Plus} size={14} gap={6}>เพิ่มรายการ</IconLabel>
                     </button>
                   ) : null}
                   <StickerRotationControl />
@@ -883,7 +885,7 @@ export function CustomerAdminDepositReviewPage() {
                     disabled={selectedLineIds.size === 0}
                     onClick={handlePrintSelectedStickers}
                   >
-                    🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                    <IconLabel icon={Printer} size={14} gap={6}>พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
                   </button>
                 </div>
               </div>
@@ -936,7 +938,7 @@ export function CustomerAdminDepositReviewPage() {
                               {line.actual_boxes}
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12, fontWeight: 600 }}>⚠</span>
+                            <span style={{ color: 'var(--tgd-danger)', fontSize: 12, fontWeight: 600 }}><AlertTriangle size={14} role="img" aria-label="ยังไม่ระบุจำนวนรับจริง" style={{ verticalAlign: '-2px' }} /></span>
                           )}
                           <span style={{ color: 'var(--tgd-muted-text)', fontSize: 12 }}> / {line.expected_boxes ?? '-'}</span>
                         </td>
@@ -1004,7 +1006,7 @@ export function CustomerAdminDepositReviewPage() {
             {/* Warning when confirm is blocked */}
             {confirmBlockedReason ? (
               <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
-                ⚠️ {confirmBlockedReason}
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{confirmBlockedReason}
               </div>
             ) : null}
 
@@ -1015,9 +1017,9 @@ export function CustomerAdminDepositReviewPage() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>แจ้งลูกค้าทางอีเมล</div>
                     {selected.status === 'CUSTOMER_NOTIFIED' ? (
-                      <span style={{ fontSize: 12, color: 'var(--tgd-success)', fontWeight: 600 }}>✓ ส่งอีเมลแจ้งลูกค้าแล้ว</span>
+                      <span style={{ fontSize: 12, color: 'var(--tgd-success)', fontWeight: 600 }}><IconLabel icon={Check} size={14} gap={4}>ส่งอีเมลแจ้งลูกค้าแล้ว</IconLabel></span>
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--tgd-warning, #d97706)', fontWeight: 600 }}>⚠ ยังไม่ได้ส่งอีเมลแจ้งลูกค้า</span>
+                      <span style={{ fontSize: 12, color: 'var(--tgd-warning, #d97706)', fontWeight: 600 }}><IconLabel icon={AlertTriangle} size={14} gap={4}>ยังไม่ได้ส่งอีเมลแจ้งลูกค้า</IconLabel></span>
                     )}
                   </div>
                   <button
@@ -1248,7 +1250,7 @@ export function CustomerAdminDepositReviewPage() {
             </label>
             {recountTemperatureType && recountTemperatureType !== recountLine.temperature_type ? (
               <p className="form-helper" style={{ marginTop: 6, marginBottom: 0 }}>
-                ⚠️ การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
               </p>
             ) : null}
             <label className="form-field" style={{ marginTop: 8 }}>

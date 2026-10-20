@@ -1,3 +1,4 @@
+import { Check, PartyPopper } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardSection } from '../../components/dashboard/DashboardSection.jsx';
@@ -313,7 +314,7 @@ export function DashboardPage() {
               
               {d.openReceivingRows === 0 && d.openPutawayRows === 0 && d.openPickingRows === 0 && d.openDispatchRows === 0 && (
                 <li className="task-item" style={{ color: 'var(--tgd-text-light)', borderLeftColor: 'var(--color-border-strong)' }}>
-                  {language === 'th' ? 'ไม่มีงานค้างสำหรับวันนี้ 🎉' : 'No pending tasks for today 🎉'}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{language === 'th' ? 'ไม่มีงานค้างสำหรับวันนี้' : 'No pending tasks for today'}<PartyPopper size={16} aria-hidden="true" /></span>
                 </li>
               )}
             </ul>
@@ -365,7 +366,7 @@ export function DashboardPage() {
           <div style={{ color: 'var(--tgd-text-light)' }}>{language === 'th' ? 'กำลังโหลด...' : 'Loading...'}</div>
         ) : !pendingDocs.data || pendingDocs.data.length === 0 ? (
           <div style={{ color: 'var(--tgd-text-light)', padding: '8px 0' }}>
-            {language === 'th' ? 'ไม่มีเอกสารค้างดำเนินการ ✓' : 'No documents awaiting action ✓'}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{language === 'th' ? 'ไม่มีเอกสารค้างดำเนินการ' : 'No documents awaiting action'}<Check size={16} aria-hidden="true" /></span>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

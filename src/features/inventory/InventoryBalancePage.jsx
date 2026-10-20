@@ -1,3 +1,4 @@
+import { User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -439,7 +440,7 @@ export function InventoryBalancePage() {
                 padding: '10px 16px',
                 display: 'flex', alignItems: 'center', gap: 12,
               }}>
-                <span style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>👤 {cg.customerName}</span>
+                <span style={{ fontWeight: 700, fontSize: 14, flex: 1 }}><User size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{cg.customerName}</span>
                 <span style={{ fontSize: 12, opacity: 0.75 }}>
                   รวม {cg.totalBoxes.toLocaleString()} กล่อง · {formatFixed2(cg.totalWeight)} กก.
                 </span>

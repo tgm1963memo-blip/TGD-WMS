@@ -1,3 +1,5 @@
+import { AlertTriangle, Calculator, Camera, Check, CheckCircle2, Circle, Hourglass, MapPin, Pencil, Printer, RefreshCw, X } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { C, Pill, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -123,13 +125,13 @@ function ConfirmedChip({ item }) {
         background: C.green, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: '#fff', fontSize: 18, boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
-      }}>✓</div>
+      }}><Check size={20} aria-hidden="true" /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: C.text, fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'break-word' }}>
           {item.line?.product_name ?? item.line?.customer_product_code}
         </div>
         <div style={{ color: C.green, fontSize: 13, marginTop: 4, fontWeight: 600 }}>
-          {item.boxes} กล่อง · {item.weight} กก.{item.palletId ? ` · ${item.palletId}` : ''}{item.location ? ` · 📍 ${item.location.code}` : ''}
+          {item.boxes} กล่อง · {item.weight} กก.{item.palletId ? ` · ${item.palletId}` : ''}{item.location ? <> · <IconLabel icon={MapPin} size={13} gap={3}>{item.location.code}</IconLabel></> : ''}
         </div>
       </div>
       <span style={{ color: C.textSec, fontSize: 12, fontWeight: 600 }}>{item.confirmedAt}</span>
@@ -170,7 +172,7 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: '#fff', fontSize: 15, fontWeight: 800,
       }}>
-        {isDone ? '✓' : index + 1}
+        {isDone ? <Check size={18} aria-hidden="true" /> : index + 1}
       </div>
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <div style={{ fontSize: 15, fontWeight: 800, wordBreak: 'break-word', overflowWrap: 'anywhere', color: C.text, lineHeight: 1.4 }}>
@@ -639,7 +641,8 @@ function ReceivingWorkflow({ onBack, t }) {
               background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
               padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
             }}>
-            📷 สแกน QR ใบงานฝาก
+            <Camera size={18} aria-hidden="true" />
+            สแกน QR ใบงานฝาก
           </button>
           {docScanError && (
             <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
@@ -717,7 +720,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
       <TopBar
         title={selectedDoc.request_no}
-        subtitle={`✅ ${doneCount}/${lines.length} รายการ`}
+        subtitle={<IconLabel icon={CheckCircle2} size={14} gap={4}>{doneCount}/{lines.length} รายการ</IconLabel>}
         onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); }}
         badge={
           <div style={{
@@ -901,11 +904,12 @@ function ReceivingWorkflow({ onBack, t }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ color: C.primaryDark, fontWeight: 900, fontSize: 20 }}>ยืนยันรับเข้า</div>
               <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); }}
+                aria-label="ปิด"
                 style={{
                   background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 20, color: C.textSec, cursor: 'pointer',
-                }}>✕</button>
+                }}><X size={20} aria-hidden="true" /></button>
             </div>
 
             <div style={{
@@ -949,7 +953,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
             {mismatchWarned && (
               <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 16 }}>
-                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 4 }}>⚠ จำนวนไม่ตรงกับที่แจ้ง</div>
+                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 4 }}><IconLabel icon={AlertTriangle} size={16} gap={6}>จำนวนไม่ตรงกับที่แจ้ง</IconLabel></div>
                 <div style={{ color: '#78350f', fontSize: 13 }}>
                   ที่แจ้ง: {matchedLine.expected_boxes} กล่อง / {matchedLine.expected_weight} กก.
                   — ที่นับได้: {boxes} กล่อง / {weight} กก.
@@ -970,10 +974,10 @@ function ReceivingWorkflow({ onBack, t }) {
             {locations.length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                  📍 เลือก Location จัดเก็บ
+                  <IconLabel icon={MapPin} size={14} gap={4}>เลือก Location จัดเก็บ</IconLabel>
                   {selectedLocation && (
                     <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>
-                      ✓ {selectedLocation.code}
+                      <IconLabel icon={Check} size={14} gap={3}>{selectedLocation.code}</IconLabel>
                     </span>
                   )}
                 </div>
@@ -1052,7 +1056,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
             {selectedLocation && locationOccupied && (
               <div style={{ background: '#fef9c3', border: '1.5px solid #f59e0b', borderRadius: 14, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 20 }}>⚠️</span>
+                <span style={{ display: 'flex', color: '#92400e' }}><AlertTriangle size={20} aria-hidden="true" /></span>
                 <div>
                   <div style={{ fontWeight: 800, color: '#92400e', fontSize: 14 }}>Location นี้มีสินค้าอยู่แล้ว</div>
                   <div style={{ color: '#a16207', fontSize: 12, marginTop: 2 }}>Location <strong>{selectedLocation.code}</strong> มีสินค้าจัดเก็บอยู่แล้ว กรุณาตรวจสอบก่อนยืนยัน</div>
@@ -1072,7 +1076,7 @@ function ReceivingWorkflow({ onBack, t }) {
                 boxShadow: (!boxes && !weight) ? 'none' : (mismatchWarned ? '0 8px 24px rgba(245,158,11,0.4)' : (matchedLine?.actual_boxes != null ? '0 8px 24px rgba(29,111,207,0.4)' : '0 8px 24px rgba(16,185,129,0.4)')),
                 transition: 'all 0.2s',
               }}>
-              {saving ? '⏳ กำลังบันทึก...' : mismatchWarned ? '⚠ ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)' : locationOccupiedWarned ? '⚠ ยืนยันอีกครั้ง (Location มีสินค้าอยู่แล้ว)' : matchedLine?.actual_boxes != null ? '✎ แก้ไขยอดรับเข้า' : '✓ ยืนยันรับสินค้า'}
+              {saving ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังบันทึก...</IconLabel> : mismatchWarned ? <IconLabel icon={AlertTriangle} size={20} gap={8}>ยืนยันอีกครั้ง (จำนวนต่างจากแจ้ง)</IconLabel> : locationOccupiedWarned ? <IconLabel icon={AlertTriangle} size={20} gap={8}>ยืนยันอีกครั้ง (Location มีสินค้าอยู่แล้ว)</IconLabel> : matchedLine?.actual_boxes != null ? <IconLabel icon={Pencil} size={20} gap={8}>แก้ไขยอดรับเข้า</IconLabel> : <IconLabel icon={Check} size={20} gap={8}>ยืนยันรับสินค้า</IconLabel>}
             </button>
           </div>
         ) : (
@@ -1131,8 +1135,9 @@ function ReceivingWorkflow({ onBack, t }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontWeight: 900, fontSize: 18, color: C.text }}>เพิ่มสินค้าที่ไม่ได้แจ้ง</div>
               <button type="button" onClick={() => { setAddExtraOpen(false); setExtraError(''); }}
-                style={{ background: C.border, border: 'none', borderRadius: 14, width: 36, height: 36, fontSize: 18, cursor: 'pointer', color: C.textSec }}>
-                ✕
+                aria-label="ปิด"
+                style={{ background: C.border, border: 'none', borderRadius: 14, width: 36, height: 36, fontSize: 18, cursor: 'pointer', color: C.textSec, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} aria-hidden="true" />
               </button>
             </div>
             {extraError && (
@@ -1193,7 +1198,7 @@ function ReceivingWorkflow({ onBack, t }) {
                 color: (!extraProductName.trim() || !extraBoxes) ? C.muted : '#fff',
                 border: 'none', fontSize: 17, fontWeight: 900, cursor: 'pointer',
               }}>
-              {extraSaving ? '⏳ กำลังบันทึก...' : '✓ เพิ่มและบันทึก'}
+              {extraSaving ? <IconLabel icon={Hourglass} size={18} gap={8}>กำลังบันทึก...</IconLabel> : <IconLabel icon={Check} size={18} gap={8}>เพิ่มและบันทึก</IconLabel>}
             </button>
           </div>
         </div>
@@ -1539,7 +1544,8 @@ function PickingWorkflow({ onBack, t }) {
               background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
               padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
             }}>
-            📷 สแกน QR ใบงานเบิก
+            <Camera size={18} aria-hidden="true" />
+            สแกน QR ใบงานเบิก
           </button>
           {docScanError && (
             <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
@@ -1631,7 +1637,7 @@ function PickingWorkflow({ onBack, t }) {
       {cameraItemEl}
       <TopBar
         title={selectedDoc.withdrawal_no}
-        subtitle={`✅ ${doneCount}/${lines.length} รายการ`}
+        subtitle={<IconLabel icon={CheckCircle2} size={14} gap={4}>{doneCount}/{lines.length} รายการ</IconLabel>}
         onBack={() => { setSelectedDoc(null); setLines([]); setConfirmed([]); setMatchedLine(null); setScanValue(''); }}
         badge={
           <div style={{
@@ -1700,7 +1706,7 @@ function PickingWorkflow({ onBack, t }) {
           <>
             {docCompleted && (
               <div style={{ padding: '16px 20px', background: C.greenLight, borderRadius: 20, border: `2px solid ${C.greenBorder}`, marginBottom: 20, textAlign: 'center' }}>
-                <div style={{ color: C.green, fontWeight: 900, fontSize: 18 }}>✓ ปิดใบงานเรียบร้อยแล้ว</div>
+                <div style={{ color: C.green, fontWeight: 900, fontSize: 18 }}><IconLabel icon={CheckCircle2} size={20} gap={8}>ปิดใบงานเรียบร้อยแล้ว</IconLabel></div>
                 <div style={{ color: C.textSec, fontSize: 13, marginTop: 4 }}>{selectedDoc.withdrawal_no} — สถานะ: เสร็จสิ้น</div>
               </div>
             )}
@@ -1757,13 +1763,14 @@ function PickingWorkflow({ onBack, t }) {
         {autoConfirmedItem ? (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ color: C.green, fontWeight: 900, fontSize: 20 }}>✓ จัดเตรียมเรียบร้อย</div>
+              <div style={{ color: C.green, fontWeight: 900, fontSize: 20 }}><IconLabel icon={CheckCircle2} size={22} gap={8}>จัดเตรียมเรียบร้อย</IconLabel></div>
               <button type="button" onClick={() => setAutoConfirmedItem(null)}
+                aria-label="ปิด"
                 style={{
                   background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 20, color: C.textSec, cursor: 'pointer',
-                }}>✕</button>
+                }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div style={{
               background: C.greenLight, borderRadius: 20, padding: '16px',
@@ -1786,11 +1793,12 @@ function PickingWorkflow({ onBack, t }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ color: C.pickAccent, fontWeight: 900, fontSize: 20 }}>ยืนยันหยิบสินค้า</div>
               <button type="button" onClick={() => { setMatchedLine(null); setScanValue(''); setEditWarned(false); }}
+                aria-label="ปิด"
                 style={{
                   background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 20, color: C.textSec, cursor: 'pointer',
-                }}>✕</button>
+                }}><X size={20} aria-hidden="true" /></button>
             </div>
 
             {/* Product card with requested qty */}
@@ -1829,7 +1837,7 @@ function PickingWorkflow({ onBack, t }) {
 
             {editWarned && (
               <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12 }}>
-                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 2 }}>⚠ รายการนี้ยืนยันแล้ว</div>
+                <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 2 }}><IconLabel icon={AlertTriangle} size={16} gap={6}>รายการนี้ยืนยันแล้ว</IconLabel></div>
                 <div style={{ color: '#78350f', fontSize: 13 }}>กดยืนยันการแก้ไขอีกครั้งเพื่อบันทึกค่าใหม่</div>
               </div>
             )}
@@ -1838,12 +1846,12 @@ function PickingWorkflow({ onBack, t }) {
               <div style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>กำลังตรวจสอบ pallet...</div>
             ) : pickablePallets.length === 1 ? (
               <div style={{ background: C.blueLight, borderRadius: 12, padding: '8px 12px', marginBottom: 12, fontSize: 13, fontWeight: 700, color: C.text }}>
-                📍 หยิบจาก {buildPalletCode(pickablePallets[0].locationCode ?? '?', pickablePallets[0].palletNo)}
+                <IconLabel icon={MapPin} size={14} gap={4}>หยิบจาก {buildPalletCode(pickablePallets[0].locationCode ?? '?', pickablePallets[0].palletNo)}</IconLabel>
                 <span style={{ color: C.muted, fontWeight: 500, marginLeft: 6 }}>(เหลือ {pickablePallets[0].remainingBoxes ?? '-'} กล่อง)</span>
               </div>
             ) : pickablePallets.length > 1 ? (
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 6 }}>📍 เลือก pallet ที่จะหยิบ</div>
+                <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 6 }}><IconLabel icon={MapPin} size={13} gap={4}>เลือก pallet ที่จะหยิบ</IconLabel></div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {pickablePallets.map((p) => {
                     const isSel = selectedPalletId === p.allocationId;
@@ -1895,7 +1903,7 @@ function PickingWorkflow({ onBack, t }) {
                 boxShadow: ((!boxes && !weight) || (pickablePallets.length > 1 && !selectedPalletId)) ? 'none' : (editWarned ? '0 8px 24px rgba(245,158,11,0.4)' : '0 8px 24px rgba(9,17,28,0.3)'),
                 transition: 'all 0.2s',
               }}>
-              {saving ? '⏳ กำลังบันทึก...' : (editWarned ? '⚠ ยืนยันการแก้ไข' : '✓ ยืนยันหยิบสินค้า')}
+              {saving ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังบันทึก...</IconLabel> : (editWarned ? <IconLabel icon={AlertTriangle} size={20} gap={8}>ยืนยันการแก้ไข</IconLabel> : <IconLabel icon={Check} size={20} gap={8}>ยืนยันหยิบสินค้า</IconLabel>)}
             </button>
           </div>
         ) : (
@@ -1916,14 +1924,14 @@ function PickingWorkflow({ onBack, t }) {
                     boxShadow: completing ? 'none' : '0 8px 24px rgba(5,150,105,0.4)',
                     transition: 'all 0.2s',
                   }}>
-                  {completing ? '⏳ กำลังปิดใบงาน...' : '✓ ปิดใบงาน (หยิบครบแล้ว)'}
+                  {completing ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังปิดใบงาน...</IconLabel> : <IconLabel icon={Check} size={20} gap={8}>ปิดใบงาน (หยิบครบแล้ว)</IconLabel>}
                 </button>
               </div>
             )}
 
             {docCompleted && (
               <div style={{ padding: '14px', background: C.greenLight, borderRadius: 16, border: `2px solid ${C.greenBorder}`, marginBottom: 14, textAlign: 'center' }}>
-                <div style={{ color: C.green, fontWeight: 900, fontSize: 15 }}>✓ ปิดใบงานเรียบร้อยแล้ว</div>
+                <div style={{ color: C.green, fontWeight: 900, fontSize: 15 }}><IconLabel icon={CheckCircle2} size={18} gap={6}>ปิดใบงานเรียบร้อยแล้ว</IconLabel></div>
               </div>
             )}
 
@@ -2396,7 +2404,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
         borderBottom: `1px solid ${isOnline ? C.greenBorder : '#f59e0b'}`,
       }}>
         <span>
-          {isOnline ? (syncing ? '🔄 กำลังซิงค์...' : '🟢 ออนไลน์') : '🟡 ออฟไลน์ — ใช้ข้อมูลที่เตรียมไว้ล่วงหน้า'}
+          {isOnline ? (syncing ? <IconLabel icon={RefreshCw} size={12} gap={4}>กำลังซิงค์...</IconLabel> : <IconLabel icon={Circle} size={10} gap={4} iconProps={{ fill: 'currentColor' }}>ออนไลน์</IconLabel>) : <IconLabel icon={Circle} size={10} gap={4} iconProps={{ fill: 'currentColor' }}>ออฟไลน์ — ใช้ข้อมูลที่เตรียมไว้ล่วงหน้า</IconLabel>}
           {!isOnline && snapshotAt && ` (เมื่อ ${new Date(snapshotAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })})`}
         </span>
         {pendingSyncCount > 0 && <span>· รอซิงค์ {pendingSyncCount} รายการ</span>}
@@ -2440,7 +2448,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
               background: C.headerBg, color: '#fff', border: 'none', borderRadius: 14,
               padding: '14px 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
             }}>
-            📷 {trackingScanning ? 'กำลังค้นหา...' : 'สแกนรหัสติดตาม'}
+            <Camera size={18} aria-hidden="true" />
+            {trackingScanning ? 'กำลังค้นหา...' : 'สแกนรหัสติดตาม'}
           </button>
           {trackingScanError && (
             <div style={{ background: C.redLight, border: `1px solid ${C.red}`, color: C.red, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
@@ -2483,7 +2492,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontWeight: 700 }}>กำลังโหลด...</div>
                 ) : filteredDocs.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '60px 24px', background: C.card, borderRadius: 24, marginTop: 8, border: `1px solid ${C.border}`, boxShadow: C.shadow }}>
-                    <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>📍</div>
+                    <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}><MapPin size={40} aria-hidden="true" /></div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>{hasFilter ? 'ไม่พบใบงานที่ตรงกับเงื่อนไข' : 'ไม่มีใบงานที่รับแล้ว'}</div>
                     <div style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>ใบงานสถานะ "รับแล้ว" จะปรากฏที่นี่</div>
                   </div>
@@ -2525,7 +2534,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
     <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <TopBar
         title={selectedDoc.request_no}
-        subtitle={`📍 รอระบุ Location ${pendingCount}/${lines.length} รายการ`}
+        subtitle={<IconLabel icon={MapPin} size={14} gap={4}>รอระบุ Location {pendingCount}/{lines.length} รายการ</IconLabel>}
         onBack={() => { setSelectedDoc(null); setLines([]); setSelectedLine(null); setUpdated([]); }}
       />
       {renderOfflineStatusBar()}
@@ -2540,7 +2549,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                 <div style={{ color: C.green, fontSize: 13, fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>อัปเดตแล้ว ({updated.length})</div>
                 {updated.slice(0, 3).map((item, i) => (
                   <div key={i} style={{ background: C.greenLight, borderRadius: 14, padding: '10px 14px', marginBottom: 8, border: `1px solid ${C.greenBorder}`, fontSize: 13 }}>
-                    <span style={{ fontWeight: 800, color: C.green }}>{item.pending ? '⏳' : '✓'} {item.line.product_name}</span>
+                    <span style={{ fontWeight: 800, color: C.green, display: 'inline-flex', alignItems: 'center', gap: 4 }}>{item.pending ? <Hourglass size={13} aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}{item.line.product_name}</span>
                     {' → '}
                     <span style={{ color: C.textSec }}>{item.location?.code ? (item.palletNo ? buildPalletCode(item.location.code, item.palletNo) : item.location.code) : 'ไม่ระบุ'}</span>
                     <span style={{ color: C.muted, marginLeft: 8 }}>{item.at}</span>
@@ -2576,9 +2585,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       {hasloc ? (
-                        <span style={{ color: C.green, fontWeight: 900, fontSize: 13 }}>✓ {locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
+                        <span style={{ color: C.green, fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Check size={14} aria-hidden="true" />{locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
                       ) : (
-                        <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13 }}>📍 ระบุ Location</span>
+                        <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}><MapPin size={14} aria-hidden="true" />ระบุ Location</span>
                       )}
                       <button
                         type="button"
@@ -2589,7 +2598,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                           whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                       >
-                        🖨 พิมพ์สติกเกอร์
+                        <IconLabel icon={Printer} size={14} gap={4}>พิมพ์สติกเกอร์</IconLabel>
                       </button>
                     </div>
                   </div>
@@ -2612,8 +2621,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontWeight: 900, fontSize: 18, color: C.text }}>ระบุ Location</div>
-            <button type="button" onClick={() => setSelectedLine(null)}
-              style={{ background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36, fontSize: 20, color: C.textSec, cursor: 'pointer' }}>✕</button>
+            <button type="button" onClick={() => setSelectedLine(null)} aria-label="ปิด"
+              style={{ background: C.border, border: 'none', borderRadius: 16, width: 36, height: 36, fontSize: 20, color: C.textSec, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><X size={20} aria-hidden="true" /></button>
           </div>
           <div style={{ background: C.blueLight, borderRadius: 14, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
             <div style={{ fontWeight: 800, color: C.text }}>{selectedLine.product_name}</div>
@@ -2649,7 +2658,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
               {allocations.map((a) => (
                 <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 12px', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-                    {a.pending && '⏳ '}{buildPalletCode(a.locationCode ?? '?', a.palletNo)}
+                    {a.pending && <Hourglass size={13} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />}{buildPalletCode(a.locationCode ?? '?', a.palletNo)}
                     <span style={{ color: C.muted, fontWeight: 500, marginLeft: 6 }}>{a.boxes ?? '-'} กล่อง{a.weight != null ? ` · ${a.weight} กก.` : ''}</span>
                   </span>
                   {!a.pending && (
@@ -2673,8 +2682,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
           {locations.length > 0 ? (
             <div style={{ marginBottom: 16 }}>
               <div style={{ color: C.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                📍 เพิ่มการจัดเก็บ (เลือกที่ว่างทีละ pallet)
-                {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}>✓ {selectedLocation.code}</span>}
+                <IconLabel icon={MapPin} size={14} gap={4}>เพิ่มการจัดเก็บ (เลือกที่ว่างทีละ pallet)</IconLabel>
+                {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}><IconLabel icon={Check} size={14} gap={3}>{selectedLocation.code}</IconLabel></span>}
               </div>
               {useHierarchy ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
@@ -2766,7 +2775,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
               boxShadow: (!selectedLocation || !allocPalletNo) ? 'none' : '0 8px 24px rgba(99,102,241,0.4)',
               transition: 'all 0.2s',
             }}>
-            {saving ? '⏳ กำลังบันทึก...' : '📍 เพิ่มการจัดเก็บ + พิมพ์สติกเกอร์'}
+            {saving ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังบันทึก...</IconLabel> : <IconLabel icon={MapPin} size={20} gap={8}>เพิ่มการจัดเก็บ + พิมพ์สติกเกอร์</IconLabel>}
           </button>
         </div>
       )}
@@ -2880,7 +2889,7 @@ function ModeSelect({ onSelect }) {
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
           >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>📍 ระบุที่จัดเก็บ (Location)</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}><IconLabel icon={MapPin} size={20} gap={8}>ระบุที่จัดเก็บ (Location)</IconLabel></div>
             <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>ระบุตำแหน่งสินค้าที่รับเข้าแล้ว</div>
           </div>
         </button>
@@ -2901,7 +2910,7 @@ function ModeSelect({ onSelect }) {
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
           >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>🧮 นับสต็อก (Stock Count)</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}><IconLabel icon={Calculator} size={20} gap={8}>นับสต็อก (Stock Count)</IconLabel></div>
             <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>เดินนับทีละแถว ดูรูปสินค้าเทียบกับของจริง</div>
           </div>
         </button>

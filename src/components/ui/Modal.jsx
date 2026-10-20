@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect } from 'react';
 
 export function Modal({ isOpen, onClose, title, children, size = 'md', footer }) {
@@ -28,7 +29,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer })
       <div className="operational-report-modal" style={{ maxWidth, width: '100%' }}>
         <div className="operational-report-modal-toolbar">
           <h2 style={{ margin: 0, fontSize: 16 }}>{title}</h2>
-          <button className="btn btn-secondary btn-sm" onClick={onClose} type="button" aria-label="ปิด">✕</button>
+          <button className="btn btn-secondary btn-sm" onClick={onClose} type="button" aria-label="ปิด"><X size={14} aria-hidden="true" /></button>
         </div>
         <div className="operational-report-modal-scroll-body">
           {children}

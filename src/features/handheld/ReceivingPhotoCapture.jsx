@@ -1,3 +1,5 @@
+import { Camera, Image, X } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useRef, useState } from 'react';
 import {
   DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE,
@@ -97,15 +99,15 @@ export function ReceivingPhotoCapture({ lineId, customerId, uploadedByUserId = n
   return (
     <div style={{ marginBottom: 20 }} data-testid="handheld-receiving-photos">
       <div style={{ color: S.textSec, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-        📷 รูปถ่ายสินค้ารับเข้า {count > 0 && <span style={{ color: S.muted }}>({count})</span>}
+        <IconLabel icon={Camera} size={14} gap={4}>รูปถ่ายสินค้ารับเข้า {count > 0 && <span style={{ color: S.muted }}>({count})</span>}</IconLabel>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button type="button" style={buttonStyle} disabled={!lineId} onClick={() => cameraInputRef.current?.click()}>
-          📷 ถ่ายรูป
+          <IconLabel icon={Camera} size={18} gap={6}>ถ่ายรูป</IconLabel>
         </button>
         <button type="button" style={buttonStyle} disabled={!lineId} onClick={() => galleryInputRef.current?.click()}>
-          🖼 เลือกรูป
+          <IconLabel icon={Image} size={18} gap={6}>เลือกรูป</IconLabel>
         </button>
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFiles} style={{ display: 'none' }} data-testid="handheld-receiving-photo-camera" />
         <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: 'none' }} data-testid="handheld-receiving-photo-gallery" />
@@ -133,7 +135,7 @@ export function ReceivingPhotoCapture({ lineId, customerId, uploadedByUserId = n
                   position: 'absolute', top: 3, right: 3, width: 24, height: 24, borderRadius: 12,
                   border: 'none', background: 'rgba(15,23,42,0.7)', color: '#fff', fontSize: 13,
                   lineHeight: '24px', padding: 0, cursor: 'pointer',
-                }}>✕</button>
+                }}><X size={13} aria-hidden="true" /></button>
             </div>
           ))}
           {pending.map((item) => (

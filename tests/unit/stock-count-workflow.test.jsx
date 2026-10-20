@@ -67,8 +67,10 @@ describe('StockCountWorkflow', () => {
     expect(mocks.record).not.toHaveBeenCalled();
 
     const [firstCard, secondCard] = screen.getAllByTestId('stock-count-pallet-card');
-    fireEvent.click(within(firstCard).getByRole('button', { name: '✓ ตรง' }));
-    fireEvent.click(within(secondCard).getByRole('button', { name: '✎ ไม่ตรง' }));
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'ตรง' }));
+    // The chosen button fills with its own color so its white label stays readable.
+    expect(within(firstCard).getByRole('button', { name: 'ตรง' })).toHaveStyle({ background: '#059669' });
+    fireEvent.click(within(secondCard).getByRole('button', { name: 'ไม่ตรง' }));
     const [boxesInput, weightInput] = within(secondCard).getAllByRole('spinbutton');
     fireEvent.change(boxesInput, { target: { value: '3' } });
     // Weight follows boxes x kg per box.

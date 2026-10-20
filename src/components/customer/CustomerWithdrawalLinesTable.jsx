@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { normalizeCatalogBarcode } from '../../utils/customerProductExcelUtils.js';
@@ -521,7 +522,7 @@ export function CustomerWithdrawalLinesTable({
                       style={{ fontSize: 11, color: 'var(--color-warning)', marginTop: 4, whiteSpace: 'nowrap' }}
                       title="ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุทั้งสองค่า"
                     >
-                      ⚠ ระบุทั้งสองค่า
+                      <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />ระบุทั้งสองค่า
                     </div>
                   )}
                 </td>
@@ -548,12 +549,12 @@ export function CustomerWithdrawalLinesTable({
                       )}
                       {!canDeriveUnitWeight(selectedUnit, weightPerBox) && (
                         <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
-                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
+                          <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
                         </div>
                       )}
                       {!canDeriveUnitBoxes(selectedUnit, weightPerBox) && (
                         <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
-                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
+                          <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
                         </div>
                       )}
                     </>

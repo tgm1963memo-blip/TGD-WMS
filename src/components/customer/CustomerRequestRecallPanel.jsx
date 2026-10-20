@@ -1,3 +1,5 @@
+import { Undo2 } from 'lucide-react';
+import { IconLabel } from '../ui/IconLabel.jsx';
 import { useState } from 'react';
 import { recallCustomerDepositRequest } from '../../services/customerDepositRequestService.js';
 
@@ -56,7 +58,7 @@ export function CustomerRequestRecallPanel({
         type="button"
         title="ดึงเอกสารกลับมาเป็นร่างเพื่อแก้ไข ก่อนที่เจ้าหน้าที่จะเปิดใบงาน"
       >
-        {submitting ? 'กำลังเรียกเอกสารกลับ...' : '↩ เรียกเอกสารกลับ'}
+        {submitting ? 'กำลังเรียกเอกสารกลับ...' : <IconLabel icon={Undo2} size={14} gap={6}>เรียกเอกสารกลับ</IconLabel>}
       </button>
     </div>
   );

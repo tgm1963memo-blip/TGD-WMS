@@ -1,3 +1,4 @@
+import { Calendar } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 // Native <input type="date"> renders its format (mm/dd/yyyy vs dd/mm/yyyy) based on the
@@ -172,7 +173,7 @@ export function DateInputDMY({
         title="เลือกวันที่จากปฏิทิน"
         type="button"
       >
-        📅
+        <Calendar size={14} aria-hidden="true" />
       </button>
       <input
         aria-hidden="true"

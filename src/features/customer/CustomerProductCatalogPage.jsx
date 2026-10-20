@@ -1,3 +1,5 @@
+import { ClipboardList, Download, Info, Package, Search, Upload, X } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -170,12 +172,13 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
           <button
             type="button"
             onClick={onClose}
+            aria-label="ปิด"
             style={{
               background: 'none', border: 'none', fontSize: 22, cursor: 'pointer',
               color: 'var(--tgd-muted-text)', width: 36, height: 36, borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
-          >✕</button>
+          ><X size={22} aria-hidden="true" /></button>
         </div>
 
         <form onSubmit={onSave} style={{ padding: '18px 22px 22px' }}>
@@ -559,7 +562,7 @@ export function CustomerProductCatalogPage() {
               title="ดาวน์โหลด Template Excel สำหรับนำเข้าสินค้า"
               onClick={downloadTemplate}
             >
-              ⬇️ Template
+              <IconLabel icon={Download} size={14} gap={6}>Template</IconLabel>
             </button>
             <button
               className="btn btn-secondary btn-sm"
@@ -568,7 +571,7 @@ export function CustomerProductCatalogPage() {
               onClick={() => exportProducts(products)}
               disabled={products.length === 0}
             >
-              📤 Export
+              <IconLabel icon={Upload} size={14} gap={6}>Export</IconLabel>
             </button>
             {canWrite && (
               <>
@@ -578,7 +581,7 @@ export function CustomerProductCatalogPage() {
                   title="นำเข้าสินค้าจากไฟล์ Excel"
                   onClick={() => importFileRef.current?.click()}
                 >
-                  📥 Import
+                  <IconLabel icon={Download} size={14} gap={6}>Import</IconLabel>
                 </button>
                 <input
                   ref={importFileRef}
@@ -607,7 +610,7 @@ export function CustomerProductCatalogPage() {
           background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)',
           borderRadius: 10, padding: '10px 18px', display: 'flex', gap: 10, alignItems: 'center',
         }}>
-          <span style={{ fontSize: 22 }}>📦</span>
+          <span style={{ display: 'flex' }}><Package size={22} aria-hidden="true" /></span>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, color: 'var(--tgd-primary)' }}>{activeCount}</div>
             <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>สินค้าที่ใช้งานอยู่</div>
@@ -617,7 +620,7 @@ export function CustomerProductCatalogPage() {
           background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)',
           borderRadius: 10, padding: '10px 18px', display: 'flex', gap: 10, alignItems: 'center',
         }}>
-          <span style={{ fontSize: 22 }}>📋</span>
+          <span style={{ display: 'flex' }}><ClipboardList size={22} aria-hidden="true" /></span>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{products.length}</div>
             <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>สินค้าทั้งหมด</div>
@@ -629,7 +632,7 @@ export function CustomerProductCatalogPage() {
             borderRadius: 10, padding: '10px 16px',
             display: 'flex', gap: 8, alignItems: 'center',
           }}>
-            <span style={{ fontSize: 16 }}>ℹ️</span>
+            <span style={{ display: 'flex', color: 'var(--color-warning-strong)' }}><Info size={16} aria-hidden="true" /></span>
             <div style={{ fontSize: 12, color: 'var(--color-warning-strong)' }}>
               สิทธิ์ดูข้อมูลเท่านั้น — ติดต่อ <strong>Customer Admin</strong> เพื่อเพิ่ม/แก้ไขสินค้า
             </div>
@@ -643,7 +646,7 @@ export function CustomerProductCatalogPage() {
         borderRadius: 10, padding: '10px 14px', marginBottom: 14,
         display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
       }}>
-        <span style={{ color: 'var(--tgd-muted-text)', fontSize: 16, flexShrink: 0 }}>🔍</span>
+        <span style={{ color: 'var(--tgd-muted-text)', fontSize: 16, flexShrink: 0, display: 'flex' }}><Search size={16} aria-hidden="true" /></span>
         <input
           className="form-control"
           style={{ flex: 1, margin: 0, minWidth: 160 }}
@@ -807,8 +810,9 @@ export function CustomerProductCatalogPage() {
               <button
                 type="button"
                 onClick={() => setImportPreview(null)}
+                aria-label="ปิด"
                 style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--tgd-muted-text)' }}
-              >✕</button>
+              ><X size={22} aria-hidden="true" /></button>
             </div>
             <div style={{ overflowY: 'auto', flex: 1, padding: '14px 22px' }}>
               <div style={{ overflowX: 'auto' }}>

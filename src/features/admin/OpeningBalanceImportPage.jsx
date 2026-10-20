@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -87,12 +88,12 @@ export function OpeningBalanceImportPage() {
           </thead>
           <tbody>
             {[
-              ['customer_product_code', 'รหัสสินค้าของลูกค้า', '✓', '10154-10'],
-              ['product_name', 'ชื่อสินค้า', '✓', 'หมูสามชั้นแช่แข็ง'],
+              ['customer_product_code', 'รหัสสินค้าของลูกค้า', true, '10154-10'],
+              ['product_name', 'ชื่อสินค้า', true, 'หมูสามชั้นแช่แข็ง'],
               ['lot_no', 'Lot Number', '', 'LOT-2025-001'],
               ['mfg_date', 'วันผลิต (YYYY-MM-DD)', '', '2025-01-15'],
               ['expiry_date', 'วันหมดอายุ (YYYY-MM-DD)', '', '2026-01-15'],
-              ['qty_boxes', 'จำนวน (ลัง)', '✓', '100'],
+              ['qty_boxes', 'จำนวน (ลัง)', true, '100'],
               ['weight_kg', 'น้ำหนัก (กก.)', '', '500'],
               ['note', 'หมายเหตุ', '', 'นำเข้าจากเยอรมัน'],
               ['location_code', 'รหัส Location (ถ้ามี)', '', 'A-L-01-1'],
@@ -100,7 +101,7 @@ export function OpeningBalanceImportPage() {
               <tr key={col}>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', fontFamily: 'monospace' }}>{col}</td>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)' }}>{desc}</td>
-                <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'center', color: req ? 'var(--color-danger)' : '#888' }}>{req || '-'}</td>
+                <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', textAlign: 'center', color: req ? 'var(--color-danger)' : '#888' }}>{req ? <Check size={14} role="img" aria-label="จำเป็น" style={{ verticalAlign: '-2px' }} /> : '-'}</td>
                 <td style={{ padding: '5px 10px', border: '1px solid var(--tgd-border)', color: '#555' }}>{ex}</td>
               </tr>
             ))}

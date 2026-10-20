@@ -80,9 +80,12 @@ styles.css) and a disabled state that is visibly different and not clickable.
 
 ## Icons
 
-Use one SVG icon set, not emoji. ⚠ ✓ ✕ 📷 🖨 and similar emoji are still used in
-some screens (mostly handheld); replace them when you touch those screens. Icons next
-to text get `aria-hidden="true"`; icon-only buttons get an `aria-label`.
+Icons come from `lucide-react` (pinned 0.468.0), not emoji. For an icon next to text
+use `components/ui/IconLabel` (`<IconLabel icon={Check}>บันทึกแล้ว</IconLabel>`), which
+aligns it and hides it from screen readers. An icon that carries meaning on its own
+gets `role="img"` and a Thai `aria-label`; an icon-only button gets an `aria-label`.
+Icons inherit the text color. Arrows inside running text (A → B) are punctuation and
+stay as text, and print documents keep their glyphs.
 
 ## Navigation
 

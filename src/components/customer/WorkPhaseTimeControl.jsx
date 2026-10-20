@@ -1,3 +1,5 @@
+import { Check, Clock, Pencil } from 'lucide-react';
+import { IconLabel } from '../ui/IconLabel.jsx';
 import { useEffect, useState } from 'react';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import { computeOvertimePoolLines } from '../../utils/billingRateCalc.js';
@@ -29,7 +31,7 @@ function CompactFieldCell({ label, valueNode, byline, canWrite, editing, onToggl
             aria-label={`แก้ไข${label}`}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}
           >
-            ✏️
+            <Pencil size={13} aria-hidden="true" />
           </button>
         )}
       </div>
@@ -145,7 +147,7 @@ function PhaseRow({ label, at, byEmail, canWrite, onRecordNow, onEditSave, fallb
           disabled={busy}
           onClick={async () => { setBusy(true); await onRecordNow(); setBusy(false); setEditing(false); }}
         >
-          ⏺ เวลาปัจจุบัน
+          <IconLabel icon={Clock} size={14} gap={4}>เวลาปัจจุบัน</IconLabel>
         </button>
       </div>
     </CompactFieldCell>
@@ -250,7 +252,7 @@ export function OvertimeControl({ canWrite, isOvertime, overtimeType, note, setB
       label="คิด OT"
       valueNode={isOvertime ? (
         <span style={{ fontWeight: 700, color: '#c2570b' }}>
-          ✔ {kindLabel}
+          <Check size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{kindLabel}
           {estimate && <OvertimeEstimateText estimate={estimate} />}
         </span>
       ) : '-'}

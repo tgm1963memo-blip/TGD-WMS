@@ -1,3 +1,5 @@
+import { Check, Moon, Pencil, Play, Square, Timer } from 'lucide-react';
+import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useState } from 'react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { triggerSuccessFeedback } from './handheldUi.jsx';
@@ -44,7 +46,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
       borderRadius: 14, padding: 14,
     }}>
       <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
-        ⏱ เวลาใน{label}
+        <Timer size={13} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />เวลาใน{label}
       </div>
 
       {!startedAt && (
@@ -57,7 +59,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
             borderRadius: 12, padding: '13px 14px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
           }}
         >
-          ▶ เริ่ม{label}
+          <IconLabel icon={Play} size={16} gap={6}>เริ่ม{label}</IconLabel>
         </button>
       )}
 
@@ -78,7 +80,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
             borderRadius: 12, padding: '13px 14px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
           }}
         >
-          ■ สิ้นสุด{label}
+          <IconLabel icon={Square} size={16} gap={6} iconProps={{ fill: 'currentColor' }}>สิ้นสุด{label}</IconLabel>
         </button>
       )}
 
@@ -150,7 +152,7 @@ function TimeRow({ label, iso, onEdit }) {
         aria-label={`แก้ไขเวลา${label}`}
         style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
       >
-        ✏️
+        <Pencil size={14} aria-hidden="true" />
       </button>
     </div>
   );
@@ -187,7 +189,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 800, flex: 1, color: on ? '#c2570b' : '#334155' }}>
-          🌙 งานนี้คิด OT
+          <Moon size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />งานนี้คิด OT
         </span>
         <button
           type="button"
@@ -227,7 +229,7 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
                   color: type === value ? '#fff' : '#334155',
                 }}
               >
-                {type === value ? '✓ ' : ''}{label}
+                {type === value ? <Check size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} /> : null}{label}
               </button>
             ))}
           </div>

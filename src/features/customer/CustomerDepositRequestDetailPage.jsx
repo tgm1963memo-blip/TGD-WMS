@@ -1,3 +1,4 @@
+import { AlertTriangle, Check, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -160,11 +161,11 @@ export function CustomerDepositRequestDetailPage() {
           <div style={{ padding: '0 20px 12px' }}>
             {hasVariance ? (
               <div className="banner banner-warning" role="status" style={{ margin: 0 }}>
-                ⚠️ ได้รับสินค้าไม่ครบทุกรายการ — มีส่วนต่างจากที่แจ้งฝาก
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />ได้รับสินค้าไม่ครบทุกรายการ — มีส่วนต่างจากที่แจ้งฝาก
               </div>
             ) : allReceived ? (
               <div className="banner" role="status" style={{ margin: 0, background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#065f46' }}>
-                ✓ ได้รับสินค้าครบทุกจำนวน
+                <CheckCircle2 size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />ได้รับสินค้าครบทุกจำนวน
               </div>
             ) : (
               <div className="banner banner-info" role="status" style={{ margin: 0 }}>
@@ -180,7 +181,7 @@ export function CustomerDepositRequestDetailPage() {
           <div><strong>{t('customer_field_contact_name')}:</strong> {header.contact_name ?? '-'}</div>
           <div><strong>{t('customer_field_contact_phone')}:</strong> {header.contact_phone ?? '-'}</div>
           <div><strong>{t('customer_field_vehicle_registration')}:</strong> {header.vehicle_registration ?? '-'}</div>
-          <div><strong>{t('customer_field_r3_document')}:</strong> {header.requires_r3_document ? '✔' : '-'}</div>
+          <div><strong>{t('customer_field_r3_document')}:</strong> {header.requires_r3_document ? <Check size={16} role="img" aria-label="มี" style={{ verticalAlign: '-3px' }} /> : '-'}</div>
           <div><strong>{t('customer_col_note')}:</strong> {header.note || '-'}</div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { Lock, Pencil } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
@@ -379,7 +380,7 @@ function RoleCard({ role, userCount, customerMap, onEdit, onEditPermissions, isP
         border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center',
         justifyContent: 'center', fontSize: 18, flexShrink: 0,
       }}>
-        {role.is_system ? '🔒' : '✏️'}
+        {role.is_system ? <Lock size={18} role="img" aria-label="System role" /> : <Pencil size={18} role="img" aria-label="Custom role" />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)' }}>{role.display_name}</div>
@@ -617,7 +618,7 @@ export function RolePermissionsAdminPage() {
             </button>
           </div>
           <div style={{ marginBottom: 6, fontSize: 12, color: 'var(--color-text-subtle)' }}>
-            🔒 System roles — แก้ไขได้แค่ชื่อแสดง &nbsp;|&nbsp; ✏️ Custom roles — แก้ไขได้เต็มรูปแบบ
+            <Lock size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />System roles — แก้ไขได้แค่ชื่อแสดง &nbsp;|&nbsp; <Pencil size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />Custom roles — แก้ไขได้เต็มรูปแบบ
           </div>
           {roles.map((r) => (
             <div key={r.id}>

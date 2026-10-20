@@ -1,3 +1,5 @@
+import { AlertTriangle, Check, MapPin, Pencil, Plus, Printer, RefreshCw, Save, ScrollText, Undo2 } from 'lucide-react';
+import { IconLabel } from '../ui/IconLabel.jsx';
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal.jsx';
 import { LoadingState } from '../ui/LoadingState.jsx';
@@ -819,7 +821,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 className="btn btn-secondary"
                 onClick={() => setTimelineOpen((v) => !v)}
               >
-                📜 {timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}
+                <IconLabel icon={ScrollText} size={14} gap={6}>{timelineOpen ? 'ซ่อน log การแก้ไข' : `ดู log การแก้ไข (${timelineEvents.length})`}</IconLabel>
               </button>
             </div>
 
@@ -882,7 +884,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                       onClick={openAddLine}
                       title="สำหรับกรณีลูกค้าใส่รหัสผิด หรือฝากสินค้าเข้ามาไม่ครบตามที่แจ้ง"
                     >
-                      ➕ เพิ่มรายการ
+                      <IconLabel icon={Plus} size={14} gap={6}>เพิ่มรายการ</IconLabel>
                     </button>
                   ) : null}
                   <StickerRotationControl />
@@ -893,7 +895,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                     disabled={selectedLineIds.size === 0}
                     onClick={handlePrintSelectedStickers}
                   >
-                    🖨️ พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}
+                    <IconLabel icon={Printer} size={14} gap={6}>พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
                   </button>
                 </div>
               </div>
@@ -971,6 +973,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 disabled={!canWriteReceiving || savingTemperatureType[line.id]}
+                                aria-label="บันทึกอุณหภูมิ"
                                 style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
                                 onClick={async () => {
                                   const nextTemperatureType = lineTemperatureTypes[line.id] ?? '';
@@ -995,7 +998,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   }
                                 }}
                               >
-                                {savingTemperatureType[line.id] ? '…' : '💾'}
+                                {savingTemperatureType[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                               </button>
                             </div>
                           </td>
@@ -1025,6 +1028,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 disabled={savingNote[line.id]}
+                                aria-label="บันทึกหมายเหตุ"
                                 style={{ whiteSpace: 'nowrap', fontSize: 11, padding: '2px 8px', height: 28 }}
                                 onClick={async () => {
                                   setSavingNote((prev) => ({ ...prev, [line.id]: true }));
@@ -1043,7 +1047,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   }
                                 }}
                               >
-                                {savingNote[line.id] ? '…' : '💾'}
+                                {savingNote[line.id] ? '…' : <Save size={14} aria-hidden="true" />}
                               </button>
                             </div>
                           </td>
@@ -1069,7 +1073,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 setLocRow(p?.row ? String(p.row) : '');
                               }}
                             >
-                              📍
+                              <MapPin size={14} aria-hidden="true" />
                             </button>
                             <button
                               className="btn btn-secondary btn-sm"
@@ -1082,7 +1086,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                 setRecountQty(line.actual_weight?.toString() ?? line.expected_weight?.toString() ?? '');
                               }}
                             >
-                              🔄
+                              <RefreshCw size={14} aria-hidden="true" />
                             </button>
                             <button
                               className="btn btn-secondary btn-sm"
@@ -1092,7 +1096,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               style={{ marginLeft: 4 }}
                               onClick={() => handlePrintSticker(line)}
                             >
-                              🖨
+                              <Printer size={14} aria-hidden="true" />
                             </button>
                             {isSystemAdmin ? (
                               <button
@@ -1110,7 +1114,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                                   setLotEditTemperatureType(line.temperature_type ?? '');
                                 }}
                               >
-                                ✏️
+                                <Pencil size={14} aria-hidden="true" />
                               </button>
                             ) : null}
                           </td>
@@ -1236,7 +1240,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             {/* Confirm-block warning */}
             {confirmBlockedReason ? (
               <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
-                ⚠️ {confirmBlockedReason}
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{confirmBlockedReason}
               </div>
             ) : null}
 
@@ -1266,7 +1270,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   title="เปลี่ยนสถานะให้ handheld สามารถนับสินค้าใหม่ได้"
                   type="button"
                 >
-                  🔄 ขอตรวจนับใหม่
+                  <IconLabel icon={RefreshCw} size={14} gap={6}>ขอตรวจนับใหม่</IconLabel>
                 </button>
               ) : null}
               {canRecallConfirmed ? (
@@ -1277,7 +1281,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   title="เรียกเอกสารกลับมาแก้ไขจำนวนรับจริง (ภายใน 24 ชม. หลังยืนยัน และยังไม่มีการเบิกจากใบฝากนี้)"
                   type="button"
                 >
-                  ↩️ เรียกคืนแก้ไข
+                  <IconLabel icon={Undo2} size={14} gap={6}>เรียกคืนแก้ไข</IconLabel>
                 </button>
               ) : null}
               {canReject ? (
@@ -1366,7 +1370,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
         )}
       >
         <div className="banner banner-warning" style={{ marginBottom: 12 }}>
-          ⚠️ เอกสารนี้ยืนยันการรับเข้าแล้ว การเรียกคืนจะย้อนสถานะกลับไปเป็น "คลังรับสินค้า"
+          <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />เอกสารนี้ยืนยันการรับเข้าแล้ว การเรียกคืนจะย้อนสถานะกลับไปเป็น "คลังรับสินค้า"
           และยกเลิกรายการเคลื่อนไหวสต็อกที่สร้างไว้ — ทำได้เฉพาะภายใน 24 ชั่วโมงหลังยืนยัน
           และจะถูกปฏิเสธหากมีการเบิกสินค้าจากใบฝากนี้ไปแล้ว
         </div>
@@ -1577,12 +1581,12 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             </div>
             {lotEditProductCode.trim() && lotEditProductCode.trim() !== lotEditLine.customer_product_code ? (
               <p className="form-helper" style={{ marginTop: 10, marginBottom: 0 }}>
-                ⚠️ การเปลี่ยนรหัสสินค้าจะปรับชื่อสินค้าตามรายการสินค้าของลูกค้า (ถ้าพบรหัสใหม่ในแคตตาล็อก) — กระทบยอดคงเหลือ/การเรียกเก็บเงินที่อ้างอิงรายการนี้
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />การเปลี่ยนรหัสสินค้าจะปรับชื่อสินค้าตามรายการสินค้าของลูกค้า (ถ้าพบรหัสใหม่ในแคตตาล็อก) — กระทบยอดคงเหลือ/การเรียกเก็บเงินที่อ้างอิงรายการนี้
               </p>
             ) : null}
             {lotEditTemperatureType && lotEditTemperatureType !== lotEditLine.temperature_type ? (
               <p className="form-helper" style={{ marginTop: 10, marginBottom: 0 }}>
-                ⚠️ การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
+                <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />การเปลี่ยนวิธีจัดเก็บที่นี่มีผลเฉพาะ LOT นี้เท่านั้น ไม่กระทบค่าเริ่มต้นของสินค้านี้ในแคตตาล็อก
               </p>
             ) : null}
           </>
@@ -1687,7 +1691,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 </label>
                 {selectedLocObj && (
                   <div style={{ gridColumn: '1/-1', background: 'var(--tgd-success-light, #ecfdf5)', border: '1px solid var(--tgd-success)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
-                    <strong style={{ color: 'var(--tgd-success)' }}>✓ {selectedLocObj.code}</strong>
+                    <strong style={{ color: 'var(--tgd-success)' }}><IconLabel icon={Check} size={14} gap={3}>{selectedLocObj.code}</IconLabel></strong>
                     {selectedLocObj.name && <span style={{ color: '#555', marginLeft: 8 }}>{selectedLocObj.name}</span>}
                   </div>
                 )}

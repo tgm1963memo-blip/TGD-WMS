@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { DateInputDMY } from '../common/DateInputDMY.jsx';
 import {
@@ -211,12 +212,12 @@ export function CustomerDepositLinesTable({
                       )}
                       {isCustomUnitMode && !canDeriveUnitWeight(selectedUnit, line.weight_per_box) && (
                         <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
-                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
+                          <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุน้ำหนักรวมเอง
                         </div>
                       )}
                       {isCustomUnitMode && !canDeriveUnitBoxes(selectedUnit, line.weight_per_box) && (
                         <div style={{ color: 'var(--color-warning)', fontSize: 11, marginTop: 2 }}>
-                          ⚠ ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
+                          <AlertTriangle size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 3 }} />ไม่ทราบน้ำหนัก/กล่อง กรุณาระบุจำนวนกล่องเอง
                         </div>
                       )}
                     </>
