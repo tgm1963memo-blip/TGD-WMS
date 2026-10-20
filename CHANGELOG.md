@@ -21,7 +21,7 @@
 
 ### Added
 - Production lint gate (`scripts/lint-check.mjs`)
-- `PRODUCTION_CERTIFICATION.md`, `KNOWN_ISSUES.md`
+- `docs/reports/PRODUCTION_CERTIFICATION.md`, `docs/reports/KNOWN_ISSUES.md`
 - `systemRouteExpectations` export for E2E route fixtures
 
 ### Fixed
@@ -52,4 +52,4 @@
 - Vercel production: https://tgc-wms.vercel.app (deployment `dpl_Gfi2HLEnCSsYH6uPzVMEey9LUCEm`)
 
 ### Known Issues
-- 97 legacy Vitest guardrail tests require update (see TEST_REPORT.md)
+- 97 legacy Vitest guardrail tests require update (see docs/reports/TEST_REPORT.md)
