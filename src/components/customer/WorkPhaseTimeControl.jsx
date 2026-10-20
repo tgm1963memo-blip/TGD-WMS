@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
-import { computeOvertimeWeightLines } from '../../utils/billingRateCalc.js';
+import { computeOvertimePoolLines } from '../../utils/billingRateCalc.js';
+import { listOvertimeFlaggedDocuments } from '../../services/billingRateEngineService.js';
 import {
   combineDateAndEditedTime,
   formatDateYYYYMMDD,
@@ -211,24 +212,25 @@ function TemperatureRow({ label, value, canWrite, onSave }) {
 }
 
 // "คิด OT" cell — same compact shape as the cells above. Marks the whole
-// document as overtime work; billing charges it by weight against the
-// customer's OVERTIME PER_KG rate (computeOvertimeWeightLines). `estimate`
-// is the caller's useOvertimeEstimate() result, shown under the value.
-export function OvertimeControl({ canWrite, isOvertime, note, setByEmail, estimate, onSave }) {
+// document as overtime work, either วันทำการ (WORKDAY → OVERTIME rate) or
+// วันหยุดพิเศษ (HOLIDAY → OVERTIME_HOLIDAY rate). Billing pools a customer's
+// OT per work day + type and charges the minimum once per pool
+// (computeOvertimePoolLines). `estimate` is the caller's useOvertimeEstimate().
+export function OvertimeControl({ canWrite, isOvertime, overtimeType, note, setByEmail, estimate, onSave }) {
   const [editing, setEditing] = useState(false);
-  const [draftOn, setDraftOn] = useState(false);
+  const [draftChoice, setDraftChoice] = useState('NONE');
   const [draftNote, setDraftNote] = useState('');
   const [busy, setBusy] = useState(false);
 
   function openEdit() {
-    setDraftOn(Boolean(isOvertime));
+    setDraftChoice(isOvertime ? (overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY') : 'NONE');
     setDraftNote(note ?? '');
     setEditing(true);
   }
 
   async function save() {
     setBusy(true);
-    await onSave(draftOn, draftNote);
+    await onSave(draftChoice !== 'NONE', draftNote, draftChoice === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY');
     setBusy(false);
     setEditing(false);
   }
@@ -236,13 +238,19 @@ export function OvertimeControl({ canWrite, isOvertime, note, setByEmail, estima
   const bylineParts = [];
   if (isOvertime && note) bylineParts.push(note);
   if (setByEmail) bylineParts.push(`โดย ${setByEmail}`);
+  const kindLabel = overtimeType === 'HOLIDAY' ? 'OT วันหยุดพิเศษ' : 'OT วันทำการ';
+  const choices = [
+    { value: 'NONE', label: 'ไม่คิด' },
+    { value: 'WORKDAY', label: 'OT วันทำการ', rate: estimate?.rateInfo?.WORKDAY },
+    { value: 'HOLIDAY', label: 'OT วันหยุดพิเศษ', rate: estimate?.rateInfo?.HOLIDAY },
+  ];
 
   return (
     <CompactFieldCell
       label="คิด OT"
       valueNode={isOvertime ? (
         <span style={{ fontWeight: 700, color: '#c2570b' }}>
-          ✔ คิด OT
+          ✔ {kindLabel}
           {estimate && <OvertimeEstimateText estimate={estimate} />}
         </span>
       ) : '-'}
@@ -251,13 +259,18 @@ export function OvertimeControl({ canWrite, isOvertime, note, setByEmail, estima
       editing={editing}
       onToggleEdit={() => (editing ? setEditing(false) : openEdit())}
     >
-      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-          <input type="radio" checked={draftOn} onChange={() => setDraftOn(true)} /> คิด
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-          <input type="radio" checked={!draftOn} onChange={() => setDraftOn(false)} /> ไม่คิด
-        </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+        {choices.map((choice) => (
+          <label key={choice.value} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="radio" checked={draftChoice === choice.value} onChange={() => setDraftChoice(choice.value)} />
+            <span>{choice.label}</span>
+            {choice.value !== 'NONE' && estimate && !estimate.loading && (
+              <span style={{ color: choice.rate ? 'var(--tgd-muted-text)' : 'var(--tgd-warning, #b45309)', fontSize: 11 }}>
+                {choice.rate ? formatRateInfo(choice.rate) : 'ยังไม่ตั้ง rate'}
+              </span>
+            )}
+          </label>
+        ))}
       </div>
       <input
         type="text"
@@ -273,59 +286,110 @@ export function OvertimeControl({ canWrite, isOvertime, note, setByEmail, estima
   );
 }
 
+const fmt2 = (n) => Number(n ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function formatRateInfo(rate) {
+  const min = rate.min_charge_amount != null ? ` · ขั้นต่ำ ${fmt2(rate.min_charge_amount)}` : '';
+  return `${Number(rate.rate)} ฿/กก.${min}`;
+}
+
+function formatDmy(isoDate) {
+  if (!isoDate) return '-';
+  const [y, m, d] = String(isoDate).slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function OvertimeEstimateText({ estimate }) {
-  const fmt = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (estimate.loading) return <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>กำลังคำนวณ...</div>;
-  if (estimate.pricedCount === 0) {
-    return <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-warning, #b45309)' }}>ไม่พบ rate OT (ต่อ กก.)</div>;
+  const muted = { fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' };
+  if (estimate.loading) return <div style={muted}>กำลังคำนวณ...</div>;
+  if (!estimate.pool) {
+    return <div style={{ ...muted, color: 'var(--tgd-warning, #b45309)' }}>ไม่พบ rate OT (ต่อ กก.) ของประเภทนี้</div>;
   }
+  const { pool, share } = estimate;
   return (
-    <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>
-      {fmt(estimate.ratedWeight)} กก. = ฿{fmt(estimate.amount)}
-      {estimate.isProvisional ? ' (ประมาณการ)' : ''}
-      {estimate.unratedCount > 0 ? ` · ${estimate.unratedCount} รายการไม่พบ rate OT` : ''}
+    <div style={muted}>
+      <div>รวม OT ของลูกค้าวันที่ {formatDmy(pool.workDate)}: {pool.documentCount} ใบ · {fmt2(pool.totalWeight)} กก.</div>
+      <div>
+        ฿{fmt2(pool.rawAmount)}
+        {pool.minApplied ? ` → ขั้นต่ำ ฿${fmt2(pool.poolAmount)}` : ''}
+      </div>
+      <div style={{ fontWeight: 700, color: '#c2570b' }}>
+        ส่วนของใบนี้ ({fmt2(share.weight)} กก.) = ฿{fmt2(share.amount)}
+        {estimate.isProvisional ? ' (ประมาณการ)' : ''}
+      </div>
     </div>
   );
 }
 
-// Live estimate of what billing will charge for OT on one document: same
-// computeOvertimeWeightLines the billing engine uses. lines are
-// { customer_product_code, temperature_type, weight, isActual } — when any
-// line has no actual weight yet the declared weight is used and the result
-// is marked provisional.
-export function useOvertimeEstimate({ customerId, enabled, lines }) {
+// Live estimate of this document's OT: loads the customer's OT rates and
+// every document currently marked OT (listOvertimeFlaggedDocuments), pools
+// them with the same computeOvertimePoolLines billing uses, and returns the
+// pool this document falls in plus this document's share. refreshKey should
+// change whenever this document's OT flag/type or line weights change.
+// Always returns rateInfo (the customer-wide PER_KG rate per OT type) once
+// loaded, so the edit popover can show both rates.
+export function useOvertimeEstimate({ customerId, requestId, requestType, enabled, refreshKey = '' }) {
   const [rates, setRates] = useState(null);
+  const [docs, setDocs] = useState(null);
 
   useEffect(() => {
-    if (!enabled || !customerId) return undefined;
+    setRates(null);
+    if (!customerId) return undefined;
     let cancelled = false;
-    listAllProductServiceRates({ customerId, serviceType: 'OVERTIME', isActive: true }).then((result) => {
-      if (!cancelled) setRates(result?.data ?? []);
+    listAllProductServiceRates({ customerId, isActive: true }).then((result) => {
+      if (!cancelled) {
+        setRates((result?.data ?? []).filter((r) => r.unit_basis === 'PER_KG'
+          && (r.service_type === 'OVERTIME' || r.service_type === 'OVERTIME_HOLIDAY')));
+      }
     });
     return () => { cancelled = true; };
-  }, [customerId, enabled]);
+  }, [customerId]);
 
-  if (!enabled) return null;
+  useEffect(() => {
+    setDocs(null);
+    if (!enabled || !customerId) return undefined;
+    let cancelled = false;
+    listOvertimeFlaggedDocuments(customerId).then((result) => {
+      if (!cancelled) setDocs(result?.data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [customerId, enabled, refreshKey]);
+
+  if (!customerId) return null;
   if (!rates) return { loading: true };
+
+  const customerWide = (type) => rates.find((r) => r.service_type === type && !r.customer_product_id)
+    ?? rates.find((r) => r.service_type === type) ?? null;
+  const rateInfo = { WORKDAY: customerWide('OVERTIME'), HOLIDAY: customerWide('OVERTIME_HOLIDAY') };
+  if (!enabled) return { loading: false, rateInfo };
+  if (!docs) return { loading: true, rateInfo };
 
   const productIdByCode = new Map(
     rates.filter((r) => r.customer_product_code).map((r) => [r.customer_product_code, r.customer_product_id]),
   );
-  const inputs = (lines ?? []).map((line, index) => ({
-    id: index,
+  const inputs = docs.flatMap((doc) => doc.lines.map((line, index) => ({
+    id: `${doc.requestType}:${doc.requestId}:${index}`,
+    requestId: doc.requestId,
+    requestType: doc.requestType,
     customerId,
     customerProductId: productIdByCode.get(line.customer_product_code) ?? null,
     temperatureType: line.temperature_type ?? null,
     weight: Number(line.weight ?? 0),
-  }));
-  const priced = computeOvertimeWeightLines({ lines: inputs, rates });
+    workDate: doc.workDate,
+    overtimeType: doc.overtimeType,
+  })));
+  const mine = computeOvertimePoolLines({ lines: inputs, rates })
+    .filter((l) => l.requestType === requestType && l.sourceRequestId === requestId);
+  const thisDoc = docs.find((d) => d.requestType === requestType && d.requestId === requestId);
 
   return {
     loading: false,
-    pricedCount: priced.length,
-    ratedWeight: priced.reduce((sum, l) => sum + l.weight, 0),
-    amount: priced.reduce((sum, l) => sum + l.amount, 0),
-    unratedCount: inputs.length - priced.length,
-    isProvisional: (lines ?? []).some((l) => !l.isActual),
+    rateInfo,
+    pool: mine[0]?.pool ?? null,
+    share: {
+      weight: mine.reduce((sum, l) => sum + l.weight, 0),
+      amount: mine.reduce((sum, l) => sum + l.amount, 0),
+    },
+    isProvisional: Boolean(thisDoc?.lines.some((l) => !l.isActual)),
   };
 }

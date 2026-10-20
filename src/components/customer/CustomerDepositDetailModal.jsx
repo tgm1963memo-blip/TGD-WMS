@@ -389,15 +389,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     && (Date.now() - new Date(header.last_action_at).getTime()) <= 24 * 60 * 60 * 1000;
 
   // Received weight once recorded, else the declared weight (provisional).
+  // Pools this document with the customer's other OT documents of the same
+  // work day (minimum charged once per day); refreshKey reloads the pool
+  // whenever this document's OT flag/type or line weights change.
   const overtimeEstimate = useOvertimeEstimate({
     customerId: header?.customer_id,
+    requestId: requestId,
+    requestType: 'DEPOSIT',
     enabled: Boolean(header?.is_overtime),
-    lines: lines.map((l) => ({
-      customer_product_code: l.customer_product_code,
-      temperature_type: l.temperature_type,
-      weight: l.actual_weight ?? l.expected_weight,
-      isActual: l.actual_weight != null,
-    })),
+    refreshKey: [header?.is_overtime, header?.overtime_type, ...lines.map((l) => l.actual_weight ?? l.expected_weight)].join('|'),
   });
 
   async function handleRequestRecount() {
@@ -444,16 +444,16 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setActionMsg('บันทึกอุณหภูมิเรียบร้อยแล้ว');
   }
 
-  async function handleSaveOvertime(isOvertime, note) {
+  async function handleSaveOvertime(isOvertime, note, overtimeType) {
     if (!requestId) return;
     setError('');
-    const r = await setDepositOvertime(requestId, isOvertime, { note });
+    const r = await setDepositOvertime(requestId, isOvertime, { note, overtimeType });
     if (r.error) {
       setError(r.error.message ?? 'บันทึก OT ไม่สำเร็จ');
       return;
     }
     setHeader((prev) => prev ? {
-      ...prev, is_overtime: r.data.is_overtime, overtime_note: r.data.note, overtime_set_by_email: r.data.by_email, overtime_set_at: r.data.at,
+      ...prev, is_overtime: r.data.is_overtime, overtime_type: r.data.overtime_type, overtime_note: r.data.note, overtime_set_by_email: r.data.by_email, overtime_set_at: r.data.at,
     } : prev);
     setActionMsg('บันทึก OT เรียบร้อยแล้ว');
   }
@@ -791,6 +791,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
               <OvertimeControl
                 canWrite={canWriteReceiving}
                 isOvertime={header.is_overtime}
+                overtimeType={header.overtime_type}
                 note={header.overtime_note}
                 setByEmail={header.overtime_set_by_email}
                 estimate={overtimeEstimate}

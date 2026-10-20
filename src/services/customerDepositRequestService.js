@@ -30,6 +30,7 @@ const DEPOSIT_HEADER_SELECT = [
   'truck_temp',
   'requires_r3_document',
   'is_overtime',
+  'overtime_type',
   'overtime_note',
   'overtime_set_by_email',
   'overtime_set_at',
@@ -731,7 +732,8 @@ export async function setDepositReceivingTemperature(requestId, field, value) {
 // Marks the document as overtime work ("คิด OT") — billed by weight against
 // the customer's OVERTIME PER_KG rate. Set from the admin header or the
 // Scan Center handheld (actorProfileId, same as setDepositReceivingTime).
-export async function setDepositOvertime(requestId, isOvertime, { note = null, actorProfileId = null } = {}) {
+// overtimeType: 'WORKDAY' (วันทำการ) | 'HOLIDAY' (วันหยุดพิเศษ, own rate + minimum).
+export async function setDepositOvertime(requestId, isOvertime, { note = null, actorProfileId = null, overtimeType = 'WORKDAY' } = {}) {
   if (!supabase) return missingSupabaseClientResult();
 
   const { data, error } = await supabase.rpc('tgd_set_deposit_overtime', {
@@ -739,6 +741,7 @@ export async function setDepositOvertime(requestId, isOvertime, { note = null, a
     p_is_overtime: Boolean(isOvertime),
     p_note: toNullableText(note),
     p_actor_profile_id: actorProfileId,
+    p_overtime_type: overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY',
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

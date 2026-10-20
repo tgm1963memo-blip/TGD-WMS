@@ -752,15 +752,16 @@ function ReceivingWorkflow({ onBack, t }) {
         }}
         overtime={{
           isOvertime: selectedDoc.is_overtime,
+          overtimeType: selectedDoc.overtime_type,
           note: selectedDoc.overtime_note,
           setByEmail: selectedDoc.overtime_set_by_email,
           setAt: selectedDoc.overtime_set_at,
         }}
-        onToggleOvertime={async (next, note) => {
-          const { data, error } = await setDepositOvertime(selectedDoc.id, next, { note, actorProfileId: activeProfile?.id });
+        onToggleOvertime={async (next, note, overtimeType) => {
+          const { data, error } = await setDepositOvertime(selectedDoc.id, next, { note, overtimeType, actorProfileId: activeProfile?.id });
           if (!error) {
             setSelectedDoc((d) => (d ? {
-              ...d, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+              ...d, is_overtime: data.is_overtime, overtime_type: data.overtime_type, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
             } : d));
           }
           return { error };
@@ -1665,15 +1666,16 @@ function PickingWorkflow({ onBack, t }) {
         }}
         overtime={{
           isOvertime: selectedDoc.is_overtime,
+          overtimeType: selectedDoc.overtime_type,
           note: selectedDoc.overtime_note,
           setByEmail: selectedDoc.overtime_set_by_email,
           setAt: selectedDoc.overtime_set_at,
         }}
-        onToggleOvertime={async (next, note) => {
-          const { data, error } = await setWithdrawalOvertime(selectedDoc.id, next, { note, actorProfileId: activeProfile?.id });
+        onToggleOvertime={async (next, note, overtimeType) => {
+          const { data, error } = await setWithdrawalOvertime(selectedDoc.id, next, { note, overtimeType, actorProfileId: activeProfile?.id });
           if (!error) {
             setSelectedDoc((d) => (d ? {
-              ...d, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+              ...d, is_overtime: data.is_overtime, overtime_type: data.overtime_type, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
             } : d));
           }
           return { error };

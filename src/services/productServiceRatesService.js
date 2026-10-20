@@ -18,6 +18,9 @@ export const SERVICE_TYPES = [
   // the deposit/withdrawal request create pages, same as any other FLAT/PER_HOUR rate.
   { value: 'PLUG_IN',      label: 'ค่าเสียบปลั๊ก',       labelEn: 'Reefer Plug-in' },
   { value: 'OVERTIME',     label: 'ค่าล่วงเวลา (OT)',    labelEn: 'Overtime' },
+  // Holiday OT: own PER_KG rate + min_charge_amount, used when a document is
+  // marked "OT วันหยุดพิเศษ" (overtime_type HOLIDAY) — see computeOvertimePoolLines.
+  { value: 'OVERTIME_HOLIDAY', label: 'ค่าล่วงเวลาวันหยุดพิเศษ (OT)', labelEn: 'Holiday Overtime' },
   { value: 'OTHER',        label: 'ค่าบริการอื่นๆ',     labelEn: 'Other' },
 ];
 

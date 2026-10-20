@@ -58,6 +58,8 @@ const SERVICE_COLORS = {
   HANDLING_OUT: { bg: '#fff7ed', color: '#c2570b' },
   LABEL:        { bg: '#fdf4ff', color: '#7c3aed' },
   FREEZING:     { bg: '#f0f9ff', color: '#0369a1' },
+  OVERTIME:         { bg: '#fff7ed', color: '#c2570b' },
+  OVERTIME_HOLIDAY: { bg: '#fef2f2', color: '#b91c1c' },
   OTHER:        { bg: '#f8fafc', color: '#475569' },
 };
 

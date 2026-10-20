@@ -397,15 +397,15 @@ export function CustomerAdminWithdrawalReviewPage() {
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 
   // Picked weight once staff recorded it, else the requested weight (provisional).
+  // Pools this document with the customer's other OT documents of the same
+  // work day (minimum charged once per day); refreshKey reloads the pool
+  // whenever this document's OT flag/type or line weights change.
   const overtimeEstimate = useOvertimeEstimate({
     customerId: selected?.customer_id,
+    requestId: selected?.id,
+    requestType: 'WITHDRAWAL',
     enabled: Boolean(selected?.is_overtime),
-    lines: lines.map((l) => ({
-      customer_product_code: l.customer_product_code,
-      temperature_type: l.temperature_type,
-      weight: l.picked_weight ?? l.requested_weight,
-      isActual: l.picked_weight != null,
-    })),
+    refreshKey: [selected?.is_overtime, selected?.overtime_type, ...lines.map((l) => l.picked_weight ?? l.requested_weight)].join('|'),
   });
 
   const bulkEligibleRows = sortedData.filter((r) => BULK_PRINT_ELIGIBLE_STATUSES.includes(r.status));
@@ -587,15 +587,15 @@ export function CustomerAdminWithdrawalReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
   }
 
-  async function handleSaveOvertime(isOvertime, note) {
+  async function handleSaveOvertime(isOvertime, note, overtimeType) {
     if (!selectedId) return;
-    const { data, error } = await setWithdrawalOvertime(selectedId, isOvertime, { note });
+    const { data, error } = await setWithdrawalOvertime(selectedId, isOvertime, { note, overtimeType });
     if (error) {
       setError(error.message ?? 'บันทึก OT ไม่สำเร็จ');
       return;
     }
     setRows((prev) => prev.map((r) => (r.id === selectedId ? {
-      ...r, is_overtime: data.is_overtime, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
+      ...r, is_overtime: data.is_overtime, overtime_type: data.overtime_type, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
     } : r)));
   }
 
@@ -1143,6 +1143,7 @@ export function CustomerAdminWithdrawalReviewPage() {
               <OvertimeControl
                 canWrite={canWrite}
                 isOvertime={selected.is_overtime}
+                overtimeType={selected.overtime_type}
                 note={selected.overtime_note}
                 setByEmail={selected.overtime_set_by_email}
                 estimate={overtimeEstimate}

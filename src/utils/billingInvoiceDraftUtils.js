@@ -295,31 +295,49 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
   };
 }
 
-// One line per item of a document marked "คิด OT" — see
-// computeOvertimeWeightLines. deposit_line_id is left null on purpose: it
-// is what the lot billing-cycle/duplicate checks key on, and OT is a
-// per-document service, not a storage charge for the lot.
+function formatDmy(isoDate) {
+  if (!isoDate) return '-';
+  const [y, m, d] = String(isoDate).slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function formatBaht(value) {
+  return toNumber(value).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// One line per document marked "คิด OT" — its share of the day's OT pool
+// (computeOvertimePoolLines + groupOvertimeLinesByDocument). When the pool
+// was raised to the minimum, min_charge_applied is set and the note says so;
+// amount is then the document's share, not weight x rate. deposit_line_id is
+// left null on purpose: it is what the lot billing-cycle/duplicate checks
+// key on, and OT is a per-document service, not a storage charge.
 export function buildInvoiceDraftLineFromOvertimeLine(overtimeLine) {
   const rate = overtimeLine.rate ?? {};
-  const docLabel = overtimeLine.requestType === 'WITHDRAWAL' ? 'เบิก' : 'รับเข้า';
+  const pool = overtimeLine.pool ?? {};
+  const kindLabel = pool.overtimeType === 'HOLIDAY' ? 'วันหยุดพิเศษ' : 'วันทำการ';
+  const weight = roundTo2(toNumber(overtimeLine.weight));
+  const noteParts = [`OT รวมของวัน ${pool.documentCount ?? 1} ใบ ${formatBaht(pool.totalWeight)} กก.`];
+  if (pool.minApplied) {
+    noteParts.push(`${formatBaht(pool.rawAmount)} บาท ต่ำกว่าขั้นต่ำ → คิดขั้นต่ำ ${formatBaht(pool.poolAmount)} บาท เฉลี่ยตามน้ำหนัก`);
+  }
   return {
     invoice_draft_id: null,
     source_movement_id: null,
-    source_document_no: null,
+    source_document_no: overtimeLine.requestNo ?? null,
     source_document_type: 'OVERTIME',
     customer_id: overtimeLine.customerId,
     product_id: null,
-    product_code: overtimeLine.productCode ?? null,
-    product_name: overtimeLine.productName ?? overtimeLine.productCode ?? null,
-    lot_no: overtimeLine.lotNo ?? null,
+    product_code: null,
+    product_name: `ค่าล่วงเวลา (OT) ${kindLabel} ${formatDmy(overtimeLine.date)} — ${overtimeLine.requestNo ?? '-'}`,
+    lot_no: null,
     pallet_no: null,
     movement_type: 'OVERTIME',
     movement_date: overtimeLine.date ?? null,
     qty: 0,
     uom: 'กก.',
-    net_weight: overtimeLine.weight,
-    gross_weight: overtimeLine.weight,
-    chargeable_weight: overtimeLine.weight,
+    net_weight: weight,
+    gross_weight: weight,
+    chargeable_weight: weight,
     billing_status: 'READY',
     rate: rate.rate != null ? toNumber(rate.rate) : null,
     amount: overtimeLine.amount,
@@ -329,10 +347,10 @@ export function buildInvoiceDraftLineFromOvertimeLine(overtimeLine) {
     deposit_line_id: null,
     billing_period_start: null,
     billing_period_end: null,
-    line_note: `ค่าล่วงเวลา (OT) — ${docLabel} ${overtimeLine.date ?? '-'}, น้ำหนัก ${overtimeLine.weight} กก.`,
+    line_note: noteParts.join(' · '),
     duplicate_guard_active: false,
     // Same NOT NULL / heterogeneous-batch hazard as buildInvoiceDraftLineFromHandlingLine.
-    min_charge_applied: false,
+    min_charge_applied: Boolean(pool.minApplied),
     free_period_applied: false,
   };
 }

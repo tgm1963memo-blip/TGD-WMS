@@ -389,47 +389,130 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
   return results;
 }
 
-// OT (ค่าล่วงเวลา) for documents an admin/staff marked "คิด OT"
-// (is_overtime on tgd_customer_deposit_requests / tgd_customer_withdrawal_requests):
-// each line's actual weight x the OVERTIME rate with unit_basis PER_KG,
-// resolved per product like computeHandlingFeeLines. Lines are pre-filtered
-// by the caller to flagged documents confirmed inside the billing period;
-// each line is { id, requestId, requestType, customerId, customerProductId,
-// temperatureType, productCode, productName, lotNo, weight, date }. A line with no PER_KG OVERTIME rate is
-// skipped — FLAT/PER_HOUR OVERTIME rates bill through the aux-service path
-// instead (computeAuxiliaryServiceLines), so they are deliberately not
-// matched here to avoid charging the same OT twice.
-export function computeOvertimeWeightLines({ lines = [], rates = [] }) {
-  const results = [];
+// Calendar date (YYYY-MM-DD) of a timestamp in Bangkok time (UTC+7, no DST)
+// — e.g. a job started 23:30 UTC on the 14th is OT on the 15th locally.
+export function bangkokDateOf(iso) {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 10);
+}
 
+export const OVERTIME_SERVICE_TYPE_BY_KIND = { WORKDAY: 'OVERTIME', HOLIDAY: 'OVERTIME_HOLIDAY' };
+
+// OT (ค่าล่วงเวลา) for documents marked "คิด OT" (is_overtime +
+// overtime_type on tgd_customer_deposit_requests /
+// tgd_customer_withdrawal_requests). The OT minimum (min_charge_amount) is
+// per occasion, and one occasion is every flagged deposit/withdrawal of a
+// customer on the same work day with the same OT type (WORKDAY / HOLIDAY),
+// so OT is priced per pool:
+//   raw  = sum of line weight x that product's PER_KG rate
+//          (OVERTIME for WORKDAY, OVERTIME_HOLIDAY for HOLIDAY)
+//   pool = max(raw, minimum)
+// and the pool amount is spread back over its lines in proportion to each
+// line's raw amount (= by weight when all lines share one rate), rounding
+// remainder on the last line so the lines always sum to the pool exactly.
+// The minimum comes from the customer's all-items rate if the pool used one,
+// else the largest minimum among the rates used. Lines without a matching
+// PER_KG rate are left out (FLAT/PER_HOUR OVERTIME rates bill through the
+// aux-service path instead, computeAuxiliaryServiceLines).
+//
+// Callers must pass every flagged line of the period, BEFORE any
+// storage-type/product-group scoping, so a split bill never charges the
+// minimum twice; filter the returned lines afterwards.
+// line: { id, requestId, requestType, requestNo, customerId,
+//   customerProductId, temperatureType, productCategory, productCode,
+//   productName, lotNo, weight, workDate, overtimeType }
+export function computeOvertimePoolLines({ lines = [], rates = [] }) {
+  const pools = new Map();
   for (const line of lines) {
+    const overtimeType = line.overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY';
     const rate = resolveServiceRate(rates, {
       customerId: line.customerId,
       customerProductId: line.customerProductId,
       temperatureType: line.temperatureType,
-      serviceType: 'OVERTIME',
+      serviceType: OVERTIME_SERVICE_TYPE_BY_KIND[overtimeType],
       unitBasis: 'PER_KG',
-      asOfDate: line.date ?? null,
+      asOfDate: line.workDate ?? null,
     });
     if (!rate) continue;
-
+    const key = `${line.customerId}|${line.workDate ?? '-'}|${overtimeType}`;
+    if (!pools.has(key)) pools.set(key, { key, workDate: line.workDate ?? null, overtimeType, items: [] });
     const weight = toNumber(line.weight);
-    results.push({
-      lineId: line.id,
-      sourceRequestId: line.requestId,
-      requestType: line.requestType ?? null,
-      productCode: line.productCode ?? null,
-      productName: line.productName ?? null,
-      lotNo: line.lotNo ?? null,
-      customerId: line.customerId,
-      rate,
-      weight,
-      amount: round2(weight * toNumber(rate.rate)),
-      date: line.date ?? null,
+    pools.get(key).items.push({ line, rate, weight, raw: weight * toNumber(rate.rate) });
+  }
+
+  const results = [];
+  for (const pool of pools.values()) {
+    const { items } = pool;
+    const rawAmount = round2(items.reduce((sum, it) => sum + it.raw, 0));
+    const totalWeight = items.reduce((sum, it) => sum + it.weight, 0);
+    const allItemsMins = items.filter((it) => !it.rate.customer_product_id && it.rate.min_charge_amount != null)
+      .map((it) => toNumber(it.rate.min_charge_amount));
+    const anyMins = items.filter((it) => it.rate.min_charge_amount != null).map((it) => toNumber(it.rate.min_charge_amount));
+    const minCharge = allItemsMins.length ? Math.max(...allItemsMins) : (anyMins.length ? Math.max(...anyMins) : null);
+    const minApplied = minCharge != null && rawAmount < minCharge;
+    const poolAmount = minApplied ? round2(minCharge) : rawAmount;
+    const documentCount = new Set(items.map((it) => `${it.line.requestType}:${it.line.requestId}`)).size;
+    const summary = {
+      key: pool.key, workDate: pool.workDate, overtimeType: pool.overtimeType,
+      documentCount, totalWeight, rawAmount, minCharge, poolAmount, minApplied,
+    };
+
+    // Spread by raw amount; fall back to weight, then to equal shares, when
+    // the basis sums to zero (e.g. zero-rated or zero-weight lines).
+    const rawTotal = items.reduce((sum, it) => sum + it.raw, 0);
+    const basis = rawTotal > 0 ? items.map((it) => it.raw)
+      : totalWeight > 0 ? items.map((it) => it.weight)
+        : items.map(() => 1);
+    const basisTotal = basis.reduce((a, b) => a + b, 0);
+    let allocated = 0;
+    items.forEach((it, index) => {
+      const amount = index === items.length - 1
+        ? round2(poolAmount - allocated)
+        : round2(poolAmount * (basis[index] / basisTotal));
+      allocated = round2(allocated + amount);
+      results.push({
+        lineId: it.line.id,
+        sourceRequestId: it.line.requestId,
+        requestType: it.line.requestType ?? null,
+        requestNo: it.line.requestNo ?? null,
+        productCode: it.line.productCode ?? null,
+        productName: it.line.productName ?? null,
+        productCategory: it.line.productCategory ?? null,
+        temperatureType: it.line.temperatureType ?? null,
+        lotNo: it.line.lotNo ?? null,
+        customerId: it.line.customerId,
+        rate: it.rate,
+        weight: it.weight,
+        amount,
+        date: pool.workDate,
+        pool: summary,
+      });
     });
   }
 
   return results;
+}
+
+// Sums pooled OT lines (computeOvertimePoolLines, after any scoping) into
+// one entry per document — the unit shown on the invoice draft and in the
+// admin header estimate.
+export function groupOvertimeLinesByDocument(poolLines = []) {
+  const byDoc = new Map();
+  for (const line of poolLines) {
+    const key = `${line.pool.key}|${line.requestType}:${line.sourceRequestId}`;
+    if (!byDoc.has(key)) {
+      byDoc.set(key, {
+        sourceRequestId: line.sourceRequestId, requestType: line.requestType, requestNo: line.requestNo,
+        customerId: line.customerId, rate: line.rate, date: line.date, pool: line.pool, weight: 0, amount: 0,
+      });
+    }
+    const doc = byDoc.get(key);
+    doc.weight += line.weight;
+    doc.amount = round2(doc.amount + line.amount);
+  }
+  return [...byDoc.values()];
 }
 
 // Product-group scoping for period billing (e.g. a "Raw material" bill and

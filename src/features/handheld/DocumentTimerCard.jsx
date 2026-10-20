@@ -156,20 +156,22 @@ function TimeRow({ label, iso, onEdit }) {
   );
 }
 
-// Tapping the switch saves immediately; the note saves on blur. Disabled
-// while offline — the flag feeds billing, so it is never queued.
+// Tapping the switch saves immediately (as วันทำการ unless วันหยุดพิเศษ was
+// already chosen); the type buttons and the note (on blur) save the same
+// way. Disabled while offline — the flag feeds billing, so it is never queued.
 function OvertimeSwitchRow({ overtime, onToggle }) {
   const isOnline = useOnlineStatus();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(overtime.note ?? '');
   const [error, setError] = useState('');
   const on = Boolean(overtime.isOvertime);
+  const type = overtime.overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY';
   const disabled = busy || !isOnline;
 
-  async function save(next, nextNote) {
+  async function save(next, nextNote, nextType = type) {
     setBusy(true);
     setError('');
-    const result = await onToggle(next, nextNote);
+    const result = await onToggle(next, nextNote, nextType);
     setBusy(false);
     if (result?.error) {
       setError(result.error.message ?? 'บันทึก OT ไม่สำเร็จ');
@@ -209,6 +211,26 @@ function OvertimeSwitchRow({ overtime, onToggle }) {
       )}
       {on && (
         <>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {[['WORKDAY', 'วันทำการ'], ['HOLIDAY', 'วันหยุดพิเศษ']].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                disabled={disabled}
+                aria-pressed={type === value}
+                onClick={() => { if (type !== value) save(true, note, value); }}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 800,
+                  cursor: disabled ? 'default' : 'pointer',
+                  border: `1px solid ${type === value ? '#f97316' : '#e2e8f0'}`,
+                  background: type === value ? '#f97316' : '#fff',
+                  color: type === value ? '#fff' : '#334155',
+                }}
+              >
+                {type === value ? '✓ ' : ''}{label}
+              </button>
+            ))}
+          </div>
           <input
             type="text"
             value={note}

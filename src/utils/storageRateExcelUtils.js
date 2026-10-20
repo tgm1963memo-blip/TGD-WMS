@@ -22,7 +22,7 @@ export const STORAGE_RATE_EXCEL_HEADERS = [
 // — R3_DOCUMENT/PER_HOUR were already valid single-row form options but
 // missing here, which would have rejected a bulk-import row for a type the
 // UI itself could already create; PLUG_IN/OVERTIME added alongside them.
-const SERVICE_TYPE_VALUES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'R3_DOCUMENT', 'PLUG_IN', 'OVERTIME', 'OTHER']);
+const SERVICE_TYPE_VALUES = new Set(['STORAGE', 'HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'R3_DOCUMENT', 'PLUG_IN', 'OVERTIME', 'OVERTIME_HOLIDAY', 'OTHER']);
 const UNIT_BASIS_VALUES = new Set(['PER_KG', 'PER_UNIT', 'PER_PALLET', 'PER_TRIP', 'PER_DAY', 'PER_HOUR', 'FLAT']);
 
 export function mapRateRowToExcelRow(row = {}) {
