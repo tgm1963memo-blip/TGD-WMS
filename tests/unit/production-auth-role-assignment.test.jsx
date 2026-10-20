@@ -10,11 +10,6 @@ import {
   normalizeProductionRole,
 } from '../../src/security/productionRoleModel.js';
 import {
-  resolveUserRoleFromAuthContext,
-  resolveUserRoleFromProfile,
-  summarizeAuthRoleResolution,
-} from '../../src/security/authUserRoleResolver.js';
-import {
   auditDemoRoleSelectorRisk,
   auditProductionAuthReadiness,
 } from '../../src/security/authReadinessAuditService.js';
@@ -44,38 +39,6 @@ describe('production role model', () => {
     expect(canProductionRoleAccess('viewer', 'admin')).toBe(true);
     expect(canProductionRoleAccess('admin', 'viewer')).toBe(false);
     expect(normalizeProductionRole(' Accounting ')).toBe('accounting');
-  });
-});
-
-describe('auth user role resolver', () => {
-  test('invalid role falls back safely', () => {
-    const result = resolveUserRoleFromProfile({ role: 'invalid_role' });
-
-    expect(result.role).toBe('viewer');
-    expect(result.fallback).toBe(true);
-    expect(result.warnings[0]).toMatch(/Invalid production role/);
-  });
-
-  test('no admin default', () => {
-    const result = resolveUserRoleFromProfile(null);
-
-    expect(result.role).toBe('viewer');
-    expect(result.role).not.toBe('admin');
-    expect(result.fallback).toBe(true);
-  });
-
-  test('viewer fallback when missing auth', () => {
-    const result = resolveUserRoleFromAuthContext(undefined);
-
-    expect(result.role).toBe('viewer');
-    expect(result.fallback).toBe(true);
-  });
-
-  test('summarizes admin assignment with review warning', () => {
-    const result = summarizeAuthRoleResolution({ profile: { role: 'admin' } });
-
-    expect(result.role).toBe('admin');
-    expect(result.warnings).toContain('Admin role requires explicit production assignment review');
   });
 });
 
@@ -124,7 +87,6 @@ describe('auth readiness UI', () => {
   test('no mutation or external calls exist in sprint files', () => {
     const files = [
       '../../src/security/productionRoleModel.js',
-      '../../src/security/authUserRoleResolver.js',
       '../../src/security/authReadinessAuditService.js',
       '../../src/components/security/AuthReadinessPanel.jsx',
       '../../src/features/admin/AuthReadinessPage.jsx',

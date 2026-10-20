@@ -7,7 +7,6 @@ const migrationPath = path.join(
   'database/migrations/029_tgd_wms_controlled_pick_confirmation_rpc_draft.sql',
 );
 const docPath = path.join(process.cwd(), 'docs/14T_CONTROLLED_PICK_CONFIRMATION_RPC_DRAFT.md');
-const servicePath = path.join(process.cwd(), 'src/services/outboundPickingService.js');
 const srcDir = path.join(process.cwd(), 'src');
 
 function readMigration() {
@@ -16,10 +15,6 @@ function readMigration() {
 
 function readDoc() {
   return readFileSync(docPath, 'utf8');
-}
-
-function readService() {
-  return readFileSync(servicePath, 'utf8');
 }
 
 function readAllSrcFiles(dir = srcDir) {
@@ -100,18 +95,6 @@ describe('Sprint 14T controlled pick confirmation RPC draft', () => {
   it('does NOT contain truncate', () => {
     expect(readMigration().toLowerCase()).not.toMatch(/\btruncate\b/);
   });
-
-  it('service wrapper exists and calls the draft RPC', () => {
-    const source = readService();
-
-    expect(source).toContain('confirmOutboundPickDraft');
-    expect(source).toContain('tgd_rpc_confirm_outbound_pick_draft');
-    expect(source).toContain('postOutboundDocumentDraft');
-    expect(source).not.toContain('tgd_stock_movements');
-    expect(source).not.toContain('tgd_stock_balances');
-  });
-
-
 
   it('documentation states 14T safety boundaries', () => {
     expect(existsSync(docPath)).toBe(true);

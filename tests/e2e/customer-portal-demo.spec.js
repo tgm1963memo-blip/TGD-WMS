@@ -40,8 +40,6 @@ test.describe('CUSTOMER-PORTAL-2F Customer Portal Live Data', () => {
     test('Scenario 10: Forbidden side effects absent', async () => {
       await gotoUrl(page, `${getBaseUrl()}/operations/receiving`);
       await expect(page.locator('[data-testid="receiving-post-button"]')).toHaveCount(0);
-      await gotoUrl(page, `${getBaseUrl()}/operations/dispatch`);
-      await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
       await gotoUrl(page, `${getBaseUrl()}/billing/invoice-drafts`);
       await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
       await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);

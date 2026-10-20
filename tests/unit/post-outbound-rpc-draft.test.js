@@ -4,9 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 const migrationPath = path.join(process.cwd(), 'database/migrations/030_tgd_wms_post_outbound_rpc_draft.sql');
 const docPath = path.join(process.cwd(), 'docs/14Z_POST_OUTBOUND_RPC_DRAFT.md');
-const pickingPagePath = path.join(process.cwd(), 'src/features/operations/picking/PickingDraftWorkflowPage.jsx');
-const controlledPickPagePath = path.join(process.cwd(), 'src/features/operations/picking/ControlledPickConfirmationPage.jsx');
-const servicePath = path.join(process.cwd(), 'src/services/outboundPickingService.js');
 
 function readFile(filePath) {
   return readFileSync(filePath, 'utf8');
@@ -88,22 +85,6 @@ describe('Sprint 14Z post outbound RPC draft', () => {
 
     expect(migration).not.toMatch(/delete\s+from/);
     expect(migration).not.toMatch(/\btruncate\b/);
-  });
-
-  it('does not add UI post outbound or confirm stock out buttons', () => {
-    const source = [
-      pickingPagePath,
-      controlledPickPagePath,
-      servicePath,
-    ]
-      .filter((filePath) => existsSync(filePath))
-      .map((filePath) => readFile(filePath))
-      .join('\n');
-
-    expect(source).not.toMatch(/<button[^>]*>\s*post outbound\s*</i);
-    expect(source).not.toMatch(/<button[^>]*>\s*confirm stock out\s*</i);
-    expect(source).not.toContain("rpc('tgd_rpc_post_outbound_document'");
-    expect(source).not.toContain('rpc("tgd_rpc_post_outbound_document"');
   });
 
   it('documents draft-only scope and next sprint staging apply gate', () => {

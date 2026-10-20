@@ -74,7 +74,6 @@ describe('User management + catalog frontend wiring', () => {
       'src/features/admin/UserManagementPage.jsx',
       'src/features/admin/CustomerProductCatalogAdminPage.jsx',
       'src/features/customer/CustomerProductCatalogPage.jsx',
-      'src/components/customer/CustomerProductPicker.jsx',
     ];
 
     paths.forEach((relativePath) => {

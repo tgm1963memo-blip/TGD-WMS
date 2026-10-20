@@ -335,7 +335,7 @@ test.describe('Post-UAT: LOT Matching — UI validation', () => {
       test.skip(true, 'No customer credentials — skip');
       return;
     }
-    await gotoUrl(page, `${baseUrl}/customer/stock`);
+    await gotoUrl(page, `${baseUrl}/customer/stock-balance`);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2500);
     await screenshot(page, '12-customer-portal.png');

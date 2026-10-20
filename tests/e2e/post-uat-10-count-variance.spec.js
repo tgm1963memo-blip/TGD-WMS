@@ -94,7 +94,7 @@ test.describe('Post-UAT: COUNT_VARIANCE Decision — RPC', () => {
       test.skip(true, 'No customer credentials — skip');
       return;
     }
-    await gotoUrl(page, `${baseUrl}/customer/stock`);
+    await gotoUrl(page, `${baseUrl}/customer/stock-balance`);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1500);
 

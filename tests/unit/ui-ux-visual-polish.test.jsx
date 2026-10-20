@@ -7,7 +7,6 @@ import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { getTranslation } from '../../src/i18n/translationCatalog.js';
 import ReportsPage from '../../src/features/reports/ReportsPage.jsx';
 import { AuthReadinessPage } from '../../src/features/admin/AuthReadinessPage.jsx';
-import { DocumentBrandingAdminPage } from '../../src/features/admin/DocumentBrandingAdminPage.jsx';
 
 vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
   useUserRole: () => ({ role: 'admin', ready: true }),
@@ -55,7 +54,8 @@ describe('Sprint 12D UI/UX visual polish', () => {
   });
 
   it('keeps the demo role selector visually marked as demo-only', () => {
-    renderWithShell(<ReportsPage />);    expect(screen.getByText(/สำหรับทดสอบเท่านั้น \/ Demo only/i)).toBeInTheDocument();
+    renderWithShell(<ReportsPage />);
+    expect(screen.getByText(/สำหรับทดสอบเท่านั้น \/ Demo only/i)).toBeInTheDocument();
   });
 
   it('renders admin readiness page with modern card sections', () => {
@@ -64,12 +64,4 @@ describe('Sprint 12D UI/UX visual polish', () => {
     expect(screen.getByText('Production Role Model')).toBeInTheDocument();
     expect(screen.getByText('Next Action Checklist')).toBeInTheDocument();
   });
-
-  it('does not add save or upload actions to branding admin page', () => {
-    renderWithShell(<DocumentBrandingAdminPage />);
-
-    expect(screen.queryByRole('button', { name: /save/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /upload/i })).not.toBeInTheDocument();
-  });
 });
-

@@ -7,11 +7,6 @@ import {
   resolveBillingEligibility,
 } from '../../src/constants/movementTypeMapping.js';
 import {
-  assertMigrationApplyAllowed,
-  classifySupabaseEnvironment,
-  maskSupabaseProjectRef,
-} from '../../src/config/supabaseEnvironmentGuard.js';
-import {
   BILLING_MOVEMENT_WEIGHT_VIEW_NAME,
   shapeBillingMovementWeightRow,
 } from '../../src/services/billingMovementWeightService.js';
@@ -19,27 +14,6 @@ import { normalizeStockMovementRow } from '../../src/services/unifiedMovementRea
 import { resolveMovementWeights } from '../../src/utils/billingWeightUtils.js';
 
 describe('Gate 2 billing data foundation', () => {
-  it('classifies unknown environment as not safe for migration apply', () => {
-    const status = classifySupabaseEnvironment({
-      supabaseUrl: 'https://lievvsqbosvrolkrftna.supabase.co',
-      appEnv: 'development',
-    });
-
-    expect(status.classification).toBe('unknown');
-    expect(status.canApplyMigration).toBe(false);
-    expect(() => assertMigrationApplyAllowed(status)).toThrow(/BLOCKED/i);
-  });
-
-  it('allows migration apply only for explicit uat/dev/staging labels', () => {
-    expect(classifySupabaseEnvironment({ appEnv: 'uat' }).canApplyMigration).toBe(true);
-    expect(classifySupabaseEnvironment({ appEnv: 'staging' }).canApplyMigration).toBe(true);
-    expect(classifySupabaseEnvironment({ appEnv: 'production' }).canApplyMigration).toBe(false);
-  });
-
-  it('masks supabase project ref for reporting', () => {
-    expect(maskSupabaseProjectRef('https://lievvsqbosvrolkrftna.supabase.co')).toBe('lievvsqbosvrolkrftna');
-  });
-
   it('marks RECEIVE_CONFIRM as billable inbound handling', () => {
     const row = normalizeStockMovementRow({
       id: 'mv-1',

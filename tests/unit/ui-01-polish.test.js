@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getTranslation, TRANSLATION_CATALOG } from '../../src/i18n/translations.js';
+import { getTranslation, TRANSLATION_CATALOG } from '../../src/i18n/translationCatalog.js';
 
 describe('UI-01 polish and language support', () => {
-  it('translations.js re-exports catalog utilities', () => {
+  it('translation catalog resolves Thai and English values', () => {
     expect(getTranslation('uat_mode', 'th')).toBeTruthy();
     expect(getTranslation('uat_mode', 'en')).toBeTruthy();
   });

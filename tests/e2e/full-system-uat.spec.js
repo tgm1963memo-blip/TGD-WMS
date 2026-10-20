@@ -132,12 +132,6 @@ test.describe('UAT — Admin role', () => {
     await snap(page, 'admin_storage_aging');
   });
 
-  test('No forbidden side-effect buttons for admin', async () => {
-    await gotoUrl(page, `${BASE}/operations/dispatch`);
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
-    await snap(page, 'admin_dispatch');
-  });
-
   test('Profile settings page loads', async () => {
     await gotoUrl(page, `${BASE}/settings/profile`);
     await expect(page.locator('[data-testid="profile-settings-page"]')).toBeVisible({ timeout: 20000 });

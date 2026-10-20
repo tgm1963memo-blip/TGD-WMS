@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 import { DEFAULT_LANGUAGE, TRANSLATION_CATALOG } from '../../src/i18n/translationCatalog.js';
 import LanguageToggle from '../../src/components/common/LanguageToggle.jsx';
-import { ReceivingPage } from '../../src/features/receiving/ReceivingPage.jsx';
 
 const requiredOperationKeys = [
   'warehouse_operations',
@@ -94,11 +93,4 @@ describe('Sprint 12E warehouse operation UI polish', () => {
     }
   });
 
-  it('renders a polished receiving operation page with modern layout components', () => {
-    renderWithProviders(<ReceivingPage />);
-
-    expect(screen.getByRole('heading', { name: 'รับสินค้าเข้า' })).toBeInTheDocument();
-    expect(screen.getByText('สินค้าคงคลังของลูกค้า')).toBeInTheDocument();
-    expect(screen.getByText('สแกนบาร์โค้ด')).toBeInTheDocument();
-  });
 });

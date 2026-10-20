@@ -343,17 +343,6 @@ export async function postReceivingDocument(id) {
   });
 }
 
-export async function cancelReceivingDocument() {
-  if (!supabase) {
-    return missingSupabaseClientResult();
-  }
-
-  return {
-    data: null,
-    error: new Error('Cancellation is disabled until controller-approved RPC exists.'),
-  };
-}
-
 export async function resolveLotForReceiving(productId, lotNo) {
   if (!supabase) {
     return missingSupabaseClientResult();

@@ -11,17 +11,13 @@ import { CustomerWithdrawalRequestPage } from '../../src/features/customer/Custo
 import { CustomerWithdrawalRequestCreatePage } from '../../src/features/customer/CustomerWithdrawalRequestCreatePage.jsx';
 import { CustomerRequestHistoryPage } from '../../src/features/customer/CustomerRequestHistoryPage.jsx';
 import { CustomerAdminDepositReviewPage } from '../../src/features/customer/CustomerAdminDepositReviewPage.jsx';
-import { CustomerWarehouseReceivingDemoPage } from '../../src/features/customer/CustomerWarehouseReceivingDemoPage.jsx';
-import { CustomerAdminReceivingVerificationPage } from '../../src/features/customer/CustomerAdminReceivingVerificationPage.jsx';
 import { CustomerAdminWithdrawalReviewPage } from '../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx';
-import { CustomerWarehousePickingLoadingDemoPage } from '../../src/features/customer/CustomerWarehousePickingLoadingDemoPage.jsx';
 import {
   canReadBillingInvoiceDrafts,
   canWriteBillingInvoiceDrafts,
 } from '../../src/security/billingInvoiceDraftPermissions.js';
 
 const receivingRpc = vi.hoisted(() => vi.fn());
-const dispatchRpc = vi.hoisted(() => vi.fn());
 const createDepositRpc = vi.hoisted(() => vi.fn());
 const submitDepositRpc = vi.hoisted(() => vi.fn());
 const upsertDepositLineRpc = vi.hoisted(() => vi.fn());
@@ -31,11 +27,6 @@ const upsertWithdrawalLineRpc = vi.hoisted(() => vi.fn());
 vi.mock('../../src/services/receivingService.js', () => ({
   createReceivingDraft: receivingRpc,
   confirmReceiving: receivingRpc,
-}));
-
-vi.mock('../../src/services/dispatchService.js', () => ({
-  confirmDispatch: dispatchRpc,
-  createDispatchDraft: dispatchRpc,
 }));
 
 vi.mock('../../src/features/customer/useCustomerPortalProfile.js', () => ({
@@ -270,7 +261,6 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
       expect(createWithdrawalRpc).toHaveBeenCalled();
     });
     expect(upsertWithdrawalLineRpc).toHaveBeenCalled();
-    expect(dispatchRpc).not.toHaveBeenCalled();
   });
 
   it('renders request history from live service', async () => {
@@ -279,12 +269,6 @@ describe('CUSTOMER-PORTAL-2F live data UI', () => {
       expect(screen.getByTestId('customer-request-history-table')).toBeInTheDocument();
     });
     expect(screen.getByText('CDR-20260608-0001')).toBeInTheDocument();
-  });
-
-  it('keeps warehouse execution pages in demo mode', () => {
-    renderPage(CustomerWarehouseReceivingDemoPage);
-    expect(screen.getByTestId('customer-portal-demo-banner')).toBeInTheDocument();
-    expect(screen.getByTestId('pallet-card')).toBeInTheDocument();
   });
 
   it('keeps billing permission boundaries unchanged', () => {

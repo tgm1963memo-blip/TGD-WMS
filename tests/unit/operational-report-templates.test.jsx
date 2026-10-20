@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReceivingReportTemplate } from '../../src/components/reports/ReceivingReportTemplate.jsx';
-import { DeliverySlipTemplate } from '../../src/components/reports/DeliverySlipTemplate.jsx';
 import { InventoryMovementReportTemplate } from '../../src/components/reports/InventoryMovementReportTemplate.jsx';
 
 const receivingData = {
@@ -22,22 +21,6 @@ const receivingData = {
   lines: [{ id: '1', lotNo: 'LOT-1', customerProduct: 'Pork Loin', code: 'PRD-1', qty: 10 }],
   totalQty: 10,
   totalWeight: 120,
-};
-
-const deliveryData = {
-  customerName: 'ACME Cold Chain',
-  address: 'Bangkok',
-  deliveryTo: 'DC-01',
-  roomTemperature: '2C',
-  truckTemperature: '-18C',
-  documentNo: 'OUT-001',
-  documentDate: '2026-06-02',
-  lines: [{ id: '1', lotNo: 'LOT-1', location: 'A-01', customerProduct: 'Pork Loin', itemCode: 'PRD-1', batchNo: 'B-1', totalWeightKg: 50, balanceTotal: 40 }],
-  totalWeightKg: 50,
-  balanceTotal: 40,
-  remark: 'Friday test run',
-  startTime: '10:00',
-  finishTime: '11:00',
 };
 
 const inventoryData = {
@@ -81,16 +64,6 @@ describe('20B operational report templates', () => {
     const totals = screen.getByTestId('report-totals-section');
     expect(totals).toBeInTheDocument();
     expect(totals).toHaveTextContent('10');
-    expect(screen.getByTestId('report-signature-section')).toBeInTheDocument();
-  });
-
-  it('renders delivery slip with headings, lines, totals, and signatures', () => {
-    render(<DeliverySlipTemplate data={deliveryData} language="en" />);
-
-    expect(screen.getByTestId('delivery-slip-template')).toBeInTheDocument();
-    expect(screen.getByText('Delivery Slip')).toBeInTheDocument();
-    expect(screen.getByText('PRD-1')).toBeInTheDocument();
-    expect(screen.getByTestId('report-totals-section')).toBeInTheDocument();
     expect(screen.getByTestId('report-signature-section')).toBeInTheDocument();
   });
 

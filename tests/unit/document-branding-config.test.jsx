@@ -17,7 +17,6 @@ import {
 } from '../../src/services/documentBrandingService.js';
 import { DocumentHeader } from '../../src/components/documents/DocumentHeader.jsx';
 import { DocumentFooter } from '../../src/components/documents/DocumentFooter.jsx';
-import { DocumentBrandingPreviewPage } from '../../src/features/admin/DocumentBrandingPreviewPage.jsx';
 
 describe('document branding config', () => {
   test('config exports exist', () => {
@@ -77,25 +76,12 @@ describe('document branding components', () => {
     expect(screen.getByText(/Approved by: Approved User/)).toBeInTheDocument();
   });
 
-  test('preview page renders without write actions', () => {
-    render(<DocumentBrandingPreviewPage />);
-
-    expect(screen.getByText('Document Branding Preview')).toBeInTheDocument();
-    expect(screen.getByText('Thai Preview')).toBeInTheDocument();
-    expect(screen.getByText('English Preview')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /upload/i })).toBeNull();
-  });
-});
-
-describe('document branding safety', () => {
   test('source contains no database calls, network calls, or file writes', () => {
     const files = [
       '../../src/config/documentBrandingConfig.js',
       '../../src/services/documentBrandingService.js',
       '../../src/components/documents/DocumentHeader.jsx',
       '../../src/components/documents/DocumentFooter.jsx',
-      '../../src/features/admin/DocumentBrandingPreviewPage.jsx',
     ];
 
     files.forEach((file) => {

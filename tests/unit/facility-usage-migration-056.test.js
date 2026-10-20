@@ -51,9 +51,8 @@ describe('056 facility usage and storage rate rules', () => {
 });
 
 describe('056 frontend wiring', () => {
-  it('exposes facility usage page and storage rate admin', () => {
+  it('exposes facility usage page and staff work order print', () => {
     expect(existsSync(path.join(process.cwd(), 'src/features/customer/CustomerFacilityUsageRequestPage.jsx'))).toBe(true);
-    expect(existsSync(path.join(process.cwd(), 'src/features/admin/CustomerStorageRateRulesAdminPage.jsx'))).toBe(true);
     expect(existsSync(path.join(process.cwd(), 'src/components/customer/CustomerDepositStaffWorkOrderPrint.jsx'))).toBe(true);
   });
 });

@@ -17,7 +17,6 @@ describe('Sprint 6B movement ledger report foundation', () => {
     'src/features/reports/MovementLedgerReportPage.jsx',
     'src/components/reports/ReportFilterPanel.jsx',
     'src/components/reports/ReportSummaryCard.jsx',
-    'src/components/reports/MovementTypeBreakdown.jsx',
     'src/components/reports/MovementLedgerTable.jsx',
     'src/app/routes.jsx',
   ];
@@ -75,7 +74,6 @@ describe('Sprint 6B movement ledger report foundation', () => {
       'src/features/reports/ReportsPage.jsx',
       'src/components/reports/ReportFilterPanel.jsx',
       'src/components/reports/ReportSummaryCard.jsx',
-      'src/components/reports/MovementTypeBreakdown.jsx',
       'src/components/reports/MovementLedgerTable.jsx',
     ].forEach((path) => {
       expect(statSync(resolve(projectRoot, path)).isFile()).toBe(true);

@@ -270,7 +270,7 @@ test.describe('Transaction UAT Round 1', () => {
       if (getScenarioStatus('A') !== 'PASS') {
         throw new Error('DEPENDENCY_BLOCKED: Scenario A did not PASS');
       }
-      await safeGoto(page, '/receiving', '22N_01_receiving_page.png');
+      await safeGoto(page, '/operations/receiving', '22N_01_receiving_page.png');
       const createButtons = [
         'a:has-text("Create Receiving Draft")',
       ];
@@ -386,7 +386,7 @@ try {
     await runScenario('E', 'Verify receiving movement ledger evidence', '22N_05_receiving_ledger_check.png', async () => {
       if (getScenarioStatus('D') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario D did not PASS');
 
-      await safeGoto(page, '/movement-ledger', null);
+      await safeGoto(page, '/reports/movement-ledger', null);
       // verify something here
       const tableRows = ['tr:has-text("'+process.env.UAT_PRODUCT_CODE+'")'];
       const element = await firstVisible(page, tableRows);
@@ -397,7 +397,7 @@ try {
     await runScenario('F', 'Verify stock balance increase evidence', '22N_06_stock_balance_check.png', async () => {
       if (getScenarioStatus('D') !== 'PASS') throw new Error('DEPENDENCY_BLOCKED: Scenario D did not PASS');
 
-      await safeGoto(page, '/stock-balance', null);
+      await safeGoto(page, '/inventory', null);
       const tableRows = ['tr:has-text("'+process.env.UAT_PRODUCT_CODE+'")'];
       const element = await firstVisible(page, tableRows);
       if (!element) throw new Error('MISSING_SELECTOR: Stock balance record not found for product');

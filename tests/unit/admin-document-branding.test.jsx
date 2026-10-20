@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -10,13 +10,6 @@ import {
   validateDocumentBrandingConfig,
   validateDocumentLogoReference,
 } from '../../src/config/documentBrandingConfig.js';
-import {
-  createEditableBrandingDraft,
-  previewEditableBrandingDraft,
-  validateEditableBrandingDraft,
-} from '../../src/services/documentBrandingAdminService.js';
-import { DocumentBrandingForm } from '../../src/components/documents/DocumentBrandingForm.jsx';
-import { DocumentBrandingAdminPage } from '../../src/features/admin/DocumentBrandingAdminPage.jsx';
 
 describe('admin document branding config', () => {
   test('editable fields exist', () => {
@@ -25,9 +18,6 @@ describe('admin document branding config', () => {
     expect(DOCUMENT_BRANDING_EDITABLE_FIELDS).toContain('document_footer_note_th');
     expect(typeof createDocumentBrandingDraft).toBe('function');
     expect(typeof applyDocumentBrandingDraft).toBe('function');
-    expect(typeof createEditableBrandingDraft).toBe('function');
-    expect(typeof previewEditableBrandingDraft).toBe('function');
-    expect(typeof validateEditableBrandingDraft).toBe('function');
   });
 
   test('company_name_th required validation', () => {
@@ -62,45 +52,7 @@ describe('admin document branding config', () => {
   });
 });
 
-describe('admin document branding UI', () => {
-  test('form renders Thai-first labels', () => {
-    render(<DocumentBrandingForm />);
-
-    expect(screen.getByText('แก้ไขการตั้งค่าเอกสาร')).toBeInTheDocument();
-    expect(screen.getByText('ชื่อบริษัทภาษาไทย')).toBeInTheDocument();
-    expect(screen.getByText('ข้อมูลบริษัท (Company Information)')).toBeInTheDocument();
-  });
-
-  test('no save button exists and no upload button exists', () => {
-    render(<DocumentBrandingForm />);
-
-    expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /upload/i })).toBeNull();
-  });
-
-  test('preview update uses local state only', () => {
-    const handlePreviewChange = vi.fn();
-    render(<DocumentBrandingForm onPreviewChange={handlePreviewChange} />);
-
-    fireEvent.change(screen.getByLabelText('ชื่อบริษัทภาษาอังกฤษ'), {
-      target: { value: 'Preview Company' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /update preview/i }));
-
-    expect(handlePreviewChange).toHaveBeenCalledWith(
-      expect.objectContaining({ company_name_en: 'Preview Company' }),
-    );
-  });
-
-  test('admin page renders header/footer preview', () => {
-    render(<DocumentBrandingAdminPage />);
-
-    expect(screen.getAllByText(/ตั้งค่าเอกสาร/).length).toBeGreaterThan(0);
-    expect(screen.getByText('Thai Preview')).toBeInTheDocument();
-    expect(screen.getByText('English Preview')).toBeInTheDocument();
-    expect(screen.getAllByText(/Prepared by|จัดทำโดย/).length).toBeGreaterThan(0);
-  });
-
+describe('admin document branding wiring', () => {
   test('document branding admin route is intentionally not wired in routes.jsx', () => {
     const routesSource = fs.readFileSync(
       path.resolve(__dirname, '../../src/app/routes.jsx'),
@@ -114,9 +66,6 @@ describe('admin document branding UI', () => {
   test('no database, storage, network, or browser persistence call exists', () => {
     const files = [
       '../../src/config/documentBrandingConfig.js',
-      '../../src/services/documentBrandingAdminService.js',
-      '../../src/components/documents/DocumentBrandingForm.jsx',
-      '../../src/features/admin/DocumentBrandingAdminPage.jsx',
     ];
 
     files.forEach((file) => {

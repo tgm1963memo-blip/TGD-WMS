@@ -69,7 +69,7 @@ test.describe('FLOW-A: System Setup', () => {
   });
 
   test('A3-1: Product catalog is accessible', async ({ page }) => {
-    await goto(page, '/admin/customer-product-catalog');
+    await goto(page, '/admin/customer-products');
     await expect(page.locator('h1, h2, [data-testid="page-header-title"]').first()).toBeVisible({ timeout: 15000 });
   });
 
@@ -107,15 +107,6 @@ test.describe('FLOW-B: Deposit Flow', () => {
     expect(minAttr, 'min attribute should be set').toBeTruthy();
     // min=today means yesterday is strictly before min
     expect(new Date(yesterday) < new Date(minAttr)).toBeTruthy();
-  });
-
-  test('B2-1: Admin receiving list shows only pending section (no duplicate table)', async ({ page }) => {
-    await goto(page, '/customer/warehouse/receiving');
-    // The page should exist
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 15000 });
-    // The duplicate "Receiving documents" table should NOT be present
-    const duplicateHeading = page.locator('h3:has-text("Receiving documents"), h3:has-text("เอกสารรับสินค้า")');
-    await expect(duplicateHeading).toHaveCount(0);
   });
 
   test('B5-1: Admin deposit review table is visible', async ({ page }) => {

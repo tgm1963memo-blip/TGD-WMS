@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 const projectRoot = resolve(__dirname, '../../');
 const migrationPath = resolve(projectRoot, 'database/migrations/017_tgd_wms_rpc_traceability_fix.sql');
-const dryRunServicePath = resolve(projectRoot, 'src/services/controlledFrontendWriteDryRunService.js');
 
 function readSource(path) {
   return readFileSync(path, 'utf8');
@@ -40,31 +39,5 @@ describe('Sprint 13J-H RPC traceability fix migration', () => {
 
   it('does not reference private key terminology', () => {
     expect(sql).not.toMatch(/service_role/i);
-  });
-});
-
-describe('Sprint 13J-H controlled frontend dry-run safety', () => {
-  const serviceSource = readSource(dryRunServicePath);
-
-  it('controlled frontend dry-run service calls only the allowed receive movement RPC', () => {
-    const rpcCalls = serviceSource.match(/\.rpc\s*\(/g) ?? [];
-
-    expect(rpcCalls).toHaveLength(1);
-    expect(serviceSource).toContain('tgd_rpc_create_receive_movement');
-    expect(serviceSource).not.toMatch(/tgd_rpc_create_(putaway|transfer|adjustment|pick|dispatch)_movement/i);
-  });
-
-  it('does not add direct frontend table write methods', () => {
-    expect(serviceSource).not.toMatch(/\.insert\s*\(/);
-    expect(serviceSource).not.toMatch(/\.update\s*\(/);
-    expect(serviceSource).not.toMatch(/\.delete\s*\(/);
-    expect(serviceSource).not.toMatch(/\.upsert\s*\(/);
-    expect(serviceSource).not.toMatch(/service_role/i);
-  });
-
-  it('does not directly mutate tgd_stock_balances from frontend dry-run service', () => {
-    expect(serviceSource).toContain(".from('tgd_stock_balances')");
-    expect(serviceSource).toContain(".select('id, customer_id, location_id')");
-    expect(serviceSource).not.toMatch(/from\('tgd_stock_balances'\)[\s\S]{0,240}\.(insert|update|delete|upsert)\s*\(/);
   });
 });

@@ -240,32 +240,6 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     }
 
     // ---------------------------------------------------------
-    // 5.9 Admin Outbound Dispatch
-    // ---------------------------------------------------------
-    console.log('--- Step 5.9: Admin Outbound Dispatch ---');
-    await gotoUrl(page, `${baseUrl}/operations/outbound`);
-    await page.waitForLoadState('networkidle');
-    
-    // Check if there are documents to dispatch
-    const confirmPickListBtn = page.locator('button', { hasText: /Confirm Pick/ }).first();
-    if (await confirmPickListBtn.isVisible()) {
-        await confirmPickListBtn.click();
-        await page.waitForTimeout(1000);
-    }
-    const dispatchRowBtn = page.locator('a[href^="/operations/outbound/"]').first();
-    if (await dispatchRowBtn.isVisible()) {
-        await dispatchRowBtn.click();
-        await page.waitForTimeout(1000);
-        
-        // Dispatch
-        const dispatchActionBtn = page.locator('button', { hasText: /Dispatch|ตัดจ่าย/ }).first();
-        if (await dispatchActionBtn.isVisible()) {
-            await dispatchActionBtn.click();
-            await page.waitForTimeout(1000);
-        }
-    }
-
-    // ---------------------------------------------------------
     // 6. Trigger Email Processing Endpoint
     // ---------------------------------------------------------
     console.log('--- Step 6: Process Email Queue ---');

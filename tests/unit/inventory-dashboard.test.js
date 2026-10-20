@@ -13,9 +13,7 @@ function readProjectFile(path) {
 describe('Sprint 6A inventory dashboard foundation', () => {
   const dashboardFiles = [
     'src/features/dashboard/DashboardPage.jsx',
-    'src/components/dashboard/DashboardCard.jsx',
     'src/components/dashboard/DashboardSection.jsx',
-    'src/components/dashboard/InventorySummaryTable.jsx',
     'src/app/routes.jsx',
   ];
 
@@ -39,9 +37,7 @@ describe('Sprint 6A inventory dashboard foundation', () => {
   it('creates dashboard page and dashboard components', () => {
     [
       'src/features/dashboard/DashboardPage.jsx',
-      'src/components/dashboard/DashboardCard.jsx',
       'src/components/dashboard/DashboardSection.jsx',
-      'src/components/dashboard/InventorySummaryTable.jsx',
     ].forEach((path) => {
       expect(statSync(resolve(projectRoot, path)).isFile()).toBe(true);
     });

@@ -30,7 +30,7 @@ const ROLE_SMOKE_MATRIX = [
     checks: [
       { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
       { path: '/customer/admin/withdrawal-review', testId: 'customer-admin-withdrawal-review-page' },
-      { path: '/stock-count', testId: null },
+      { path: '/inventory/count', testId: null },
     ],
   },
   {

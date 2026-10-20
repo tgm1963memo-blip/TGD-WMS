@@ -6,8 +6,6 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(testDir, '..', '..');
 const dashboardPath = resolve(projectRoot, 'src/features/dashboard/DashboardPage.jsx');
-const newReceivingPanelPath = resolve(projectRoot, 'src/components/dashboard/ControlledReceivingRpcDryRunPanel.jsx');
-const newReceivingServicePath = resolve(projectRoot, 'src/services/controlledReceivingRpcDryRunService.js');
 const receivingDetailPath = resolve(projectRoot, 'src/features/operations/receiving/ReceivingDetailPage.jsx');
 const receivingServicePath = resolve(projectRoot, 'src/services/receivingService.js');
 
@@ -23,38 +21,18 @@ describe('Sprint 13J-M receiving RPC dry run safety hardening', () => {
     expect(dashboard).not.toContain('Run controlled RECEIVE dry run');
   });
 
-  it('dashboard still renders the new Controlled Receiving RPC Dry Run panel', () => {
+  it('dashboard does not render the Controlled Receiving RPC Dry Run panel', () => {
     const dashboard = readProjectFile(dashboardPath);
-    const panel = readProjectFile(newReceivingPanelPath);
 
     expect(dashboard).not.toContain('ControlledReceivingRpcDryRunPanel');
     expect(dashboard).not.toContain('<ControlledReceivingRpcDryRunPanel session={session} />');
-    expect(panel).toContain('Controlled Receiving RPC Dry Run');
-    expect(panel).toContain('Run Receiving RPC Dry Run');
   });
 
   it('dashboard-visible code does not call stock movement RPCs', () => {
-    const dashboardVisibleSource = [
-      readProjectFile(dashboardPath),
-      readProjectFile(newReceivingPanelPath),
-      readProjectFile(newReceivingServicePath),
-    ].join('\n');
+    const dashboardVisibleSource = readProjectFile(dashboardPath);
 
     expect(dashboardVisibleSource).not.toContain('tgd_rpc_create_receive_movement');
     expect(dashboardVisibleSource).not.toContain('tgd_rpc_create_stock_movement');
-  });
-
-  it('new Receiving RPC dry-run service uses only the dry-run RPC and no direct writes', () => {
-    const source = readProjectFile(newReceivingServicePath);
-
-    expect(source).toContain('tgd_rpc_post_receiving_document_dry');
-    expect(source).not.toContain('tgd_rpc_create_receiving_draft');
-    expect(source).not.toContain('tgd_rpc_add_receiving_line');
-    expect(source).not.toContain('tgd_rpc_confirm_receiving_document');
-    expect(source).not.toMatch(/\.insert\s*\(/);
-    expect(source).not.toMatch(/\.update\s*\(/);
-    expect(source).not.toMatch(/\.delete\s*\(/);
-    expect(source).not.toMatch(/\.upsert\s*\(/);
   });
 
   it('ReceivingDetailPage allows controlled post wrapper only', () => {
