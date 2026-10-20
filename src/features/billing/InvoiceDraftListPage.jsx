@@ -1013,6 +1013,36 @@ export function InvoiceDraftListPage() {
                 </table>
               </div>
 
+              {storageBillPreview.handlingOutMissingWeightLines?.length > 0 ? (
+                <div className="banner banner-warning" style={{ marginBottom: 12 }} data-testid="storage-bill-handling-out-missing-weight">
+                  <strong>ค่านำออกที่ยังคิดไม่ได้ ({storageBillPreview.handlingOutMissingWeightLines.length} รายการ)</strong> — ใบเบิกยืนยันจำนวนกล่องแต่ไม่ได้บันทึกน้ำหนักที่จ่ายจริง ให้แก้น้ำหนักในใบเบิกก่อนสร้างบิล
+                  <div className="responsive-table" style={{ marginTop: 8 }}>
+                    <table className="data-table" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th>ใบเบิก</th>
+                          <th>วันที่จ่าย</th>
+                          <th>Lot</th>
+                          <th>รหัสสินค้า</th>
+                          <th style={{ textAlign: 'right' }}>จำนวน (กล่อง)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storageBillPreview.handlingOutMissingWeightLines.map((l) => (
+                          <tr key={l.id}>
+                            <td>{l.withdrawalNo ?? '-'}</td>
+                            <td>{formatDocumentDate(l.dispatchDate, { dateOnly: true })}</td>
+                            <td>{l.lotNo ?? '-'}</td>
+                            <td>{l.productCode ?? '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{Number(l.pickedBoxes).toLocaleString('th-TH')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
               {storageBillPreview.unratedDepositLines?.length > 0 ? (
                 <div className="banner banner-warning" style={{ marginBottom: 12 }} data-testid="storage-bill-unmatched-section">
                   <strong>รายการที่ไม่มีสัญญา/อัตรารองรับ ({storageBillPreview.unratedDepositLines.length} รายการ)</strong> — ไม่ถูกนำมาคำนวณในบิลนี้

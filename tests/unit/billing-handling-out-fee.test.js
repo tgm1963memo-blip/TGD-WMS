@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { computeHandlingOutFeeLines } from '../../src/utils/billingRateCalc.js';
+import { computeHandlingOutFeeLines, findHandlingOutLinesMissingWeight } from '../../src/utils/billingRateCalc.js';
 import { buildInvoiceDraftLineFromHandlingOutLine } from '../../src/utils/billingInvoiceDraftUtils.js';
 
 // HANDLING_OUT (ค่านำออก) used to be billable only from the Billing Movement
@@ -183,5 +183,28 @@ describe('computeHandlingOutFeeLines — rate eligibility', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0].rate.id).toBe('rate-frozen-out');
     expect(lines[0].amount).toBeCloseTo(30, 2);
+  });
+});
+
+describe('findHandlingOutLinesMissingWeight', () => {
+  const period = { periodStart: '2026-07-01', periodEnd: '2026-07-31' };
+  const base = {
+    id: 'wl-1', withdrawalNo: 'CWR-1', customerId: CUSTOMER_ID, customerProductId: null,
+    temperatureType: 'FROZEN', dispatchDate: '2026-07-15',
+  };
+
+  it('flags a boxes-only pick that a HANDLING_OUT rate would have billed', () => {
+    const flagged = findHandlingOutLinesMissingWeight({
+      ...period, rates: [HANDLING_OUT_RATE], lines: [{ ...base, weight: 0, pickedBoxes: 40 }],
+    });
+    expect(flagged.map((l) => l.id)).toEqual(['wl-1']);
+  });
+
+  it('ignores lines that have a weight, have no boxes either, fall outside the period, or have no rate', () => {
+    const args = { ...period, rates: [HANDLING_OUT_RATE] };
+    expect(findHandlingOutLinesMissingWeight({ ...args, lines: [{ ...base, weight: 400, pickedBoxes: 40 }] })).toHaveLength(0);
+    expect(findHandlingOutLinesMissingWeight({ ...args, lines: [{ ...base, weight: 0, pickedBoxes: 0 }] })).toHaveLength(0);
+    expect(findHandlingOutLinesMissingWeight({ ...args, lines: [{ ...base, weight: 0, pickedBoxes: 40, dispatchDate: '2026-08-02' }] })).toHaveLength(0);
+    expect(findHandlingOutLinesMissingWeight({ ...args, rates: [STORAGE_RATE], lines: [{ ...base, weight: 0, pickedBoxes: 40 }] })).toHaveLength(0);
   });
 });

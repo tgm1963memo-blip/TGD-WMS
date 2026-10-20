@@ -59,6 +59,15 @@ describe('CustomerAdminWithdrawalReviewPage confirm-dispatch backdating', () => 
     expect(input).toHaveValue('2026-09-18');
     expect(input).not.toHaveAttribute('min');
     expect(screen.getByTestId('btn-confirm-withdrawal-date')).not.toBeDisabled();
+    // 20 days before creation: a normal catch-up, no warning.
+    expect(screen.queryByTestId('confirm-withdrawal-date-backdate-warning')).not.toBeInTheDocument();
+  });
+
+  it('warns admin when the date is far before the request was created, e.g. a mistyped year', async () => {
+    const input = await renderAs('admin');
+    fireEvent.change(input, { target: { value: '2025-09-18' } });
+    expect(screen.getByTestId('confirm-withdrawal-date-backdate-warning')).toHaveTextContent('385 วัน');
+    expect(screen.getByTestId('btn-confirm-withdrawal-date')).not.toBeDisabled();
   });
 
   it('keeps the created-date floor for non-admin roles', async () => {

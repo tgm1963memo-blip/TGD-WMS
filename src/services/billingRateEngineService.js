@@ -4,7 +4,7 @@ import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
-  computeHandlingFeeLines, computeHandlingOutFeeLines, computeOvertimePoolLines, groupOvertimeLinesByDocument, bangkokDateOf, resolveStorageRateForLine,
+  computeHandlingFeeLines, computeHandlingOutFeeLines, findHandlingOutLinesMissingWeight, computeOvertimePoolLines, groupOvertimeLinesByDocument, bangkokDateOf, resolveStorageRateForLine,
   matchesProductCategory, pickDominantCategory,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
@@ -389,6 +389,7 @@ async function fetchRateEngineInputs({ customerId }) {
         lotNo: depositLine?.lot_no ?? null,
         productCategory: categoryByCode.get(productCode) ?? null,
         weight: Number(line.picked_weight ?? 0),
+        pickedBoxes: Number(line.picked_boxes ?? 0),
         dispatchDate: requestDispatchDateById.get(req.id) ?? null,
       });
     }
@@ -669,13 +670,14 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   // HANDLING_OUT (ค่านำออก): per withdrawal line dispatched in this period,
   // scoped by the lot's storage room / product group like the lines above.
+  const scopedHandlingOutInputs = (handlingOutLineInputs ?? []).filter((l) =>
+    (!temperatureType || l.temperatureType === temperatureType)
+    && matchesProductCategory(productCategory, l.productCategory));
   const handlingOutLines = computeHandlingOutFeeLines({
-    lines: (handlingOutLineInputs ?? []).filter((l) =>
-      (!temperatureType || l.temperatureType === temperatureType)
-      && matchesProductCategory(productCategory, l.productCategory)),
-    rates,
-    periodStart,
-    periodEnd,
+    lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
+  });
+  const handlingOutMissingWeightLines = findHandlingOutLinesMissingWeight({
+    lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
   });
 
   // Scope the aux-service lookup to requests whose receipt/dispatch date
@@ -802,7 +804,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   return {
     data: {
       storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines, overtimeLines,
-      depositLines, unratedDepositLines,
+      depositLines, unratedDepositLines, handlingOutMissingWeightLines,
     },
     error: null,
   };

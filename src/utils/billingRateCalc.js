@@ -403,28 +403,41 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
 // FROZEN rate, same as resolveStorageRateForLine.
 const NON_WEIGHT_UNIT_BASES = new Set(['FLAT', 'PER_HOUR']);
 
+function resolveHandlingOutRate(weightRates, line, dispatchDate) {
+  const lookup = {
+    customerId: line.customerId,
+    customerProductId: line.customerProductId,
+    temperatureType: line.temperatureType,
+    serviceType: 'HANDLING_OUT',
+    asOfDate: dispatchDate,
+  };
+  return resolveServiceRate(weightRates, lookup)
+    ?? (line.temperatureType === 'FREEZE_FROZEN'
+      ? resolveServiceRate(weightRates, { ...lookup, temperatureType: 'FROZEN' })
+      : null);
+}
+
+function weightBasedRates(rates) {
+  return rates.filter((r) => !NON_WEIGHT_UNIT_BASES.has(r.unit_basis));
+}
+
+function dispatchDateInPeriod(line, periodStart, periodEnd) {
+  const dispatchDate = toDateOnly(line.dispatchDate);
+  return dispatchDate && dispatchDate >= periodStart && dispatchDate <= periodEnd ? dispatchDate : null;
+}
+
 export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart, periodEnd }) {
   const results = [];
-  const weightRates = rates.filter((r) => !NON_WEIGHT_UNIT_BASES.has(r.unit_basis));
+  const weightRates = weightBasedRates(rates);
 
   for (const line of lines) {
-    const dispatchDate = toDateOnly(line.dispatchDate);
-    if (!dispatchDate || dispatchDate < periodStart || dispatchDate > periodEnd) continue;
+    const dispatchDate = dispatchDateInPeriod(line, periodStart, periodEnd);
+    if (!dispatchDate) continue;
 
     const weight = toNumber(line.weight);
     if (!(weight > 0)) continue;
 
-    const lookup = {
-      customerId: line.customerId,
-      customerProductId: line.customerProductId,
-      temperatureType: line.temperatureType,
-      serviceType: 'HANDLING_OUT',
-      asOfDate: dispatchDate,
-    };
-    const rate = resolveServiceRate(weightRates, lookup)
-      ?? (line.temperatureType === 'FREEZE_FROZEN'
-        ? resolveServiceRate(weightRates, { ...lookup, temperatureType: 'FROZEN' })
-        : null);
+    const rate = resolveHandlingOutRate(weightRates, line, dispatchDate);
     if (!rate) continue;
 
     results.push({
@@ -437,6 +450,21 @@ export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart
   }
 
   return results;
+}
+
+// Withdrawal lines dispatched in the period that a HANDLING_OUT rate covers
+// but that were confirmed with boxes only (no picked weight), so
+// computeHandlingOutFeeLines can't bill them. Surfaced on the draft preview
+// for staff to fix the pick weight; the weight is never guessed.
+export function findHandlingOutLinesMissingWeight({ lines = [], rates = [], periodStart, periodEnd }) {
+  const weightRates = weightBasedRates(rates);
+  return lines.filter((line) => {
+    const dispatchDate = dispatchDateInPeriod(line, periodStart, periodEnd);
+    return dispatchDate
+      && !(toNumber(line.weight) > 0)
+      && toNumber(line.pickedBoxes) > 0
+      && resolveHandlingOutRate(weightRates, line, dispatchDate) != null;
+  });
 }
 
 // Calendar date (YYYY-MM-DD) of a timestamp in Bangkok time (UTC+7, no DST)

@@ -102,6 +102,17 @@ function earliestDispatchDateIso(request, role) {
   return request?.created_at ? bangkokDateIso(request.created_at) : '';
 }
 
+// Admin has no lower bound, so flag a date far behind the request's own
+// creation day (e.g. a mistyped year) before it lands in a closed period.
+const BACKDATE_WARNING_DAYS = 31;
+
+function daysBeforeCreated(request, dateIso) {
+  if (!request?.created_at || !dateIso) return 0;
+  const created = Date.parse(`${bangkokDateIso(request.created_at)}T00:00:00Z`);
+  const picked = Date.parse(`${dateIso}T00:00:00Z`);
+  return Math.round((created - picked) / 86400000);
+}
+
 function formatAttachmentSize(size) {
   if (size == null) return '-';
   return `${(Number(size) / 1024).toFixed(1)} KB`;
@@ -1626,6 +1637,12 @@ export function CustomerAdminWithdrawalReviewPage() {
             value={confirmDate}
           />
         </label>
+        {daysBeforeCreated(selected, confirmDate) > BACKDATE_WARNING_DAYS ? (
+          <p className="banner banner-warning" data-testid="confirm-withdrawal-date-backdate-warning" role="status" style={{ marginBottom: 0 }}>
+            วันที่นี้ย้อนหลังก่อนวันสร้างใบเบิก {daysBeforeCreated(selected, confirmDate)} วัน
+            — ตรวจสอบปีและเดือนอีกครั้ง ยอดค่าบริการจะไปอยู่ในงวดของวันที่นี้
+          </p>
+        ) : null}
       </Modal>
 
       {/* Cancel modal */}

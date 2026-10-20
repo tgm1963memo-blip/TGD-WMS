@@ -574,6 +574,7 @@ export async function previewBillingPeriodInvoice({ customerId, billingPeriodSta
 
   const {
     storageLines, auxLines, handlingLines, handlingOutLines, overtimeLines, depositLines, unratedDepositLines,
+    handlingOutMissingWeightLines,
   } = previewResult.data;
   const depositLineById = new Map(depositLines.map((dl) => [dl.id, dl]));
 
@@ -591,7 +592,13 @@ export async function previewBillingPeriodInvoice({ customerId, billingPeriodSta
     customerId, billingPeriodStart, currentTotal: totals.total_amount,
   });
 
-  return { data: { lines, totals, totalsByType, unratedDepositLines: unratedDepositLines ?? [], anomaly }, error: null };
+  return {
+    data: {
+      lines, totals, totalsByType, unratedDepositLines: unratedDepositLines ?? [],
+      handlingOutMissingWeightLines: handlingOutMissingWeightLines ?? [], anomaly,
+    },
+    error: null,
+  };
 }
 
 export async function createBillingInvoiceDraftForPeriod({
