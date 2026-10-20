@@ -414,8 +414,8 @@ export async function fetchDepositLineTrackingCodes(depositLineIds = []) {
 }
 
 // Backfills rate/amount on an existing draft's lines that predate the rate
-// lookup in resolveMovementRates/createBillingInvoiceDraftFromMovements —
-// those lines were persisted with rate/amount always null. Only lines
+// lookup in resolveMovementRates (lines from the retired movement-based
+// draft flow) — those lines were persisted with rate/amount always null. Only lines
 // still missing a rate and with a source_movement_id are touched (storage/
 // auxiliary lines already resolve a rate at creation time; a line with no
 // source_movement_id has nothing to re-fetch). Re-derives the movement
@@ -552,9 +552,9 @@ async function detectBillingPeriodAnomaly({ customerId, billingPeriodStart, curr
 
 // Generates a draft's storage + handling-in + auxiliary-service lines from
 // the rate engine (see billingRateEngineService.js) for one customer over
-// one billing period, instead of the manual "pick movement rows" flow above
-// — storage charges span the whole period rather than a single movement, so
-// they don't fit that flow. Returns a preview (no rate resolved / nothing
+// one billing period — storage charges span the whole period rather than a
+// single movement, which is why this replaced the retired movement-based
+// draft flow. Returns a preview (no rate resolved / nothing
 // to bill is reported via zero lines) so the caller can show it before
 // committing, and a separate confirm step actually inserts it.
 export async function previewBillingPeriodInvoice({ customerId, billingPeriodStart, billingPeriodEnd, temperatureType = null, productCategory = null }) {

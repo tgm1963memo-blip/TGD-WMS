@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // keyed in 08/10), so the confirm-dispatch date picker must let admin pick a
 // day before the request was created. Every other role keeps the
 // created-date floor, matching tgd_review_customer_withdrawal_request
-// (20261008090000).
+// (20261020100000).
 
 vi.mock('../../src/services/documentBrandingService.js', () => ({
   getDocumentBrandingConfig: () => ({}),

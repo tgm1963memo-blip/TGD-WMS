@@ -93,7 +93,7 @@ function bangkokDateIso(value) {
 
 // Earliest allowed dispatch date: the day the request was created (Bangkok)
 // — the RPC rejects anything earlier (20261007090000), except for admin, who
-// may key in a request after the fact and backdate it (20261008090000).
+// may key in a request after the fact and backdate it (20261020100000).
 // '' means no lower bound.
 function earliestDispatchDateIso(request, role) {
   if (role === 'admin') return '';

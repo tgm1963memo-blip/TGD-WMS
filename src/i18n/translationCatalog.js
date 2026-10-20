@@ -44,7 +44,6 @@ export const TRANSLATION_CATALOG = {
   accounting_charge_handoff_review_draft: { th: 'ร่างการส่งต่อค่าบัญชี', en: 'Accounting Charge Handoff Review Draft' },
 
   // Accounting charge terms
-  accounting_charge_summary: { th: 'สรุปค่าใช้จ่ายบัญชี', en: 'Accounting Charge Summary' },
   canonical_payload: { th: 'ข้อมูลต้นฉบับ', en: 'Canonical Payload' },
   bplus_draft_mapping: { th: 'แมป Draft Bplus', en: 'Bplus Draft Mapping' },
   handoff_review_draft: { th: 'ร่างการส่งต่อตรวจสอบ', en: 'Handoff Review Draft' },
@@ -222,15 +221,10 @@ Object.assign(TRANSLATION_CATALOG, {
 
 Object.assign(TRANSLATION_CATALOG, {
   movement_ledger_report_description: { th: 'รายงานอ่านอย่างเดียวสำหรับติดตามการเคลื่อนไหวสินค้าของลูกค้าและเตรียมข้อมูลค่าบริการจัดเก็บ', en: 'Read-only customer stock movement report for cold storage operations and billing preparation.' },
-  customer_storage_balance_report_description: { th: 'ยอดคงเหลือสินค้าของลูกค้าแยกตามสินค้า ล็อต พาเลท คลัง และตำแหน่งจัดเก็บ', en: 'Current customer-owned inventory balances by product, lot, pallet, warehouse, and location.' },
   storage_aging_report_description: { th: 'ตรวจสอบอายุการจัดเก็บ วันหมดอายุ และข้อมูลประกอบการคิดค่าบริการของสินค้าฝักเก็บ', en: 'Read-only lot aging, expiry monitoring, and chargeable days preparation for stored customer-owned goods.' },
-  warehouse_operation_performance_report_description: { th: 'สรุปภาระงานคลังและกิจกรรมค่าบริการปฏิบัติการสำหรับคลังเย็น', en: 'Read-only warehouse workload and operation charge activity preview for cold storage operations.' },
-  monthly_storage_billing_summary_description: { th: 'ข้อมูลสรุปรายเดือนแบบตัวอย่างสำหรับให้บัญชีตรวจสอบก่อนจัดทำค่าบริการจัดเก็บ', en: 'Preview-only monthly storage billing support for accounting review.' },
   billing_invoice_drafts: { th: 'ร่างใบแจ้งหนี้บิลลิ่ง', en: 'Billing Invoice Drafts' },
   billing_invoice_drafts_description: { th: 'ดูรายการร่างใบแจ้งหนี้ที่สร้างจาก movement สำหรับบิลลิ่ง', en: 'Review invoice draft headers created from billing movement weight rows.' },
   billing_invoice_draft_detail: { th: 'รายละเอียดร่างใบแจ้งหนี้', en: 'Invoice Draft Detail' },
-  accounting_charge_staging_preview_description: { th: 'พื้นที่ตัวอย่างสำหรับตรวจสอบรายการค่าบริการและร่างการแมปไปยัง Bplus', en: 'Read-only staging area to review canonical charges and Bplus draft mappings.' },
-  accounting_charge_handoff_review_draft_description: { th: 'ร่างตรวจสอบการส่งต่อข้อมูลค่าบริการให้บัญชีแบบอ่านอย่างเดียว ไม่มีการส่งออก สร้างเอกสาร หรือบันทึกบัญชี', en: 'Review-only accounting charge handoff draft for Bplus preview. No send, export, invoice, or posting actions.' },
 });
 
 Object.assign(TRANSLATION_CATALOG, {

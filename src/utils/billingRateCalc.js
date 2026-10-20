@@ -395,8 +395,17 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
 // handlingOutLineInputs in billingRateEngineService.js) since, unlike
 // HANDLING_IN, the charge follows the goods leaving, not the lot arriving.
 // No matching rate is skipped silently, same as computeHandlingFeeLines.
+//
+// Only weight-based rates apply: a FLAT/PER_HOUR HANDLING_OUT rate is a
+// per-document aux service (picked on the withdrawal and billed by
+// computeAuxiliaryServiceLines), so multiplying it by kg here would both
+// misprice it and bill it twice. A Freeze & Frozen lot falls back to the
+// FROZEN rate, same as resolveStorageRateForLine.
+const NON_WEIGHT_UNIT_BASES = new Set(['FLAT', 'PER_HOUR']);
+
 export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart, periodEnd }) {
   const results = [];
+  const weightRates = rates.filter((r) => !NON_WEIGHT_UNIT_BASES.has(r.unit_basis));
 
   for (const line of lines) {
     const dispatchDate = toDateOnly(line.dispatchDate);
@@ -405,13 +414,17 @@ export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart
     const weight = toNumber(line.weight);
     if (!(weight > 0)) continue;
 
-    const rate = resolveServiceRate(rates, {
+    const lookup = {
       customerId: line.customerId,
       customerProductId: line.customerProductId,
       temperatureType: line.temperatureType,
       serviceType: 'HANDLING_OUT',
       asOfDate: dispatchDate,
-    });
+    };
+    const rate = resolveServiceRate(weightRates, lookup)
+      ?? (line.temperatureType === 'FREEZE_FROZEN'
+        ? resolveServiceRate(weightRates, { ...lookup, temperatureType: 'FROZEN' })
+        : null);
     if (!rate) continue;
 
     results.push({

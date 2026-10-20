@@ -51,6 +51,7 @@ const SOURCE_DOCUMENT_TYPE_LABELS = {
   HANDLING_IN: 'ค่าบริการจัดการแรกเข้า',
   HANDLING_OUT: 'ค่านำออก',
   FREEZING: 'ค่าฟรีส',
+  OVERTIME: 'ค่าล่วงเวลา (OT)',
   SERVICE: 'ค่าบริการเสริม',
 };
 

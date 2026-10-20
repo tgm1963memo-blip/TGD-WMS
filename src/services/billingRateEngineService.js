@@ -371,13 +371,13 @@ async function fetchRateEngineInputs({ customerId }) {
   }
   const handlingOutLineInputs = [];
   for (const req of (withdrawalResult.data ?? [])) {
-    (req.tgd_customer_withdrawal_request_lines ?? []).forEach((line, index) => {
+    for (const line of (req.tgd_customer_withdrawal_request_lines ?? [])) {
       const sourceId = line.source_customer_deposit_request_line_id
         ?? (line.tracking_code ? depositLineIdByTrackingCode.get(line.tracking_code) : null);
       const depositLine = sourceId ? depositLineByRawId.get(sourceId) : null;
       const productCode = line.customer_product_code ?? depositLine?.customer_product_code ?? null;
       handlingOutLineInputs.push({
-        id: line.id ?? `${req.id}:${index}`,
+        id: line.id,
         requestId: req.id,
         withdrawalNo: req.withdrawal_no ?? null,
         depositLineId: depositLine?.id ?? null,
@@ -391,7 +391,7 @@ async function fetchRateEngineInputs({ customerId }) {
         weight: Number(line.picked_weight ?? 0),
         dispatchDate: requestDispatchDateById.get(req.id) ?? null,
       });
-    });
+    }
   }
 
   return {

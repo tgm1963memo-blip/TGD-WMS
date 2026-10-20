@@ -163,3 +163,25 @@ describe('getBillingPeriodPreview — HANDLING_OUT', () => {
     expect(data.handlingOutLines).toHaveLength(0);
   });
 });
+
+describe('computeHandlingOutFeeLines — rate eligibility', () => {
+  const line = {
+    id: 'wl-1', withdrawalNo: 'CWR-1', customerId: CUSTOMER_ID, customerProductId: null,
+    temperatureType: 'FREEZE_FROZEN', weight: 100, dispatchDate: '2026-07-15',
+  };
+  const period = { periodStart: '2026-07-01', periodEnd: '2026-07-31' };
+
+  it('ignores FLAT and PER_HOUR HANDLING_OUT rates, which are billed as per-document services', () => {
+    const flat = { ...HANDLING_OUT_RATE, id: 'rate-flat', unit_basis: 'FLAT', rate: 500 };
+    const hourly = { ...HANDLING_OUT_RATE, id: 'rate-hour', unit_basis: 'PER_HOUR', rate: 300 };
+    expect(computeHandlingOutFeeLines({ ...period, lines: [line], rates: [flat, hourly] })).toHaveLength(0);
+  });
+
+  it('bills a Freeze & Frozen lot at the FROZEN HANDLING_OUT rate when it has no rate of its own', () => {
+    const frozenOnly = { ...HANDLING_OUT_RATE, id: 'rate-frozen-out', temperature_type: 'FROZEN' };
+    const lines = computeHandlingOutFeeLines({ ...period, lines: [line], rates: [frozenOnly] });
+    expect(lines).toHaveLength(1);
+    expect(lines[0].rate.id).toBe('rate-frozen-out');
+    expect(lines[0].amount).toBeCloseTo(30, 2);
+  });
+});
