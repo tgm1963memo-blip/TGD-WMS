@@ -1,5 +1,6 @@
-import { AlertTriangle, RefreshCw, Settings, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Settings, Warehouse } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -663,37 +664,13 @@ export function WarehouseLayoutWidget() {
 
       {/* Stock detail modal */}
       {stockModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onClick={() => setStockModal(null)}
+        <Modal
+          isOpen
+          onClose={() => setStockModal(null)}
+          title="รายละเอียดสินค้าใน Location"
+          size="sm"
         >
-          <div
-            style={{
-              background: '#fff', borderRadius: 16, padding: 28,
-              maxWidth: 520, width: '90vw',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-              maxHeight: '80vh', overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--color-text-strong)' }}>รายละเอียดสินค้าใน Location</div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{stockModal.locCode}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStockModal(null)}
-                aria-label="ปิด"
-                style={{ border: 'none', background: 'var(--color-surface-sunken)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 18, color: 'var(--color-text-muted)' }}
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 18 }}>{stockModal.locCode}</div>
 
             {stockLoading ? (
               <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>กำลังโหลด...</div>
@@ -772,8 +749,7 @@ export function WarehouseLayoutWidget() {
                 </div>
               </>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

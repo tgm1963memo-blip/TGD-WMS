@@ -1,5 +1,5 @@
-import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -82,52 +82,19 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
     [products, form.customerId],
   );
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '16px',
-      }}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={isEdit ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าในแคตตาล็อก'}
+      size="sm"
+      closeOnBackdrop={false}
     >
-      <div style={{
-        background: 'var(--tgd-card-bg, #fff)',
-        borderRadius: 16,
-        width: '100%', maxWidth: 600,
-        maxHeight: '90vh', overflowY: 'auto',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-      }}>
-        {/* Modal header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px 16px',
-          borderBottom: '1px solid var(--tgd-border)',
-        }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
-              {isEdit ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าในแคตตาล็อก'}
-            </h2>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
-              {isEdit ? 'แก้ไขข้อมูลสินค้าในแคตตาล็อกลูกค้า' : 'เพิ่มรายการสินค้าใหม่สำหรับลูกค้า'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิด"
-            style={{
-              background: 'none', border: 'none', fontSize: 22,
-              cursor: 'pointer', color: 'var(--tgd-muted-text)',
-              width: 36, height: 36, borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <X size={22} aria-hidden="true" />
-          </button>
-        </div>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
+          {isEdit ? 'แก้ไขข้อมูลสินค้าในแคตตาล็อกลูกค้า' : 'เพิ่มรายการสินค้าใหม่สำหรับลูกค้า'}
+        </p>
 
         {/* Form body */}
-        <form onSubmit={onSave} style={{ padding: '20px 24px 24px' }}>
+        <form onSubmit={onSave}>
           {error && (
             <div className="banner banner-danger" style={{ marginBottom: 16 }} role="alert">{error}</div>
           )}
@@ -338,8 +305,7 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

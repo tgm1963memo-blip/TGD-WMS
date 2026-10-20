@@ -1,5 +1,6 @@
 import { Lock, Pencil } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
 import { listRoleDefinitions, upsertRoleDefinition } from '../../services/productServiceRatesService.js';
@@ -729,14 +730,13 @@ export function RolePermissionsAdminPage() {
 
       {/* Role create/edit modal */}
       {roleForm !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-        }}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440, padding: 28, boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700 }}>
-              {roleForm.id ? 'แก้ไข Role' : 'สร้าง Role ใหม่'}
-            </h3>
+        <Modal
+          isOpen
+          onClose={() => setRoleForm(null)}
+          title={roleForm.id ? 'แก้ไข Role' : 'สร้าง Role ใหม่'}
+          size="sm"
+          closeOnBackdrop={false}
+        >
             <form onSubmit={handleRoleSubmit}>
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', display: 'block', marginBottom: 4 }}>
@@ -818,8 +818,7 @@ export function RolePermissionsAdminPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </section>
   );

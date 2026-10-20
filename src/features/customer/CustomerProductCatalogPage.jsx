@@ -1,7 +1,8 @@
-import { ClipboardList, Download, Info, Package, Search, Upload, X } from 'lucide-react';
+import { ClipboardList, Download, Info, Package, Search, Upload } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -145,43 +146,18 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
   const uomDropdownVal = uomIsCustom ? 'OTHER' : (UOM_PRESETS.includes(form.uom) ? form.uom : '');
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16,
-    }}>
-      <div style={{
-        background: 'var(--tgd-card-bg, #fff)',
-        borderRadius: 16, width: '100%', maxWidth: 580,
-        maxHeight: '92vh', overflowY: 'auto',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 22px 14px', borderBottom: '1px solid var(--tgd-border)',
-        }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-              {isEdit ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าในแคตตาล็อก'}
-            </h2>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
-              {isEdit ? 'แก้ไขข้อมูลสินค้าในรายการของคุณ' : 'เพิ่มรายการสินค้าใหม่สำหรับการฝาก-เบิกสินค้า'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิด"
-            style={{
-              background: 'none', border: 'none', fontSize: 22, cursor: 'pointer',
-              color: 'var(--tgd-muted-text)', width: 36, height: 36, borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          ><X size={22} aria-hidden="true" /></button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={isEdit ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าในแคตตาล็อก'}
+      size="sm"
+      closeOnBackdrop={false}
+    >
+        <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
+          {isEdit ? 'แก้ไขข้อมูลสินค้าในรายการของคุณ' : 'เพิ่มรายการสินค้าใหม่สำหรับการฝาก-เบิกสินค้า'}
+        </p>
 
-        <form onSubmit={onSave} style={{ padding: '18px 22px 22px' }}>
+        <form onSubmit={onSave}>
           {error && (
             <div className="banner banner-danger" style={{ marginBottom: 14 }} role="alert">{error}</div>
           )}
@@ -340,8 +316,7 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -785,36 +760,26 @@ export function CustomerProductCatalogPage() {
       )}
 
       {importPreview && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16,
-        }}>
-          <div style={{
-            background: 'var(--tgd-card-bg, #fff)',
-            borderRadius: 16, width: '100%', maxWidth: 780,
-            maxHeight: '88vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '18px 22px 14px', borderBottom: '1px solid var(--tgd-border)', flexShrink: 0,
-            }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>ตรวจสอบข้อมูลก่อนนำเข้า</h2>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
-                  พบ {importPreview.length} รายการ — กด "นำเข้า" เพื่อบันทึกเข้าระบบ (รหัสสินค้าซ้ำจะอัปเดตอัตโนมัติ)
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setImportPreview(null)}
-                aria-label="ปิด"
-                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--tgd-muted-text)' }}
-              ><X size={22} aria-hidden="true" /></button>
+        <Modal
+          isOpen
+          onClose={() => setImportPreview(null)}
+          title="ตรวจสอบข้อมูลก่อนนำเข้า"
+          size="md"
+          closeOnBackdrop={false}
+          footer={(
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setImportPreview(null)} disabled={importing}>
+                ยกเลิก
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleImportConfirm} disabled={importing}>
+                {importing ? `กำลังนำเข้า...` : `นำเข้า ${importPreview.length} รายการ`}
+              </button>
             </div>
-            <div style={{ overflowY: 'auto', flex: 1, padding: '14px 22px' }}>
+          )}
+        >
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--tgd-muted-text)' }}>
+                พบ {importPreview.length} รายการ — กด "นำเข้า" เพื่อบันทึกเข้าระบบ (รหัสสินค้าซ้ำจะอัปเดตอัตโนมัติ)
+              </p>
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table" style={{ fontSize: 12, width: '100%' }}>
                   <thead>
@@ -847,17 +812,7 @@ export function CustomerProductCatalogPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--tgd-border)', display: 'flex', gap: 10, justifyContent: 'flex-end', flexShrink: 0 }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setImportPreview(null)} disabled={importing}>
-                ยกเลิก
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleImportConfirm} disabled={importing}>
-                {importing ? `กำลังนำเข้า...` : `นำเข้า ${importPreview.length} รายการ`}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </section>
   );

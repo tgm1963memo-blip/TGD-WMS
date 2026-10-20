@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
@@ -583,16 +584,13 @@ export function CustomerProductServiceRatesPage() {
 
       {/* Form modal */}
       {form !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-        }}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, padding: 28, boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700 }}>
-              {form.rateId ? 'แก้ไขอัตราค่าบริการ' : 'เพิ่มอัตราค่าบริการ'}
-            </h3>
-
+        <Modal
+          isOpen
+          onClose={() => setForm(null)}
+          title={form.rateId ? 'แก้ไขอัตราค่าบริการ' : 'เพิ่มอัตราค่าบริการ'}
+          size="sm"
+          closeOnBackdrop={false}
+        >
             <form onSubmit={handleSubmit}>
               {!form.rateId && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -846,8 +844,7 @@ export function CustomerProductServiceRatesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </section>
   );

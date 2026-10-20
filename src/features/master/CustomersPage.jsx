@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { getPageShellClassName } from '../../config/pageShellPresentation.js';
@@ -86,27 +87,13 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
   const isEdit = !!form.id;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: 16,
-        padding: '28px 28px 24px',
-        width: '100%',
-        maxWidth: 560,
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        boxShadow: '0 12px 48px rgba(0,0,0,0.28)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h2 style={{ margin: 0, fontSize: 18, color: '#111827', fontWeight: 700 }}>
-            {isEdit ? 'แก้ไขข้อมูลลูกค้า' : 'เพิ่มลูกค้าใหม่'}
-          </h2>
-          <button type="button" style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#6b7280', lineHeight: 1 }} onClick={onClose}>×</button>
-        </div>
-
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={isEdit ? 'แก้ไขข้อมูลลูกค้า' : 'เพิ่มลูกค้าใหม่'}
+      size="sm"
+      closeOnBackdrop={false}
+    >
         {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 14 }}>{error}</div> : null}
 
         <form className="form-card" onSubmit={handleSubmit} style={{ padding: 0, border: 'none', boxShadow: 'none' }}>
@@ -292,8 +279,7 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

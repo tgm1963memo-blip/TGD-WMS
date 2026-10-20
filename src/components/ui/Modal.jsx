@@ -1,7 +1,10 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
 
-export function Modal({ isOpen, onClose, title, children, size = 'md', footer }) {
+// closeOnBackdrop: pass false for forms, so a stray click outside the dialog
+// doesn't throw away what the user has typed. Escape and the close button
+// still close it.
+export function Modal({ isOpen, onClose, title, children, size = 'md', footer, closeOnBackdrop = true }) {
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -24,7 +27,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer })
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (closeOnBackdrop && e.target === e.currentTarget) onClose(); }}
     >
       <div className="operational-report-modal" style={{ maxWidth, width: '100%' }}>
         <div className="operational-report-modal-toolbar">
