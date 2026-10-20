@@ -389,6 +389,43 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
   return results;
 }
 
+// HANDLING_OUT (ค่านำออก): the dispatch-side twin of HANDLING_IN — picked
+// weight x a flat per-kg rate, billed once in whichever period contains the
+// withdrawal's confirmed dispatch date. Inputs are per withdrawal line (see
+// handlingOutLineInputs in billingRateEngineService.js) since, unlike
+// HANDLING_IN, the charge follows the goods leaving, not the lot arriving.
+// No matching rate is skipped silently, same as computeHandlingFeeLines.
+export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart, periodEnd }) {
+  const results = [];
+
+  for (const line of lines) {
+    const dispatchDate = toDateOnly(line.dispatchDate);
+    if (!dispatchDate || dispatchDate < periodStart || dispatchDate > periodEnd) continue;
+
+    const weight = toNumber(line.weight);
+    if (!(weight > 0)) continue;
+
+    const rate = resolveServiceRate(rates, {
+      customerId: line.customerId,
+      customerProductId: line.customerProductId,
+      temperatureType: line.temperatureType,
+      serviceType: 'HANDLING_OUT',
+      asOfDate: dispatchDate,
+    });
+    if (!rate) continue;
+
+    results.push({
+      ...line,
+      rate,
+      weight,
+      amount: round2(weight * toNumber(rate.rate)),
+      dispatchDate,
+    });
+  }
+
+  return results;
+}
+
 // Calendar date (YYYY-MM-DD) of a timestamp in Bangkok time (UTC+7, no DST)
 // — e.g. a job started 23:30 UTC on the 14th is OT on the 15th locally.
 export function bangkokDateOf(iso) {

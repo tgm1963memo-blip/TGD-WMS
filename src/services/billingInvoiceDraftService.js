@@ -22,6 +22,7 @@ import {
   buildInvoiceDraftLineFromAuxiliaryLine,
   buildInvoiceDraftLineFromOvertimeLine,
   buildInvoiceDraftLineFromHandlingLine,
+  buildInvoiceDraftLineFromHandlingOutLine,
   groupInvoiceDraftLinesByType,
   calculateInvoiceDraftTotals,
   canApproveBillingInvoiceDraft,
@@ -687,12 +688,15 @@ export async function previewBillingPeriodInvoice({ customerId, billingPeriodSta
   });
   if (previewResult.error) return { data: null, error: previewResult.error };
 
-  const { storageLines, auxLines, handlingLines, overtimeLines, depositLines, unratedDepositLines } = previewResult.data;
+  const {
+    storageLines, auxLines, handlingLines, handlingOutLines, overtimeLines, depositLines, unratedDepositLines,
+  } = previewResult.data;
   const depositLineById = new Map(depositLines.map((dl) => [dl.id, dl]));
 
   const lines = [
     ...storageLines.map((sl) => buildInvoiceDraftLineFromStorageLine(sl, depositLineById.get(sl.depositLineId) ?? {})),
     ...(handlingLines ?? []).map((hl) => buildInvoiceDraftLineFromHandlingLine(hl, depositLineById.get(hl.depositLineId) ?? {})),
+    ...(handlingOutLines ?? []).map((hl) => buildInvoiceDraftLineFromHandlingOutLine(hl)),
     ...auxLines.map((al) => buildInvoiceDraftLineFromAuxiliaryLine(al)),
     ...(overtimeLines ?? []).map((ol) => buildInvoiceDraftLineFromOvertimeLine(ol)),
   ];

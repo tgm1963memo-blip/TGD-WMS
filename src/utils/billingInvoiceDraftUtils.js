@@ -275,7 +275,7 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
     deposit_line_id: handlingLine.depositLineId ?? null,
     billing_period_start: null,
     billing_period_end: null,
-    line_note: `ค่าบริการจัดการแรกเข้า (รับเข้า ${handlingLine.receiptDate ?? '-'}, น้ำหนัก ${handlingLine.weight} กก.)`,
+    line_note: `${documentType === 'FREEZING' ? 'ค่าฟรีส' : 'ค่าบริการจัดการแรกเข้า'} (รับเข้า ${handlingLine.receiptDate ?? '-'}, น้ำหนัก ${handlingLine.weight} กก.)`,
     duplicate_guard_active: false,
     // Explicit false, not omitted: min_charge_applied/free_period_applied
     // are NOT NULL DEFAULT false columns, which covers a plain single-type
@@ -290,6 +290,48 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
     // outright with "null value in column min_charge_applied violates
     // not-null constraint" the moment a HANDLING_IN line shared a batch
     // with a STORAGE line (which already set this field).
+    min_charge_applied: false,
+    free_period_applied: false,
+  };
+}
+
+// HANDLING_OUT (ค่านำออก) lines: one per withdrawal line, dated by its
+// confirmed dispatch day (see computeHandlingOutFeeLines). Like HANDLING_IN
+// there is no single source movement; the withdrawal document number is kept
+// so the draft/print can point back to the dispatch it billed.
+export function buildInvoiceDraftLineFromHandlingOutLine(handlingOutLine) {
+  const rate = handlingOutLine.rate ?? {};
+  return {
+    invoice_draft_id: null,
+    source_movement_id: null,
+    source_document_no: handlingOutLine.withdrawalNo ?? null,
+    source_document_type: 'HANDLING_OUT',
+    customer_id: handlingOutLine.customerId,
+    product_id: null,
+    product_code: handlingOutLine.productCode ?? null,
+    product_name: handlingOutLine.productName ?? handlingOutLine.productCode ?? null,
+    lot_no: handlingOutLine.lotNo ?? null,
+    pallet_no: null,
+    movement_type: 'HANDLING_OUT',
+    movement_date: handlingOutLine.dispatchDate ?? null,
+    qty: 0,
+    uom: 'กก.',
+    net_weight: handlingOutLine.weight,
+    gross_weight: handlingOutLine.weight,
+    chargeable_weight: handlingOutLine.weight,
+    billing_status: 'READY',
+    rate: rate.rate != null ? toNumber(rate.rate) : null,
+    amount: handlingOutLine.amount,
+    service_rate_id: rate.id ?? null,
+    period_days: null,
+    storage_days: null,
+    deposit_line_id: handlingOutLine.depositLineId ?? null,
+    billing_period_start: null,
+    billing_period_end: null,
+    line_note: `ค่านำออก (${handlingOutLine.withdrawalNo ?? '-'} จ่ายออก ${handlingOutLine.dispatchDate ?? '-'}, น้ำหนัก ${handlingOutLine.weight} กก.)`,
+    duplicate_guard_active: false,
+    // Explicit false for the same batch-insert reason as
+    // buildInvoiceDraftLineFromHandlingLine.
     min_charge_applied: false,
     free_period_applied: false,
   };

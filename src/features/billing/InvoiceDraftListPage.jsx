@@ -49,6 +49,8 @@ const UNRATED_REASON_LABELS = {
 const SOURCE_DOCUMENT_TYPE_LABELS = {
   STORAGE: 'ค่าฝากสินค้า',
   HANDLING_IN: 'ค่าบริการจัดการแรกเข้า',
+  HANDLING_OUT: 'ค่านำออก',
+  FREEZING: 'ค่าฟรีส',
   SERVICE: 'ค่าบริการเสริม',
 };
 

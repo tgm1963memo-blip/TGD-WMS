@@ -4,7 +4,7 @@ import { listCustomerProducts } from './customerProductCatalogService.js';
 import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js';
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
-  computeHandlingFeeLines, computeOvertimePoolLines, groupOvertimeLinesByDocument, bangkokDateOf, resolveStorageRateForLine,
+  computeHandlingFeeLines, computeHandlingOutFeeLines, computeOvertimePoolLines, groupOvertimeLinesByDocument, bangkokDateOf, resolveStorageRateForLine,
   matchesProductCategory, pickDominantCategory,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
@@ -177,7 +177,7 @@ async function fetchRateEngineInputs({ customerId }) {
         id, withdrawal_no, customer_id, requested_dispatch_date, requires_r3_document,
         is_overtime, overtime_type, dispatch_started_at,
         tgd_customer_withdrawal_request_lines(
-          source_customer_deposit_request_line_id, tracking_code, customer_product_code,
+          id, source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at
         )
       `)
@@ -359,9 +359,45 @@ async function fetchRateEngineInputs({ customerId }) {
     });
   }
 
+  // HANDLING_OUT (ค่านำออก) is charged per withdrawal line on its picked
+  // weight, dated by the document's confirmed dispatch day (the same date
+  // ร.3/aux services use). Lot, product and storage room come from the
+  // deposit line it was picked from, matched the same way
+  // buildWithdrawalEventsByLine matches it.
+  const depositLineByRawId = new Map(depositLines.map((dl) => [dl.id, dl]));
+  const depositLineIdByTrackingCode = new Map();
+  for (const line of rawDepositLines) {
+    if (line.tracking_code) depositLineIdByTrackingCode.set(line.tracking_code, line.id);
+  }
+  const handlingOutLineInputs = [];
+  for (const req of (withdrawalResult.data ?? [])) {
+    (req.tgd_customer_withdrawal_request_lines ?? []).forEach((line, index) => {
+      const sourceId = line.source_customer_deposit_request_line_id
+        ?? (line.tracking_code ? depositLineIdByTrackingCode.get(line.tracking_code) : null);
+      const depositLine = sourceId ? depositLineByRawId.get(sourceId) : null;
+      const productCode = line.customer_product_code ?? depositLine?.customer_product_code ?? null;
+      handlingOutLineInputs.push({
+        id: line.id ?? `${req.id}:${index}`,
+        requestId: req.id,
+        withdrawalNo: req.withdrawal_no ?? null,
+        depositLineId: depositLine?.id ?? null,
+        customerId: req.customer_id,
+        customerProductId: productIdByCode.get(productCode) ?? depositLine?.customer_product_id ?? null,
+        temperatureType: depositLine?.temperature_type ?? temperatureTypeByCode.get(productCode) ?? null,
+        productCode,
+        productName: productNameByCode.get(productCode) ?? depositLine?.product_name ?? null,
+        lotNo: depositLine?.lot_no ?? null,
+        productCategory: categoryByCode.get(productCode) ?? null,
+        weight: Number(line.picked_weight ?? 0),
+        dispatchDate: requestDispatchDateById.get(req.id) ?? null,
+      });
+    });
+  }
+
   return {
     depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, requestCategoryById, error: null,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
+    handlingOutLineInputs, requestCategoryById, error: null,
   };
 }
 
@@ -548,7 +584,8 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   if (inputs.error) return { data: null, error: inputs.error };
   const {
     depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
-    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs, requestCategoryById,
+    requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
+    handlingOutLineInputs, requestCategoryById,
   } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
@@ -628,6 +665,17 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const freezeFrozenLines = depositLines.filter((dl) => dl.temperature_type === 'FREEZE_FROZEN');
   const freezingLines = computeHandlingFeeLines({
     depositLines: freezeFrozenLines, rates, periodStart, periodEnd, serviceType: 'FREEZING',
+  });
+
+  // HANDLING_OUT (ค่านำออก): per withdrawal line dispatched in this period,
+  // scoped by the lot's storage room / product group like the lines above.
+  const handlingOutLines = computeHandlingOutFeeLines({
+    lines: (handlingOutLineInputs ?? []).filter((l) =>
+      (!temperatureType || l.temperatureType === temperatureType)
+      && matchesProductCategory(productCategory, l.productCategory)),
+    rates,
+    periodStart,
+    periodEnd,
   });
 
   // Scope the aux-service lookup to requests whose receipt/dispatch date
@@ -753,7 +801,8 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   return {
     data: {
-      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], overtimeLines, depositLines, unratedDepositLines,
+      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines, overtimeLines,
+      depositLines, unratedDepositLines,
     },
     error: null,
   };
