@@ -13,34 +13,13 @@ function readProjectFile(path) {
 describe('Sprint 5D outbound UI structure', () => {
   const outboundUiFiles = [
     'src/app/routes.jsx',
-    'src/features/operations/WithdrawalRequestsPage.jsx',
-    'src/features/operations/withdrawal/WithdrawalRequestListPage.jsx',
-    'src/features/operations/withdrawal/WithdrawalRequestDetailPage.jsx',
-    'src/features/operations/withdrawal/WithdrawalRequestCreatePage.jsx',
   ];
 
-  it('creates withdrawal list, detail, and create pages', () => {
-    [
-      'src/features/operations/withdrawal/WithdrawalRequestListPage.jsx',
-      'src/features/operations/withdrawal/WithdrawalRequestDetailPage.jsx',
-      'src/features/operations/withdrawal/WithdrawalRequestCreatePage.jsx',
-    ].forEach((path) => {
-      expect(statSync(resolve(projectRoot, path)).isFile()).toBe(true);
-    });
-  });
-
-  it('routes withdrawal list, new, and detail pages', () => {
+  it('does not register standalone internal withdrawal, allocation, picking, or dispatch routes', () => {
     const routesSource = readProjectFile('src/app/routes.jsx');
 
     [
       '/operations/withdrawal-requests',
-      '/operations/withdrawal-requests/new',
-      '/operations/withdrawal-requests/:id',
-    ].forEach((routePath) => {
-      expect(routesSource).toContain(routePath);
-    });
-
-    [
       '/operations/allocations',
       '/operations/picking',
       '/operations/dispatch',
@@ -66,15 +45,6 @@ describe('Sprint 5D outbound UI structure', () => {
     });
 
     expect(source).not.toMatch(/update\s+tgd_stock_balances/i);
-  });
-
-  it('uses services for read and draft-create access only', () => {
-    const withdrawalList = readProjectFile('src/features/operations/withdrawal/WithdrawalRequestListPage.jsx');
-    const withdrawalCreate = readProjectFile('src/features/operations/withdrawal/WithdrawalRequestCreatePage.jsx');
-
-    expect(withdrawalList).toContain('getWithdrawalRequests');
-    expect(withdrawalCreate).toContain('createWithdrawalRequest');
-    expect(withdrawalCreate).toContain("status: 'DRAFT'");
   });
 
   it('does not create database, legacy, or Express sync artifacts', () => {

@@ -100,12 +100,6 @@ test.describe('UAT — Admin role', () => {
     await snap(page, 'admin_inventory');
   });
 
-  test('Billing movement weight page loads', async () => {
-    await gotoUrl(page, `${BASE}/reports/billing-movement-weight`);
-    await expect(page.locator('[data-testid="billing-movement-weight-report-page"]')).toBeVisible({ timeout: 20000 });
-    await snap(page, 'admin_billing_weight');
-  });
-
   test('Invoice drafts page loads', async () => {
     await gotoUrl(page, `${BASE}/billing/invoice-drafts`);
     await expect(page.locator('[data-testid="billing-invoice-drafts-page"]')).toBeVisible({ timeout: 20000 });
@@ -328,11 +322,5 @@ test.describe('UAT — Admin customer portal workflow', () => {
     await gotoUrl(page, `${BASE}/customer/admin/withdrawal-review`);
     await expect(page.locator('[data-testid="customer-admin-withdrawal-review-page"]')).toBeVisible({ timeout: 20000 });
     await snap(page, 'admin_withdrawal_review_list');
-  });
-
-  test('Withdrawal requests page shows customer withdrawal table', async () => {
-    await gotoUrl(page, `${BASE}/operations/withdrawal-requests`);
-    await expect(page.locator('[data-testid="withdrawal-customer-withdrawal-table"]')).toBeVisible({ timeout: 20000 });
-    await snap(page, 'admin_operations_withdrawals');
   });
 });

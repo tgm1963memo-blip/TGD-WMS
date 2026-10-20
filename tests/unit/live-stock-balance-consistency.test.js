@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-// The bug this fix addresses: three report pages read a separately-maintained
+// The bug this fix addresses: report pages read a separately-maintained
 // per-location ledger table that could silently drift from the live balance
-// "ยอดคงเหลือ" computes fresh on every read. This test proves all three now
-// source from the exact same underlying data as "ยอดคงเหลือ" and produce
-// numbers that agree with each other for the same customer/product — the
-// concrete guarantee the fix is supposed to provide, not just "reads a
-// different function" as a source-text check.
+// "ยอดคงเหลือ" computes fresh on every read. This test proves the storage
+// aging report (the remaining report built on this source; the customer
+// storage balance report and storage weight snapshot were retired) sources
+// from the exact same underlying data as "ยอดคงเหลือ" and produces numbers
+// that agree with it for the same customer/product.
 
 const { getAllCustomerStockBalancesMock, getCustomersMock } = vi.hoisted(() => ({
   getAllCustomerStockBalancesMock: vi.fn(),
@@ -58,11 +58,9 @@ const MOCK_BALANCE_LINES = [
   },
 ];
 
-const { getCustomerStorageBalanceRows } = await import('../../src/services/customerStorageBalanceReportService.js');
 const { getStorageAgingRows } = await import('../../src/services/storageAgingReportService.js');
-const { getDailyStorageWeightPreview } = await import('../../src/services/storageWeightSnapshotService.js');
 
-describe('the 3 report services agree with each other and with the live balance (ยอดคงเหลือ) source', () => {
+describe('the storage aging report agrees with the live balance (ยอดคงเหลือ) source', () => {
   beforeEach(() => {
     getAllCustomerStockBalancesMock.mockReset();
     getCustomersMock.mockReset();
@@ -70,53 +68,28 @@ describe('the 3 report services agree with each other and with the live balance 
     getCustomersMock.mockResolvedValue({ data: MOCK_CUSTOMERS, error: null });
   });
 
-  it('all three call the same live balance source, not a separate ledger', async () => {
-    await getCustomerStorageBalanceRows();
+  it('calls the live balance source, not a separate ledger', async () => {
     await getStorageAgingRows();
-    await getDailyStorageWeightPreview();
 
-    expect(getAllCustomerStockBalancesMock).toHaveBeenCalledTimes(3);
+    expect(getAllCustomerStockBalancesMock).toHaveBeenCalledTimes(1);
   });
 
-  it('total boxes/weight for the customer agree across all three reports', async () => {
-    const [storageBalance, aging, weightSnapshot] = await Promise.all([
-      getCustomerStorageBalanceRows(),
-      getStorageAgingRows(),
-      getDailyStorageWeightPreview(),
-    ]);
+  it('total boxes/weight for the customer agree with the live balance lines', async () => {
+    const aging = await getStorageAgingRows();
 
     const sumBoxes = (rows) => rows.reduce((s, r) => s + Number(r.qty_boxes ?? 0), 0);
     const sumWeight = (rows) => rows.reduce((s, r) => s + Number(r.qty_weight ?? 0), 0);
 
-    const expectedBoxes = 40 + 10;
-    const expectedWeight = 400 + 100;
-
-    expect(sumBoxes(storageBalance.data)).toBe(expectedBoxes);
-    expect(sumBoxes(aging.data)).toBe(expectedBoxes);
-    expect(sumBoxes(weightSnapshot.data)).toBe(expectedBoxes);
-
-    expect(sumWeight(storageBalance.data)).toBe(expectedWeight);
-    expect(sumWeight(aging.data)).toBe(expectedWeight);
-    expect(sumWeight(weightSnapshot.data)).toBe(expectedWeight);
+    expect(sumBoxes(aging.data)).toBe(40 + 10);
+    expect(sumWeight(aging.data)).toBe(400 + 100);
   });
 
-  it('resolves the customer name the same way ยอดคงเหลือ does (client-side join against getCustomers)', async () => {
-    const { data } = await getCustomerStorageBalanceRows();
-    expect(data.every((row) => row.customer_name === 'Alpha Cold Co.')).toBe(true);
-  });
-
-  it('propagates a balance-source error to every report instead of silently showing partial/zero data', async () => {
+  it('propagates a balance-source error instead of silently showing partial/zero data', async () => {
     const boom = new Error('RPC unavailable');
     getAllCustomerStockBalancesMock.mockResolvedValue({ data: null, error: boom });
 
-    const [storageBalance, aging, weightSnapshot] = await Promise.all([
-      getCustomerStorageBalanceRows(),
-      getStorageAgingRows(),
-      getDailyStorageWeightPreview(),
-    ]);
+    const aging = await getStorageAgingRows();
 
-    expect(storageBalance.error).toBe(boom);
     expect(aging.error).toBe(boom);
-    expect(weightSnapshot.error).toBe(boom);
   });
 });

@@ -23,7 +23,6 @@ const WAREHOUSE_ADMIN_NAV_KEYS = Object.freeze([
 
 const WAREHOUSE_ADMIN_ROUTE_PREFIXES = Object.freeze([
   '/operations/receiving',
-  '/operations/withdrawal-requests',
   '/inventory',
   '/customer/admin/deposit-review',
   '/customer/admin/withdrawal-review',

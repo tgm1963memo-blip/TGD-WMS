@@ -29,7 +29,7 @@ const ROLE_SMOKE_MATRIX = [
     email: process.env.UAT_WAREHOUSE_ADMIN_EMAIL || 'warehouse.admin.test@tgd-wms.local',
     checks: [
       { path: '/operations/receiving', testId: 'receiving-customer-deposit-section' },
-      { path: '/operations/withdrawal-requests', testId: null },
+      { path: '/customer/admin/withdrawal-review', testId: 'customer-admin-withdrawal-review-page' },
       { path: '/stock-count', testId: null },
     ],
   },
@@ -44,7 +44,7 @@ const ROLE_SMOKE_MATRIX = [
     role: 'accounting',
     email: process.env.UAT_BILLING_EMAIL || 'accounting.test@tgd-wms.local',
     checks: [
-      { path: '/reports/billing-movement-weight', testId: 'billing-movement-weight-report-page' },
+      { path: '/billing/invoice-drafts', testId: 'billing-invoice-drafts-page' },
     ],
   },
   {

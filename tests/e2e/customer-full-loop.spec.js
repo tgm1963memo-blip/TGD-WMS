@@ -188,7 +188,7 @@ test.describe('Customer to Admin Full Loop UAT', () => {
     // 5.7 Admin Open Work Order (Withdrawal)
     // ---------------------------------------------------------
     console.log('--- Step 5.7: Admin Open Work Order (Withdrawal) ---');
-    await gotoUrl(page, `${baseUrl}/operations/withdrawal-requests`);
+    await gotoUrl(page, `${baseUrl}/customer/admin/withdrawal-review`);
     await page.waitForLoadState('networkidle');
     
     // Click the first Review button

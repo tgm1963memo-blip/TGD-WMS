@@ -13,8 +13,6 @@ function readProjectFile(path) {
 describe('Sprint 6A inventory dashboard foundation', () => {
   const dashboardFiles = [
     'src/features/dashboard/DashboardPage.jsx',
-    'src/features/dashboard/DashboardInventorySection.jsx',
-    'src/features/dashboard/InventoryDashboardPage.jsx',
     'src/components/dashboard/DashboardCard.jsx',
     'src/components/dashboard/DashboardSection.jsx',
     'src/components/dashboard/InventorySummaryTable.jsx',
@@ -38,39 +36,8 @@ describe('Sprint 6A inventory dashboard foundation', () => {
     'sales order',
   ];
 
-  it('creates the inventory dashboard service and read-only functions', () => {
-    const path = 'src/services/inventoryDashboardService.js';
-    const source = readProjectFile(path);
-
-    expect(statSync(resolve(projectRoot, path)).isFile()).toBe(true);
-    [
-      'getInventorySummary',
-      'getStockBalanceRows',
-      'getLowStockItems',
-      'getExpiringLots',
-      'getInventoryByWarehouse',
-      'getInventoryByCustomer',
-    ].forEach((functionName) => {
-      expect(source).toContain(functionName);
-    });
-  });
-
-  it('keeps the dashboard service read-only', () => {
-    const source = readProjectFile('src/services/inventoryDashboardService.js');
-
-    expect(source).toContain('.select(');
-    expect(source).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
-    expect(source).not.toContain('.rpc(');
-
-    forbiddenTerms.forEach((term) => {
-      expect(source).not.toContain(term);
-    });
-  });
-
   it('creates dashboard page and dashboard components', () => {
     [
-      'src/features/dashboard/DashboardInventorySection.jsx',
-      'src/features/dashboard/InventoryDashboardPage.jsx',
       'src/features/dashboard/DashboardPage.jsx',
       'src/components/dashboard/DashboardCard.jsx',
       'src/components/dashboard/DashboardSection.jsx',
@@ -80,28 +47,12 @@ describe('Sprint 6A inventory dashboard foundation', () => {
     });
   });
 
-  it('routes dashboard and inventory dashboard pages', () => {
+  it('routes the dashboard page (inventory dashboard retired)', () => {
     const routesSource = readProjectFile('src/app/routes.jsx');
 
     expect(routesSource).toContain('/dashboard');
-    expect(routesSource).toContain('/dashboard/inventory');
-    expect(routesSource).toContain('InventoryDashboardPage');
-  });
-
-  it('renders dashboard filters, summaries, stock table, low stock, and expiring lot sections', () => {
-    const source = readProjectFile('src/features/dashboard/DashboardInventorySection.jsx');
-
-    [
-      'DocumentFilterBar',
-      'Stock Balances',
-      'Low Stock',
-      'Expiring Lots',
-      'Inventory By Warehouse',
-      'Inventory By Customer',
-      'dashboard-inventory-section',
-    ].forEach((term) => {
-      expect(source).toContain(term);
-    });
+    expect(routesSource).not.toContain('/dashboard/inventory');
+    expect(routesSource).not.toContain('InventoryDashboardPage');
   });
 
   it('keeps dashboard UI free of posting, stock writes, and disallowed terminology', () => {

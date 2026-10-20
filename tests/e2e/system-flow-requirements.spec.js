@@ -252,14 +252,6 @@ test.describe('FLOW-C: Withdrawal Flow', () => {
 test.describe('FLOW-D: Reports', () => {
   test.beforeEach(async ({ page }) => adminLogin(page));
 
-  test('D1-1: Billing movement weight report page loads and shows customer name column', async ({ page }) => {
-    await goto(page, '/reports/billing-movement-weight');
-    await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 15000 });
-    // Table or report content should be present
-    const content = page.locator('table, [data-testid="billing-movement-weight-table"], h2, h3').first();
-    await expect(content).toBeVisible({ timeout: 15000 });
-  });
-
   test('D1-2: Movement ledger report page loads', async ({ page }) => {
     await goto(page, '/reports/movement-ledger');
     await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 15000 });

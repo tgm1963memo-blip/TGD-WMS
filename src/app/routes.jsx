@@ -1,24 +1,15 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout.jsx';
 import { DashboardPage } from '../features/dashboard/DashboardPage.jsx';
-import { InventoryDashboardPage } from '../features/dashboard/InventoryDashboardPage.jsx';
 import { CustomersPage } from '../features/master/CustomersPage.jsx';
 import { ReceivingPage } from '../features/operations/ReceivingPage.jsx';
 import { ReceivingDetailPage } from '../features/operations/receiving/ReceivingDetailPage.jsx';
-import { WithdrawalRequestsPage } from '../features/operations/WithdrawalRequestsPage.jsx';
-import { WithdrawalRequestCreatePage } from '../features/operations/withdrawal/WithdrawalRequestCreatePage.jsx';
-import { WithdrawalRequestDetailPage } from '../features/operations/withdrawal/WithdrawalRequestDetailPage.jsx';
 import { HandheldPage } from '../features/handheld/HandheldPage.jsx';
 import { InventoryBalancePage } from '../features/inventory/InventoryBalancePage.jsx';
 import { StockCountReviewPage } from '../features/inventory/StockCountReviewPage.jsx';
 import { ReportsPage } from '../features/reports/ReportsPage.jsx';
 import { MovementLedgerReportPage } from '../features/reports/MovementLedgerReportPage.jsx';
-import { CustomerStorageBalanceReportPage } from '../features/reports/CustomerStorageBalanceReportPage.jsx';
 import { StorageAgingReportPage } from '../features/reports/StorageAgingReportPage.jsx';
-import { WarehouseOperationPerformanceReportPage } from '../features/reports/WarehouseOperationPerformanceReportPage.jsx';
-import { MonthlyStorageBillingSummaryPage } from '../features/reports/MonthlyStorageBillingSummaryPage.jsx';
-import { AccountingChargeStagingPreviewPage } from '../features/reports/AccountingChargeStagingPreviewPage.jsx';
-import { AccountingChargeHandoffReviewPage } from '../features/reports/AccountingChargeHandoffReviewPage.jsx';
 import { InvoiceDraftListPage } from '../features/billing/InvoiceDraftListPage.jsx';
 import { InvoiceDraftDetailPage } from '../features/billing/InvoiceDraftDetailPage.jsx';
 import { EmailSettingsPage } from '../features/settings/EmailSettingsPage.jsx';
@@ -68,23 +59,14 @@ export function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route index element={<DefaultHomeRedirect />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/dashboard/inventory" element={<InventoryDashboardPage />} />
             <Route path="/master/customers" element={<CustomersPage />} />
             <Route path="/operations/receiving" element={<ReceivingPage />} />
             <Route path="/operations/receiving/:id" element={<ReceivingDetailPage />} />
-            <Route path="/operations/withdrawal-requests" element={<WithdrawalRequestsPage />} />
-            <Route path="/operations/withdrawal-requests/new" element={<WithdrawalRequestCreatePage />} />
-            <Route path="/operations/withdrawal-requests/:id" element={<WithdrawalRequestDetailPage />} />
             <Route path="/inventory" element={<InventoryBalancePage />} />
             <Route path="/inventory/count" element={<StockCountReviewPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/movement-ledger" element={<MovementLedgerReportPage />} />
-            <Route path="/reports/customer-storage-balance" element={<CustomerStorageBalanceReportPage />} />
             <Route path="/reports/storage-aging" element={<StorageAgingReportPage />} />
-            <Route path="/reports/warehouse-operation-performance" element={<WarehouseOperationPerformanceReportPage />} />
-            <Route path="/reports/monthly-storage-billing-summary" element={<MonthlyStorageBillingSummaryPage />} />
-            <Route path="/reports/accounting-charge-staging-preview" element={<AccountingChargeStagingPreviewPage />} />
-            <Route path="/reports/accounting-charge-handoff-review" element={<AccountingChargeHandoffReviewPage />} />
             <Route path="/billing/invoice-drafts" element={<InvoiceDraftListPage />} />
             <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
             <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />

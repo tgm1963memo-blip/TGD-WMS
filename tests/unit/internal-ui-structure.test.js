@@ -28,7 +28,6 @@ describe('Sprint 5C internal operation UI structure', () => {
 
     [
       '/operations/receiving',
-      '/operations/withdrawal-requests',
       '/inventory',
       '/handheld',
     ].forEach((routePath) => {

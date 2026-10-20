@@ -145,7 +145,7 @@ test.describe('CUSTOMER-PORTAL-1B Process Demo', () => {
     await expect(page.locator('[data-testid="storage-upload-button"]')).toHaveCount(0);
     await gotoUrl(page, `${getBaseUrl()}/customer/warehouse/picking-loading`);
     await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
-    await gotoUrl(page, `${getBaseUrl()}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${getBaseUrl()}/billing/invoice-drafts`);
     await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
   });

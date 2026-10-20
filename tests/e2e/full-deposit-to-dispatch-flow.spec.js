@@ -166,23 +166,6 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
 
     // Putaway / allocation / picking / dispatch pages removed from active menu.
     await runStep({
-      id: '10-withdrawal-draft',
-      phase: 'outbound',
-      name: 'Create withdrawal request draft',
-      evidence: '10-withdrawal-draft.png',
-      action: async () => {
-        await safeGoto(page, '/operations/withdrawal-requests/new');
-        const withdrawalNo = buildDraftNo('WDR-FLOW');
-        await page.locator('input[name="withdrawal_no"]').fill(withdrawalNo);
-        await page.locator('input[name="customer_id"]').fill(FLOW_CONTEXT.customerId || process.env.UAT_CUSTOMER_CODE || '');
-        await page.locator('input[name="warehouse_id"]').fill(FLOW_CONTEXT.warehouseId || process.env.UAT_WAREHOUSE_CODE || '');
-        await page.locator('input[name="requested_dispatch_date"]').fill(process.env.UAT_DISPATCH_DATE || '2026-12-31');
-        await page.locator('button[type="submit"]').click();
-        await page.waitForURL(/\/operations\/withdrawal-requests\//, { timeout: 15000 });
-      },
-    });
-
-    await runStep({
       id: '15-customer-withdrawal',
       phase: 'outbound',
       name: 'Customer withdrawal request page',
@@ -205,13 +188,12 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
     });
 
     await runStep({
-      id: '18-billing-movement-weight',
+      id: '18-billing-invoice-drafts',
       phase: 'verification',
-      name: 'Billing movement weight report loads',
-      evidence: '18-billing-movement-weight.png',
+      name: 'Billing invoice drafts page loads',
+      evidence: '18-billing-invoice-drafts.png',
       action: async () => {
-        await expectRouteShell(page, '/reports/billing-movement-weight', 'billing-movement-weight-report-page');
-        await expect(page.locator('[data-testid="billing-movement-weight-summary-card"]').first()).toBeVisible();
+        await expectRouteShell(page, '/billing/invoice-drafts', 'billing-invoice-drafts-page');
         await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
       },
@@ -258,10 +240,9 @@ test.describe('Full deposit-to-dispatch warehouse flow', () => {
       '03-warehouse-receiving-workspace',
       '07-inventory-balance',
       '08-movement-ledger-inbound',
-      '10-withdrawal-draft',
       '15-customer-withdrawal',
       '16-admin-withdrawal-review',
-      '18-billing-movement-weight',
+      '18-billing-invoice-drafts',
       '19-request-history',
     ];
 

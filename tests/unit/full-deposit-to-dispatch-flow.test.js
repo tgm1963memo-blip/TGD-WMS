@@ -19,9 +19,8 @@ describe('full deposit-to-dispatch Playwright flow', () => {
       'customer-deposit',
       'warehouse-receiving-workspace',
       'inventory-balance',
-      'withdrawal-draft',
       'movement-ledger-inbound',
-      'billing-movement-weight',
+      'billing-invoice-drafts',
     ].forEach((marker) => {
       expect(source).toContain(marker);
     });

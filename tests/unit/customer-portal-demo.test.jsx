@@ -142,21 +142,6 @@ vi.mock('../../src/services/productServiceRatesService.js', () => ({
   listAllProductServiceRates: vi.fn(async () => ({ data: [], error: null })),
 }));
 
-vi.mock('../../src/services/customerStorageBalanceReportService.js', () => ({
-  getCustomerStorageBalanceRows: vi.fn(async () => ({
-    data: [{
-      id: 'bal-1',
-      product_id: 'prod-1',
-      lot_id: 'lot-1',
-      pallet_id: 'plt-1',
-      location_id: 'loc-1',
-      qty_available: 10,
-      uom: 'KG',
-    }],
-    error: null,
-  })),
-}));
-
 vi.mock('../../src/services/customerPortalRequestHistoryService.js', () => ({
   listCustomerPortalRequestHistory: vi.fn(async () => ({
     data: [{

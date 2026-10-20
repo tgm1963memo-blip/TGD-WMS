@@ -83,8 +83,7 @@
 | RP-01 | `/reports` (สรุปรายงาน) | viewer+ | ไม่ crash — เห็นการ์ดรายงานตามสิทธิ์ | ☐ |
 | RP-02 | Movement Ledger | viewer+ | โหลดได้ | ☐ |
 | RP-03 | Storage Aging | viewer+ | โหลดได้ | ☐ |
-| RP-04 | Billing Movement Weight | accounting | โหลดได้ มีปุ่มสร้าง draft (ถ้ามีสิทธิ์) | ☐ |
-| RP-05 | Invoice Drafts | accounting | รายการ draft โหลดได้ | ☐ |
+| RP-04 | Invoice Drafts (ใบแจ้งหนี้ร่าง) | accounting | รายการ draft โหลดได้ มีปุ่มสร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา (ถ้ามีสิทธิ์) | ☐ |
 
 ### สิ่งที่ต้อง **ไม่** เห็น (Gate 3B)
 

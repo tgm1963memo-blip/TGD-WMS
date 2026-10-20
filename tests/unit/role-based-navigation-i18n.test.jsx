@@ -56,58 +56,38 @@ describe('UserRoleDemoSelector component', () => {
 describe('ReportsPage role‑based visibility', () => {
   const getCardTitle = (key) => getTranslation(key, 'th') || key.replace(/_/g, ' ');
 
+  const liveReportKeys = ['movement_ledger_report', 'storage_aging_report'];
+  const retiredReportKeys = [
+    'customer_storage_balance_report',
+    'warehouse_operation_performance_report',
+    'monthly_storage_billing_summary',
+    'accounting_charge_staging_preview',
+    'accounting_charge_handoff_review_draft',
+  ];
+
   test('admin sees all report cards', () => {
     setDemoUserRole('admin');
     renderWithLanguage(<ReportsPage />);
-    const titles = [
-      'movement_ledger_report',
-      'customer_storage_balance_report',
-      'storage_aging_report',
-      'warehouse_operation_performance_report',
-      'monthly_storage_billing_summary',
-      'accounting_charge_staging_preview',
-      'accounting_charge_handoff_review_draft',
-    ];
-    titles.forEach((key) => {
+    liveReportKeys.forEach((key) => {
       expect(screen.getByText(getCardTitle(key))).toBeInTheDocument();
     });
-  });
-
-  test('viewer sees only general read‑only reports', () => {
-    setDemoUserRole('viewer');
-    renderWithLanguage(<ReportsPage />);
-    const visible = [
-      'movement_ledger_report',
-      'customer_storage_balance_report',
-      'storage_aging_report',
-      'warehouse_operation_performance_report',
-      'monthly_storage_billing_summary',
-    ];
-    const hidden = [
-      'accounting_charge_staging_preview',
-      'accounting_charge_handoff_review_draft',
-    ];
-    visible.forEach((key) => {
-      expect(screen.getByText(getCardTitle(key))).toBeInTheDocument();
-    });
-    hidden.forEach((key) => {
+    retiredReportKeys.forEach((key) => {
       expect(screen.queryByText(getCardTitle(key))).toBeNull();
     });
   });
 
-  test('accounting sees general reports plus accounting cards', () => {
+  test('viewer sees the general read‑only reports', () => {
+    setDemoUserRole('viewer');
+    renderWithLanguage(<ReportsPage />);
+    liveReportKeys.forEach((key) => {
+      expect(screen.getByText(getCardTitle(key))).toBeInTheDocument();
+    });
+  });
+
+  test('accounting sees the general reports', () => {
     setDemoUserRole('accounting');
     renderWithLanguage(<ReportsPage />);
-    const visible = [
-      'movement_ledger_report',
-      'customer_storage_balance_report',
-      'storage_aging_report',
-      'warehouse_operation_performance_report',
-      'monthly_storage_billing_summary',
-      'accounting_charge_staging_preview',
-      'accounting_charge_handoff_review_draft',
-    ];
-    visible.forEach((key) => {
+    liveReportKeys.forEach((key) => {
       expect(screen.getByText(getCardTitle(key))).toBeInTheDocument();
     });
   });

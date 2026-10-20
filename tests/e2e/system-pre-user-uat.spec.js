@@ -74,7 +74,7 @@ test.describe('System pre-user UAT smoke', () => {
     await gotoUrl(page, `${baseUrl}/operations/dispatch`);
     await expect(page.locator('[data-testid="dispatch-confirm-button"]')).toHaveCount(0);
 
-    await gotoUrl(page, `${baseUrl}/reports/billing-movement-weight`);
+    await gotoUrl(page, `${baseUrl}/billing/invoice-drafts`);
     await expect(page.locator('[data-testid="export-bplus-button"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mark-billed-button"]')).toHaveCount(0);
 

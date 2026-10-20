@@ -161,7 +161,6 @@ describe('App', () => {
     ['/operations/receiving', getTranslation('receiving', 'th'), 'heading'],
     ['/inventory', 'ยอดคงเหลือสินค้า', 'heading'],
     ['/reports/movement-ledger', /รายงานการเคลื่อนไหวสินค้าของลูกค้า/, 'heading'],
-    ['/operations/withdrawal-requests', 'Withdrawal Requests', 'heading-multiple'],
     ['/admin/users', 'จัดการผู้ใช้', 'heading'],
     ['/handheld', /Handheld/i, 'text'],
   ])('renders %s route', async (path, title, queryType) => {

@@ -12,34 +12,11 @@ function readProjectFile(path) {
 
 describe('Sprint 6C-Prep cold storage billing support services', () => {
   const serviceFiles = [
-    'src/services/storageWeightSnapshotService.js',
-    'src/services/operationChargeLogService.js',
-    'src/services/monthlyStorageBillingSummaryService.js',
     'src/services/rateCardService.js',
     'src/services/billingExportService.js',
-    'src/services/customerStorageBalanceReportService.js',
   ];
 
   const requiredFunctions = {
-    'src/services/storageWeightSnapshotService.js': [
-      'getDailyStorageWeightPreview',
-      'getMonthlyStorageWeightPreview',
-      'calculateChargeableWeight',
-      'groupStorageWeightByCustomer',
-      'groupStorageWeightByProduct',
-    ],
-    'src/services/operationChargeLogService.js': [
-      'getOperationChargeLogs',
-      'getOperationChargeSummary',
-      'getOperationChargeTypes',
-      'calculateOperationChargePreview',
-    ],
-    'src/services/monthlyStorageBillingSummaryService.js': [
-      'getMonthlyStorageBillingPreview',
-      'getCustomerBillingSummaryPreview',
-      'combineStorageAndOperationCharges',
-      'validateBillingPreviewRows',
-    ],
     'src/services/rateCardService.js': [
       'getCustomerRateCards',
       'getRateCardByCustomer',
@@ -52,13 +29,6 @@ describe('Sprint 6C-Prep cold storage billing support services', () => {
       'mapBillingSummaryToExportRows',
       'validateExportRows',
       'getSupportedExportFormats',
-    ],
-    'src/services/customerStorageBalanceReportService.js': [
-      'getCustomerStorageBalanceRows',
-      'getCustomerStorageBalanceSummary',
-      'getStorageBalanceByCustomer',
-      'getStorageBalanceByProduct',
-      'getStorageBalanceByLot',
     ],
   };
 
@@ -118,27 +88,6 @@ describe('Sprint 6C-Prep cold storage billing support services', () => {
     });
 
     expect(source).not.toMatch(/\bSO\b/);
-  });
-
-  it('creates cold storage billing constants with operation charge examples', () => {
-    const constantsPath = 'src/constants/coldStorageBilling.js';
-    const source = readProjectFile(constantsPath);
-
-    expect(statSync(resolve(projectRoot, constantsPath)).isFile()).toBe(true);
-    [
-      'OPERATION_CHARGE_TYPES',
-      'BILLING_BASIS_TYPES',
-      'STORAGE_CHARGE_BASIS',
-      'BILLING_PREVIEW_STATUS',
-      'SUPPORTED_BILLING_EXPORT_FORMATS',
-      'LIFTING',
-      'REPACK',
-      'SORTING',
-      'LABELING',
-      'PALLETIZING',
-    ].forEach((term) => {
-      expect(source).toContain(term);
-    });
   });
 
   it('documents preview-only billing service foundation scope', () => {
