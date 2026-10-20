@@ -35,20 +35,17 @@ describe('Gate 3B-RLS billing invoice draft permissions', () => {
     expect(isBillingNavigationItemVisible('billing_invoice_drafts', 'admin')).toBe(true);
     expect(isBillingNavigationItemVisible('billing_invoice_drafts', 'warehouse_manager')).toBe(true);
     expect(isBillingNavigationItemVisible('billing_invoice_drafts', 'viewer')).toBe(false);
-    expect(isBillingNavigationItemVisible('billing_movement_weight', 'viewer')).toBe(true);
   });
 
   it('catalogs invoice draft routes with accounting minimum and warehouse_manager read support', () => {
     const listEntry = getRoutePermission('/billing/invoice-drafts');
     const detailEntry = getRoutePermission('/billing/invoice-drafts/:draftId');
-    const reportEntry = getRoutePermission('/reports/billing-movement-weight');
 
     expect(listEntry.minimum_role).toBe('accounting');
     expect(detailEntry.minimum_role).toBe('accounting');
-    expect(reportEntry.minimum_role).toBe('viewer');
     expect(listEntry.permission_area).toBe('accounting_review');
     expect(detailEntry.permission_area).toBe('accounting_review');
-    expect(reportEntry.minimum_role).toBe('viewer');
+    expect(getRoutePermission('/reports/billing-movement-weight')).toBeFalsy();
   });
 
   it('allows warehouse_manager route access via role hierarchy for invoice draft pages', () => {
@@ -56,6 +53,5 @@ describe('Gate 3B-RLS billing invoice draft permissions', () => {
     expect(canAccessRoute('accounting', '/billing/invoice-drafts').allowed).toBe(true);
     expect(canAccessRoute('viewer', '/billing/invoice-drafts').allowed).toBe(false);
     expect(canAccessRoute('warehouse_staff', '/billing/invoice-drafts').allowed).toBe(false);
-    expect(canAccessRoute('viewer', '/reports/billing-movement-weight').allowed).toBe(true);
   });
 });

@@ -53,7 +53,7 @@ describe('navigation role permissions', () => {
     const labels = visibleLabelsForRole('accounting');
 
     expect(labels).not.toContain('Dashboard');
-    expect(labels).toContain('Billing Movement Weight');
+    expect(labels).not.toContain('Billing Movement Weight');
     expect(labels).toContain('Invoice Drafts');
     expect(labels).toContain('Movement Ledger');
     expect(labels).not.toContain('การรับเข้าสินค้า');

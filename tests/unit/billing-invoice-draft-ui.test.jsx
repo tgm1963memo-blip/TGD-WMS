@@ -3,16 +3,13 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { getMovementDraftSelectionState } from '../../src/utils/billingInvoiceDraftUtils.js';
 
 const {
   listBillingInvoiceDraftsMock,
   getBillingInvoiceDraftByIdMock,
-  createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraftMock,
   getBillingInvoiceDraftBplusExportReadinessMock,
-  findActiveDuplicateDraftLinesMock,
   fetchDepositLineTrackingCodesMock,
   getBillingMovementWeightRowsMock,
   getMovementLedgerRowsMock,
@@ -24,11 +21,9 @@ const {
 } = vi.hoisted(() => ({
   listBillingInvoiceDraftsMock: vi.fn(),
   getBillingInvoiceDraftByIdMock: vi.fn(),
-  createBillingInvoiceDraftFromMovementsMock: vi.fn(),
   approveBillingInvoiceDraftMock: vi.fn(),
   cancelBillingInvoiceDraftMock: vi.fn(),
   getBillingInvoiceDraftBplusExportReadinessMock: vi.fn(),
-  findActiveDuplicateDraftLinesMock: vi.fn(),
   fetchDepositLineTrackingCodesMock: vi.fn().mockResolvedValue(new Map()),
   getBillingMovementWeightRowsMock: vi.fn(),
   getMovementLedgerRowsMock: vi.fn(),
@@ -42,11 +37,9 @@ const {
 vi.mock('../../src/services/billingInvoiceDraftService.js', () => ({
   listBillingInvoiceDrafts: listBillingInvoiceDraftsMock,
   getBillingInvoiceDraftById: getBillingInvoiceDraftByIdMock,
-  createBillingInvoiceDraftFromMovements: createBillingInvoiceDraftFromMovementsMock,
   approveBillingInvoiceDraft: approveBillingInvoiceDraftMock,
   cancelBillingInvoiceDraft: cancelBillingInvoiceDraftMock,
   getBillingInvoiceDraftBplusExportReadiness: getBillingInvoiceDraftBplusExportReadinessMock,
-  findActiveDuplicateDraftLines: findActiveDuplicateDraftLinesMock,
   fetchDepositLineTrackingCodes: fetchDepositLineTrackingCodesMock,
 }));
 
@@ -95,7 +88,6 @@ vi.mock('../../src/features/auth/UserRoleProvider.jsx', () => ({
 
 const { InvoiceDraftListPage } = await import('../../src/features/billing/InvoiceDraftListPage.jsx');
 const { InvoiceDraftDetailPage } = await import('../../src/features/billing/InvoiceDraftDetailPage.jsx');
-const { BillingMovementWeightReportPage } = await import('../../src/features/reports/BillingMovementWeightReportPage.jsx');
 
 const validMovement = {
   movement_id: 'mv-1',
@@ -131,11 +123,9 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     getCurrentUserRoleMock.mockReturnValue('admin');
     listBillingInvoiceDraftsMock.mockReset();
     getBillingInvoiceDraftByIdMock.mockReset();
-    createBillingInvoiceDraftFromMovementsMock.mockReset();
     approveBillingInvoiceDraftMock.mockReset();
     cancelBillingInvoiceDraftMock.mockReset();
     getBillingInvoiceDraftBplusExportReadinessMock.mockReset();
-    findActiveDuplicateDraftLinesMock.mockReset();
     getBillingMovementWeightRowsMock.mockReset();
     getMovementLedgerRowsMock.mockReset();
     getConfirmedDepositReceiptRowsMock.mockReset();
@@ -195,7 +185,6 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
       error: null,
       source: 'billing_database_view',
     });
-    findActiveDuplicateDraftLinesMock.mockResolvedValue({ data: [], error: null });
   });
 
   it('creates invoice draft UI files and routes', () => {
@@ -324,228 +313,6 @@ describe('Gate 3B-2 billing invoice draft UI', () => {
     expect(screen.getByTestId('invoice-draft-cancel-button')).toBeInTheDocument();
 
     confirmMock.mockRestore();
-  });
-
-  it('keeps create draft button disabled when no selection', async () => {
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(await screen.findByTestId('billing-movement-weight-report-page')).toBeInTheDocument();
-    expect(screen.getByTestId('create-invoice-draft-button')).toBeDisabled();
-  });
-
-  it('enables create draft after selecting valid rows and calls service', async () => {
-    createBillingInvoiceDraftFromMovementsMock.mockResolvedValue({
-      data: {
-        draft: { id: 'draft-2', draft_no: 'BID-20260608-0002' },
-        lines: [],
-      },
-      error: null,
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-          <Route path="/billing/invoice-drafts/:draftId" element={<div data-testid="draft-detail-redirect" />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
-
-    // Rows are grouped one-per-source-document; validMovement has no
-    // source_document_no, so the group falls back to its first line's
-    // movement_id for the accessible name.
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select document mv-1' }));
-
-    const createButton = screen.getByTestId('create-invoice-draft-button');
-    expect(createButton).toBeEnabled();
-
-    fireEvent.click(createButton);
-
-    await waitFor(() => {
-      expect(createBillingInvoiceDraftFromMovementsMock).toHaveBeenCalledWith({
-        movementIds: ['mv-1'],
-        note: 'E2E_TEST',
-      });
-    });
-  });
-
-  it('shows validation error for mixed customer selection', async () => {
-    getConfirmedWithdrawalRowsMock.mockResolvedValue({
-      data: [
-        validMovement,
-        { ...validMovement, movement_id: 'mv-3', customer_id: 'cust-2', customer_name: 'Beta' },
-      ],
-      error: null,
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
-
-    const checkboxes = await screen.findAllByTestId('billing-movement-row-checkbox');
-    fireEvent.click(checkboxes[0]);
-    fireEvent.click(checkboxes[1]);
-    fireEvent.click(screen.getByTestId('create-invoice-draft-button'));
-
-    expect(await screen.findByTestId('invoice-draft-validation-alert')).toHaveTextContent(/same customer/i);
-    expect(createBillingInvoiceDraftFromMovementsMock).not.toHaveBeenCalled();
-  });
-
-  // Real reported gap: tgd_stock_movements actually stores 'CUSTOMER_DEPOSIT_REQUEST'
-  // for source_module, not the bare 'CUSTOMER_DEPOSIT' the outboundRows filter used to
-  // check for — that exact-match never fired, so a generic stock_movements row for a
-  // deposit confirmation event slipped through the filter and got billed a second time
-  // alongside the richer, lot_no-bearing row getConfirmedDepositReceiptRows already
-  // supplies for that same event (real double-billing risk). Both rows below share the
-  // same source_document_no, so BillingMovementWeightTable groups them into one
-  // checkbox — the double count would otherwise hide behind an inflated group weight
-  // total and a movementIds array carrying both ids into the created draft.
-  it('does not double count a deposit confirmation appearing in both raw movement rows and the richer deposit source', async () => {
-    createBillingInvoiceDraftFromMovementsMock.mockResolvedValue({
-      data: { draft: { id: 'draft-dep-1', draft_no: 'BID-DEP-0001' }, lines: [] },
-      error: null,
-    });
-    getConfirmedWithdrawalRowsMock.mockResolvedValue({ data: [], error: null });
-    getMovementLedgerRowsMock.mockResolvedValue({
-      data: [{
-        id: 'raw-mv-dep-1',
-        movement_type_raw: 'RECEIVE_CONFIRM',
-        movement_type: 'RECEIVE',
-        movement_date: '2026-06-01T10:00:00.000Z',
-        customer_id: 'cust-1',
-        customer_name: 'Alpha',
-        source_module: 'CUSTOMER_DEPOSIT_REQUEST',
-        source_document_no: 'DEP-100',
-        qty: 10,
-        quantity: 10,
-        weight: 100,
-        chargeable_weight: 100,
-        is_billable: true,
-        billing_status: 'READY_FOR_PREVIEW',
-      }],
-      error: null,
-    });
-    getConfirmedDepositReceiptRowsMock.mockResolvedValue({
-      data: [{
-        id: 'deposit-line-1',
-        // shapeBillingMovementWeightRow is identity-mocked in this test file (it
-        // normally maps row.id -> movement_id — see the mock above), so movement_id
-        // must be supplied directly here for the row to be selectable/toggleable.
-        movement_id: 'deposit-line-1',
-        movement_type_raw: 'RECEIVE_CONFIRM',
-        movement_date: '2026-06-01',
-        customer_id: 'cust-1',
-        customer_name: 'Alpha',
-        lot_no: 'LOT-100',
-        source_document_no: 'DEP-100',
-        qty: 10,
-        quantity: 10,
-        weight: 100,
-        chargeable_weight: 100,
-        is_billable: true,
-        billing_status: 'READY_FOR_PREVIEW',
-      }],
-      error: null,
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-          <Route path="/billing/invoice-drafts/:draftId" element={<div data-testid="draft-detail-redirect" />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
-
-    const checkboxes = await screen.findAllByTestId('billing-movement-row-checkbox');
-    expect(checkboxes).toHaveLength(1);
-    expect(screen.getByText('100.00')).toBeInTheDocument();
-    expect(screen.queryByText('200.00')).not.toBeInTheDocument();
-
-    fireEvent.click(checkboxes[0]);
-    fireEvent.click(screen.getByTestId('create-invoice-draft-button'));
-
-    await waitFor(() => {
-      expect(createBillingInvoiceDraftFromMovementsMock).toHaveBeenCalledWith({
-        movementIds: ['deposit-line-1'],
-        note: 'E2E_TEST',
-      });
-    });
-  });
-
-  it('marks NEEDS_WEIGHT_REVIEW rows as not selectable', () => {
-    expect(getMovementDraftSelectionState(blockedMovement).selectable).toBe(false);
-    expect(getMovementDraftSelectionState(validMovement).selectable).toBe(true);
-  });
-
-  it('disables guarded movement and excludes it from select-all', async () => {
-    const guardedMovement = { ...validMovement, movement_id: 'mv-guarded' };
-    const releasedMovement = { ...validMovement, movement_id: 'mv-released' };
-    getConfirmedWithdrawalRowsMock.mockResolvedValue({
-      data: [guardedMovement, releasedMovement],
-      error: null,
-    });
-    findActiveDuplicateDraftLinesMock.mockResolvedValue({
-      data: [{
-        source_movement_id: 'mv-guarded',
-        invoice_draft_id: 'draft-active',
-        line_id: 'line-active',
-      }],
-      error: null,
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
-
-    const guardedCheckbox = await screen.findByRole('checkbox', { name: 'Select document mv-guarded' });
-    const releasedCheckbox = screen.getByRole('checkbox', { name: 'Select document mv-released' });
-    expect(guardedCheckbox).toBeDisabled();
-    expect(guardedCheckbox).toHaveAttribute('title', 'Already linked to an active invoice draft');
-    expect(releasedCheckbox).toBeEnabled();
-
-    fireEvent.click(screen.getByTestId('billing-movement-select-all-checkbox'));
-
-    expect(guardedCheckbox).not.toBeChecked();
-    expect(releasedCheckbox).toBeChecked();
-    expect(screen.getByText('Selected rows: 1')).toBeInTheDocument();
-  });
-
-  it('keeps movement selectable when duplicate guard has been released', () => {
-    expect(getMovementDraftSelectionState({
-      ...validMovement,
-      active_duplicate_guard: false,
-    })).toEqual({ selectable: true, reason: null });
-  });
-
-  it('does not expose forbidden Gate 3B controls in report page source', () => {
-    const pageSource = readProjectFile('src/features/reports/BillingMovementWeightReportPage.jsx');
-    expect(pageSource).toContain('create-invoice-draft-button');
-    expect(pageSource).not.toContain('approve-invoice-draft-button');
-    expect(pageSource).not.toContain('export-bplus-button');
-    expect(pageSource).not.toContain('mark-billed-button');
-    expect(pageSource).not.toContain('bplus-invoice-no-input');
   });
 
   it('cancel draft flow calls service from detail page source', () => {
@@ -709,7 +476,6 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
     getMovementLedgerRowsMock.mockReset();
     getConfirmedDepositReceiptRowsMock.mockReset();
     getConfirmedWithdrawalRowsMock.mockReset();
-    findActiveDuplicateDraftLinesMock.mockReset();
     getCustomersMock.mockReset();
     getProductsMock.mockReset();
     listAllProductServiceRatesMock.mockReset();
@@ -745,42 +511,6 @@ describe('Gate 3B-RLS billing invoice draft UI permissions', () => {
       error: null,
       source: 'billing_database_view',
     });
-    findActiveDuplicateDraftLinesMock.mockResolvedValue({ data: [], error: null });
-  });
-
-  it('hides create draft controls for viewer role', async () => {
-    getCurrentUserRoleMock.mockReturnValue('viewer');
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByTestId('billing-movement-weight-report-page')).toBeInTheDocument();
-    expect(screen.queryByTestId('create-invoice-draft-button')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('billing-movement-row-checkbox')).not.toBeInTheDocument();
-    expect(findActiveDuplicateDraftLinesMock).not.toHaveBeenCalled();
-  });
-
-  it('shows create draft controls for accounting role', async () => {
-    getCurrentUserRoleMock.mockReturnValue('accounting');
-
-    render(
-      <MemoryRouter initialEntries={['/reports/billing-movement-weight']}>
-        <Routes>
-          <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByTestId('create-invoice-draft-button')).toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
-
-    expect(await screen.findAllByTestId('billing-movement-row-checkbox')).toHaveLength(1);
   });
 
   it('hides approve and cancel buttons for warehouse_manager read-only role', async () => {

@@ -118,7 +118,7 @@ export function InvoiceDraftDetailPage() {
         >
           {formatInvoiceDraftError({ code: 'INVOICE_DRAFT_PERMISSION_DENIED' })}
         </div>
-        <Link className="btn btn-outline" to="/reports/billing-movement-weight">Back to Billing Report</Link>
+        <Link className="btn btn-outline" to="/billing/invoice-drafts">Back to Invoice Drafts</Link>
       </section>
     );
   }

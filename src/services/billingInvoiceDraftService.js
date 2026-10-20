@@ -17,7 +17,6 @@ import {
   INVOICE_DRAFT_STATUS,
   INVOICE_DRAFT_TABLE,
   buildBillingInvoiceDraftNo,
-  buildInvoiceDraftCreatePayload,
   buildInvoiceDraftLineFromStorageLine,
   buildInvoiceDraftLineFromAuxiliaryLine,
   buildInvoiceDraftLineFromOvertimeLine,
@@ -28,7 +27,6 @@ import {
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
   canDeleteBillingInvoiceDraft,
-  findDuplicateDraftLines,
   shapeBillingInvoiceDraftHeader,
   shapeBillingInvoiceDraftLine,
 } from '../utils/billingInvoiceDraftUtils.js';
@@ -191,11 +189,9 @@ async function fetchMovementsByIds(movementIds = []) {
 // A customer with any of those terms configured would get a different (almost
 // always lower/wrong) STORAGE amount here than the authoritative
 // createBillingInvoiceDraftForPeriod flow would produce for the exact same lot.
-// STORAGE charges must always go through that period-based flow instead — see the
-// matching guard in validateInvoiceDraftSourceRows (billingInvoiceDraftUtils.js) and
-// getMovementDraftSelectionState, which block a STORAGE-classified row from ever
-// reaching this movement-based draft path at all, rather than silently leaving it
-// with a flat (and possibly wrong) rate.
+// STORAGE charges must always go through that period-based flow instead, so a
+// STORAGE-classified row is left with no rate here rather than a flat (and
+// possibly wrong) one.
 const RATE_SERVICE_TYPES = new Set(['HANDLING_IN', 'HANDLING_OUT', 'LABEL', 'FREEZING', 'OTHER']);
 
 // enrichClientMergedBillingMovementWeightRow classifies deposit/withdrawal
@@ -211,8 +207,8 @@ function toRateServiceType(billingServiceType) {
   return null;
 }
 
-// Movement rows selected on BillingMovementWeightReportPage never carry a
-// resolved rate/amount (see buildInvoiceDraftLineFromMovement) — unlike the
+// Lines of the retired movement-based drafts (source_movement_id set) never
+// carried a resolved rate/amount of their own — unlike the
 // period-preview draft path (getBillingPeriodPreview), which resolves a
 // rate per deposit line via the same rate engine. This looks up the
 // customer's configured service rate for each movement the same way, using
@@ -287,33 +283,9 @@ async function resolveMovementRates(movements = []) {
   });
 }
 
-export async function findActiveDuplicateDraftLines(movementIds = []) {
-  if (!supabase) return missingSupabaseClientResult();
-
-  const normalizedIds = [...new Set((movementIds ?? []).map((id) => String(id)).filter(Boolean))];
-  if (normalizedIds.length === 0) {
-    return { data: [], error: null };
-  }
-
-  const result = await supabase
-    .from(INVOICE_DRAFT_LINE_TABLE)
-    .select('id, invoice_draft_id, source_movement_id, duplicate_guard_active')
-    .eq('duplicate_guard_active', true)
-    .in('source_movement_id', normalizedIds);
-
-  if (result.error) {
-    return { data: null, error: normalizeServiceError(result.error) };
-  }
-
-  return {
-    data: findDuplicateDraftLines(normalizedIds, result.data ?? []),
-    error: null,
-  };
-}
-
 // Storage/service-period drafts have no per-movement source id to check
-// against (unlike findActiveDuplicateDraftLines, used for movement-based
-// drafts) — a period draft is scoped to a customer + date range instead, so
+// against (unlike the retired movement-based drafts, which guarded on
+// source_movement_id) — a period draft is scoped to a customer + date range instead, so
 // the duplicate check here is a date-range overlap against that customer's
 // other still-active drafts. Without this, nothing stops staff from billing
 // e.g. 1-15 and then again 10-20 for the same customer, double-charging the
@@ -540,94 +512,6 @@ export async function recalculateInvoiceDraftLineRates(draftId) {
       draft: shapeBillingInvoiceDraftHeader(headerUpdate.data),
       lines: refreshed.data.lines,
       updatedCount,
-    },
-    error: null,
-  };
-}
-
-export async function createBillingInvoiceDraftFromMovements({
-  movementIds = [],
-  billingPeriodStart = null,
-  billingPeriodEnd = null,
-  note = null,
-  internalReference = null,
-  createdBy = null,
-} = {}) {
-  if (!supabase) return missingSupabaseClientResult();
-
-  const normalizedIds = [...new Set((movementIds ?? []).map((id) => String(id)).filter(Boolean))];
-  if (normalizedIds.length === 0) {
-    return { data: null, error: validationError('At least one movement id is required.') };
-  }
-
-  const movementResult = await fetchMovementsByIds(normalizedIds);
-  if (movementResult.error) {
-    return { data: null, error: movementResult.error };
-  }
-
-  const duplicateResult = await findActiveDuplicateDraftLines(normalizedIds);
-  if (duplicateResult.error) {
-    return { data: null, error: duplicateResult.error };
-  }
-
-  if ((duplicateResult.data ?? []).length > 0) {
-    return {
-      data: null,
-      error: validationError('One or more movements are already linked to an active invoice draft.', {
-        duplicates: duplicateResult.data,
-      }),
-    };
-  }
-
-  const ratedMovements = await resolveMovementRates(movementResult.data);
-
-  const draftNo = await resolveDraftNo();
-  const payload = buildInvoiceDraftCreatePayload({
-    draftNo,
-    movements: ratedMovements,
-    billingPeriodStart,
-    billingPeriodEnd,
-    note,
-    internalReference,
-    createdBy,
-  });
-
-  if (!payload.valid) {
-    return {
-      data: null,
-      error: validationError(payload.errors.join(' '), { errors: payload.errors }),
-    };
-  }
-
-  const headerInsert = await supabase
-    .from(INVOICE_DRAFT_TABLE)
-    .insert(payload.header)
-    .select('*')
-    .single();
-
-  if (headerInsert.error) {
-    return { data: null, error: normalizeServiceError(headerInsert.error) };
-  }
-
-  const draftId = headerInsert.data.id;
-  const lineRows = payload.lines.map((line) => ({
-    ...line,
-    invoice_draft_id: draftId,
-  }));
-
-  const linesInsert = await supabase
-    .from(INVOICE_DRAFT_LINE_TABLE)
-    .insert(lineRows)
-    .select('*');
-
-  if (linesInsert.error) {
-    return { data: null, error: normalizeServiceError(linesInsert.error) };
-  }
-
-  return {
-    data: {
-      draft: shapeBillingInvoiceDraftHeader(headerInsert.data),
-      lines: (linesInsert.data ?? []).map(shapeBillingInvoiceDraftLine),
     },
     error: null,
   };
@@ -1244,6 +1128,4 @@ export async function getBillingInvoiceDraftBplusExportReadiness(draftId) {
 
 export {
   calculateInvoiceDraftTotals,
-  validateInvoiceDraftSourceRows,
-  findDuplicateDraftLines,
 } from '../utils/billingInvoiceDraftUtils.js';

@@ -5,18 +5,13 @@ import {
   ACTIVE_INVOICE_DRAFT_STATUSES,
   APPROVABLE_INVOICE_DRAFT_STATUSES,
   INVOICE_DRAFT_STATUS,
-  buildInvoiceDraftCreatePayload,
-  buildInvoiceDraftLineFromMovement,
   buildInvoiceDraftLineFromStorageLine,
   buildInvoiceDraftLineFromHandlingLine,
+  buildInvoiceDraftLineFromHandlingOutLine,
   buildInvoiceDraftLineFromAuxiliaryLine,
   calculateInvoiceDraftTotals,
-  applyActiveDuplicateDraftGuards,
   canApproveBillingInvoiceDraft,
   canCancelBillingInvoiceDraft,
-  findDuplicateDraftLines,
-  getMovementDraftSelectionState,
-  validateInvoiceDraftSourceRows,
 } from '../../src/utils/billingInvoiceDraftUtils.js';
 
 const {
@@ -74,9 +69,7 @@ const {
   cancelBillingInvoiceDraft,
   createAutoLotBillingDraft,
   createBillingInvoiceDraftForPeriod,
-  createBillingInvoiceDraftFromMovements,
   deleteBillingInvoiceDraft,
-  findActiveDuplicateDraftLines,
   findOverlappingBillingPeriodDrafts,
   findOverlappingLotBillingLines,
   getBillingInvoiceDraftById,
@@ -228,7 +221,7 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     const source = readService();
     expect(source).toContain('listBillingInvoiceDrafts');
     expect(source).toContain('getBillingInvoiceDraftById');
-    expect(source).toContain('createBillingInvoiceDraftFromMovements');
+    expect(source).toContain('createBillingInvoiceDraftForPeriod');
     expect(source).toContain('cancelBillingInvoiceDraft');
     expect(source).toContain('approveBillingInvoiceDraft');
     expect(source).not.toContain('receivingService');
@@ -237,107 +230,23 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(source).not.toMatch(/\.rpc\('tgd_rpc_post|\.rpc\('tgd_rpc_confirm/);
   });
 
-  it('creates draft payload from valid movement rows', () => {
-    const payload = buildInvoiceDraftCreatePayload({
-      draftNo: 'BID-20260608-0001',
-      movements: [validMovement, validMovementTwo],
-      billingPeriodStart: '2026-06-01',
-      billingPeriodEnd: '2026-06-30',
-      note: 'June billing',
-    });
-
-    expect(payload.valid).toBe(true);
-    expect(payload.header.customer_id).toBe('cust-1');
-    expect(payload.header.total_qty).toBe(15);
-    expect(payload.header.total_chargeable_weight).toBe(150);
-    expect(payload.lines).toHaveLength(2);
-    expect(payload.lines[0].source_movement_id).toBe('mv-1');
-  });
-
-  it('rejects empty movement selection', () => {
-    const validation = validateInvoiceDraftSourceRows([]);
-    expect(validation.valid).toBe(false);
-    expect(validation.errors[0]).toMatch(/at least one/i);
-  });
-
-  it('rejects mixed customers', () => {
-    const validation = validateInvoiceDraftSourceRows([
-      validMovement,
-      { ...validMovementTwo, customer_id: 'cust-2' },
-    ]);
-
-    expect(validation.valid).toBe(false);
-    expect(validation.errors.join(' ')).toMatch(/same customer/i);
-  });
-
-  it('rejects non-billable rows', () => {
-    const validation = validateInvoiceDraftSourceRows([
-      { ...validMovement, is_billable: false, billing_status: 'EXCLUDED' },
-    ]);
-
-    expect(validation.valid).toBe(false);
-    expect(validation.errors.join(' ')).toMatch(/not billable/i);
-  });
-
-  it('rejects NEEDS_WEIGHT_REVIEW rows', () => {
-    const validation = validateInvoiceDraftSourceRows([
-      {
-        ...validMovement,
-        billing_status: 'NEEDS_WEIGHT_REVIEW',
-        chargeable_weight: 0,
-        gross_weight: 0,
-        net_weight: 0,
-      },
-    ]);
-
-    expect(validation.valid).toBe(false);
-    expect(validation.errors.join(' ')).toMatch(/needs weight review/i);
-  });
-
-  it('rejects duplicate movement in active draft', () => {
-    const duplicates = findDuplicateDraftLines(['mv-1'], [
-      { id: 'line-1', invoice_draft_id: 'draft-1', source_movement_id: 'mv-1', duplicate_guard_active: true },
-    ]);
-
-    expect(duplicates).toHaveLength(1);
-    expect(duplicates[0].source_movement_id).toBe('mv-1');
-  });
-
-  it('allows cancelled draft source to be reused', () => {
-    const duplicates = findDuplicateDraftLines(['mv-1'], [
-      { id: 'line-1', invoice_draft_id: 'draft-1', source_movement_id: 'mv-1', duplicate_guard_active: false },
-    ]);
-
-    expect(duplicates).toHaveLength(0);
-  });
-
-  it('enriches movement rows with active duplicate guard state', () => {
-    const rows = applyActiveDuplicateDraftGuards(
-      [{ movement_id: 'mv-1' }, { movement_id: 'mv-2' }],
-      [
-        { source_movement_id: 'mv-1', duplicate_guard_active: true },
-        { source_movement_id: 'mv-2', duplicate_guard_active: false },
-      ],
-    );
-
-    expect(rows).toEqual([
-      { movement_id: 'mv-1', active_duplicate_guard: true },
-      { movement_id: 'mv-2', active_duplicate_guard: false },
-    ]);
-  });
-
   it('calculates totals correctly', () => {
     const lines = [
-      buildInvoiceDraftLineFromMovement(validMovement),
-      buildInvoiceDraftLineFromMovement(validMovementTwo),
+      buildInvoiceDraftLineFromStorageLine(
+        { customerId: 'cust-1', depositLineId: 'dl-1', weight: 100, amount: 50, rate: { rate: 0.5 } },
+        { lot_no: 'LOT-1' },
+      ),
+      buildInvoiceDraftLineFromHandlingOutLine(
+        { customerId: 'cust-1', depositLineId: 'dl-1', weight: 50, amount: 15, dispatchDate: '2026-09-02', rate: { rate: 0.3 } },
+      ),
     ];
 
     expect(calculateInvoiceDraftTotals(lines)).toEqual({
-      total_qty: 15,
+      total_qty: 0,
       total_net_weight: 150,
       total_gross_weight: 150,
       total_chargeable_weight: 150,
-      total_amount: null,
+      total_amount: 65,
     });
   });
 
@@ -365,9 +274,11 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     const auxLine = buildInvoiceDraftLineFromAuxiliaryLine(
       { customerId: 'cust-1', sourceRequestId: 'req-1', quantity: 1, amount: 100, rate: { rate: 100, unit_basis: 'FLAT' } },
     );
-    const movementLine = buildInvoiceDraftLineFromMovement(validMovement);
+    const handlingOutLine = buildInvoiceDraftLineFromHandlingOutLine(
+      { customerId: 'cust-1', depositLineId: 'dl-1', weight: 100, amount: 30, dispatchDate: '2026-09-02', rate: { rate: 0.3 } },
+    );
 
-    for (const line of [storageLine, handlingLine, auxLine, movementLine]) {
+    for (const line of [storageLine, handlingLine, auxLine, handlingOutLine]) {
       expect(line).toHaveProperty('min_charge_applied');
       expect(line).toHaveProperty('free_period_applied');
       expect(line.min_charge_applied).not.toBeUndefined();
@@ -391,66 +302,6 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.READY_TO_REVIEW })).toBe(true);
     expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.APPROVED })).toBe(false);
     expect(canApproveBillingInvoiceDraft({ status: INVOICE_DRAFT_STATUS.CANCELLED })).toBe(false);
-  });
-
-  it('creates invoice draft from movements through service layer', async () => {
-    const headerRow = {
-      id: 'draft-1',
-      draft_no: 'BID-20260608-0001',
-      customer_id: 'cust-1',
-      customer_name: 'Alpha Cold',
-      status: 'DRAFT',
-      total_qty: 15,
-      total_net_weight: 150,
-      total_gross_weight: 150,
-      total_chargeable_weight: 150,
-      currency: 'THB',
-    };
-
-    let lineTableCalls = 0;
-    fromMock.mockImplementation((tableName) => {
-      if (tableName === 'tgd_billing_invoice_draft_lines') {
-        lineTableCalls += 1;
-        if (lineTableCalls === 1) {
-          return createTableChain(tableName, {
-            inResult: () => ({ data: [], error: null }),
-          });
-        }
-
-        return createTableChain(tableName, {
-          afterWrite: (state) => ({
-            data: (Array.isArray(state.payload) ? state.payload : []).map((line, index) => ({
-              id: `line-${index + 1}`,
-              ...line,
-            })),
-            error: null,
-          }),
-        });
-      }
-
-      if (tableName === 'tgd_billing_invoice_drafts') {
-        return createTableChain(tableName, {
-          afterWrite: () => ({ data: headerRow, error: null }),
-          single: async () => ({ data: headerRow, error: null }),
-        });
-      }
-
-      return createTableChain(tableName);
-    });
-
-    const result = await createBillingInvoiceDraftFromMovements({
-      movementIds: ['mv-1', 'mv-2'],
-      billingPeriodStart: '2026-06-01',
-      billingPeriodEnd: '2026-06-30',
-      note: 'UAT draft',
-    });
-
-    expect(result.error).toBeNull();
-    expect(result.data.draft.draft_no).toBe('BID-20260608-0001');
-    expect(result.data.lines).toHaveLength(2);
-    expect(fromMock).toHaveBeenCalledWith('tgd_billing_invoice_drafts');
-    expect(fromMock).toHaveBeenCalledWith('tgd_billing_invoice_draft_lines');
-    expect(rpcMock).toHaveBeenCalledWith('tgd_next_billing_invoice_draft_no');
   });
 
   // Real reported gap: resolveMovementRates (the movement-based invoice draft path)
@@ -491,106 +342,6 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
       return createTableChain(tableName);
     });
   }
-
-  it('does not resolve a rate for a movement dated after the rate contract has ended', async () => {
-    listAllProductServiceRatesMock.mockResolvedValue({
-      data: [{
-        id: 'rate-handling-expired',
-        customer_id: 'cust-1',
-        customer_product_id: null,
-        service_type: 'HANDLING_IN',
-        rate: 5,
-        unit_basis: 'PER_KG',
-        is_active: true,
-        contract_start_date: '2026-01-01',
-        contract_end_date: '2026-06-30',
-      }],
-      error: null,
-    });
-
-    const lateMovement = {
-      ...validMovement,
-      movement_id: 'mv-late',
-      movement_date: '2026-07-15T00:00:00.000Z',
-      billing_service_type: 'INBOUND_HANDLING',
-    };
-    getBillingMovementWeightRowsMock.mockResolvedValue({
-      data: [lateMovement],
-      error: null,
-      source: 'billing_database_view',
-    });
-
-    mockDraftInsertChain({ draftId: 'draft-late', draftNo: 'BID-20260715-0001' });
-
-    const result = await createBillingInvoiceDraftFromMovements({ movementIds: ['mv-late'] });
-
-    expect(result.error).toBeNull();
-    expect(result.data.lines).toHaveLength(1);
-    expect(result.data.lines[0].rate).toBeNull();
-    expect(result.data.lines[0].amount).toBeNull();
-  });
-
-  it('resolves a rate for a movement dated within the rate contract window', async () => {
-    listAllProductServiceRatesMock.mockResolvedValue({
-      data: [{
-        id: 'rate-handling-active',
-        customer_id: 'cust-1',
-        customer_product_id: null,
-        service_type: 'HANDLING_IN',
-        rate: 5,
-        unit_basis: 'PER_KG',
-        is_active: true,
-        contract_start_date: '2026-01-01',
-        contract_end_date: '2026-12-31',
-      }],
-      error: null,
-    });
-
-    const inWindowMovement = {
-      ...validMovement,
-      movement_id: 'mv-in-window',
-      movement_date: '2026-07-15T00:00:00.000Z',
-      billing_service_type: 'INBOUND_HANDLING',
-    };
-    getBillingMovementWeightRowsMock.mockResolvedValue({
-      data: [inWindowMovement],
-      error: null,
-      source: 'billing_database_view',
-    });
-
-    mockDraftInsertChain({ draftId: 'draft-window', draftNo: 'BID-20260715-0002' });
-
-    const result = await createBillingInvoiceDraftFromMovements({ movementIds: ['mv-in-window'] });
-
-    expect(result.error).toBeNull();
-    expect(result.data.lines).toHaveLength(1);
-    expect(result.data.lines[0].rate).toBe(5);
-    expect(result.data.lines[0].amount).toBe(500);
-  });
-
-  // Bug 3 investigation: STORAGE-classified rows (e.g. the STORAGE_OPENING_BALANCE
-  // "ยอดยกมา" rows BillingMovementWeightReportPage.jsx merges in) have no
-  // period/cycle context on this movement-based path, so resolving a flat rate for
-  // them would silently skip every contract term computeStorageInvoiceLines applies
-  // (minimum charge, free days, discount percent, cycle proration). Both guards below
-  // must block the row rather than let it through with a flat (and likely wrong)
-  // amount — see the matching comment on RATE_SERVICE_TYPES in
-  // billingInvoiceDraftService.js.
-  it('rejects a STORAGE-classified row from the movement-based draft validation', () => {
-    const storageRow = { ...validMovement, billing_service_type: 'STORAGE' };
-    const validation = validateInvoiceDraftSourceRows([storageRow]);
-
-    expect(validation.valid).toBe(false);
-    expect(validation.errors.join(' ')).toMatch(/period-based billing flow/i);
-  });
-
-  it('marks a STORAGE-classified row not selectable on the movement weight report', () => {
-    const storageRow = { ...validMovement, billing_service_type: 'STORAGE' };
-
-    const state = getMovementDraftSelectionState(storageRow);
-    expect(state.selectable).toBe(false);
-    expect(state.reason).toMatch(/period-based billing flow/i);
-  });
 
   it('cancel draft updates status through service layer', async () => {
     const draft = {
@@ -838,19 +589,6 @@ describe('Gate 3B-1 billing invoice draft foundation', () => {
     expect(detailResult.data.draft.id).toBe('draft-1');
     expect(fromMock.mock.calls.every(([table]) => !table.includes('stock'))).toBe(true);
     expect(fromMock.mock.calls.every(([table]) => !table.includes('receiving'))).toBe(true);
-  });
-
-  it('findActiveDuplicateDraftLines uses duplicate guard only', async () => {
-    fromMock.mockImplementation(() => createTableChain('tgd_billing_invoice_draft_lines', {
-      inResult: () => ({
-        data: [{ id: 'line-1', invoice_draft_id: 'draft-9', source_movement_id: 'mv-1', duplicate_guard_active: true }],
-        error: null,
-      }),
-    }));
-
-    const result = await findActiveDuplicateDraftLines(['mv-1']);
-    expect(result.data).toHaveLength(1);
-    expect(result.data[0].source_movement_id).toBe('mv-1');
   });
 
   it('findOverlappingBillingPeriodDrafts detects an active draft covering an overlapping date range', async () => {

@@ -121,7 +121,7 @@ describe('17B App Shell and Navigation UI', () => {
       'Customer Deposit',
       'Customer Requests',
       'Portal Overview',
-      'Billing Movement Weight',
+      'Invoice Drafts',
     ];
 
     it.each(additionalItems)('contains item: %s', (item) => {

@@ -285,16 +285,3 @@ export async function getBillingMovementWeightRows(filters = {}) {
 }
 
 
-
-export async function getBillableMovementWeightRows(filters = {}) {
-
-  return getBillingMovementWeightRows({
-
-    ...filters,
-
-    billableOnly: true,
-
-  });
-
-}
-

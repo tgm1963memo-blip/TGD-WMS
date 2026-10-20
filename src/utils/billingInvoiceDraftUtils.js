@@ -52,11 +52,6 @@ export const DELETABLE_INVOICE_DRAFT_STATUSES = Object.freeze([
   INVOICE_DRAFT_STATUS.CANCELLED,
 ]);
 
-export const BILLABLE_SOURCE_BILLING_STATUSES = Object.freeze([
-  BILLING_STATUS_FOUNDATION.READY_FOR_PREVIEW,
-  'READY',
-]);
-
 const toNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -142,43 +137,6 @@ export function shapeBillingInvoiceDraftLine(row = {}) {
     line_note: row.line_note ?? null,
     duplicate_guard_active: row.duplicate_guard_active !== false,
     created_at: row.created_at ?? null,
-  };
-}
-
-export function buildInvoiceDraftLineFromMovement(movement = {}, invoiceDraftId = null) {
-  const rate = movement.rate == null ? null : toNumber(movement.rate);
-  const chargeableWeight = toNumber(movement.chargeable_weight);
-  const amount = rate == null ? null : rate * chargeableWeight;
-
-  return {
-    invoice_draft_id: invoiceDraftId,
-    source_movement_id: movement.movement_id,
-    source_document_no: movement.source_document_no ?? null,
-    source_document_type: movement.source_document_type ?? null,
-    customer_id: movement.customer_id,
-    product_id: movement.product_id ?? null,
-    product_code: movement.product_code ?? null,
-    product_name: movement.product_name ?? null,
-    lot_no: movement.lot_no ?? null,
-    pallet_no: movement.pallet_no ?? null,
-    movement_type: movement.movement_type ?? movement.canonical_movement_type ?? null,
-    movement_date: movement.movement_date ?? null,
-    qty: toNumber(movement.qty),
-    uom: movement.uom ?? null,
-    net_weight: movement.net_weight == null ? null : toNumber(movement.net_weight),
-    gross_weight: movement.gross_weight == null ? null : toNumber(movement.gross_weight),
-    chargeable_weight: chargeableWeight,
-    billing_status: movement.billing_status ?? null,
-    rate,
-    amount,
-    service_rate_id: movement.service_rate_id ?? null,
-    line_note: movement.line_note ?? null,
-    duplicate_guard_active: true,
-    // See the identical comment in buildInvoiceDraftLineFromHandlingLine --
-    // same NOT NULL / heterogeneous-batch hazard if a movement-based line
-    // is ever inserted in the same batch as a contract-adjusted line.
-    min_charge_applied: false,
-    free_period_applied: false,
   };
 }
 
@@ -481,103 +439,6 @@ export function calculateInvoiceDraftTotals(lines = []) {
   };
 }
 
-export function validateInvoiceDraftSourceRows(rows = []) {
-  const errors = [];
-
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return {
-      valid: false,
-      errors: ['At least one billing movement row is required.'],
-      customerId: null,
-      customerName: null,
-    };
-  }
-
-  const customerIds = [...new Set(rows.map((row) => row.customer_id).filter(Boolean))];
-  if (customerIds.length !== 1) {
-    errors.push('All selected movements must belong to the same customer.');
-  }
-
-  rows.forEach((row) => {
-    const movementId = row.movement_id ?? row.id ?? 'unknown';
-
-    // STORAGE charges (e.g. the STORAGE_OPENING_BALANCE "ยอดยกมา" rows shown on the
-    // Billing Movement Weight Report) must never be billed through this
-    // movement-based flow — it has no period/cycle context, so it can only ever
-    // resolve a flat rate x weight amount, silently skipping the audited period-based
-    // engine's minimum-charge floor, free-day grace period, discount percent, and
-    // "เต็มรอบทันที ไม่เฉลี่ยตามวัน" cycle proration (see the matching comment on
-    // RATE_SERVICE_TYPES in billingInvoiceDraftService.js). Blocked here rather than
-    // left to silently produce a wrong/lower amount.
-    if (String(row.billing_service_type ?? '').toUpperCase() === 'STORAGE') {
-      errors.push(`Movement ${movementId} is a STORAGE charge and cannot be billed from this movement-based draft — use the period-based billing flow ("+ สร้างบิลค่าฝาก/ค่าบริการตามช่วงเวลา" on Invoice Draft List) instead.`);
-    }
-
-    if (!row.is_billable) {
-      errors.push(`Movement ${movementId} is not billable.`);
-    }
-
-    if (row.billing_status === BILLING_STATUS_FOUNDATION.EXCLUDED) {
-      errors.push(`Movement ${movementId} is excluded from billing.`);
-    }
-
-    if (row.billing_status === BILLING_STATUS_FOUNDATION.NEEDS_WEIGHT_REVIEW) {
-      errors.push(`Movement ${movementId} needs weight review before invoice draft creation.`);
-    }
-
-    if (!BILLABLE_SOURCE_BILLING_STATUSES.includes(row.billing_status)) {
-      errors.push(`Movement ${movementId} has unsupported billing status ${row.billing_status ?? 'UNKNOWN'}.`);
-    }
-
-    const chargeableWeight = toNumber(row.chargeable_weight);
-    const grossWeight = toNumber(row.gross_weight);
-    const netWeight = toNumber(row.net_weight);
-    if (chargeableWeight <= 0 && grossWeight <= 0 && netWeight <= 0) {
-      errors.push(`Movement ${movementId} has incomplete weight data.`);
-    }
-  });
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    customerId: customerIds[0] ?? null,
-    customerName: rows.find((row) => row.customer_id === customerIds[0])?.customer_name ?? null,
-  };
-}
-
-export function findDuplicateDraftLines(movementIds = [], activeDraftLines = []) {
-  const requested = new Set((movementIds ?? []).map((id) => String(id)));
-  const duplicates = [];
-
-  (activeDraftLines ?? []).forEach((line) => {
-    if (!line?.duplicate_guard_active) return;
-    const sourceId = String(line.source_movement_id ?? '');
-    if (requested.has(sourceId)) {
-      duplicates.push({
-        source_movement_id: line.source_movement_id,
-        invoice_draft_id: line.invoice_draft_id ?? null,
-        line_id: line.id ?? null,
-      });
-    }
-  });
-
-  return duplicates;
-}
-
-export function applyActiveDuplicateDraftGuards(rows = [], activeDraftLines = []) {
-  const guardedMovementIds = new Set(
-    (activeDraftLines ?? [])
-      .filter((line) => line?.duplicate_guard_active !== false)
-      .map((line) => String(line.source_movement_id ?? ''))
-      .filter(Boolean),
-  );
-
-  return (rows ?? []).map((row) => ({
-    ...row,
-    active_duplicate_guard: guardedMovementIds.has(String(row.movement_id ?? '')),
-  }));
-}
-
 export function canCancelBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
 }
@@ -594,45 +455,6 @@ export function canApproveBillingInvoiceDraft(draft = {}) {
 // READY_TO_REVIEW its line amounts shouldn't be silently rewritten anymore.
 export function canRecalculateBillingInvoiceDraft(draft = {}) {
   return CANCELLABLE_INVOICE_DRAFT_STATUSES.includes(draft.status);
-}
-
-export function getMovementDraftSelectionState(row = {}) {
-  if (row.active_duplicate_guard) {
-    return { selectable: false, reason: 'Already linked to an active invoice draft' };
-  }
-
-  // See the matching comment in validateInvoiceDraftSourceRows above — a STORAGE row
-  // has no period/cycle context on this movement-based path, so it must not be
-  // selectable here at all (not just rejected after the fact) to keep staff from
-  // ever building a STORAGE line with the wrong (flat-rate) amount.
-  if (String(row.billing_service_type ?? '').toUpperCase() === 'STORAGE') {
-    return { selectable: false, reason: 'STORAGE charges must be created via the period-based billing flow' };
-  }
-
-  if (!row.is_billable) {
-    return { selectable: false, reason: 'Not billable' };
-  }
-
-  if (row.billing_status === BILLING_STATUS_FOUNDATION.EXCLUDED) {
-    return { selectable: false, reason: 'Excluded from billing' };
-  }
-
-  if (row.billing_status === BILLING_STATUS_FOUNDATION.NEEDS_WEIGHT_REVIEW) {
-    return { selectable: false, reason: 'Needs weight review' };
-  }
-
-  if (!BILLABLE_SOURCE_BILLING_STATUSES.includes(row.billing_status)) {
-    return { selectable: false, reason: `Unsupported status: ${row.billing_status ?? 'UNKNOWN'}` };
-  }
-
-  const chargeableWeight = toNumber(row.chargeable_weight);
-  const grossWeight = toNumber(row.gross_weight);
-  const netWeight = toNumber(row.net_weight);
-  if (chargeableWeight <= 0 && grossWeight <= 0 && netWeight <= 0) {
-    return { selectable: false, reason: 'Incomplete weight data' };
-  }
-
-  return { selectable: true, reason: null };
 }
 
 export function isBillingInvoiceDraftPermissionError(error) {
@@ -656,43 +478,6 @@ export function formatInvoiceDraftError(error) {
     return error.message;
   }
   return error.message || String(error);
-}
-
-export function buildInvoiceDraftCreatePayload({
-  draftNo,
-  movements = [],
-  billingPeriodStart = null,
-  billingPeriodEnd = null,
-  note = null,
-  internalReference = null,
-  createdBy = null,
-}) {
-  const validation = validateInvoiceDraftSourceRows(movements);
-  if (!validation.valid) {
-    return { valid: false, errors: validation.errors, header: null, lines: null };
-  }
-
-  const lines = movements.map((movement) => buildInvoiceDraftLineFromMovement(movement));
-  const totals = calculateInvoiceDraftTotals(lines);
-
-  return {
-    valid: true,
-    errors: [],
-    header: {
-      draft_no: draftNo,
-      customer_id: validation.customerId,
-      customer_name: validation.customerName,
-      billing_period_start: billingPeriodStart,
-      billing_period_end: billingPeriodEnd,
-      status: INVOICE_DRAFT_STATUS.DRAFT,
-      ...totals,
-      currency: 'THB',
-      note,
-      internal_reference: internalReference,
-      created_by: createdBy,
-    },
-    lines,
-  };
 }
 
 // Label for a draft's product-group scope (tgd_billing_invoice_drafts.product_category).

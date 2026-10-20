@@ -106,12 +106,6 @@ export const navigationGroups = [
     key: 'billing',
     items: [
       {
-        label: 'Billing Movement Weight',
-        key: 'billing_movement_weight',
-        path: '/reports/billing-movement-weight',
-        testId: 'billing-menu-item',
-      },
-      {
         label: 'Invoice Drafts',
         key: 'billing_invoice_drafts',
         path: '/billing/invoice-drafts',

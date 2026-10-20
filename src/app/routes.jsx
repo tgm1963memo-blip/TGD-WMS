@@ -19,7 +19,6 @@ import { WarehouseOperationPerformanceReportPage } from '../features/reports/War
 import { MonthlyStorageBillingSummaryPage } from '../features/reports/MonthlyStorageBillingSummaryPage.jsx';
 import { AccountingChargeStagingPreviewPage } from '../features/reports/AccountingChargeStagingPreviewPage.jsx';
 import { AccountingChargeHandoffReviewPage } from '../features/reports/AccountingChargeHandoffReviewPage.jsx';
-import { BillingMovementWeightReportPage } from '../features/reports/BillingMovementWeightReportPage.jsx';
 import { InvoiceDraftListPage } from '../features/billing/InvoiceDraftListPage.jsx';
 import { InvoiceDraftDetailPage } from '../features/billing/InvoiceDraftDetailPage.jsx';
 import { EmailSettingsPage } from '../features/settings/EmailSettingsPage.jsx';
@@ -86,7 +85,6 @@ export function AppRoutes() {
             <Route path="/reports/monthly-storage-billing-summary" element={<MonthlyStorageBillingSummaryPage />} />
             <Route path="/reports/accounting-charge-staging-preview" element={<AccountingChargeStagingPreviewPage />} />
             <Route path="/reports/accounting-charge-handoff-review" element={<AccountingChargeHandoffReviewPage />} />
-            <Route path="/reports/billing-movement-weight" element={<BillingMovementWeightReportPage />} />
             <Route path="/billing/invoice-drafts" element={<InvoiceDraftListPage />} />
             <Route path="/billing/invoice-drafts/:draftId" element={<InvoiceDraftDetailPage />} />
             <Route path="/admin/auth-readiness" element={<AuthReadinessPage />} />

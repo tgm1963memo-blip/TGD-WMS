@@ -29,7 +29,6 @@ const APP_ROUTES = [
   '/reports/monthly-storage-billing-summary',
   '/reports/accounting-charge-staging-preview',
   '/reports/accounting-charge-handoff-review',
-  '/reports/billing-movement-weight',
   '/billing/invoice-drafts',
   '/billing/invoice-drafts/:draftId',
   '/admin/auth-readiness',
