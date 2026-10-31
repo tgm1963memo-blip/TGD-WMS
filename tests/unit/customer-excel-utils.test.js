@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCustomerDepositDocumentRows,
   buildCustomerDepositDocumentFormRows,
+  buildDepositLineSheet,
   buildDepositLineTemplateRows,
   CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS,
   mapImportedRowsToDepositLines,
   parseCustomerDepositLineImportFile,
+  resolveDepositTemperatureType,
 } from '../../src/utils/customerDepositLineExcelUtils.js';
-import { rowsToSheet } from '../../src/utils/excelFileUtils.js';
 import {
   resolveBarcodeCode,
 } from '../../src/utils/customerProductExcelUtils.js';
@@ -57,14 +58,63 @@ describe('customerDepositLineExcelUtils', () => {
   // produces exactly the format that round-trips correctly.
   it('template sample row writes mfg_date/exp_date as real Excel date cells, not text', () => {
     const rows = buildDepositLineTemplateRows([]);
-    const sheet = rowsToSheet(rows, CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS);
+    const sheet = buildDepositLineSheet(rows);
 
-    // mfg_date/exp_date are columns G/H (1-indexed 7th/8th header), so on
-    // the first data row (sheet row 2) that's cells G2/H2.
-    expect(sheet.G2.t).toBe('n');
-    expect(typeof sheet.G2.v).toBe('number');
+    // mfg_date/exp_date are columns H/I (8th/9th header), so on the first
+    // data row (sheet row 2) that's cells H2/I2.
     expect(sheet.H2.t).toBe('n');
     expect(typeof sheet.H2.v).toBe('number');
+    expect(sheet.I2.t).toBe('n');
+    expect(typeof sheet.I2.v).toBe('number');
+  });
+
+  it('template headers use the same Thai labels as the on-screen deposit lines table', () => {
+    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS[0]).toBe('รหัสสินค้าลูกค้า *');
+    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('การจัดเก็บ *');
+    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('จำนวนกล่อง');
+    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('น้ำหนักฝากทั้งหมด (กก.)');
+  });
+
+  it('pre-fills catalog storage as the dropdown label', () => {
+    const rows = buildDepositLineTemplateRows([
+      { customer_product_code: 'C-1', product_name: 'Chicken', pack_weight_kg: 12, temperature_type: 'CHILLED' },
+    ]);
+    expect(rows[0].temperature_type).toBe('Chilled — แช่เย็น');
+    expect(rows[0].weight_per_box).toBe(12);
+  });
+
+  it('skips untouched pre-listed rows and derives the missing quantity', () => {
+    const catalog = [
+      { id: 'p1', customer_product_code: 'C-1', product_name: 'A', pack_weight_kg: 10, temperature_type: 'FROZEN' },
+      { id: 'p2', customer_product_code: 'C-2', product_name: 'B', pack_weight_kg: 5, temperature_type: 'FROZEN' },
+      { id: 'p3', customer_product_code: 'C-3', product_name: 'C', pack_weight_kg: 2, temperature_type: 'FROZEN' },
+    ];
+    const { lines, errors } = mapImportedRowsToDepositLines([
+      { __row: 2, customer_product_code: 'C-1', weight_per_box: '10', temperature_type: 'Frozen — แช่แข็ง', expected_boxes: '3' },
+      { __row: 3, customer_product_code: 'C-2', weight_per_box: '5', temperature_type: 'แช่เย็น', expected_weight: '50', mfg_date: '01/09/2569' },
+      { __row: 4, customer_product_code: 'C-3', weight_per_box: '2', temperature_type: 'Frozen — แช่แข็ง' },
+    ], catalog, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ expected_boxes: '3', expected_weight: '30', pack_entry_mode: 'BOXES', weight_from_master: true });
+    expect(lines[1]).toMatchObject({ expected_boxes: '10', pack_entry_mode: 'WEIGHT', temperature_type: 'CHILLED', mfg_date: '2026-09-01' });
+  });
+
+  it('reports an unknown storage value and an invalid date in Thai', () => {
+    const catalog = [{ id: 'p1', customer_product_code: 'C-1', pack_weight_kg: 10 }];
+    const { errors } = mapImportedRowsToDepositLines([
+      { __row: 2, customer_product_code: 'C-1', temperature_type: 'ร้อน', expected_boxes: '1' },
+      { __row: 3, customer_product_code: 'C-1', expected_boxes: '1', exp_date: '31/02/2026' },
+    ], catalog, 1);
+    expect(errors[0]).toContain('การจัดเก็บ');
+    expect(errors[1]).toContain('วันที่');
+  });
+
+  it('resolves Freeze&Frozen before the single Freeze/Frozen options', () => {
+    expect(resolveDepositTemperatureType('Freeze&Frozen — ฟรีสและฝากแช่')).toBe('FREEZE_FROZEN');
+    expect(resolveDepositTemperatureType('freeze')).toBe('FREEZE');
+    expect(resolveDepositTemperatureType('', 'CHILLED')).toBe('CHILLED');
   });
 
   it('builds document rows with a header block, line table, and totals row', () => {
@@ -156,7 +206,44 @@ describe('parseCustomerDepositLineImportFile', () => {
     const file = { arrayBuffer: async () => buffer };
     const result = await parseCustomerDepositLineImportFile(file);
 
-    expect(result.errors[0]).toContain('customer_product_code');
+    expect(result.errors[0]).toContain('รหัสสินค้าลูกค้า');
+  });
+
+  it('round-trips a filled-in downloaded template back into deposit lines', async () => {
+    const XLSX = await import('xlsx');
+    const catalog = [
+      { id: 'p1', customer_product_code: 'C-1', product_name: 'A', pack_weight_kg: 10, temperature_type: 'FROZEN' },
+      { id: 'p2', customer_product_code: 'C-2', product_name: 'B', pack_weight_kg: 5, temperature_type: 'CHILLED' },
+    ];
+    const rows = buildDepositLineTemplateRows(catalog);
+    rows[0].expected_boxes = 2;
+    rows[0].exp_date = new Date(Date.UTC(2027, 0, 9));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, buildDepositLineSheet(rows), 'รายการฝาก');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const parsed = await parseCustomerDepositLineImportFile({ arrayBuffer: async () => buffer });
+    const { lines, errors } = mapImportedRowsToDepositLines(parsed.rows, catalog, 1);
+
+    expect(errors).toEqual([]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ catalog_product_id: 'p1', expected_boxes: '2', expected_weight: '20', temperature_type: 'FROZEN', exp_date: '2027-01-09' });
+  });
+
+  it('maps the Thai template headers (with "*") to internal keys', async () => {
+    const XLSX = await import('xlsx');
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['รหัสสินค้าลูกค้า *', 'จำนวนกล่อง', 'การจัดเก็บ *'],
+      ['C-1', 4, 'Frozen — แช่แข็ง'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'รายการฝาก');
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+
+    const result = await parseCustomerDepositLineImportFile({ arrayBuffer: async () => buffer });
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ customer_product_code: 'C-1', expected_boxes: '4', temperature_type: 'Frozen — แช่แข็ง' });
   });
 
   // Regression for a real report: a template uploaded with mfg_date/exp_date
