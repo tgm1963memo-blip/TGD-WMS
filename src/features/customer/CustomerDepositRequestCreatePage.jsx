@@ -7,6 +7,9 @@ import { CustomerProcessTimeline } from '../../components/customer/CustomerProce
 import { CustomerDepositLinesTable } from '../../components/customer/CustomerDepositLinesTable.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
+import { TgmPoImportButton } from '../../components/customer/TgmPoImportButton.jsx';
+import { isTgmCustomerCode } from '../../utils/tgmPoImportUtils.js';
+import { getCustomerCode } from '../../services/masterDataService.js';
 import {
   CUSTOMER_DEPOSIT_STATUSES,
   getDepositStatusLabel,
@@ -94,6 +97,7 @@ export function CustomerDepositRequestCreatePage() {
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [customerCode, setCustomerCode] = useState('');
   // Auxiliary per-request services (container reefer plug-in, overnight flat
   // fee, Slow Freeze prep, etc.) not tied to any single product's weight —
   // see tgd_customer_deposit_request_services / billingRateCalc.js.
@@ -319,6 +323,19 @@ export function CustomerDepositRequestCreatePage() {
       active = false;
     };
   }, [effectiveCustomerId, copyFromId]);
+
+  // Only used to decide whether to offer TGM's own PO upload.
+  useEffect(() => {
+    let active = true;
+    setCustomerCode('');
+    if (!effectiveCustomerId) return undefined;
+    getCustomerCode(effectiveCustomerId).then((result) => {
+      if (active) setCustomerCode(result.data ?? '');
+    });
+    return () => {
+      active = false;
+    };
+  }, [effectiveCustomerId]);
 
   if (copyLoading) {
     return (
@@ -652,6 +669,19 @@ export function CustomerDepositRequestCreatePage() {
           <div className="customer-deposit-lines-header">
             <h3>{t('customer_deposit_lines_title')}</h3>
             <div className="action-row">
+              {isTgmCustomerCode(customerCode) ? (
+                <TgmPoImportButton
+                  catalogProducts={catalogProducts}
+                  disabled={!canWriteCustomerRequests || importing}
+                  onApply={(importedLines, notice) => {
+                    setLines(importedLines);
+                    setNextLineKey(importedLines[importedLines.length - 1].key + 1);
+                    setImportNotice(notice);
+                  }}
+                  onError={setSubmitError}
+                  startKey={nextLineKey}
+                />
+              ) : null}
               <ExcelImportExportToolbar
                 disabled={!canWriteCustomerRequests || importing}
                 exportTestId="customer-deposit-export-button"
