@@ -384,6 +384,9 @@ button, .btn {
 .form-group { margin-bottom: 6px; }
 label, .form-label { font-size: 11px; font-weight: 600; margin-bottom: 2px; display: block; color: var(--tgd-main-text); }
 input[type="checkbox"], input[type="radio"] { width: auto; height: auto; cursor: pointer; margin: 0; display: inline-block; }
+/* The input rule below sets display:block, which would otherwise beat the
+   hidden attribute and show the file inputs inside the import buttons. */
+[hidden] { display: none !important; }
 input:not([type="checkbox"]):not([type="radio"]), select, textarea, .form-control {
   display: block;
   width: 100%;
@@ -1911,6 +1914,55 @@ table .status-badge,
 .csv-import-button {
   cursor: pointer;
   margin: 0;
+}
+
+.toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--tgd-border);
+  margin: 2px 4px;
+}
+
+@media (max-width: 640px) {
+  .toolbar-divider {
+    display: none;
+  }
+}
+
+/* A checkbox with its label and helper text on one row, the whole box clickable. */
+.form-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--tgd-border);
+  border-radius: 6px;
+  background: var(--tgd-surface);
+  cursor: pointer;
+}
+
+.form-checkbox-field:has(input:checked) {
+  border-color: var(--tgd-primary-gold);
+  background: var(--tgm-gold-soft);
+}
+
+.form-checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: var(--tgd-primary-gold);
+}
+
+.form-checkbox-text {
+  display: grid;
+  gap: 2px;
+}
+
+.form-checkbox-title {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .customer-deposit-lines-header {

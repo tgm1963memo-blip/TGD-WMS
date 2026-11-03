@@ -682,6 +682,7 @@ export function CustomerDepositRequestCreatePage() {
                   startKey={nextLineKey}
                 />
               ) : null}
+              {isTgmCustomerCode(customerCode) ? <span aria-hidden="true" className="toolbar-divider" /> : null}
               <ExcelImportExportToolbar
                 disabled={!canWriteCustomerRequests || importing}
                 exportTestId="customer-deposit-export-button"
@@ -691,6 +692,7 @@ export function CustomerDepositRequestCreatePage() {
                 onTemplate={() => downloadCustomerDepositLineTemplate(catalogProducts)}
                 templateTestId="customer-deposit-template-button"
               />
+              <span aria-hidden="true" className="toolbar-divider" />
               <button className="btn btn-secondary" data-testid="customer-deposit-add-line-button" disabled={importing} onClick={addLine} type="button">
                 {t('customer_deposit_add_line')}
               </button>
@@ -772,14 +774,17 @@ export function CustomerDepositRequestCreatePage() {
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
           </label>
-          <label className="form-field form-field-span-2" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <label className="form-field-span-2 form-checkbox-field">
             <input
               type="checkbox"
               data-testid="customer-deposit-r3-document"
               checked={header.requires_r3_document}
               onChange={(e) => updateHeaderField('requires_r3_document', e.target.checked)}
             />
-            <span>{t('customer_field_r3_document')}</span>
+            <span className="form-checkbox-text">
+              <span className="form-checkbox-title">{t('customer_field_r3_document')}</span>
+              <span className="form-helper">{t('customer_field_r3_document_help')}</span>
+            </span>
           </label>
         </div>
 
