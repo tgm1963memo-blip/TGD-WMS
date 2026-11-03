@@ -22,8 +22,12 @@ function formatIsoDate(iso) {
 // user confirms. See tgmPoImportUtils.js.
 export function TgmPoImportButton({ catalogProducts, startKey, disabled = false, onApply, onError }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
+  const [poRows, setPoRows] = useState(null);
+  const [supplierChoices, setSupplierChoices] = useState({});
   const [fileName, setFileName] = useState('');
+  const result = poRows
+    ? mapTgmPoRowsToDepositLines(poRows, catalogProducts, startKey, undefined, supplierChoices)
+    : null;
 
   async function handleFile(event) {
     const file = event.target.files?.[0];
@@ -43,7 +47,8 @@ export function TgmPoImportButton({ catalogProducts, startKey, disabled = false,
         return;
       }
       setFileName(file.name);
-      setResult(mapped);
+      setSupplierChoices({});
+      setPoRows(rows);
     } catch (err) {
       onError(err?.message ?? 'อ่านไฟล์ PO ไม่สำเร็จ');
     } finally {
@@ -52,7 +57,7 @@ export function TgmPoImportButton({ catalogProducts, startKey, disabled = false,
   }
 
   function close() {
-    setResult(null);
+    setPoRows(null);
   }
 
   function apply() {
@@ -69,6 +74,10 @@ export function TgmPoImportButton({ catalogProducts, startKey, disabled = false,
   const preview = result?.preview ?? [];
   const first = preview[0];
   const usableCount = result?.lines.length ?? 0;
+  const supplierPicks = result?.supplierPicksNeeded ?? [];
+  // A shared B-Plus code would otherwise leave the wrong plant's lot (or none)
+  // on every line, so the plant has to be picked before filling.
+  const pickPending = supplierPicks.some((pick) => !pick.chosen);
 
   return (
     <>
@@ -92,10 +101,12 @@ export function TgmPoImportButton({ catalogProducts, startKey, disabled = false,
         closeOnBackdrop={false}
         footer={(
           <div className="action-row" style={{ justifyContent: 'space-between', width: '100%' }}>
-            <span style={{ fontSize: 13 }}>เติมได้ {usableCount} รายการ · ข้าม {preview.length - usableCount}</span>
+            <span style={{ fontSize: 13 }}>
+              {pickPending ? 'เลือกโรงงานของผู้ขายก่อน · ' : ''}เติมได้ {usableCount} รายการ · ข้าม {preview.length - usableCount}
+            </span>
             <div className="action-row">
               <button className="btn btn-secondary" onClick={close} type="button">ยกเลิก</button>
-              <button className="btn btn-primary" data-testid="tgm-po-import-apply" disabled={!usableCount} onClick={apply} type="button">
+              <button className="btn btn-primary" data-testid="tgm-po-import-apply" disabled={!usableCount || pickPending} onClick={apply} type="button">
                 เติมลงใบฝาก
               </button>
             </div>
@@ -113,6 +124,24 @@ export function TgmPoImportButton({ catalogProducts, startKey, disabled = false,
             <div className="banner banner-info" style={{ margin: 0 }}>
               Lot = Lot + ลำดับวันในปีของวันที่ส่ง + Sup + รหัส sup ของผู้ขาย เช่น 02/11/2026 → Lot 306 Sup 39
             </div>
+            {supplierPicks.map((pick) => (
+              <label className="form-field" key={pick.apCode} style={{ maxWidth: 360 }}>
+                <span>
+                  ผู้ขาย {pick.apCode} มีหลายโรงงาน — เลือกโรงงานของ PO นี้ <span className="field-required">*</span>
+                </span>
+                <select
+                  className="form-control"
+                  data-testid="tgm-po-supplier-pick"
+                  onChange={(event) => setSupplierChoices((current) => ({ ...current, [pick.apCode]: event.target.value }))}
+                  value={pick.chosen}
+                >
+                  <option value="">— เลือกโรงงาน —</option>
+                  {pick.options.map((option) => (
+                    <option key={option.code} value={option.code}>{option.label} (Sup {option.code})</option>
+                  ))}
+                </select>
+              </label>
+            ))}
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table" data-testid="tgm-po-import-preview">
                 <thead>

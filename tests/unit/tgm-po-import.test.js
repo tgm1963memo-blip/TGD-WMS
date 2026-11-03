@@ -8,6 +8,7 @@ import {
   mapTgmPoRowsToDepositLines,
   parseBplusAmount,
   parseTgmPoFile,
+  resolveSupCode,
 } from '../../src/utils/tgmPoImportUtils.js';
 
 const CATALOG = [
@@ -105,6 +106,35 @@ describe('mapTgmPoRowsToDepositLines', () => {
   it('accepts an ISO ship date from a real date cell', () => {
     const { lines } = mapTgmPoRowsToDepositLines([poRow({ TRH_SHIP_DATE: '2026-01-05' })], CATALOG, 1, { 'BB-T': '39' });
     expect(lines[0].lot_no).toBe('Lot 005 Sup 39');
+  });
+});
+
+describe('TGM supplier sup codes', () => {
+  it('maps B-Plus supplier codes from TGM\'s table', () => {
+    expect(resolveSupCode('BB-T')).toBe('18');
+    expect(resolveSupCode(' 1-cp-f ')).toBe('24');
+    expect(resolveSupCode('1-TF-P')).toBe('39');
+    expect(resolveSupCode('UNKNOWN')).toBe('');
+  });
+
+  it('needs the plant picked for a B-Plus code shared by two plants', () => {
+    expect(resolveSupCode('1-BT-G')).toBe('');
+    expect(resolveSupCode('1-BT-G', undefined, { '1-BT-G': '49' })).toBe('49');
+    expect(resolveSupCode('1-BT-G', undefined, { '1-BT-G': '99' })).toBe('');
+  });
+
+  it('uses the default table and reports the pending plant pick', () => {
+    const rows = [poRow(), poRow({ __row: 3, AP_CODE: '1-BT-G' })];
+    const before = mapTgmPoRowsToDepositLines(rows, CATALOG, 1);
+    expect(before.lines.map((l) => l.lot_no)).toEqual(['Lot 306 Sup 18', 'Lot 306']);
+    expect(before.preview[1].messages.join(' ')).toMatch(/เลือกโรงงาน/);
+    expect(before.supplierPicksNeeded).toEqual([
+      expect.objectContaining({ apCode: '1-BT-G', chosen: '' }),
+    ]);
+
+    const after = mapTgmPoRowsToDepositLines(rows, CATALOG, 1, undefined, { '1-BT-G': '1' });
+    expect(after.lines[1].lot_no).toBe('Lot 306 Sup 1');
+    expect(after.supplierPicksNeeded[0].chosen).toBe('1');
   });
 });
 
