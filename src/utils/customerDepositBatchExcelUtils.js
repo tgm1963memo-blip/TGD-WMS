@@ -9,6 +9,7 @@ import {
   mapImportedRowsToDepositLines,
   normalizeHeaderText,
   parseDepositExcelDate,
+  resolveDepositTemperatureType,
 } from './customerDepositLineExcelUtils.js';
 
 // One Excel file -> several deposit requests: every row carries its own
@@ -105,7 +106,8 @@ const BATCH_TEMPLATE_INSTRUCTIONS = [
   ['2.', 'ระบบสร้างใบแจ้งฝากให้ "วันละ 1 ใบ" ตามคอลัมน์วันที่จัดส่ง แถวที่วันที่เดียวกันจะอยู่ในใบเดียวกัน'],
   ['3.', `วันที่จัดส่ง กรอกเป็น วว/ดด/ปปปป เช่น 05/11/2026 หรือ 05/11/2569 (พ.ศ.) ได้ ห้ามย้อนหลัง และไม่เกิน ${MAX_ARRIVAL_DATE_DAYS_AHEAD} วันล่วงหน้า`],
   ['4.', 'เวลาถึง (ชช:นน) และทะเบียนรถไม่บังคับ ถ้าวันเดียวกันกรอกไม่ตรงกัน ระบบใช้ค่าจากแถวแรกของวันนั้นและเตือนในหน้าตรวจสอบ'],
-  ['5.', 'ระบบใส่รหัสสินค้า ชื่อสินค้า น้ำหนักต่อหน่วย และการจัดเก็บไว้ให้แล้ว กรอกเพิ่มแค่วันที่จัดส่ง และ "จำนวนกล่อง" หรือ "น้ำหนักฝากทั้งหมด" อย่างใดอย่างหนึ่ง'],
+  ['5.', 'ช่องที่ต้องกรอกมีแค่ วันที่จัดส่ง รหัสสินค้า และ "จำนวนกล่อง" หรือ "น้ำหนักฝากทั้งหมด" อย่างใดอย่างหนึ่ง ชื่อสินค้า น้ำหนักต่อหน่วย และการจัดเก็บเว้นว่างได้ ระบบดึงจากแคตตาล็อกตามรหัสสินค้า'],
+  ['', 'รหัสสินค้าที่ยังไม่มีในแคตตาล็อก หน้าตรวจสอบจะมีปุ่ม "สร้างสินค้า" ให้เพิ่มก่อน แล้วกดโหลดแคตตาล็อกใหม่ ไม่ต้องอัปโหลดไฟล์ซ้ำ'],
   ['6.', 'สินค้าเดียวกันเข้าหลายวัน หรือหลาย LOT ให้คัดลอกแถวแล้วแก้วันที่ / เลข LOT'],
   ['7.', 'แถวที่ไม่ได้กรอกจำนวน ระบบจะข้ามให้อัตโนมัติ ไม่ต้องลบทิ้ง'],
   ['8.', 'ผู้ติดต่อ เบอร์โทร หมายเหตุ และ ร.3 กรอกครั้งเดียวในหน้าตรวจสอบหลังอัปโหลด ใช้กับทุกใบ'],
@@ -168,10 +170,14 @@ export async function parseCustomerDepositBatchFile(file) {
 // group's lines go through mapImportedRowsToDepositLines, the single-request
 // import, so catalog lookup, box/weight maths and per-row checks are the
 // same. Rows that can't be used are reported in `skipped`, never silently
-// dropped (except untouched pre-listed catalog rows).
+// dropped (except untouched pre-listed catalog rows). Codes not in the
+// catalog are collected in `missingProducts` (with what the file says about
+// them) so the page can offer to create each product first.
 export function groupDepositBatchRows(rows, catalogProducts = [], { minDate = '', maxDate = '' } = {}) {
   const byDate = new Map();
   const skipped = [];
+  const catalogCodes = new Set(catalogProducts.map((p) => String(p.customer_product_code ?? '').trim().toUpperCase()));
+  const missingByCode = new Map();
 
   rows.forEach((row) => {
     const untouched = LINE_INPUT_KEYS.every((key) => isBlank(row[key]));
@@ -196,6 +202,21 @@ export function groupDepositBatchRows(rows, catalogProducts = [], { minDate = ''
     }
     if (maxDate && parsed.date > maxDate) {
       skipped.push(`แถว ${row.__row}: วันที่จัดส่งเกิน ${MAX_ARRIVAL_DATE_DAYS_AHEAD} วันล่วงหน้า`);
+      return;
+    }
+    const code = String(row.customer_product_code ?? '').trim();
+    if (code && !catalogCodes.has(code.toUpperCase())) {
+      const key = code.toUpperCase();
+      if (!missingByCode.has(key)) {
+        missingByCode.set(key, {
+          code,
+          rows: [],
+          productName: String(row.product_name ?? '').trim(),
+          weightPerBox: String(row.weight_per_box ?? '').trim(),
+          temperatureType: resolveDepositTemperatureType(row.temperature_type) ?? 'FROZEN',
+        });
+      }
+      missingByCode.get(key).rows.push(row.__row);
       return;
     }
     if (!byDate.has(parsed.date)) byDate.set(parsed.date, []);
@@ -236,5 +257,5 @@ export function groupDepositBatchRows(rows, catalogProducts = [], { minDate = ''
 
   const rowNo = (message) => Number(message.match(/^แถว (\d+)/)?.[1] ?? 0);
   skipped.sort((a, b) => rowNo(a) - rowNo(b));
-  return { slips, skipped };
+  return { slips, skipped, missingProducts: [...missingByCode.values()] };
 }

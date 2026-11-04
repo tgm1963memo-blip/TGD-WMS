@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
@@ -14,6 +15,7 @@ import {
 } from '../../services/customerProductUnitService.js';
 import { ProductUnitsEditor, saveProductUnits, unitsFromCatalogRow } from '../../components/customer/ProductUnitsEditor.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
+import { readNewProductPrefill, withoutNewProductPrefill } from '../../utils/catalogProductPrefill.js';
 
 const TEMPLATE_COLUMNS = [
   'รหัสสินค้า (ของท่าน)*',
@@ -345,6 +347,7 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
 export function CustomerProductCatalogPage() {
   const { customerId, role, loading: profileLoading } = useCustomerPortalProfile();
   const canWrite = role === 'customer_admin';
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [products, setProducts] = useState([]);
   const [searchText, setSearchText] = useState('');
@@ -380,6 +383,14 @@ export function CustomerProductCatalogPage() {
       setLoading(false);
     }
   }, [profileLoading, customerId]);
+
+  // Arrived from a deposit import's "สร้างสินค้า" link: open the add form.
+  useEffect(() => {
+    const prefill = readNewProductPrefill(searchParams);
+    if (!prefill || !canWrite) return;
+    setForm({ ...EMPTY_FORM, ...prefill });
+    setSearchParams(withoutNewProductPrefill(searchParams), { replace: true });
+  }, [canWrite]);
 
   function openCreate() {
     setForm({ ...EMPTY_FORM });

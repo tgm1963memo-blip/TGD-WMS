@@ -8,9 +8,11 @@ import { calcBoxesFromTotalWeight, calcTotalWeightFromBoxes, PACK_ENTRY_MODES } 
 // from whichever of จำนวนกล่อง / น้ำหนักฝากทั้งหมด is filled in.
 export const CUSTOMER_DEPOSIT_LINE_EXCEL_COLUMNS = [
   { key: 'customer_product_code', label: 'รหัสสินค้าลูกค้า *', width: 20, aliases: ['รหัสสินค้าลูกค้า', 'รหัสสินค้า'] },
-  { key: 'product_name', label: 'ชื่อสินค้า (ไม่ต้องแก้)', width: 32, aliases: ['ชื่อสินค้า'] },
-  { key: 'weight_per_box', label: 'น้ำหนักต่อหน่วย (กก.) *', width: 20, aliases: ['น้ำหนักต่อหน่วย', 'น้ำหนักต่อกล่อง'] },
-  { key: 'temperature_type', label: 'การจัดเก็บ *', width: 24, aliases: ['การจัดเก็บ', 'storage'] },
+  // Name, unit weight and storage are filled from the catalog by code, so
+  // they may be left blank (older templates marked them "*" / ไม่ต้องแก้).
+  { key: 'product_name', label: 'ชื่อสินค้า (เว้นว่างได้)', width: 32, aliases: ['ชื่อสินค้า', 'ชื่อสินค้า (ไม่ต้องแก้)'] },
+  { key: 'weight_per_box', label: 'น้ำหนักต่อหน่วย (กก.) (เว้นว่างได้)', width: 20, aliases: ['น้ำหนักต่อหน่วย', 'น้ำหนักต่อหน่วย (กก.)', 'น้ำหนักต่อกล่อง'] },
+  { key: 'temperature_type', label: 'การจัดเก็บ (เว้นว่างได้)', width: 24, aliases: ['การจัดเก็บ', 'storage'] },
   { key: 'expected_boxes', label: 'จำนวนกล่อง', width: 14, aliases: ['กล่อง'] },
   { key: 'expected_weight', label: 'น้ำหนักฝากทั้งหมด (กก.)', width: 22, aliases: ['น้ำหนักฝากทั้งหมด', 'น้ำหนักรวม'] },
   { key: 'lot_no', label: 'เลข LOT', width: 16, aliases: ['lot'] },
@@ -157,7 +159,7 @@ const TEMPLATE_INSTRUCTIONS = [
   ['วิธีกรอกใบแจ้งฝากสินค้า (Excel)'],
   [],
   ['1.', 'กรอกในชีต "รายการฝาก" เท่านั้น ห้ามแก้ชื่อหัวคอลัมน์'],
-  ['2.', 'ระบบใส่รหัสสินค้า ชื่อสินค้า น้ำหนักต่อหน่วย และการจัดเก็บไว้ให้แล้ว — กรอกเพิ่มแค่ "จำนวนกล่อง" หรือ "น้ำหนักฝากทั้งหมด" ในแถวสินค้าที่จะฝาก'],
+  ['2.', 'ระบบใส่รหัสสินค้า ชื่อสินค้า น้ำหนักต่อหน่วย และการจัดเก็บไว้ให้แล้ว (3 ช่องหลังเว้นว่างได้ ระบบดึงจากแคตตาล็อกตามรหัสสินค้า) — กรอกเพิ่มแค่ "จำนวนกล่อง" หรือ "น้ำหนักฝากทั้งหมด" ในแถวสินค้าที่จะฝาก'],
   ['3.', 'กรอกจำนวนกล่อง หรือ น้ำหนักฝากทั้งหมด อย่างใดอย่างหนึ่งก็พอ ระบบคำนวณอีกช่องให้จากน้ำหนักต่อหน่วย'],
   ['4.', 'แถวที่ไม่ได้กรอกจำนวน ระบบจะข้ามให้อัตโนมัติ ไม่ต้องลบทิ้ง'],
   ['5.', 'สินค้าที่มีน้ำหนักต่อหน่วยในแคตตาล็อกแล้ว ระบบจะใช้ค่าจากแคตตาล็อก (เหมือนหน้าจอ)'],
@@ -232,7 +234,11 @@ export function mapImportedRowsToDepositLines(rows, catalogProducts = [], startK
     let expectedBoxes = String(row.expected_boxes ?? '').trim();
     let expectedWeight = String(row.expected_weight ?? '').trim();
 
-    if (!weightPerBox || !(Number(weightPerBox) > 0)) {
+    if (!weightPerBox) {
+      errors.push(`แถว ${row.__row}: สินค้า "${customerProductCode}" ยังไม่มีน้ำหนักต่อหน่วยในแคตตาล็อก กรอกในช่องน้ำหนักต่อหน่วย หรือเพิ่มในแคตตาล็อกสินค้า`);
+      return;
+    }
+    if (!(Number(weightPerBox) > 0)) {
       errors.push(`แถว ${row.__row}: น้ำหนักต่อหน่วยต้องมากกว่า 0`);
       return;
     }

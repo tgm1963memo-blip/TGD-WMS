@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { StatusBadge } from '../../components/ui/StatusBadge.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -23,6 +24,7 @@ import {
 import { hasRoleFunctionAccess, hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { readNewProductPrefill, withoutNewProductPrefill } from '../../utils/catalogProductPrefill.js';
 
 const EMPTY_FORM = {
   productId: '',
@@ -346,9 +348,10 @@ export function CustomerProductCatalogAdminPage() {
   const canView = hasRoleFunctionAccess(userRole, 'customer_product_catalog_admin');
   const canWrite = hasRoleFunctionWriteAccess(userRole, 'customer_product_catalog_admin');
   const t = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [filterCustomerId, setFilterCustomerId] = useState('');
+  const [filterCustomerId, setFilterCustomerId] = useState(() => searchParams.get('customerId') ?? '');
   const [searchText, setSearchText] = useState('');
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -387,6 +390,14 @@ export function CustomerProductCatalogAdminPage() {
     loadProducts();
     return () => { active = false; };
   }, []);
+
+  // Arrived from a deposit import's "สร้างสินค้า" link: open the add form.
+  useEffect(() => {
+    const prefill = readNewProductPrefill(searchParams);
+    if (!prefill || !canWrite) return;
+    setForm({ ...EMPTY_FORM, customerId: filterCustomerId, ...prefill });
+    setSearchParams(withoutNewProductPrefill(searchParams), { replace: true });
+  }, [canWrite]);
 
   function openCreate() {
     setForm({ ...EMPTY_FORM, customerId: filterCustomerId });

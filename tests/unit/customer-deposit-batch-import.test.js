@@ -9,6 +9,7 @@ import {
   parseDepositArrivalTime,
 } from '../../src/utils/customerDepositBatchExcelUtils.js';
 import { toDepositLineUpsertPayload } from '../../src/utils/customerDepositPackCalcUtils.js';
+import { readNewProductPrefill, withoutNewProductPrefill } from '../../src/utils/catalogProductPrefill.js';
 
 const CATALOG = [
   { id: 'p1', customer_product_code: '10003-71', product_name: 'ไส้กรอกค็อกเทล', pack_weight_kg: 15, temperature_type: 'FROZEN' },
@@ -64,16 +65,41 @@ describe('groupDepositBatchRows', () => {
       row({ __row: 3, expected_arrival_date: '31/02/2026' }),
       row({ __row: 4, expected_arrival_date: '2026-10-12' }),
       row({ __row: 5, expected_arrival_date: '2027-12-01' }),
-      row({ __row: 6, customer_product_code: 'XXX' }),
     ], CATALOG, BOUNDS);
 
     expect(slips).toEqual([]);
-    expect(skipped).toHaveLength(5);
+    expect(skipped).toHaveLength(4);
     expect(skipped[0]).toMatch(/แถว 2: ยังไม่ได้กรอกวันที่จัดส่ง/);
     expect(skipped[1]).toMatch(/แถว 3: .*ไม่ถูกต้อง/);
     expect(skipped[2]).toMatch(/แถว 4: .*ย้อนหลัง/);
     expect(skipped[3]).toMatch(/แถว 5: .*180 วัน/);
-    expect(skipped[4]).toMatch(/แถว 6: .*ไม่พบรหัสสินค้า/);
+  });
+
+  it('fills name, unit weight and storage from the catalog when left blank', () => {
+    const { slips } = groupDepositBatchRows([
+      row({ product_name: '', weight_per_box: '', temperature_type: '' }),
+    ], CATALOG, BOUNDS);
+    expect(slips[0].lines[0]).toMatchObject({
+      product_name: 'ไส้กรอกค็อกเทล', weight_per_box: '15', temperature_type: 'FROZEN', expected_weight: '600',
+    });
+  });
+
+  it('collects codes missing from the catalog, once per code, for the create-product links', () => {
+    const { slips, skipped, missingProducts } = groupDepositBatchRows([
+      row({ __row: 2, customer_product_code: 'NEW-1', product_name: 'แฮมใหม่', weight_per_box: '10', temperature_type: 'แช่เย็น' }),
+      row({ __row: 3, customer_product_code: 'new-1', expected_arrival_date: '2026-11-06' }),
+      row({ __row: 4 }),
+    ], CATALOG, BOUNDS);
+    expect(skipped).toEqual([]);
+    expect(slips.map((s) => s.lines.length)).toEqual([1]);
+    expect(missingProducts).toEqual([
+      { code: 'NEW-1', rows: [2, 3], productName: 'แฮมใหม่', weightPerBox: '10', temperatureType: 'CHILLED' },
+    ]);
+  });
+
+  it('asks for the unit weight when the catalog product has none', () => {
+    const { skipped } = groupDepositBatchRows([row({ weight_per_box: '' })], [{ ...CATALOG[0], pack_weight_kg: null }], BOUNDS);
+    expect(skipped).toEqual([expect.stringMatching(/แถว 2: .*ยังไม่มีน้ำหนักต่อหน่วยในแคตตาล็อก/)]);
   });
 
   it('lets admin backdate when no minimum date is given', () => {
@@ -155,6 +181,17 @@ describe('parseCustomerDepositBatchFile', () => {
   it('rejects the single-request template, which has no delivery date column', async () => {
     const { errors } = await parseCustomerDepositBatchFile(workbookFile([['รหัสสินค้าลูกค้า *', 'จำนวนกล่อง'], ['10003-71', 5]]));
     expect(errors[0]).toMatch(/วันที่จัดส่ง/);
+  });
+});
+
+describe('readNewProductPrefill', () => {
+  it('reads the create-product link and drops its params afterwards', () => {
+    const params = new URLSearchParams('customerId=c1&newCode=NEW-1&name=แฮม&weight=10&temp=FREEZE');
+    expect(readNewProductPrefill(params)).toEqual({
+      customerProductCode: 'NEW-1', productName: 'แฮม', packWeightKg: '10', temperatureType: 'FROZEN',
+    });
+    expect(withoutNewProductPrefill(params).toString()).toBe('customerId=c1');
+    expect(readNewProductPrefill(new URLSearchParams('customerId=c1'))).toBeNull();
   });
 });
 

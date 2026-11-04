@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 // Regression: once filtered to one customer, every visible row repeated
 // the exact same (often long) customer name in its own column for no
@@ -34,14 +35,14 @@ const { CustomerProductCatalogAdminPage } = await import('../../src/features/adm
 
 describe('CustomerProductCatalogAdminPage ลูกค้า column', () => {
   it('shows the ลูกค้า column when viewing all customers', async () => {
-    render(<CustomerProductCatalogAdminPage />);
+    render(<MemoryRouter><CustomerProductCatalogAdminPage /></MemoryRouter>);
     const table = await screen.findByTestId('catalog-admin-table');
     expect(within(table).getByText('ลูกค้า')).toBeInTheDocument();
     await waitFor(() => expect(within(table).getByText('บริษัท ทดสอบ จำกัด')).toBeInTheDocument());
   });
 
   it('omits the ลูกค้า column once filtered to a single customer', async () => {
-    render(<CustomerProductCatalogAdminPage />);
+    render(<MemoryRouter><CustomerProductCatalogAdminPage /></MemoryRouter>);
     const table = await screen.findByTestId('catalog-admin-table');
     await waitFor(() => expect(within(table).getByText('บริษัท ทดสอบ จำกัด')).toBeInTheDocument());
 

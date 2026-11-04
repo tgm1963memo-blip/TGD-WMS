@@ -6,6 +6,7 @@ import { CustomerRequestCustomerPicker } from '../../components/customer/Custome
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { createCustomerDepositDraftWithLines } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import {
   downloadCustomerDepositBatchTemplate,
   groupDepositBatchRows,
@@ -40,16 +41,36 @@ function sumLines(lines, key) {
   return lines.reduce((total, line) => total + (Number(line[key]) || 0), 0);
 }
 
+// Opens the catalog's "add product" form pre-filled with what the file says
+// about the code. Staff acting for a customer use the admin catalog.
+function createProductHref(product, { isRequestProxy, customerId }) {
+  const params = new URLSearchParams({ newCode: product.code });
+  if (product.productName) params.set('name', product.productName);
+  if (Number(product.weightPerBox) > 0) params.set('weight', product.weightPerBox);
+  params.set('temp', product.temperatureType);
+  if (isRequestProxy) {
+    params.set('customerId', customerId);
+    return `/admin/customer-products?${params}`;
+  }
+  return `/customer/product-catalog?${params}`;
+}
+
 // One Excel file with a delivery date on every row -> one DRAFT deposit
 // request per date. See customerDepositBatchExcelUtils.js.
 export function CustomerDepositRequestBatchImportPage() {
   const t = useTranslation();
-  const { customerId, canWriteCustomerRequests, isRequestProxy, profile } = useCustomerPortalProfile();
+  const { customerId, canWriteCustomerRequests, isRequestProxy, profile, role } = useCustomerPortalProfile();
+  // Customer users can't edit the catalog; their customer admin can.
+  const canCreateProduct = isRequestProxy
+    ? hasRoleFunctionWriteAccess(role, 'customer_product_catalog_admin')
+    : role === 'customer_admin';
   // Same rule as the single-request form: only admin may key a past date.
   const canBackdate = profile?.role === 'admin';
   const [proxyCustomerId, setProxyCustomerId] = useState('');
   const effectiveCustomerId = isRequestProxy ? proxyCustomerId : customerId;
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [catalogVersion, setCatalogVersion] = useState(0);
   const [fileRows, setFileRows] = useState(null);
   const [fileName, setFileName] = useState('');
   const [reading, setReading] = useState(false);
@@ -61,15 +82,20 @@ export function CustomerDepositRequestBatchImportPage() {
 
   useEffect(() => {
     let active = true;
-    setCatalogProducts([]);
-    if (!effectiveCustomerId) return undefined;
+    setCatalogLoaded(false);
+    if (!effectiveCustomerId) {
+      setCatalogProducts([]);
+      return undefined;
+    }
     listCustomerProducts({ customerId: effectiveCustomerId, activeOnly: true }).then((result) => {
-      if (active) setCatalogProducts(result.data ?? []);
+      if (!active) return;
+      setCatalogProducts(result.data ?? []);
+      setCatalogLoaded(true);
     });
     return () => {
       active = false;
     };
-  }, [effectiveCustomerId]);
+  }, [effectiveCustomerId, catalogVersion]);
 
   useEffect(() => {
     if (!profile) return;
@@ -81,16 +107,18 @@ export function CustomerDepositRequestBatchImportPage() {
   }, [profile]);
 
   // Recomputed from the raw rows so picking another customer (proxy) or the
-  // catalog finishing loading re-checks the same file.
-  const result = useMemo(() => (fileRows
+  // catalog finishing loading re-checks the same file. Until the catalog is
+  // in, every code would look unknown, so wait for it.
+  const result = useMemo(() => (fileRows && catalogLoaded
     ? groupDepositBatchRows(fileRows, catalogProducts, {
       minDate: canBackdate ? '' : new Date().toISOString().split('T')[0],
       maxDate: maxArrivalDateIso(),
     })
-    : null), [fileRows, catalogProducts, canBackdate]);
+    : null), [fileRows, catalogLoaded, catalogProducts, canBackdate]);
 
   const slips = result?.slips ?? [];
   const skipped = result?.skipped ?? [];
+  const missingProducts = result?.missingProducts ?? [];
   const lineCount = slips.reduce((total, slip) => total + slip.lines.length, 0);
   const allLines = slips.flatMap((slip) => slip.lines);
   const missingCustomer = isRequestProxy && !proxyCustomerId;
@@ -244,6 +272,7 @@ export function CustomerDepositRequestBatchImportPage() {
           </div>
         </div>
         {missingCustomer ? <p className="form-helper">เลือกลูกค้าก่อน เพื่อใช้แคตตาล็อกสินค้าของลูกค้ารายนั้น</p> : null}
+        {fileRows && !catalogLoaded && !missingCustomer ? <p className="form-helper">กำลังโหลดแคตตาล็อกสินค้า…</p> : null}
 
         {result ? (
           <>
@@ -253,7 +282,49 @@ export function CustomerDepositRequestBatchImportPage() {
               <span>รายการ <b>{lineCount}</b></span>
               <span>รวม <b>{formatNumber(sumLines(allLines, 'expected_boxes'))} กล่อง · {formatNumber(sumLines(allLines, 'expected_weight'))} กก.</b></span>
               <span>ข้าม <b>{skipped.length} แถว</b></span>
+              {missingProducts.length ? <span>สินค้าใหม่ <b>{missingProducts.length} รหัส</b></span> : null}
             </div>
+
+            {missingProducts.length ? (
+              <article className="deposit-batch-slip" data-testid="customer-deposit-batch-missing-products">
+                <div className="deposit-batch-slip-head">
+                  <b>รหัสสินค้าที่ยังไม่มีในแคตตาล็อก</b>
+                  <span>
+                    {canCreateProduct
+                      ? 'สร้างสินค้าก่อน (เปิดแท็บใหม่) แล้วกด "โหลดแคตตาล็อกใหม่" แถวเหล่านี้จะเข้าใบให้เอง'
+                      : 'แจ้งผู้ดูแลบัญชีของบริษัทให้เพิ่มสินค้าในแคตตาล็อกก่อน แล้วกด "โหลดแคตตาล็อกใหม่"'}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    data-testid="customer-deposit-batch-reload-catalog"
+                    onClick={() => setCatalogVersion((v) => v + 1)}
+                    type="button"
+                  >
+                    โหลดแคตตาล็อกใหม่
+                  </button>
+                </div>
+                {missingProducts.map((product) => (
+                  <div className="deposit-batch-result-item" key={product.code}>
+                    <span>
+                      <b>{product.code}</b>
+                      {product.productName ? ` · ${product.productName}` : ''}
+                      {` · แถว ${product.rows.join(', ')}`}
+                    </span>
+                    {canCreateProduct ? (
+                      <a
+                        className="btn btn-primary btn-sm"
+                        data-testid="customer-deposit-batch-create-product"
+                        href={createProductHref(product, { isRequestProxy, customerId: effectiveCustomerId })}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        สร้างสินค้า
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </article>
+            ) : null}
 
             {!slips.length ? (
               <div className="banner banner-warning" role="status">ไม่พบรายการที่สร้างใบได้ ตรวจวันที่จัดส่งและจำนวนในไฟล์ แล้วอัปโหลดใหม่</div>
