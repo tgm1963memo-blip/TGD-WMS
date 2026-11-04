@@ -14,7 +14,8 @@ import {
   CUSTOMER_DEPOSIT_STATUSES,
   getDepositStatusLabel,
 } from '../../utils/customerDepositStatusLabels.js';
-import { PACK_ENTRY_MODES } from '../../utils/customerDepositPackCalcUtils.js';
+import { toDepositLineUpsertPayload } from '../../utils/customerDepositPackCalcUtils.js';
+import { maxArrivalDateIso } from '../../utils/customerDepositBatchExcelUtils.js';
 import {
   createCustomerDepositRequest,
   getCustomerDepositRequest,
@@ -53,17 +54,6 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-
-// Bounds a manually-typed arrival date to a plausible near-term window — catches
-// a mistyped year (e.g. 2027 instead of 2026) before it saves, since a real
-// arrival is never planned this far out. See DateInputDMY's BUDDHIST_ERA_OFFSET
-// comment for the sibling class of year-typo it already guards against.
-const MAX_ARRIVAL_DATE_DAYS_AHEAD = 180;
-function maxArrivalDateIso() {
-  const d = new Date();
-  d.setDate(d.getDate() + MAX_ARRIVAL_DATE_DAYS_AHEAD);
-  return d.toISOString().split('T')[0];
-}
 
 const INITIAL_HEADER = {
   expected_arrival_date: '',
@@ -508,32 +498,7 @@ export function CustomerDepositRequestCreatePage() {
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
-      // line.pack_entry_mode drives the dropdown UI and can hold a
-      // packaging-unit code (e.g. CASE) as well as BOXES/WEIGHT -- but the
-      // DB column only ever accepts BOXES/WEIGHT, so a unit-code selection
-      // is sent as BOXES (the precisely-known derived value) plus the
-      // actual unit + qty in the separate entry_unit_* columns for audit.
-      const isCustomUnitMode = line.pack_entry_mode !== PACK_ENTRY_MODES.BOXES && line.pack_entry_mode !== PACK_ENTRY_MODES.WEIGHT;
-      const lineResult = await upsertCustomerDepositRequestLine(requestId, {
-        lineId: line.lineId ?? null,
-        lineNo: index + 1,
-        customerProductCode: line.customer_product_code,
-        internalProductCode: line.product_code,
-        productId: null,
-        productName: line.product_name,
-        expectedQty: line.expected_boxes,
-        expectedBoxes: line.expected_boxes,
-        expectedWeight: line.expected_weight,
-        weightPerBox: line.weight_per_box,
-        temperatureType: line.temperature_type,
-        lotNo: line.lot_no || null,
-        mfgDate: line.mfg_date || null,
-        expDate: line.exp_date || null,
-        note: line.line_note,
-        packEntryMode: isCustomUnitMode ? PACK_ENTRY_MODES.BOXES : line.pack_entry_mode,
-        entryUnitCode: isCustomUnitMode ? line.pack_entry_mode : null,
-        entryUnitQty: isCustomUnitMode ? line.entry_unit_qty : null,
-      });
+      const lineResult = await upsertCustomerDepositRequestLine(requestId, toDepositLineUpsertPayload(line, index + 1));
 
       if (lineResult.error) {
         setSubmitting(false);

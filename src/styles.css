@@ -1916,6 +1916,95 @@ table .status-badge,
   margin: 0;
 }
 
+.csv-import-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Multi-date deposit import (CustomerDepositRequestBatchImportPage) */
+.deposit-batch-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  background: var(--tgd-navy-soft);
+}
+
+.deposit-batch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 16px 0 12px;
+  font-size: 13px;
+  color: var(--tgd-muted-text);
+}
+
+.deposit-batch-summary b {
+  color: var(--tgd-main-text);
+}
+
+.deposit-batch-slip {
+  border: 1px solid var(--tgm-border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.deposit-batch-slip-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 10px 14px;
+  background: var(--tgd-navy-soft);
+  border-bottom: 1px solid var(--tgm-border);
+  font-size: 13px;
+  color: var(--tgd-muted-text);
+}
+
+.deposit-batch-slip-head b {
+  font-size: 15px;
+  color: var(--tgd-main-text);
+}
+
+.deposit-batch-note {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-top: 1px solid var(--tgm-border);
+}
+
+.deposit-batch-note--warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.deposit-batch-note--skip {
+  background: var(--tgm-red-soft);
+  color: #991b1b;
+}
+
+.deposit-batch-result {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.deposit-batch-result-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--tgm-border);
+  border-radius: 8px;
+}
+
 .toolbar-divider {
   align-self: stretch;
   width: 1px;

@@ -7,6 +7,7 @@ import {
 } from './customerPortalServiceUtils.js';
 import { chunkArray } from './billingRateEngineService.js';
 import { buildPalletCode } from '../utils/locationCodeUtils.js';
+import { toDepositLineUpsertPayload } from '../utils/customerDepositPackCalcUtils.js';
 
 const DEPOSIT_REQUEST_ID_CHUNK_SIZE = 150;
 
@@ -558,6 +559,23 @@ export async function upsertCustomerDepositRequestLine(requestId, line = {}) {
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Creates one DRAFT deposit request with its lines (the Excel multi-date
+// import). Not atomic: if a line fails, the draft already exists and is
+// returned as `data` alongside the error so the caller can point to it.
+export async function createCustomerDepositDraftWithLines({ header, lines, customerId = null }) {
+  const createResult = await createCustomerDepositRequest({ ...header, customerId });
+  if (createResult.error) return { data: null, error: createResult.error };
+
+  const request = createResult.data;
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineResult = await upsertCustomerDepositRequestLine(request.id, toDepositLineUpsertPayload(lines[index], index + 1));
+    if (lineResult.error) {
+      return { data: request, error: { message: `รายการที่ ${index + 1}: ${lineResult.error.message ?? ''}` } };
+    }
+  }
+  return { data: request, error: null };
 }
 
 // Auxiliary per-request services (container reefer plug-in, overnight flat

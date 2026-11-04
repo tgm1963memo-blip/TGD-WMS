@@ -36,7 +36,7 @@ const TEMPERATURE_ALIASES = {
   FREEZE_FROZEN: ['freeze&frozen', 'freeze_frozen', 'freeze & frozen', 'ฟรีสและฝากแช่'],
 };
 
-function normalizeHeaderText(value) {
+export function normalizeHeaderText(value) {
   return String(value ?? '')
     .replace(/\*/g, '')
     .replace(/\s+/g, ' ')
@@ -48,7 +48,7 @@ function normalizeHeaderText(value) {
 // Thai label (with or without "*"), its short aliases, and the old English
 // key headers of earlier templates, so files people already filled in still
 // import.
-const HEADER_TO_KEY = new Map(
+export const HEADER_TO_KEY = new Map(
   CUSTOMER_DEPOSIT_LINE_EXCEL_COLUMNS.flatMap((col) => [col.key, col.label, ...col.aliases]
     .map((name) => [normalizeHeaderText(name), col.key])),
 );
@@ -192,7 +192,7 @@ export function exportCustomerDepositLinesExcel(lines = [], filename = 'customer
   downloadDepositLineWorkbook(filled.map(mapDepositLineToExcelRow), filename, true);
 }
 
-function isBlank(value) {
+export function isBlank(value) {
   return String(value ?? '').trim() === '';
 }
 

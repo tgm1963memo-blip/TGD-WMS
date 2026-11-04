@@ -45,6 +45,7 @@ const APP_ROUTES = [
   '/customer',
   '/customer/deposit-request',
   '/customer/deposit-request/new',
+  '/customer/deposit-request/import',
   '/customer/deposit-request/:requestId',
   '/customer/stock-balance',
   '/customer/withdrawal-request',
