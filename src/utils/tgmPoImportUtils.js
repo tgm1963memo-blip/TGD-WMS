@@ -213,3 +213,70 @@ export function mapTgmPoRowsToDepositLines(rows, catalogProducts = [], startKey 
   }));
   return { preview, lines, supplierPicksNeeded };
 }
+
+// Deposit batch import from TGM POs: one or more B-Plus PO files -> one draft
+// request per ship date (TRH_SHIP_DATE), in the same { slips, skipped,
+// missingProducts } shape as groupDepositBatchRows. Each file is mapped by
+// mapTgmPoRowsToDepositLines, so lots and box maths match the single upload.
+export function groupTgmPoFilesByShipDate(files, catalogProducts = [], {
+  minDate = '',
+  maxDate = '',
+  maxDaysAhead = 0,
+  supplierChoices = {},
+  supplierLotCodes = TGM_SUPPLIER_LOT_CODES,
+} = {}) {
+  const byDate = new Map();
+  const skipped = [];
+  const missingByCode = new Map();
+  const picks = new Map();
+  const multiFile = files.length > 1;
+
+  files.forEach((file) => {
+    const { preview, lines, supplierPicksNeeded } = mapTgmPoRowsToDepositLines(file.rows, catalogProducts, 1, supplierLotCodes, supplierChoices);
+    supplierPicksNeeded.forEach((pick) => picks.set(pick.apCode, pick));
+    const where = (entry) => (multiFile ? `${file.name} แถว ${entry.row}` : `แถว ${entry.row}`);
+    // lines holds one line per non-skipped preview entry, in order.
+    let lineIndex = 0;
+    preview.forEach((entry) => {
+      if (entry.status === 'skip') {
+        if (entry.sku && !catalogProducts.some((p) => String(p.customer_product_code ?? '').trim().toUpperCase() === entry.sku.toUpperCase())) {
+          const key = entry.sku.toUpperCase();
+          if (!missingByCode.has(key)) {
+            missingByCode.set(key, { code: entry.sku, rows: [], productName: '', weightPerBox: '', temperatureType: 'FROZEN' });
+          }
+          missingByCode.get(key).rows.push(multiFile ? where(entry) : entry.row);
+        } else {
+          skipped.push(`${where(entry)}: ${entry.sku || '-'} — ${entry.messages.join(', ')}`);
+        }
+        return;
+      }
+      const line = lines[lineIndex];
+      lineIndex += 1;
+      if (minDate && entry.shipDate < minDate) {
+        skipped.push(`${where(entry)}: ${entry.sku} — วันที่ส่งย้อนหลัง`);
+        return;
+      }
+      if (maxDate && entry.shipDate > maxDate) {
+        skipped.push(`${where(entry)}: ${entry.sku} — วันที่ส่งเกิน ${maxDaysAhead} วันล่วงหน้า`);
+        return;
+      }
+      if (!byDate.has(entry.shipDate)) byDate.set(entry.shipDate, { lines: [], warnings: [] });
+      const group = byDate.get(entry.shipDate);
+      group.lines.push({ ...line, key: group.lines.length + 1 });
+      if (entry.status === 'warn') group.warnings.push(`${where(entry)}: ${entry.sku} — ${entry.messages.join(', ')}`);
+    });
+  });
+
+  const slips = [...byDate.keys()].sort().map((date) => ({
+    date,
+    arrivalTime: '',
+    vehicleRegistration: '',
+    ...byDate.get(date),
+  }));
+  return {
+    slips,
+    skipped,
+    missingProducts: [...missingByCode.values()],
+    supplierPicksNeeded: [...picks.values()],
+  };
+}

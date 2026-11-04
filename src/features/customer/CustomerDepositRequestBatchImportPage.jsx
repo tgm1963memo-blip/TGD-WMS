@@ -6,13 +6,16 @@ import { CustomerRequestCustomerPicker } from '../../components/customer/Custome
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { createCustomerDepositDraftWithLines } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { getCustomerCode } from '../../services/masterDataService.js';
 import { hasRoleFunctionWriteAccess } from '../../security/roleFunctionPermissions.js';
 import {
   downloadCustomerDepositBatchTemplate,
   groupDepositBatchRows,
+  MAX_ARRIVAL_DATE_DAYS_AHEAD,
   maxArrivalDateIso,
   parseCustomerDepositBatchFile,
 } from '../../utils/customerDepositBatchExcelUtils.js';
+import { groupTgmPoFilesByShipDate, isTgmCustomerCode, parseTgmPoFile } from '../../utils/tgmPoImportUtils.js';
 import { DEPOSIT_TEMPERATURE_LABELS } from '../../utils/customerDepositLineExcelUtils.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
@@ -72,6 +75,10 @@ export function CustomerDepositRequestBatchImportPage() {
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [fileRows, setFileRows] = useState(null);
+  // TGM only: B-Plus PO files ([{ name, rows }]) instead of our template.
+  const [poFiles, setPoFiles] = useState(null);
+  const [supplierChoices, setSupplierChoices] = useState({});
+  const [customerCode, setCustomerCode] = useState('');
   const [fileName, setFileName] = useState('');
   const [reading, setReading] = useState(false);
   const [sharedHeader, setSharedHeader] = useState(INITIAL_SHARED_HEADER);
@@ -97,6 +104,20 @@ export function CustomerDepositRequestBatchImportPage() {
     };
   }, [effectiveCustomerId, catalogVersion]);
 
+  // Only used to decide whether to offer TGM's PO upload.
+  useEffect(() => {
+    let active = true;
+    setCustomerCode('');
+    if (!effectiveCustomerId) return undefined;
+    getCustomerCode(effectiveCustomerId).then((codeResult) => {
+      if (active) setCustomerCode(codeResult.data ?? '');
+    });
+    return () => {
+      active = false;
+    };
+  }, [effectiveCustomerId]);
+  const isTgm = isTgmCustomerCode(customerCode);
+
   useEffect(() => {
     if (!profile) return;
     const name = profile.display_name
@@ -109,16 +130,25 @@ export function CustomerDepositRequestBatchImportPage() {
   // Recomputed from the raw rows so picking another customer (proxy) or the
   // catalog finishing loading re-checks the same file. Until the catalog is
   // in, every code would look unknown, so wait for it.
-  const result = useMemo(() => (fileRows && catalogLoaded
-    ? groupDepositBatchRows(fileRows, catalogProducts, {
+  const result = useMemo(() => {
+    if (!catalogLoaded || (!fileRows && !poFiles)) return null;
+    const bounds = {
       minDate: canBackdate ? '' : new Date().toISOString().split('T')[0],
       maxDate: maxArrivalDateIso(),
-    })
-    : null), [fileRows, catalogLoaded, catalogProducts, canBackdate]);
+    };
+    return poFiles
+      ? groupTgmPoFilesByShipDate(poFiles, catalogProducts, { ...bounds, maxDaysAhead: MAX_ARRIVAL_DATE_DAYS_AHEAD, supplierChoices })
+      : groupDepositBatchRows(fileRows, catalogProducts, bounds);
+  }, [fileRows, poFiles, supplierChoices, catalogLoaded, catalogProducts, canBackdate]);
 
   const slips = result?.slips ?? [];
   const skipped = result?.skipped ?? [];
   const missingProducts = result?.missingProducts ?? [];
+  const supplierPicks = result?.supplierPicksNeeded ?? [];
+  // A B-Plus supplier code shared by several plants would put the wrong sup
+  // code (or none) in every lot, so the plant must be picked first.
+  const pickPending = supplierPicks.some((pick) => !pick.chosen);
+  const hasFile = Boolean(fileRows || poFiles);
   const lineCount = slips.reduce((total, slip) => total + slip.lines.length, 0);
   const allLines = slips.flatMap((slip) => slip.lines);
   const missingCustomer = isRequestProxy && !proxyCustomerId;
@@ -140,12 +170,47 @@ export function CustomerDepositRequestBatchImportPage() {
         return;
       }
       setFileName(file.name);
+      setPoFiles(null);
       setFileRows(rows);
     } catch (err) {
       setError(err?.message ?? t('excel_import_error'));
     } finally {
       setReading(false);
     }
+  }
+
+  async function handlePoFiles(event) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = '';
+    if (!files.length) return;
+    setReading(true);
+    setError('');
+    setCreated([]);
+    setCreateFailure('');
+    try {
+      const parsed = [];
+      for (const file of files) {
+        const { rows, errors } = await parseTgmPoFile(file);
+        if (errors.length) {
+          setError(`${file.name}: ${errors.join(' ')}`);
+          return;
+        }
+        parsed.push({ name: file.name, rows });
+      }
+      setFileName(files.map((file) => file.name).join(', '));
+      setFileRows(null);
+      setSupplierChoices({});
+      setPoFiles(parsed);
+    } catch (err) {
+      setError(err?.message ?? 'อ่านไฟล์ PO ไม่สำเร็จ');
+    } finally {
+      setReading(false);
+    }
+  }
+
+  function clearFile() {
+    setFileRows(null);
+    setPoFiles(null);
   }
 
   function updateShared(field, value) {
@@ -194,7 +259,7 @@ export function CustomerDepositRequestBatchImportPage() {
     }
     setCreated(done);
     setCreating(false);
-    if (done.length) setFileRows(null);
+    if (done.length) clearFile();
   }
 
   return (
@@ -258,6 +323,20 @@ export function CustomerDepositRequestBatchImportPage() {
             >
               ดาวน์โหลดเทมเพลต
             </button>
+            {isTgm ? (
+              <label className={`btn btn-secondary csv-import-button${!canWriteCustomerRequests || reading || creating ? ' is-disabled' : ''}`}>
+                อัปโหลด PO (TGM)
+                <input
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  data-testid="customer-deposit-batch-tgm-po-input"
+                  disabled={!canWriteCustomerRequests || reading || creating}
+                  hidden
+                  multiple
+                  onChange={handlePoFiles}
+                  type="file"
+                />
+              </label>
+            ) : null}
             <label className={`btn btn-primary csv-import-button${!canWriteCustomerRequests || missingCustomer || reading || creating ? ' is-disabled' : ''}`}>
               {reading ? 'กำลังอ่านไฟล์…' : '2) อัปโหลด Excel'}
               <input
@@ -272,7 +351,10 @@ export function CustomerDepositRequestBatchImportPage() {
           </div>
         </div>
         {missingCustomer ? <p className="form-helper">เลือกลูกค้าก่อน เพื่อใช้แคตตาล็อกสินค้าของลูกค้ารายนั้น</p> : null}
-        {fileRows && !catalogLoaded && !missingCustomer ? <p className="form-helper">กำลังโหลดแคตตาล็อกสินค้า…</p> : null}
+        {isTgm ? (
+          <p className="form-helper">TGM: เลือกไฟล์ PO จาก B-Plus ได้หลายไฟล์พร้อมกัน ระบบแยกใบตามวันที่ส่ง (TRH_SHIP_DATE) และตั้ง Lot = Lot วันในปี + Sup ของผู้ขาย</p>
+        ) : null}
+        {hasFile && !catalogLoaded && !missingCustomer ? <p className="form-helper">กำลังโหลดแคตตาล็อกสินค้า…</p> : null}
 
         {result ? (
           <>
@@ -284,6 +366,23 @@ export function CustomerDepositRequestBatchImportPage() {
               <span>ข้าม <b>{skipped.length} แถว</b></span>
               {missingProducts.length ? <span>สินค้าใหม่ <b>{missingProducts.length} รหัส</b></span> : null}
             </div>
+
+            {supplierPicks.map((pick) => (
+              <label className="form-field" key={pick.apCode} style={{ maxWidth: 420 }}>
+                <span>ผู้ขาย {pick.apCode} มีหลายโรงงาน — เลือกโรงงานของ PO นี้ <span className="field-required">*</span></span>
+                <select
+                  className="form-control"
+                  data-testid="customer-deposit-batch-supplier-pick"
+                  onChange={(event) => setSupplierChoices((current) => ({ ...current, [pick.apCode]: event.target.value }))}
+                  value={pick.chosen}
+                >
+                  <option value="">— เลือกโรงงาน —</option>
+                  {pick.options.map((option) => (
+                    <option key={option.code} value={option.code}>{option.label} (Sup {option.code})</option>
+                  ))}
+                </select>
+              </label>
+            ))}
 
             {missingProducts.length ? (
               <article className="deposit-batch-slip" data-testid="customer-deposit-batch-missing-products">
@@ -308,7 +407,8 @@ export function CustomerDepositRequestBatchImportPage() {
                     <span>
                       <b>{product.code}</b>
                       {product.productName ? ` · ${product.productName}` : ''}
-                      {` · แถว ${product.rows.join(', ')}`}
+                      {/* PO uploads of several files label rows "<file> แถว N" already. */}
+                      {typeof product.rows[0] === 'number' ? ` · แถว ${product.rows.join(', ')}` : ` · ${product.rows.join(', ')}`}
                     </span>
                     {canCreateProduct ? (
                       <a
@@ -413,15 +513,15 @@ export function CustomerDepositRequestBatchImportPage() {
             <div className="action-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <span className="form-helper">ใบที่สร้างจะเป็น <b>ร่าง</b> ทั้งหมด เปิดตรวจแล้วกดส่งทีละใบ</span>
               <div className="action-row">
-                <button className="btn btn-secondary" disabled={creating} onClick={() => setFileRows(null)} type="button">ยกเลิก</button>
+                <button className="btn btn-secondary" disabled={creating} onClick={clearFile} type="button">ยกเลิก</button>
                 <button
                   className="btn btn-primary"
                   data-testid="customer-deposit-batch-create-button"
-                  disabled={!slips.length || creating || !canWriteCustomerRequests}
+                  disabled={!slips.length || creating || !canWriteCustomerRequests || pickPending}
                   onClick={handleCreate}
                   type="button"
                 >
-                  {creating ? 'กำลังสร้าง…' : `สร้างร่าง ${slips.length} ใบ`}
+                  {creating ? 'กำลังสร้าง…' : pickPending ? 'เลือกโรงงานของผู้ขายก่อน' : `สร้างร่าง ${slips.length} ใบ`}
                 </button>
               </div>
             </div>
