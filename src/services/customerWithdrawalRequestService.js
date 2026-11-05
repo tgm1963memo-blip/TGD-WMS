@@ -82,6 +82,8 @@ const WITHDRAWAL_LINE_SELECT = [
   'picked_at',
   'picked_by_email',
   'r3_carcass_type_code',
+  'requires_thaw',
+  'thaw_set_by_email',
   'created_at',
 ].join(', ');
 
@@ -599,6 +601,19 @@ export async function setWithdrawalOvertime(requestId, isOvertime, { note = null
     p_note: toNullableText(note),
     p_actor_profile_id: actorProfileId,
     p_overtime_type: overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY',
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// ละลาย per line — billed as THAW (per kg of picked weight). Customers only
+// while the request is a draft; TGC staff at any non-cancelled status.
+export async function setWithdrawalLineThaw(lineId, requiresThaw) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_line_thaw', {
+    p_line_id: lineId,
+    p_requires_thaw: Boolean(requiresThaw),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

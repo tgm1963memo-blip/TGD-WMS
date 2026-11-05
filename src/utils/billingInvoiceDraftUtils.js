@@ -259,18 +259,21 @@ export function buildInvoiceDraftLineFromHandlingLine(handlingLine, depositLine 
 // so the draft/print can point back to the dispatch it billed.
 export function buildInvoiceDraftLineFromHandlingOutLine(handlingOutLine) {
   const rate = handlingOutLine.rate ?? {};
+  // Also builds THAW (ค่าละลาย) lines — computeHandlingOutFeeLines is generic
+  // over serviceType, and the resolved rate carries its real service_type.
+  const documentType = rate.service_type === 'THAW' ? 'THAW' : 'HANDLING_OUT';
   return {
     invoice_draft_id: null,
     source_movement_id: null,
     source_document_no: handlingOutLine.withdrawalNo ?? null,
-    source_document_type: 'HANDLING_OUT',
+    source_document_type: documentType,
     customer_id: handlingOutLine.customerId,
     product_id: null,
     product_code: handlingOutLine.productCode ?? null,
     product_name: handlingOutLine.productName ?? handlingOutLine.productCode ?? null,
     lot_no: handlingOutLine.lotNo ?? null,
     pallet_no: null,
-    movement_type: 'HANDLING_OUT',
+    movement_type: documentType,
     movement_date: handlingOutLine.dispatchDate ?? null,
     qty: 0,
     uom: 'กก.',
@@ -286,7 +289,7 @@ export function buildInvoiceDraftLineFromHandlingOutLine(handlingOutLine) {
     deposit_line_id: handlingOutLine.depositLineId ?? null,
     billing_period_start: null,
     billing_period_end: null,
-    line_note: `ค่านำออก (${handlingOutLine.withdrawalNo ?? '-'} จ่ายออก ${handlingOutLine.dispatchDate ?? '-'}, น้ำหนัก ${handlingOutLine.weight} กก.)`,
+    line_note: `${documentType === 'THAW' ? 'ค่าละลาย' : 'ค่านำออก'} (${handlingOutLine.withdrawalNo ?? '-'} จ่ายออก ${handlingOutLine.dispatchDate ?? '-'}, น้ำหนัก ${handlingOutLine.weight} กก.)`,
     duplicate_guard_active: false,
     // Explicit false for the same batch-insert reason as
     // buildInvoiceDraftLineFromHandlingLine.

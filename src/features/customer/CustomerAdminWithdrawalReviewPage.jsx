@@ -29,6 +29,7 @@ import {
   listWithdrawalR3PermitItems,
   replaceWithdrawalR3PermitItems,
   setWithdrawalR3Document,
+  setWithdrawalLineThaw,
 } from '../../services/customerWithdrawalRequestService.js';
 import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
 import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
@@ -206,6 +207,7 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [r3PermitError, setR3PermitError] = useState('');
   const [r3CatalogMap, setR3CatalogMap] = useState(() => new Map());
   const [savingR3Flag, setSavingR3Flag] = useState(false);
+  const [savingThaw, setSavingThaw] = useState({});
 
   const customerOptions = [...new Map(
     rows
@@ -675,6 +677,20 @@ export function CustomerAdminWithdrawalReviewPage() {
     }
     const targetField = field === 'GOODS' ? 'dispatch_goods_temp' : 'dispatch_truck_temp';
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
+  }
+
+  async function handleToggleLineThaw(lineId, nextValue) {
+    setSavingThaw((prev) => ({ ...prev, [lineId]: true }));
+    const { data, error } = await setWithdrawalLineThaw(lineId, nextValue);
+    setSavingThaw((prev) => ({ ...prev, [lineId]: false }));
+    if (error) {
+      setError(error.message ?? 'บันทึกการละลายไม่สำเร็จ');
+      return;
+    }
+    setLines((prev) => prev.map((l) => (l.id === lineId ? {
+      ...l, requires_thaw: data.requires_thaw, thaw_set_by_email: data.by_email,
+    } : l)));
+    refreshTimeline(selectedId);
   }
 
   async function handleToggleR3Document(nextValue) {
@@ -1540,6 +1556,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th>รหัสติดตาม</th>
                       <th>{t('lot')}</th>
                       <th>อุณหภูมิ</th>
+                      <th title="คิดค่าละลายต่อกิโลกรัมจากน้ำหนักที่หยิบจริง">ละลาย</th>
                       <th>กล่อง (หยิบจริง / แจ้งเบิก)</th>
                       <th>น้ำหนัก กก. (หยิบจริง / แจ้งเบิก)</th>
                       <th>หมายเหตุ (Admin)</th>
@@ -1548,7 +1565,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                   </thead>
                   <tbody>
                     {linesLoading ? (
-                      <tr><td colSpan={10}><LoadingState /></td></tr>
+                      <tr><td colSpan={11}><LoadingState /></td></tr>
                     ) : lines.length ? lines.map((line) => (
                       <tr key={line.id}>
                         <td className="admin-withdrawal-lines-table__row-cell">{line.line_no}</td>
@@ -1679,6 +1696,19 @@ export function CustomerAdminWithdrawalReviewPage() {
                             </button>
                           </div>
                         </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            aria-label={`ละลายรายการที่ ${line.line_no}`}
+                            data-testid={`admin-withdrawal-line-thaw-${line.id}`}
+                            checked={Boolean(line.requires_thaw)}
+                            disabled={!canWrite || savingThaw[line.id] || ['CANCELLED', 'ADMIN_REJECTED'].includes(selected.status)}
+                            onChange={(e) => handleToggleLineThaw(line.id, e.target.checked)}
+                          />
+                          {line.requires_thaw && line.thaw_set_by_email ? (
+                            <div className="form-helper" style={{ fontSize: 10, margin: 0 }}>{line.thaw_set_by_email}</div>
+                          ) : null}
+                        </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ marginBottom: 2 }}>
                             <span
@@ -1768,7 +1798,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={11}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>

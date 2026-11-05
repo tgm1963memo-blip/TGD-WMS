@@ -8,6 +8,9 @@ export const SERVICE_TYPES = [
   { value: 'STORAGE',      label: 'ค่าฝากสินค้า',      labelEn: 'Storage' },
   { value: 'HANDLING_IN',  label: 'ค่านำเข้า',          labelEn: 'Handling In' },
   { value: 'HANDLING_OUT', label: 'ค่านำออก',           labelEn: 'Handling Out' },
+  // THAW: PER_KG on the picked weight of withdrawal lines ticked "ละลาย"
+  // (requires_thaw) — see computeHandlingOutFeeLines.
+  { value: 'THAW',         label: 'ค่าละลาย',           labelEn: 'Thawing' },
   { value: 'LABEL',        label: 'ค่าติดฉลาก',         labelEn: 'Labeling' },
   { value: 'FREEZING',     label: 'ค่าแช่แข็ง',         labelEn: 'Freezing' },
   { value: 'R3_DOCUMENT',  label: 'ค่าบริการดำเนินการเอกสาร ร.3', labelEn: 'ร.3 Document Fee' },

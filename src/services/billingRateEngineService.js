@@ -180,7 +180,7 @@ async function fetchRateEngineInputs({ customerId }) {
         is_overtime, overtime_type, dispatch_started_at,
         tgd_customer_withdrawal_request_lines(
           id, source_customer_deposit_request_line_id, tracking_code, customer_product_code,
-          picked_boxes, picked_weight, picked_at
+          picked_boxes, picked_weight, picked_at, requires_thaw
         )
       `)
       .eq('customer_id', customerId)
@@ -396,6 +396,7 @@ async function fetchRateEngineInputs({ customerId }) {
         weight: Number(line.picked_weight ?? 0),
         pickedBoxes: Number(line.picked_boxes ?? 0),
         dispatchDate: requestDispatchDateById.get(req.id) ?? null,
+        requiresThaw: line.requires_thaw === true,
       });
     }
   }
@@ -691,9 +692,20 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const handlingOutLines = computeHandlingOutFeeLines({
     lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
   });
-  const handlingOutMissingWeightLines = findHandlingOutLinesMissingWeight({
-    lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
+  // THAW (ค่าละลาย): same per-line, per-kg mechanism, over only the lines
+  // ticked "ละลาย". Returned alongside handlingOutLines (each line carries its
+  // own rate.service_type, which the draft-line builder labels by).
+  const scopedThawInputs = scopedHandlingOutInputs.filter((l) => l.requiresThaw);
+  const thawLines = computeHandlingOutFeeLines({
+    lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW',
   });
+  // A line with boxes but no picked weight blocks both fees — list it once.
+  const missingWeightById = new Map();
+  for (const l of [
+    ...findHandlingOutLinesMissingWeight({ lines: scopedHandlingOutInputs, rates, periodStart, periodEnd }),
+    ...findHandlingOutLinesMissingWeight({ lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW' }),
+  ]) missingWeightById.set(l.id, l);
+  const handlingOutMissingWeightLines = [...missingWeightById.values()];
 
   // Scope the aux-service lookup to requests whose receipt/dispatch date
   // actually falls in this billing period *before* querying, not after.
@@ -818,7 +830,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
 
   return {
     data: {
-      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines, overtimeLines,
+      storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines: [...handlingOutLines, ...thawLines], overtimeLines,
       depositLines, unratedDepositLines, handlingOutMissingWeightLines,
     },
     error: null,
