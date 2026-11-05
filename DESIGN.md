@@ -148,5 +148,11 @@ matching menu path wins, so detail routes show their parent menu item.
   to that `:not()` list in styles.css.
 - `.admin-withdrawal-lines-table` is `table-layout: fixed`, so a `min-width` on a
   cell does nothing. Set the width on the header cell.
+- Handheld uses the same ink, gold and frost through the hex palette `C` in
+  `handheldUi.jsx`. `C.green` and `C.amber` are darker than the desktop tones,
+  because small status text must stay readable in dim cold rooms. The menu uses
+  `.hh-mode*` classes. Cards have no colored left rail; the status pill carries
+  the status. An icon-only button needs `padding: 0`, or the phone rule
+  `button { padding: 0 16px }` squeezes its icon.
 - Other pages may still have their own inline styles. Move them page by page and
   check each one on real screens at desktop and phone width.

@@ -105,7 +105,7 @@ export function DocumentTimerCard({ label, startedAt, finishedAt, onStart, onFin
 
       {editingPhase && (
         <div style={{
-          marginTop: 10, background: '#fff', border: '1px dashed #09111c', borderRadius: 10, padding: 10,
+          marginTop: 10, background: '#fff', border: '1px dashed #111417', borderRadius: 10, padding: 10,
         }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
             เวลาที่ถูกต้อง
@@ -143,7 +143,7 @@ function TimeRow({ label, iso, onEdit }) {
       border: '1px solid #e2e8f0', borderRadius: 10, padding: '9px 11px',
     }}>
       <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 46, flexShrink: 0 }}>{label}</span>
-      <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, flex: 1 }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14, flex: 1 }}>
         {formatTimeHHmm(iso) ?? '-'} น.
       </span>
       <button
