@@ -14,14 +14,16 @@ import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
+// Fill tones (redesign 2026-11): frost = has room, gold → amber → red as a
+// row/section fills up. Status words/icons still carry the meaning.
 function pctColor(pct) {
-  if (pct >= 80) return '#e74c3c';
-  if (pct >= 60) return '#e07b00';
-  if (pct >= 40) return '#f0c419';
-  return '#3498db';
+  if (pct >= 80) return 'var(--color-danger)';
+  if (pct >= 60) return 'var(--color-warning)';
+  if (pct >= 40) return '#b8941f';
+  return 'var(--color-frost)';
 }
 
-function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500' }) {
+function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#d4af37' }) {
   const r = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * r;
   const dashOffset = circ - (pct / 100) * circ;
@@ -244,8 +246,8 @@ function VirtualSectionGrid({ section, onLocClick }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px minmax(0, 1fr)', alignItems: 'end', marginTop: 8 }}>
         <div style={{ borderTop: '3px solid #94a3b8' }} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: '100%', height: 8, border: '3px solid #16a34a', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success-strong)' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
+          <div style={{ width: '100%', height: 8, border: '3px solid var(--tgd-sidebar-bg)', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
         </div>
         <div style={{ borderTop: '3px solid #94a3b8' }} />
       </div>
@@ -398,7 +400,7 @@ export function WarehouseLayoutWidget() {
         <button
           type="button"
           onClick={() => navigate('/admin/warehouse-locations')}
-          style={{ padding: '10px 20px', borderRadius: 10, background: '#2d9348', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+          style={{ padding: '10px 20px', borderRadius: 10, background: 'var(--tgd-sidebar-bg)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
         >
           ตั้งค่า Location คลัง
         </button>
@@ -455,9 +457,9 @@ export function WarehouseLayoutWidget() {
               onClick={() => setSelectedId(sec.id)}
               style={{
                 padding: '6px 14px',
-                border: sec.id === selected.id ? '2px solid #2d9348' : '2px solid #e5e7eb',
+                border: sec.id === selected.id ? '1px solid var(--tgd-sidebar-bg)' : '1px solid var(--color-border)',
                 borderRadius: 20,
-                background: sec.id === selected.id ? '#2d9348' : '#fff',
+                background: sec.id === selected.id ? 'var(--tgd-sidebar-bg)' : '#fff',
                 color: sec.id === selected.id ? '#fff' : 'var(--color-text-body)',
                 cursor: 'pointer', fontSize: 13, fontWeight: sec.id === selected.id ? 700 : 400,
                 transition: 'all 0.15s',
@@ -481,7 +483,7 @@ export function WarehouseLayoutWidget() {
                   style={{
                     padding: '4px 12px', border: 'none', borderRadius: 16, cursor: 'pointer', fontSize: 12,
                     background: viewMode === mode ? '#fff' : 'transparent',
-                    color: viewMode === mode ? 'var(--color-success-strong)' : 'var(--color-text-secondary)',
+                    color: viewMode === mode ? 'var(--color-text)' : 'var(--color-text-secondary)',
                     fontWeight: viewMode === mode ? 700 : 500,
                     boxShadow: viewMode === mode ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',
                   }}
@@ -524,11 +526,11 @@ export function WarehouseLayoutWidget() {
             </span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-border-strong)', display: 'inline-block' }} />
                 ว่าง
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)', display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-frost)', display: 'inline-block' }} />
                 มีสินค้า
               </span>
             </div>
@@ -560,8 +562,8 @@ export function WarehouseLayoutWidget() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 10,
-                  background: sec.id === selected.id ? 'var(--color-success-soft)' : '#fff',
-                  border: `1px solid ${sec.id === selected.id ? '#bbf7d0' : 'var(--color-surface-sunken)'}`,
+                  background: sec.id === selected.id ? 'var(--color-gold-soft)' : '#fff',
+                  border: `1px solid ${sec.id === selected.id ? '#e9d9a0' : 'var(--color-surface-sunken)'}`,
                   marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >
@@ -584,8 +586,8 @@ export function WarehouseLayoutWidget() {
 
       {/* Right: stats panel */}
       <div style={{
-        background: 'linear-gradient(135deg, #059669 0%, #064e3b 100%)',
-        borderRadius: '0 16px 16px 0',
+        background: 'var(--tgd-sidebar-bg)',
+        borderRadius: 0,
         padding: '32px 24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         color: '#fff',
@@ -597,7 +599,7 @@ export function WarehouseLayoutWidget() {
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 24, alignSelf: 'flex-start' }}>การใช้งาน</div>
 
         <div style={{ position: 'relative', width: 130, height: 130, marginBottom: 20 }}>
-          <CircularProgress pct={selected.usedPct} size={130} strokeWidth={12} color="#f0a500" />
+          <CircularProgress pct={selected.usedPct} size={130} strokeWidth={12} color="#d4af37" />
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -634,7 +636,7 @@ export function WarehouseLayoutWidget() {
                 {sec.code}
               </div>
               <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${sec.usedPct}%`, background: sec.usedPct >= 80 ? '#ef4444' : '#f0a500', borderRadius: 4 }} />
+                <div style={{ height: '100%', width: `${sec.usedPct}%`, background: sec.usedPct >= 80 ? '#ef4444' : '#d4af37', borderRadius: 4 }} />
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, width: 30, textAlign: 'right', opacity: sec.id === selected.id ? 1 : 0.75 }}>
                 {sec.usedPct}%

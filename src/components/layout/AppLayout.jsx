@@ -1,14 +1,16 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { navigationItems } from '../../app/navigation.js';
+import { navigationGroups } from '../../app/navigation.js';
+import { findNavigationContext } from '../../app/navigationSections.js';
+import { useLanguage, useTranslation } from '../../i18n/languageProvider.jsx';
 import { AppShell } from './AppShell.jsx';
 
-function getCurrentSection(pathname) {
-  return navigationItems.find((item) => item.path === pathname)?.label ?? 'Dashboard';
-}
+const toCamelCase = (str) => str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
 
 export function AppLayout() {
   const location = useLocation();
+  const { language } = useLanguage();
+  const t = useTranslation();
 
   useEffect(() => {
     // Automatically process email queue every 2 minutes as a fallback for missing Vercel cron
@@ -18,8 +20,14 @@ export function AppLayout() {
     return () => clearInterval(interval);
   }, []);
 
+  const context = findNavigationContext(navigationGroups, location.pathname, language);
+  const pageLabel = context
+    ? (t(`nav.${toCamelCase(context.item.key)}`) || context.item.label)
+    : (t('nav.dashboard') || 'Dashboard');
+  const sectionLabel = context?.sectionLabel ?? null;
+
   return (
-    <AppShell currentSection={getCurrentSection(location.pathname)}>
+    <AppShell currentSection={pageLabel} sectionLabel={sectionLabel}>
       <Outlet />
     </AppShell>
   );

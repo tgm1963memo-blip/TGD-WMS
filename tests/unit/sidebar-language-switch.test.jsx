@@ -24,8 +24,8 @@ describe('19B Sidebar Language Switch', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Main Operation')).toBeInTheDocument();
-    expect(screen.getByText('Inbound Management')).toBeInTheDocument();
+    expect(screen.getByText('งานของฉัน')).toBeInTheDocument();
+    expect(screen.getByText('งานคลัง')).toBeInTheDocument();
     expect(screen.getByText('แดชบอร์ด')).toBeInTheDocument();
     expect(screen.getByText('รับเข้า')).toBeInTheDocument();
     expect(screen.getByText('ยอดคงเหลือ')).toBeInTheDocument();
@@ -41,9 +41,9 @@ describe('19B Sidebar Language Switch', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Main Operation')).toBeInTheDocument();
+    expect(screen.getByText('My Work')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Inbound Management')).toBeInTheDocument();
+    expect(screen.getByText('Warehouse')).toBeInTheDocument();
     expect(screen.getByText('Receiving')).toBeInTheDocument();
     expect(screen.getByText('Stock Balance')).toBeInTheDocument();
     expect(screen.getByText('Scan Center')).toBeInTheDocument();
