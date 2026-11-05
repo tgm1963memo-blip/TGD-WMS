@@ -10,6 +10,23 @@ function isInboundType(movementType) {
   return t === 'RECEIVE_CONFIRM' || t === 'STORAGE_OPENING_BALANCE' || t.includes('RECEIVE') || t.includes('INBOUND');
 }
 
+// Rate-engine charge lines (handling, freezing, OT, aux services, ...) are
+// fees, not stock movements: their kg is what the fee was charged on, not
+// goods entering or leaving. Treating them as movements printed e.g. a
+// FREEZING fee as a delivery with a negative balance, and switched off the
+// per-cycle storage rows. Fee rows carry the lot's balance unchanged.
+const INBOUND_FEE_TYPES = new Set(['HANDLING_IN', 'FREEZING', 'SLOW_FREEZE', 'PRE_CHILL']);
+const OUTBOUND_FEE_TYPES = new Set(['HANDLING_OUT', 'THAW']);
+const OTHER_FEE_TYPES = new Set(['OVERTIME', 'SERVICE']);
+
+function feeKind(movementType) {
+  const t = String(movementType ?? '').toUpperCase();
+  if (INBOUND_FEE_TYPES.has(t)) return 'inbound';
+  if (OUTBOUND_FEE_TYPES.has(t)) return 'outbound';
+  if (OTHER_FEE_TYPES.has(t)) return 'other';
+  return null;
+}
+
 // Reshapes invoice draft lines (one row per movement/storage charge, see
 // tgd_billing_invoice_draft_lines) into a THAI MAX-style per-lot ledger:
 // balance forward -> received -> delivery -> balance, walked chronologically
@@ -38,9 +55,15 @@ export function buildInvoiceLotLedger(lines = []) {
     // 400->390->380kg for one deposit + 2 cycles 1000->990kg for another,
     // sharing a lot_no, merged into a nonsensical-looking 5-cycle row).
     // Movement-based lines (no deposit_line_id) still fall back to the old key.
-    const key = line.deposit_line_id
-      ? `dep:${line.deposit_line_id}`
-      : `lot:${line.lot_no ?? ''}::${line.product_code ?? ''}`;
+    // A fee with no lot of its own (OT, aux services) is keyed by its type,
+    // name and document so e.g. a plug-in charge and an OT charge don't
+    // merge under one "lot:::" group printed with the first one's name.
+    const lotless = !line.lot_no && !line.product_code;
+    let key;
+    if (line.deposit_line_id) key = `dep:${line.deposit_line_id}`;
+    else if (lotless && feeKind(line.movement_type)) {
+      key = `fee:${line.movement_type}:${line.product_name ?? ''}:${line.source_document_no ?? ''}`;
+    } else key = `lot:${line.lot_no ?? ''}::${line.product_code ?? ''}`;
     if (!groupsByKey.has(key)) {
       groupsByKey.set(key, []);
       order.push(key);
@@ -59,7 +82,8 @@ export function buildInvoiceLotLedger(lines = []) {
       .sort((a, b) => new Date(a.movement_date ?? 0) - new Date(b.movement_date ?? 0));
 
     const openingLine = eventLines.find((l) => l.movement_type === 'STORAGE_OPENING_BALANCE');
-    const movementLines = eventLines.filter((l) => l !== openingLine);
+    const feeLines = eventLines.filter((l) => feeKind(l.movement_type));
+    const movementLines = eventLines.filter((l) => l !== openingLine && !feeKind(l.movement_type));
 
     // A lot billed entirely through the period-based STORAGE flow (no
     // separate RECEIVE_CONFIRM/DISPATCH movement lines at all -- the normal
@@ -81,7 +105,8 @@ export function buildInvoiceLotLedger(lines = []) {
 
     const receivedDate = openingLine?.movement_date
       ?? movementLines.find((l) => isInboundType(l.movement_type))?.movement_date
-      ?? first.movement_date
+      ?? movementLines[0]?.movement_date
+      ?? feeLines.find((l) => feeKind(l.movement_type) === 'inbound')?.movement_date
       ?? sortedStorageLines[0]?.billing_period_start
       ?? null;
 
@@ -191,7 +216,7 @@ export function buildInvoiceLotLedger(lines = []) {
         row.total = row.coldStorageCharge;
         previousWeight = weight;
       }
-    } else if (rows.length === 0) {
+    } else if (rows.length === 0 && feeLines.length === 0) {
       pushRow({ deliveryDate: null, receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0 });
     }
 
@@ -210,6 +235,24 @@ export function buildInvoiceLotLedger(lines = []) {
         + storageLines.reduce((s, l) => s + toNum(l.chargeable_weight), 0));
       lastRow.total = round2(lastRow.handlingFee + totalStorageCharge);
       lastRow.remark = [lastRow.remark, storageNote].filter(Boolean).join(' / ') || null;
+    }
+
+    // Fee rows go after the movement/cycle rows: zero movement, current
+    // balance, the fee in HANDLING FEE and its kg in chargedWeight (so the
+    // summed chargedWeight still equals the draft's total_chargeable_weight).
+    for (const line of feeLines) {
+      const weight = toNum(line.chargeable_weight);
+      pushRow({
+        deliveryDate: feeKind(line.movement_type) === 'outbound' ? line.movement_date : null,
+        receivedVolume: 0, receivedWeight: 0, deliveryVolume: 0, deliveryWeight: 0,
+        rate: line.rate, charge: line.amount,
+        remark: [line.source_document_no, line.line_note].filter(Boolean).join(' / ') || null,
+      });
+      const row = rows[rows.length - 1];
+      row.feeType = line.movement_type;
+      row.handlingFee = round2(toNum(line.amount));
+      row.chargedWeight = weight;
+      if (!line.lot_no && !line.product_code) row.productName = line.product_name ?? null;
     }
 
     const subtotal = {

@@ -232,4 +232,60 @@ describe('buildInvoiceLotLedger', () => {
     expect(grandTotal.balanceForwardVolume).toBe(30);
     expect(grandTotal.balanceForwardWeight).toBe(300);
   });
+
+  // Real reported gap: rate-engine fee lines (HANDLING_IN, FREEZING,
+  // HANDLING_OUT, OT, aux SERVICE) fell into the delivery branch -- the
+  // freeze fee printed as a delivery of kg that never left, balances went
+  // negative, and the per-cycle storage rows disappeared.
+  describe('rate-engine fee lines', () => {
+    const lot = { lot_no: 'FF-1', product_code: 'PORK', product_name: 'Pork', deposit_line_id: 'dep-1' };
+    const lines = [
+      { ...lot, movement_type: 'HANDLING_IN', movement_date: '2026-10-02', chargeable_weight: 1000, rate: 1, amount: 1000 },
+      { ...lot, movement_type: 'FREEZING', movement_date: '2026-10-02', chargeable_weight: 1000, rate: 0.5, amount: 500 },
+      {
+        ...lot, movement_type: 'STORAGE', rate: 0.5, amount: 500, chargeable_weight: 1000,
+        billing_period_start: '2026-10-02', billing_period_end: '2026-10-16',
+      },
+      {
+        ...lot, movement_type: 'STORAGE', rate: 0.5, amount: 400, chargeable_weight: 800,
+        billing_period_start: '2026-10-17', billing_period_end: '2026-10-31',
+      },
+      { ...lot, movement_type: 'HANDLING_OUT', movement_date: '2026-10-20', chargeable_weight: 200, rate: 1, amount: 200, source_document_no: 'CWR-1' },
+      { movement_type: 'SERVICE', product_name: 'Plug-in', qty: 2, amount: 200 },
+      { movement_type: 'OVERTIME', product_name: 'ค่าล่วงเวลา (OT) CWR-1', movement_date: '2026-10-20', chargeable_weight: 150, amount: 300, source_document_no: 'CWR-1' },
+    ];
+
+    it('keeps per-cycle storage rows and never prints a fee as a delivery or a negative balance', () => {
+      const { lots } = buildInvoiceLotLedger(lines);
+      const fflot = lots.find((l) => l.key === 'dep:dep-1');
+      const storageRows = fflot.rows.filter((r) => r.cycleCount === 1);
+      expect(storageRows).toHaveLength(2);
+      for (const row of lots.flatMap((l) => l.rows)) {
+        expect(row.balanceWeight).toBeGreaterThanOrEqual(0);
+        expect(row.balanceForwardWeight + row.receivedWeight - row.deliveryWeight).toBe(row.balanceWeight);
+      }
+      const feeRows = fflot.rows.filter((r) => r.feeType);
+      expect(feeRows.map((r) => r.feeType)).toEqual(['HANDLING_IN', 'FREEZING', 'HANDLING_OUT']);
+      expect(feeRows.every((r) => r.deliveryWeight === 0 && r.receivedWeight === 0)).toBe(true);
+      expect(feeRows.find((r) => r.feeType === 'FREEZING').handlingFee).toBe(500);
+      expect(feeRows.find((r) => r.feeType === 'HANDLING_OUT').deliveryDate).toBe('2026-10-20');
+      expect(fflot.rows[0].receivedDate).toBe('2026-10-02');
+      expect(fflot.subtotal.deliveryWeight).toBe(200);
+    });
+
+    it('keeps OT and aux services in separate groups with their own names', () => {
+      const { lots } = buildInvoiceLotLedger(lines);
+      const lotless = lots.filter((l) => l.key.startsWith('fee:'));
+      expect(lotless).toHaveLength(2);
+      expect(lotless.map((l) => l.rows[0].productName).sort()).toEqual(['Plug-in', 'ค่าล่วงเวลา (OT) CWR-1']);
+      expect(lotless.every((l) => l.rows[0].receivedDate == null)).toBe(true);
+    });
+
+    it('grand total equals the sum of every line amount', () => {
+      const { grandTotal } = buildInvoiceLotLedger(lines);
+      const expected = lines.reduce((s, l) => s + l.amount, 0);
+      expect(grandTotal.total).toBe(expected);
+      expect(grandTotal.chargedWeight).toBe(1000 + 1000 + 1000 + 800 + 200 + 150);
+    });
+  });
 });
