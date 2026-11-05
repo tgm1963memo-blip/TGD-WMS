@@ -123,6 +123,8 @@ export function mapWithdrawalLinesForCopy(sourceLines = [], catalogProducts = []
     requested_weight: toFormValue(line.requested_weight),
     picking_rule: line.picking_rule ?? 'FEFO',
     note: line.note ?? '',
+    // New lines on save, so the create page sets it via tgd_set_withdrawal_line_thaw.
+    requires_thaw: line.requires_thaw === true,
   }));
 
   if (!copied.length) {

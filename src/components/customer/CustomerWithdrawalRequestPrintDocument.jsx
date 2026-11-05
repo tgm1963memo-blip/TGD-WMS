@@ -368,8 +368,9 @@ function CustomerWithdrawalRequestPrintDocumentPage({
                 ) : null}
               </td>
               <td style={{ ...TD, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                {(line.note || line.admin_note || line._mergeConflicts) ? (
+                {(line.requires_thaw || line.note || line.admin_note || line._mergeConflicts) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {line.requires_thaw ? <span style={{ fontWeight: 700 }}>ละลาย</span> : null}
                     {line.note ? <span>{fmtWrap(line.note)}</span> : null}
                     {line.admin_note ? <span style={{ color: '#555', fontSize: 9 }}>({fmtWrap(line.admin_note)})</span> : null}
                     {line._mergeConflicts ? (

@@ -50,6 +50,7 @@ const SOURCE_DOCUMENT_TYPE_LABELS = {
   STORAGE: 'ค่าฝากสินค้า',
   HANDLING_IN: 'ค่าบริการจัดการแรกเข้า',
   HANDLING_OUT: 'ค่านำออก',
+  THAW: 'ค่าละลาย',
   FREEZING: 'ค่าฟรีส',
   OVERTIME: 'ค่าล่วงเวลา (OT)',
   SERVICE: 'ค่าบริการเสริม',
@@ -1015,7 +1016,7 @@ export function InvoiceDraftListPage() {
 
               {storageBillPreview.handlingOutMissingWeightLines?.length > 0 ? (
                 <div className="banner banner-warning" style={{ marginBottom: 12 }} data-testid="storage-bill-handling-out-missing-weight">
-                  <strong>ค่านำออกที่ยังคิดไม่ได้ ({storageBillPreview.handlingOutMissingWeightLines.length} รายการ)</strong> — ใบเบิกยืนยันจำนวนกล่องแต่ไม่ได้บันทึกน้ำหนักที่จ่ายจริง ให้แก้น้ำหนักในใบเบิกก่อนสร้างบิล
+                  <strong>ค่านำออก/ค่าละลายที่ยังคิดไม่ได้ ({storageBillPreview.handlingOutMissingWeightLines.length} รายการ)</strong> — ใบเบิกยืนยันจำนวนกล่องแต่ไม่ได้บันทึกน้ำหนักที่จ่ายจริง ให้แก้น้ำหนักในใบเบิกก่อนสร้างบิล
                   <div className="responsive-table" style={{ marginTop: 8 }}>
                     <table className="data-table" style={{ fontSize: 12 }}>
                       <thead>

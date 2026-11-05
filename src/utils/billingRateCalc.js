@@ -409,14 +409,18 @@ export function computeHandlingFeeLines({ depositLines = [], rates = [], periodS
 // computeAuxiliaryServiceLines), so multiplying it by kg here would both
 // misprice it and bill it twice. A Freeze & Frozen lot falls back to the
 // FROZEN rate, same as resolveStorageRateForLine.
+//
+// THAW (ค่าละลาย) reuses the same mechanism via serviceType: the caller passes
+// only the lines ticked "ละลาย" (requires_thaw), billed on the same picked
+// weight and dispatch date.
 const NON_WEIGHT_UNIT_BASES = new Set(['FLAT', 'PER_HOUR']);
 
-function resolveHandlingOutRate(weightRates, line, dispatchDate) {
+function resolveHandlingOutRate(weightRates, line, dispatchDate, serviceType = 'HANDLING_OUT') {
   const lookup = {
     customerId: line.customerId,
     customerProductId: line.customerProductId,
     temperatureType: line.temperatureType,
-    serviceType: 'HANDLING_OUT',
+    serviceType,
     asOfDate: dispatchDate,
   };
   return resolveServiceRate(weightRates, lookup)
@@ -434,7 +438,7 @@ function dispatchDateInPeriod(line, periodStart, periodEnd) {
   return dispatchDate && dispatchDate >= periodStart && dispatchDate <= periodEnd ? dispatchDate : null;
 }
 
-export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart, periodEnd }) {
+export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart, periodEnd, serviceType = 'HANDLING_OUT' }) {
   const results = [];
   const weightRates = weightBasedRates(rates);
 
@@ -445,7 +449,7 @@ export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart
     const weight = toNumber(line.weight);
     if (!(weight > 0)) continue;
 
-    const rate = resolveHandlingOutRate(weightRates, line, dispatchDate);
+    const rate = resolveHandlingOutRate(weightRates, line, dispatchDate, serviceType);
     if (!rate) continue;
 
     results.push({
@@ -464,14 +468,14 @@ export function computeHandlingOutFeeLines({ lines = [], rates = [], periodStart
 // but that were confirmed with boxes only (no picked weight), so
 // computeHandlingOutFeeLines can't bill them. Surfaced on the draft preview
 // for staff to fix the pick weight; the weight is never guessed.
-export function findHandlingOutLinesMissingWeight({ lines = [], rates = [], periodStart, periodEnd }) {
+export function findHandlingOutLinesMissingWeight({ lines = [], rates = [], periodStart, periodEnd, serviceType = 'HANDLING_OUT' }) {
   const weightRates = weightBasedRates(rates);
   return lines.filter((line) => {
     const dispatchDate = dispatchDateInPeriod(line, periodStart, periodEnd);
     return dispatchDate
       && !(toNumber(line.weight) > 0)
       && toNumber(line.pickedBoxes) > 0
-      && resolveHandlingOutRate(weightRates, line, dispatchDate) != null;
+      && resolveHandlingOutRate(weightRates, line, dispatchDate, serviceType) != null;
   });
 }
 

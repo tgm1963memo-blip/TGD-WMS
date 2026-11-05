@@ -310,6 +310,7 @@ export function CustomerWithdrawalLinesTable({
             <th style={{ minWidth: 80, whiteSpace: 'nowrap' }}>กล่อง <span className="field-required">*</span></th>
             <th style={{ minWidth: 100, whiteSpace: 'nowrap' }}>น้ำหนัก (กก.) <span className="field-required">*</span></th>
             <th style={{ minWidth: 150 }}>หมายเหตุ</th>
+            <th style={{ width: 60, whiteSpace: 'nowrap', textAlign: 'center' }} title="ต้องการให้ละลายสินค้ารายการนี้ (คิดค่าละลายต่อกิโลกรัม)">ละลาย</th>
             <th style={{ width: 70, whiteSpace: 'nowrap' }}>{t('catalog_col_actions')}</th>
           </tr>
         </thead>
@@ -638,6 +639,17 @@ export function CustomerWithdrawalLinesTable({
                       ดึงหมายเหตุจากใบฝาก
                     </button>
                   ) : null}
+                </td>
+
+                {/* Thaw */}
+                <td style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`ละลายรายการที่ ${index + 1}`}
+                    data-testid={`${rowTestId}-thaw`}
+                    checked={Boolean(line.requires_thaw)}
+                    onChange={(e) => updateLine(line.key, { requires_thaw: e.target.checked })}
+                  />
                 </td>
 
                 {/* Remove */}

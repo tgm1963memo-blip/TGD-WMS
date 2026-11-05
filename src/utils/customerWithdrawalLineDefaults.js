@@ -33,6 +33,8 @@ export function createEmptyWithdrawalLine(lineKey = 1) {
     argent_type: '',
     temperature_type: 'FROZEN',
     note: '',
+    // ละลาย — billed as THAW per kg; saved via tgd_set_withdrawal_line_thaw.
+    requires_thaw: false,
   };
 }
 

@@ -24,6 +24,7 @@ export function CustomerWithdrawalRequestLinesDisplay({
             <th>{t('customer_col_confirmed_boxes')}</th>
             <th>{t('customer_col_confirmed_weight')}</th>
             <th>{t('customer_col_picking_rule')}</th>
+            <th>ละลาย</th>
           </tr>
         </thead>
         <tbody>
@@ -54,10 +55,11 @@ export function CustomerWithdrawalRequestLinesDisplay({
               <td>{hasConfirmedBoxes ? line.picked_boxes : '-'}</td>
               <td>{hasConfirmedWeight ? formatRequestWeight(line.picked_weight) : '-'}</td>
               <td>{line.picking_rule ?? '-'}</td>
+              <td>{line.requires_thaw ? 'ละลาย' : '-'}</td>
             </tr>
             );
           }) : (
-            <tr><td colSpan={9}>{t('customer_request_detail_lines_empty')}</td></tr>
+            <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
           )}
         </tbody>
       </table>

@@ -21,6 +21,7 @@ import {
   deleteCustomerWithdrawalRequestService,
   listWithdrawalR3PermitItems,
   replaceWithdrawalR3PermitItems,
+  setWithdrawalLineThaw,
 } from '../../services/customerWithdrawalRequestService.js';
 import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
 import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
@@ -247,6 +248,8 @@ export function CustomerWithdrawalRequestCreatePage() {
           requested_weight: String(line.requested_weight ?? ''),
           picking_rule: line.picking_rule ?? 'FEFO',
           note: line.note ?? '',
+          requires_thaw: line.requires_thaw === true,
+          saved_requires_thaw: line.requires_thaw === true,
         }));
 
         const padded = [...editLines];
@@ -652,6 +655,19 @@ export function CustomerWithdrawalRequestCreatePage() {
           const rawMessage = lineResult.error.message ?? t('customer_portal_load_error');
           setSubmitError(`รายการที่ ${displayRowNo(line)}: ${rawMessage}`);
           return;
+        }
+
+        // ละลาย lives outside the line upsert RPC (staff can also change it
+        // after submit) — only call when it differs from what's saved.
+        const savedLineId = lineResult.data?.id ?? line.lineId;
+        if (savedLineId && Boolean(line.requires_thaw) !== Boolean(line.saved_requires_thaw)) {
+          const thawResult = await setWithdrawalLineThaw(savedLineId, line.requires_thaw);
+          if (thawResult.error) {
+            setSubmitError(`รายการที่ ${displayRowNo(line)}: บันทึกการละลายไม่สำเร็จ — ${thawResult.error.message ?? ''}`);
+            return;
+          }
+          line.saved_requires_thaw = Boolean(line.requires_thaw);
+          setLines((current) => current.map((l) => (l.key === line.key ? { ...l, saved_requires_thaw: Boolean(line.requires_thaw) } : l)));
         }
 
         if (lineResult.data?.id) {
