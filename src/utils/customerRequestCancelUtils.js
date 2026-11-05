@@ -116,7 +116,9 @@ export function getWithdrawalCancelEligibility(header, role, policy = DEFAULT_CU
   return buildCancelEligibility({
     role,
     status: header?.status,
-    scheduledDate: header?.requested_dispatch_date,
+    // Same as tgd_cancel_customer_withdrawal_request: once TGC has confirmed
+    // a dispatch date, the lead time counts from that date.
+    scheduledDate: header?.confirmed_dispatch_date || header?.requested_dispatch_date,
     leadDays: policy.withdrawal_cancel_lead_days,
     customerStatuses: CUSTOMER_WITHDRAWAL_CANCEL_STATUSES,
     terminalStatuses: TERMINAL_WITHDRAWAL_STATUSES,

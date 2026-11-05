@@ -15,6 +15,7 @@ import {
   listCustomerWithdrawalRequestLines,
   listWithdrawalLineDetailsForDocs,
   reviewCustomerWithdrawalRequest,
+  setWithdrawalConfirmedDispatchDate,
   cancelCustomerWithdrawalRequest,
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
@@ -80,6 +81,8 @@ const BULK_PRINT_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 // worked (already accepted, either awaiting or mid-picking) — matches
 // tgd_admin_add_customer_withdrawal_request_line's own status guard.
 const ADD_LINE_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
+// Matches tgd_set_withdrawal_confirmed_dispatch_date's status guard.
+const CONFIRM_DATE_ELIGIBLE_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
@@ -136,6 +139,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const isMountedRef = useRef(true);
   useEffect(() => () => { isMountedRef.current = false; }, []);
   const [comment, setComment] = useState('');
+  // Unsaved edits of the TGC-confirmed dispatch date, per request id.
+  const [confirmedDateDrafts, setConfirmedDateDrafts] = useState({});
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -556,6 +561,12 @@ export function CustomerAdminWithdrawalReviewPage() {
 
   const canOpenWorkOrder = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
   const canSendToHandheld = canWrite && selected && selected.status === 'ADMIN_ACCEPTED';
+  const canEditConfirmedDate = canWrite && selected && CONFIRM_DATE_ELIGIBLE_STATUSES.includes(selected.status);
+  const savedConfirmedDate = selected
+    ? String(selected.confirmed_dispatch_date ?? selected.requested_dispatch_date ?? '').slice(0, 10)
+    : '';
+  const confirmedDateValue = (selected && confirmedDateDrafts[selected.id]) ?? savedConfirmedDate;
+  const isAccepted = selected && ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'].includes(selected.status);
   // A line with BOTH picked_boxes and picked_weight still null was never
   // actually picked/weighed — boxes-only or weight-only is a legitimate
   // real pick (see the handheld page's own lock-weight-to-boxes toggle),
@@ -615,6 +626,34 @@ export function CustomerAdminWithdrawalReviewPage() {
     } : r)));
   }
 
+  // Saves the TGC-confirmed dispatch date. Returns false (and shows the
+  // error) on failure. Before ACCEPT this is silent -- the accepted email
+  // carries the date; afterwards the RPC emails the customer the change.
+  async function saveConfirmedDispatchDate() {
+    if (!selected || !confirmedDateValue || confirmedDateValue === savedConfirmedDate) return true;
+    const { data, error } = await setWithdrawalConfirmedDispatchDate(selected.id, confirmedDateValue);
+    if (error) {
+      setError(error.message ?? 'บันทึกวันส่งที่ยืนยันไม่สำเร็จ');
+      return false;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selected.id ? { ...r, confirmed_dispatch_date: data?.confirmed_dispatch_date ?? confirmedDateValue } : r)));
+    setConfirmedDateDrafts((prev) => {
+      const next = { ...prev };
+      delete next[selected.id];
+      return next;
+    });
+    return true;
+  }
+
+  async function handleSaveConfirmedDate() {
+    setSubmitting(true);
+    setError('');
+    setActionMsg('');
+    const ok = await saveConfirmedDispatchDate();
+    setSubmitting(false);
+    if (ok) setActionMsg('บันทึกวันส่งที่ยืนยันแล้ว — แจ้งลูกค้าทางอีเมล');
+  }
+
   async function handleOpenWorkOrder() {
     if (!selectedId || !selected) return;
     setSubmitting(true);
@@ -634,6 +673,13 @@ export function CustomerAdminWithdrawalReviewPage() {
           return;
         }
       }
+    }
+
+    // The confirmed date must be stored before ACCEPT so the accepted email
+    // carries it (ACCEPT itself defaults it to the requested date).
+    if (!(await saveConfirmedDispatchDate())) {
+      setSubmitting(false);
+      return;
     }
 
     // Step 2: ACCEPT
@@ -1116,6 +1162,35 @@ export function CustomerAdminWithdrawalReviewPage() {
               <div>
                 <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
                 <div>{formatDocumentDate(selected.requested_dispatch_date, { dateOnly: true })}</div>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="confirmed-dispatch-date">{t('customer_field_confirmed_dispatch_date')}</label>
+                {canEditConfirmedDate ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      id="confirmed-dispatch-date"
+                      type="date"
+                      className="form-input"
+                      value={confirmedDateValue}
+                      min={userRole === 'admin' ? undefined : bangkokTodayIso()}
+                      onChange={(e) => setConfirmedDateDrafts((prev) => ({ ...prev, [selected.id]: e.target.value }))}
+                      style={{ maxWidth: 170 }}
+                    />
+                    {isAccepted && confirmedDateValue !== savedConfirmedDate ? (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={handleSaveConfirmedDate} disabled={submitting || !confirmedDateValue}>
+                        <IconLabel icon={Save}>บันทึกวันส่ง</IconLabel>
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div>{selected.confirmed_dispatch_date ? formatDocumentDate(selected.confirmed_dispatch_date, { dateOnly: true }) : '-'}</div>
+                )}
+                {!isAccepted && canEditConfirmedDate ? (
+                  <div className="form-helper">ยืนยันพร้อมกับการเปิดใบงาน</div>
+                ) : null}
+                {selected.confirmed_dispatch_by_email ? (
+                  <div className="form-helper">โดย {selected.confirmed_dispatch_by_email}</div>
+                ) : null}
               </div>
               <div>
                 <div className="form-label">{t('customer_field_delivery_type')}</div>

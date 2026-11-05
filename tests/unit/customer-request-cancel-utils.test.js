@@ -52,6 +52,13 @@ describe('customerRequestCancelUtils', () => {
     expect(result.canCancel).toBe(false);
   });
 
+  it('counts withdrawal lead time from the TGC-confirmed date once one is set', () => {
+    const policy = { deposit_cancel_lead_days: 3, withdrawal_cancel_lead_days: 3 };
+    const header = { status: 'ADMIN_ACCEPTED', requested_dispatch_date: '2099-12-31' };
+    expect(getWithdrawalCancelEligibility(header, 'customer_admin', policy).canCancel).toBe(true);
+    expect(getWithdrawalCancelEligibility({ ...header, confirmed_dispatch_date: '2000-01-01' }, 'customer_admin', policy).canCancel).toBe(false);
+  });
+
   describe('getDepositRecallEligibility', () => {
     it('allows recall while awaiting admin review', () => {
       expect(getDepositRecallEligibility({ status: 'SUBMITTED_BY_CUSTOMER' }, 'customer_user').canRecall).toBe(true);

@@ -1559,7 +1559,7 @@ function PickingWorkflow({ onBack, t }) {
             ).values()];
             const filteredDocs = docs.filter((d) => {
               if (filterCustomer && d.customer_id !== filterCustomer) return false;
-              const date = d.requested_dispatch_date ?? '';
+              const date = d.confirmed_dispatch_date ?? d.requested_dispatch_date ?? '';
               if (filterDateFrom && date < filterDateFrom) return false;
               if (filterDateTo && date > filterDateTo) return false;
               return true;
@@ -1612,7 +1612,7 @@ function PickingWorkflow({ onBack, t }) {
                           docNo={doc.withdrawal_no}
                           statusLabel={getWithdrawalStatusLabel(doc.status, t)}
                           statusColor={C.pickAccent}
-                          dateStr={doc.requested_dispatch_date ?? '-'}
+                          dateStr={doc.confirmed_dispatch_date ?? doc.requested_dispatch_date ?? '-'}
                           subText={doc.delivery_type}
                           customerName={doc.customer?.customer_name || doc.customer?.name || null}
                           lotText={uniqueLots.length ? uniqueLots.join(', ') : null}

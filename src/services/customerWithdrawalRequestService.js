@@ -17,6 +17,9 @@ const WITHDRAWAL_HEADER_SELECT = [
   'customer:tgd_customers(customer_code, customer_name, name, address, phone)',
   'status',
   'requested_dispatch_date',
+  'confirmed_dispatch_date',
+  'confirmed_dispatch_by_email',
+  'confirmed_dispatch_at',
   'delivery_type',
   'pickup_contact',
   'destination',
@@ -462,6 +465,21 @@ export async function reviewCustomerWithdrawalRequest(requestId, decision, comme
     p_decision: decision,
     p_comment: toNullableText(comment),
     p_effective_date: effectiveDate || null,
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// TGC's committed dispatch date, kept beside the customer's
+// requested_dispatch_date. Set before ACCEPT (it then goes out in the
+// accepted email) or changed afterwards (which emails the customer again).
+export async function setWithdrawalConfirmedDispatchDate(requestId, date, comment = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_confirmed_dispatch_date', {
+    p_request_id: requestId,
+    p_date: date,
+    p_comment: toNullableText(comment),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

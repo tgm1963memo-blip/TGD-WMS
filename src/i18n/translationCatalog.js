@@ -846,6 +846,7 @@ Object.assign(TRANSLATION_CATALOG, {
   customer_request_history_table_title: { th: 'รายการคำขอ', en: 'Request List' },
   customer_field_expected_arrival_date: { th: 'วันที่ฝากสินค้า', en: 'Deposit Date' },
   customer_field_requested_dispatch_date: { th: 'วันที่ต้องการเบิก/จ่าย', en: 'Requested Dispatch Date' },
+  customer_field_confirmed_dispatch_date: { th: 'วันส่งที่ TGC ยืนยัน', en: 'Confirmed Dispatch Date' },
   customer_field_product_code: { th: 'รหัสสินค้า', en: 'Product Code' },
   customer_field_product_name: { th: 'ชื่อสินค้า', en: 'Product Name' },
   customer_field_lot_no: { th: 'เลขล็อต', en: 'Lot No' },

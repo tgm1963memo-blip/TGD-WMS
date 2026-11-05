@@ -442,7 +442,12 @@ export function CustomerWithdrawalRequestListPage() {
                       {getWithdrawalStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
+                  <td>
+                    {formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}
+                    {row.confirmed_dispatch_date ? (
+                      <div className="form-helper">{t('customer_field_confirmed_dispatch_date')}: {formatDocumentDate(row.confirmed_dispatch_date, { dateOnly: true })}</div>
+                    ) : null}
+                  </td>
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>{row.pickup_contact ?? '-'}</td>
                   <td style={{ maxWidth: 140 }}>
@@ -499,6 +504,9 @@ export function CustomerWithdrawalRequestListPage() {
               <div className="list-card-fields">
                 {isRequestProxy ? <div>{t('customer_col_customer_name')}: {customerNames[row.customer_id] ?? row.customer_id ?? '-'}</div> : null}
                 <div>{t('customer_field_requested_dispatch_date')}: {formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</div>
+                {row.confirmed_dispatch_date ? (
+                  <div>{t('customer_field_confirmed_dispatch_date')}: {formatDocumentDate(row.confirmed_dispatch_date, { dateOnly: true })}</div>
+                ) : null}
                 <div>{t('customer_field_delivery_type')}: {row.delivery_type ?? '-'}</div>
                 <div>{t('customer_field_pickup_contact')}: {row.pickup_contact ?? '-'}</div>
                 {row.note ? <div>{t('customer_col_note')}: {row.note}</div> : null}
@@ -564,6 +572,10 @@ export function CustomerWithdrawalRequestListPage() {
             <div>
               <div className="form-label">{t('customer_field_requested_dispatch_date')}</div>
               <div>{formatDocumentDate(detailRow.requested_dispatch_date, { dateOnly: true })}</div>
+            </div>
+            <div>
+              <div className="form-label">{t('customer_field_confirmed_dispatch_date')}</div>
+              <div>{detailRow.confirmed_dispatch_date ? formatDocumentDate(detailRow.confirmed_dispatch_date, { dateOnly: true }) : 'รอ TGC ยืนยัน'}</div>
             </div>
             <div>
               <div className="form-label">{t('customer_field_delivery_type')}</div>
