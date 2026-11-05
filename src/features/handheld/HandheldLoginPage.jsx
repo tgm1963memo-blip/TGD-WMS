@@ -82,7 +82,7 @@ export function HandheldLoginPage() {
 
   const containerStyle = {
     background: '#f8fafb',
-    minHeight: '100dvh',
+    minHeight: 'var(--handheld-screen-height)',
     display: 'flex',
     flexDirection: 'column',
     padding: '40px 24px',

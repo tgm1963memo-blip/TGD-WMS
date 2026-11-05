@@ -279,9 +279,14 @@ export function CustomerDepositRequestListPage() {
         title={t('customer_deposit_title')}
         description={isRequestProxy ? t('customer_deposit_list_proxy_description') : t('customer_deposit_list_description')}
         actions={canWriteCustomerRequests ? (
-          <Link className="btn btn-primary" data-testid="customer-deposit-create-button" to="/customer/deposit-request/new">
-            {t('customer_deposit_create_button')}
-          </Link>
+          <div className="action-row">
+            <Link className="btn btn-secondary" data-testid="customer-deposit-batch-import-button" to="/customer/deposit-request/import">
+              {t('customer_deposit_batch_import_button')}
+            </Link>
+            <Link className="btn btn-primary" data-testid="customer-deposit-create-button" to="/customer/deposit-request/new">
+              {t('customer_deposit_create_button')}
+            </Link>
+          </div>
         ) : null}
       />
       <CustomerPortalLiveBanner />

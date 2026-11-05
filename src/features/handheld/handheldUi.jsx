@@ -189,16 +189,16 @@ export function TopBar({ title, subtitle, onBack, badge }) {
     <div style={{
       background: C.headerBg,
       borderBottom: 'none',
-      padding: '16px 24px',
+      padding: 'calc(16px + env(safe-area-inset-top)) 24px 16px',
       display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0,
       boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
     }}>
       {onBack && (
-        <button type="button" onClick={onBack}
+        <button type="button" onClick={onBack} aria-label="ย้อนกลับ"
           style={{
             background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
             color: '#ffffff', fontSize: 20, cursor: 'pointer',
-            width: 40, height: 40, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
           aria-label="ย้อนกลับ">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getStagingSession, subscribeToStagingAuth } from '../../services/stagingAuthService.js';
+import { getStoredAuthSession, subscribeToStagingAuth } from '../../services/stagingAuthService.js';
 
 const AuthContext = createContext({
   session: null,
@@ -18,15 +18,38 @@ export function AuthProvider({ children }) {
     // Only use subscribeToStagingAuth to avoid deadlocking GoTrueClient.
     // supabase-js will immediately fire an INITIAL_SESSION event.
 
+    // With an expired token and no signal that event waits out the refresh
+    // retries, which can take many seconds, so don't hold the app for it.
+    if (navigator.onLine === false) {
+      const stored = getStoredAuthSession();
+      if (stored) {
+        setSession(stored);
+        setLoading(false);
+      }
+    }
+
+    // Wi-Fi with no internet looks online, so the check above does not catch
+    // it. If the event has not come after a few seconds, go on with the
+    // stored session; the event still corrects it whenever it arrives.
+    const slowStartTimer = setTimeout(() => {
+      if (!isMounted) return;
+      const stored = getStoredAuthSession();
+      if (!stored) return;
+      setSession((current) => current ?? stored);
+      setLoading(false);
+    }, 5000);
+
     const subscription = subscribeToStagingAuth((nextSession) => {
       if (!isMounted) return;
-      setSession(nextSession);
+      clearTimeout(slowStartTimer);
+      setSession(nextSession ?? getStoredAuthSession());
       setError(null);
       setLoading(false);
     });
 
     return () => {
       isMounted = false;
+      clearTimeout(slowStartTimer);
       subscription.unsubscribe();
     };
   }, []);

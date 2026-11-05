@@ -22,7 +22,15 @@ export async function getCustomers(filters = {}) {
   return query;
 }
 
-
+export async function getCustomerCode(customerId) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase
+    .from('tgd_customers')
+    .select('customer_code')
+    .eq('id', customerId)
+    .maybeSingle();
+  return { data: data?.customer_code ?? null, error };
+}
 
 export async function upsertCustomer(form = {}) {
   if (!supabase) return missingSupabaseClientResult();

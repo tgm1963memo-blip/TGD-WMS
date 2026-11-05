@@ -33,6 +33,7 @@ import { ProfileSettingsPage } from '../features/settings/ProfileSettingsPage.js
 import { CustomerPortalDashboardPage } from '../features/customer/CustomerPortalDashboardPage.jsx';
 import { CustomerDepositRequestPage } from '../features/customer/CustomerDepositRequestPage.jsx';
 import { CustomerDepositRequestCreatePage } from '../features/customer/CustomerDepositRequestCreatePage.jsx';
+import { CustomerDepositRequestBatchImportPage } from '../features/customer/CustomerDepositRequestBatchImportPage.jsx';
 import { CustomerDepositRequestDetailPage } from '../features/customer/CustomerDepositRequestDetailPage.jsx';
 import { CustomerStockBalancePage } from '../features/customer/CustomerStockBalancePage.jsx';
 import { CustomerWithdrawalRequestPage } from '../features/customer/CustomerWithdrawalRequestPage.jsx';
@@ -83,6 +84,7 @@ export function AppRoutes() {
             <Route path="/customer" element={<CustomerPortalDashboardPage />} />
             <Route path="/customer/deposit-request" element={<CustomerDepositRequestPage />} />
             <Route path="/customer/deposit-request/new" element={<CustomerDepositRequestCreatePage />} />
+            <Route path="/customer/deposit-request/import" element={<CustomerDepositRequestBatchImportPage />} />
             <Route path="/customer/deposit-request/:requestId" element={<CustomerDepositRequestDetailPage />} />
             <Route path="/customer/stock-balance" element={<CustomerStockBalancePage />} />
             <Route path="/customer/withdrawal-request" element={<CustomerWithdrawalRequestPage />} />

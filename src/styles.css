@@ -117,6 +117,8 @@ table { font-variant-numeric: tabular-nums; }
 
 body {
   margin: 0;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   min-width: 320px;
   height: 100vh;
   overflow: hidden;
@@ -442,6 +444,9 @@ button, .btn {
 .form-group { margin-bottom: 6px; }
 label, .form-label { font-size: 11px; font-weight: 600; margin-bottom: 2px; display: block; color: var(--tgd-main-text); }
 input[type="checkbox"], input[type="radio"] { width: auto; height: auto; cursor: pointer; margin: 0; display: inline-block; }
+/* The input rule below sets display:block, which would otherwise beat the
+   hidden attribute and show the file inputs inside the import buttons. */
+[hidden] { display: none !important; }
 input:not([type="checkbox"]):not([type="radio"]), select, textarea, .form-control {
   display: block;
   width: 100%;
@@ -1987,6 +1992,144 @@ table .status-badge,
   margin: 0;
 }
 
+.csv-import-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Multi-date deposit import (CustomerDepositRequestBatchImportPage) */
+.deposit-batch-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  background: var(--tgd-navy-soft);
+}
+
+.deposit-batch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 16px 0 12px;
+  font-size: 13px;
+  color: var(--tgd-muted-text);
+}
+
+.deposit-batch-summary b {
+  color: var(--tgd-main-text);
+}
+
+.deposit-batch-slip {
+  border: 1px solid var(--tgm-border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.deposit-batch-slip-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 10px 14px;
+  background: var(--tgd-navy-soft);
+  border-bottom: 1px solid var(--tgm-border);
+  font-size: 13px;
+  color: var(--tgd-muted-text);
+}
+
+.deposit-batch-slip-head b {
+  font-size: 15px;
+  color: var(--tgd-main-text);
+}
+
+.deposit-batch-note {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-top: 1px solid var(--tgm-border);
+}
+
+.deposit-batch-note--warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.deposit-batch-note--skip {
+  background: var(--tgm-red-soft);
+  color: #991b1b;
+}
+
+.deposit-batch-result {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.deposit-batch-result-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--tgm-border);
+  border-radius: 8px;
+}
+
+.toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--tgd-border);
+  margin: 2px 4px;
+}
+
+@media (max-width: 640px) {
+  .toolbar-divider {
+    display: none;
+  }
+}
+
+/* A checkbox with its label and helper text on one row, the whole box clickable. */
+.form-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--tgd-border);
+  border-radius: 6px;
+  background: var(--tgd-surface);
+  cursor: pointer;
+}
+
+.form-checkbox-field:has(input:checked) {
+  border-color: var(--tgd-primary-gold);
+  background: var(--tgm-gold-soft);
+}
+
+.form-checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: var(--tgd-primary-gold);
+}
+
+.form-checkbox-text {
+  display: grid;
+  gap: 2px;
+}
+
+.form-checkbox-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .customer-deposit-lines-header {
   display: flex;
   align-items: center;
@@ -2651,3 +2794,23 @@ table .status-badge,
   }
 }
 
+/* Handheld inside the installed app: stay clear of the iPhone home indicator,
+   and keep inputs at 16px, below which iOS Safari zooms the page on focus. */
+.handheld-root {
+  --handheld-screen-height: calc(100dvh - env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  background: var(--color-bg);
+}
+
+/* The phone-width rule above fixes every button at 44px, which squashes the
+   tall handheld cards. 44px stays as the minimum touch target here. */
+.handheld-root button {
+  height: auto;
+  min-height: 44px;
+}
+
+.handheld-root input,
+.handheld-root select,
+.handheld-root textarea {
+  font-size: 16px !important;
+}

@@ -886,14 +886,17 @@ export function CustomerWithdrawalRequestCreatePage() {
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
           </label>
-          <label className="form-field form-field-span-2" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <label className="form-field-span-2 form-checkbox-field">
             <input
               type="checkbox"
               data-testid="customer-withdrawal-r3-document"
               checked={header.requires_r3_document}
               onChange={(e) => updateHeaderField('requires_r3_document', e.target.checked)}
             />
-            <span>{t('customer_field_r3_document')}</span>
+            <span className="form-checkbox-text">
+              <span className="form-checkbox-title">{t('customer_field_r3_document')}</span>
+              <span className="form-helper">{t('customer_field_r3_document_help')}</span>
+            </span>
           </label>
         </div>
 

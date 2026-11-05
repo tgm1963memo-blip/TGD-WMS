@@ -1,6 +1,7 @@
 import { ClipboardList, Download, Info, Package, Search, Upload } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -20,6 +21,7 @@ import {
 } from '../../services/customerProductUnitService.js';
 import { ProductUnitsEditor, saveProductUnits, unitsFromCatalogRow } from '../../components/customer/ProductUnitsEditor.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
+import { readNewProductPrefill, withoutNewProductPrefill } from '../../utils/catalogProductPrefill.js';
 
 const TEMPLATE_COLUMNS = [
   'รหัสสินค้า (ของท่าน)*',
@@ -347,6 +349,7 @@ function ProductFormModal({ form, products, r3Types, saving, error, onClose, onS
 export function CustomerProductCatalogPage() {
   const { customerId, role, loading: profileLoading } = useCustomerPortalProfile();
   const canWrite = role === 'customer_admin';
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [products, setProducts] = useState([]);
   const [r3Types, setR3Types] = useState([]);
@@ -387,6 +390,14 @@ export function CustomerProductCatalogPage() {
   useEffect(() => {
     listR3CarcassTypes().then((r) => setR3Types(r.data ?? []));
   }, []);
+
+  // Arrived from a deposit import's "สร้างสินค้า" link: open the add form.
+  useEffect(() => {
+    const prefill = readNewProductPrefill(searchParams);
+    if (!prefill || !canWrite) return;
+    setForm({ ...EMPTY_FORM, ...prefill });
+    setSearchParams(withoutNewProductPrefill(searchParams), { replace: true });
+  }, [canWrite]);
 
   function openCreate() {
     setForm({ ...EMPTY_FORM });
