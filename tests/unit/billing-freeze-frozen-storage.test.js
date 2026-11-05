@@ -141,4 +141,51 @@ describe('getBillingPeriodPreview — Freeze & Frozen storage + freezing fee', (
     const freezingLines = data.handlingLines.filter((l) => l.rate?.service_type === 'FREEZING');
     expect(freezingLines).toHaveLength(0);
   });
+
+  // Real gap: the catalog can only hold FROZEN/CHILLED/AMBIENT, and
+  // catalog-wins turned every FREEZE_FROZEN lot of a catalog-FROZEN product
+  // into FROZEN -- all 98 received FF lots in UAT -- so the fee never fired.
+  describe('catalog-FROZEN product with a Freeze & Frozen lot', () => {
+    async function previewFor({ receiptDate, rates }) {
+      vi.resetModules();
+      const db = makeDb({ rates });
+      db.tgd_customer_products = [{ id: 'cp-1', customer_id: CUSTOMER_ID, customer_product_code: 'PROD-FF', temperature_type: 'FROZEN' }];
+      db.tgd_customer_deposit_requests[0].expected_arrival_date = receiptDate;
+      vi.doMock('../../src/services/supabaseClient.js', () => ({ supabase: makeSupabaseMock(db) }));
+      const { getBillingPeriodPreview } = await import('../../src/services/billingRateEngineService.js');
+      const month = receiptDate.slice(0, 7);
+      return getBillingPeriodPreview({ customerId: CUSTOMER_ID, periodStart: `${month}-01`, periodEnd: `${month}-28` });
+    }
+    const freezing = (data) => data.handlingLines.filter((l) => l.rate?.service_type === 'FREEZING');
+
+    it('bills the FREEZING fee for a lot received on/after the cut-over date, while storage stays in the FROZEN scope', async () => {
+      const { data, error } = await previewFor({ receiptDate: '2026-11-03', rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE] });
+      expect(error).toBeFalsy();
+      expect(freezing(data)).toHaveLength(1);
+      expect(freezing(data)[0].amount).toBeCloseTo(500, 2);
+      expect(data.depositLines[0].temperature_type).toBe('FROZEN');
+      expect(data.storageLines).toHaveLength(1);
+    });
+
+    it('does not back-bill the fee for a lot received before the cut-over date', async () => {
+      const { data } = await previewFor({ receiptDate: '2026-10-15', rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE] });
+      expect(freezing(data)).toHaveLength(0);
+    });
+
+    it('falls back to a FROZEN-scoped FREEZING rate', async () => {
+      const { data } = await previewFor({
+        receiptDate: '2026-11-03',
+        rates: [FROZEN_STORAGE_RATE, { ...FREEZING_FEE_RATE, temperature_type: 'FROZEN' }],
+      });
+      expect(freezing(data)).toHaveLength(1);
+    });
+
+    it('never multiplies a FLAT FREEZING rate by kg', async () => {
+      const { data } = await previewFor({
+        receiptDate: '2026-11-03',
+        rates: [FROZEN_STORAGE_RATE, { ...FREEZING_FEE_RATE, unit_basis: 'FLAT', rate: 300 }],
+      });
+      expect(freezing(data)).toHaveLength(0);
+    });
+  });
 });

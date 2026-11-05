@@ -87,6 +87,8 @@ export function buildCatalogMaps(catalogRows = []) {
 // Which physical room a temperature_type is stored in. FREEZE/FREEZE_FROZEN
 // lots sit in the frozen room (see the FREEZING comment in
 // getBillingPeriodPreview), so they're the same room as FROZEN.
+export const FREEZING_LOT_VALUE_FROM = '2026-11-01';
+
 function storageRoomOf(temperatureType) {
   if (temperatureType === 'CHILLED' || temperatureType === 'AMBIENT') return temperatureType;
   return 'FROZEN';
@@ -261,6 +263,9 @@ async function fetchRateEngineInputs({ customerId }) {
     // Master catalog's current classification wins unless the lot was
     // stored in a different room (see resolveLotTemperatureType).
     temperature_type: resolveLotTemperatureType(temperatureTypeByCode.get(line.customer_product_code), line.temperature_type),
+    // The lot's own storage method before catalog-wins. Only for deciding
+    // per-lot services (the FREEZING fee below) -- never for scope or rates.
+    lot_temperature_type: line.temperature_type ?? null,
     received_weight: Number(line.actual_weight ?? line.expected_weight ?? 0),
     receipt_date: line.receipt_date,
     withdrawal_events: withdrawalEventsByLine.get(line.id) ?? [],
@@ -663,7 +668,17 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // since physically they sit in the same frozen room, but the freezing
   // service itself is a real, separate cost that must show as its own line
   // rather than being folded into (or lost from) the storage charge.
-  const freezeFrozenLines = depositLines.filter((dl) => dl.temperature_type === 'FREEZE_FROZEN');
+  //
+  // Catalog-wins (resolveLotTemperatureType) turns a FREEZE_FROZEN lot of a
+  // catalog-FROZEN product into FROZEN -- and the catalog can't hold
+  // FREEZE_FROZEN at all -- so the fee never fired for a real lot. The lot's
+  // own value decides it instead, but only for lots received from
+  // FREEZING_LOT_VALUE_FROM on: recreating an older draft must not suddenly
+  // bill fees it never showed.
+  const freezeFrozenLines = depositLines
+    .filter((dl) => dl.temperature_type === 'FREEZE_FROZEN'
+      || (dl.lot_temperature_type === 'FREEZE_FROZEN' && dl.receipt_date >= FREEZING_LOT_VALUE_FROM))
+    .map((dl) => ({ ...dl, temperature_type: 'FREEZE_FROZEN' }));
   const freezingLines = computeHandlingFeeLines({
     depositLines: freezeFrozenLines, rates, periodStart, periodEnd, serviceType: 'FREEZING',
   });

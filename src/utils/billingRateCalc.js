@@ -364,18 +364,26 @@ export function computeAuxiliaryServiceLines({ selections = [] }) {
 // only STORAGE's absence indicates a genuine billing gap.
 export function computeHandlingFeeLines({ depositLines = [], rates = [], periodStart, periodEnd, serviceType = 'HANDLING_IN' }) {
   const results = [];
+  const weightRates = weightBasedRates(rates);
 
   for (const dl of depositLines) {
     const receiptDate = toDateOnly(dl.receipt_date);
     if (!receiptDate || receiptDate < periodStart || receiptDate > periodEnd) continue;
 
-    const rate = resolveServiceRate(rates, {
+    // Weight-based rates only (a FLAT/PER_HOUR one is a per-document aux
+    // service -- see NON_WEIGHT_UNIT_BASES), and a Freeze & Frozen lot falls
+    // back to a FROZEN-scoped rate, same as storage and HANDLING_OUT.
+    const lookup = {
       customerId: dl.customer_id,
       customerProductId: dl.customer_product_id,
       temperatureType: dl.temperature_type,
       serviceType,
       asOfDate: receiptDate,
-    });
+    };
+    const rate = resolveServiceRate(weightRates, lookup)
+      ?? (dl.temperature_type === 'FREEZE_FROZEN'
+        ? resolveServiceRate(weightRates, { ...lookup, temperatureType: 'FROZEN' })
+        : null);
     if (!rate) continue;
 
     const receivedWeight = toNumber(dl.received_weight);
