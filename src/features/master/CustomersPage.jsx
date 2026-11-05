@@ -119,7 +119,7 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
                     style={{
                       flexShrink: 0,
                       padding: '0 12px',
-                      border: '1px solid #2563eb',
+                      border: '1px solid var(--color-accent)',
                       borderRadius: 8,
                       background: 'var(--color-accent-soft)',
                       color: 'var(--color-accent)',
@@ -225,7 +225,7 @@ function CustomerFormModal({ initial, existingCustomers, onSave, onClose }) {
             </div>
           )}
 
-          <div style={{ borderTop: '1px dashed #e5e7eb', margin: '4px 0 14px', paddingTop: 14 }} data-testid="customer-notification-settings-section">
+          <div style={{ borderTop: '1px dashed var(--color-border-subtle)', margin: '4px 0 14px', paddingTop: 14 }} data-testid="customer-notification-settings-section">
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-body)', margin: '0 0 10px' }}>
               การแจ้งเตือนทางอีเมล
             </p>

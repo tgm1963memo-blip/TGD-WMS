@@ -1,3 +1,4 @@
+import { RequestProgress } from './RequestProgress.jsx';
 import { AlertTriangle, Check, MapPin, Pencil, Plus, Printer, RefreshCw, Save, ScrollText, Undo2 } from 'lucide-react';
 import { IconLabel } from '../ui/IconLabel.jsx';
 import { useEffect, useState } from 'react';
@@ -747,6 +748,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
             {actionMsg ? <div className="alert-success-panel" role="status" style={{ marginBottom: 12 }}>{actionMsg}</div> : null}
             {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
 
+            <RequestProgress kind="deposit" status={header.status} />
             {/* Header info */}
             <div className="form-grid" style={{ marginBottom: 16 }}>
               <div>
@@ -1146,7 +1148,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                           target="_blank"
                           rel="noopener noreferrer"
                           title={`${photo.uploaded_by_email ?? ''} ${photo.uploaded_at ? formatDocumentDate(photo.uploaded_at) : ''}`.trim()}
-                          style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: 'var(--color-surface-muted)', display: 'block' }}
+                          style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--color-border)', background: 'var(--color-surface-muted)', display: 'block' }}
                         >
                           {receivingPhotoUrls[photo.id] ? (
                             <img src={receivingPhotoUrls[photo.id]} alt={photo.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1625,7 +1627,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 { label: 'เหลือที่ยังไม่ระบุ', value: `${unallocatedBoxes.toLocaleString()} กล่อง` },
                 { label: 'คงเหลือพร้อมเบิก', value: `${(availableBalance.availableBoxes ?? 0).toLocaleString()} กล่อง` },
               ].map((stat) => (
-                <div key={stat.label} style={{ background: 'var(--tgd-surface-alt, #f8fafc)', borderRadius: 8, padding: '6px 10px' }}>
+                <div key={stat.label} style={{ background: 'var(--tgd-surface-alt, var(--color-surface-muted))', borderRadius: 8, padding: '6px 10px' }}>
                   <div style={{ fontSize: 10.5, color: 'var(--tgd-muted-text)', fontWeight: 700, textTransform: 'uppercase' }}>{stat.label}</div>
                   <div style={{ fontSize: 14, fontWeight: 800 }}>{allocLoading ? '…' : stat.value}</div>
                 </div>

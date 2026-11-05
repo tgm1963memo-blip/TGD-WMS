@@ -437,7 +437,7 @@ export function CustomerWithdrawalLinesTable({
                 {/* Identifier reference type + value dropdown */}
                 <td>
                   {identifierType === WITHDRAWAL_IDENTIFIER_TYPES.TRACKING_CODE ? (
-                    <div className="form-control form-control-table" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--tgd-surface-muted, #f1f5f9)' }}>
+                    <div className="form-control form-control-table" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--tgd-surface-muted, var(--color-surface-sunken))' }}>
                       <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{line.identifier_value}</span>
                       <button
                         type="button"
@@ -628,7 +628,7 @@ export function CustomerWithdrawalLinesTable({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--tgd-link-color, #2563eb)',
+                        color: 'var(--tgd-link-color, var(--color-accent))',
                         cursor: 'pointer',
                         fontSize: 11,
                         padding: '2px 0',

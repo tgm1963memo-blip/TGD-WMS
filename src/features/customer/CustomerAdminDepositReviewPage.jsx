@@ -1012,7 +1012,7 @@ export function CustomerAdminDepositReviewPage() {
 
             {/* Persistent email notification section */}
             {selected && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(selected.status) ? (
-              <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--tgd-surface-alt, #f8fafc)', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
+              <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--tgd-surface-alt, var(--color-surface-muted))', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>แจ้งลูกค้าทางอีเมล</div>
