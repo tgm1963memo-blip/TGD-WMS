@@ -12,7 +12,10 @@ import { getCustomerRequestStatusClass } from '../../components/customer/custome
 import {
   getCustomerWithdrawalRequest,
   listCustomerWithdrawalRequestLines,
+  listWithdrawalR3PermitItems,
 } from '../../services/customerWithdrawalRequestService.js';
+import { listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
+import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
 import { getCustomerRequestPolicy } from '../../services/customerRequestPolicyService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getWithdrawalCancelEligibility } from '../../utils/customerRequestCancelUtils.js';
@@ -29,6 +32,8 @@ export function CustomerWithdrawalRequestDetailPage() {
   const [header, setHeader] = useState(null);
   const [lines, setLines] = useState([]);
   const [policy, setPolicy] = useState(null);
+  const [r3PermitItems, setR3PermitItems] = useState([]);
+  const [r3Types, setR3Types] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -43,8 +48,12 @@ export function CustomerWithdrawalRequestDetailPage() {
       getCustomerWithdrawalRequest(requestId),
       listCustomerWithdrawalRequestLines(requestId),
       getCustomerRequestPolicy(),
-    ]).then(([headerResult, linesResult, policyResult]) => {
+      listWithdrawalR3PermitItems(requestId),
+      listR3CarcassTypes(),
+    ]).then(([headerResult, linesResult, policyResult, permitResult, r3TypesResult]) => {
       if (!active) return;
+      setR3PermitItems(permitResult.data ?? []);
+      setR3Types(r3TypesResult.data ?? []);
 
       if (headerResult.error || !headerResult.data) {
         setError(headerResult.error?.message ?? t('customer_request_detail_not_found'));
@@ -117,6 +126,8 @@ export function CustomerWithdrawalRequestDetailPage() {
                   language={reportLanguage}
                   lines={lines}
                   hideCustomerName={!isRequestProxy}
+                  r3PermitItems={r3PermitItems}
+                  r3CarcassTypes={r3Types}
                 />
               )}
               title={header.withdrawal_no}
@@ -160,6 +171,15 @@ export function CustomerWithdrawalRequestDetailPage() {
         </div>
         <CustomerWithdrawalRequestLinesDisplay lines={lines} />
       </div>
+
+      {header.requires_r3_document || r3PermitItems.length ? (
+        <WithdrawalR3PermitPanel
+          items={r3PermitItems}
+          lines={lines}
+          carcassTypes={r3Types}
+          usePicked
+        />
+      ) : null}
 
       <CustomerRequestCancelPanel
         eligibility={eligibility}

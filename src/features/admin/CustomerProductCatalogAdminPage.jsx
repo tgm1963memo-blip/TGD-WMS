@@ -8,8 +8,11 @@ import { getCustomers } from '../../services/masterDataService.js';
 import {
   deactivateCustomerProduct,
   listCustomerProducts,
+  listR3CarcassTypes,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import { R3CarcassTypeSelect } from '../../components/customer/R3CarcassTypeSelect.jsx';
+import { formatR3CarcassType } from '../../utils/r3PermitComparisonUtils.js';
 import {
   deleteCustomerProductUnit,
   upsertCustomerProductUnit,
@@ -41,6 +44,7 @@ const EMPTY_FORM = {
   allergen: '',
   productCategory: '',
   defaultBoxesPerPallet: '',
+  r3CarcassTypeCode: null,
   note: '',
   units: [],
   originalUnits: [],
@@ -59,7 +63,7 @@ function TempBadge({ type }) {
   );
 }
 
-function ProductFormModal({ form, customers, products, saving, error, onClose, onSave, onFieldChange }) {
+function ProductFormModal({ form, customers, products, r3Types, saving, error, onClose, onSave, onFieldChange }) {
   const isEdit = !!form.productId;
   // Tracks whether "อื่นๆ (ระบุเอง)" is the active dropdown choice, independent
   // of whether uomCustom has been typed into yet — deriving this from
@@ -273,6 +277,18 @@ function ProductFormModal({ form, customers, products, saving, error, onClose, o
           </label>
 
           <label className="form-field" style={{ margin: '0 0 14px' }}>
+            <span>ประเภทซากตาม ร.3</span>
+            <R3CarcassTypeSelect
+              carcassTypes={r3Types}
+              value={form.r3CarcassTypeCode}
+              onChange={(code) => onFieldChange('r3CarcassTypeCode', code)}
+            />
+            <small style={{ color: 'var(--tgd-muted-text)', fontSize: 11 }}>
+              ใช้เทียบยอดเบิกกับใบ ร.3 ของกรมปศุสัตว์
+            </small>
+          </label>
+
+          <label className="form-field" style={{ margin: '0 0 14px' }}>
             <span>จำนวนต่อ pallet (ค่าเริ่มต้น)</span>
             <input
               className="form-control"
@@ -316,6 +332,7 @@ export function CustomerProductCatalogAdminPage() {
   const t = useTranslation();
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [r3Types, setR3Types] = useState([]);
   const [filterCustomerId, setFilterCustomerId] = useState('');
   const [searchText, setSearchText] = useState('');
   const [form, setForm] = useState(null);
@@ -352,6 +369,9 @@ export function CustomerProductCatalogAdminPage() {
       if (!active) return;
       setCustomers(customerResult.data ?? []);
     });
+    listR3CarcassTypes().then((r) => {
+      if (active) setR3Types(r.data ?? []);
+    });
     loadProducts();
     return () => { active = false; };
   }, []);
@@ -380,6 +400,7 @@ export function CustomerProductCatalogAdminPage() {
       allergen: row.allergen ?? '',
       productCategory: row.product_category ?? '',
       defaultBoxesPerPallet: row.default_boxes_per_pallet != null ? String(row.default_boxes_per_pallet) : '',
+      r3CarcassTypeCode: row.r3_carcass_type_code ?? null,
       note: row.note ?? '',
       units: unitsFromCatalogRow(row),
       originalUnits: row.units ?? [],
@@ -413,6 +434,7 @@ export function CustomerProductCatalogAdminPage() {
       allergen: form.allergen,
       productCategory: form.productCategory,
       defaultBoxesPerPallet: form.defaultBoxesPerPallet !== '' ? parseInt(form.defaultBoxesPerPallet, 10) : null,
+      r3CarcassTypeCode: form.r3CarcassTypeCode,
       note: form.note,
       isActive: true,
     });
@@ -461,7 +483,7 @@ export function CustomerProductCatalogAdminPage() {
     setError('');
     setSuccess('');
     try {
-      const { rows, errors } = await parseCustomerProductImportFile(file);
+      const { rows, errors } = await parseCustomerProductImportFile(file, r3Types);
       if (errors.length) { setError(errors.join(' ')); return; }
       if (!rows.length) { setError(t('excel_import_empty')); return; }
 
@@ -479,6 +501,11 @@ export function CustomerProductCatalogAdminPage() {
           argentType: row.argentType,
           storageChargeBasis: row.storageChargeBasis,
           productCategory: row.productCategory,
+          // Blank ร.3 cell keeps whatever the product already has.
+          r3CarcassTypeCode: row.r3CarcassTypeCode
+            ?? products.find((p) => p.customer_id === filterCustomerId
+              && p.customer_product_code === row.customerProductCode)?.r3_carcass_type_code
+            ?? null,
           note: row.note,
           isActive: true,
         };
@@ -584,7 +611,7 @@ export function CustomerProductCatalogAdminPage() {
             disabled={saving || importing}
             exportTestId="catalog-admin-export-button"
             importTestId="catalog-admin-import-input"
-            onExport={() => exportCustomerProductsExcel(products)}
+            onExport={() => exportCustomerProductsExcel(products, undefined, r3Types)}
             onImportFile={handleImportFile}
             onTemplate={() => {
               const customer = customers.find((c) => c.id === filterCustomerId) ?? null;
@@ -634,6 +661,7 @@ export function CustomerProductCatalogAdminPage() {
                   <th>อุณหภูมิ</th>
                   <th>ฐานคิดค่าฝาก</th>
                   <th>ประเภทสินค้า</th>
+                  <th>ประเภท ร.3</th>
                   <th>สถานะ</th>
                   <th style={{ width: 120 }}>การกระทำ</th>
                 </tr>
@@ -641,7 +669,7 @@ export function CustomerProductCatalogAdminPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={filterCustomerId ? 9 : 10} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
+                    <td colSpan={filterCustomerId ? 10 : 11} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--tgd-muted-text)' }}>
                       {products.length === 0 ? t('catalog_empty') : 'ไม่พบสินค้าที่ตรงกับเงื่อนไข'}
                     </td>
                   </tr>
@@ -672,6 +700,7 @@ export function CustomerProductCatalogAdminPage() {
                       <td><TempBadge type={row.temperature_type} /></td>
                       <td style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{row.storage_charge_basis ?? '-'}</td>
                       <td style={{ fontSize: 12 }}>{row.product_category ?? '-'}</td>
+                      <td style={{ fontSize: 12 }}>{formatR3CarcassType(row.r3_carcass_type_code, r3Types)}</td>
                       <td><StatusBadge value={row.is_active} /></td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -711,6 +740,7 @@ export function CustomerProductCatalogAdminPage() {
           form={form}
           customers={customers}
           products={products}
+          r3Types={r3Types}
           saving={saving}
           error={formError}
           onClose={() => setForm(null)}

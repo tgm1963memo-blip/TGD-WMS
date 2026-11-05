@@ -20,6 +20,7 @@ const CATALOG_SELECT = [
   'allergen',
   'product_category',
   'default_boxes_per_pallet',
+  'r3_carcass_type_code',
   'is_active',
   'note',
   'created_at',
@@ -80,6 +81,7 @@ export async function upsertCustomerProduct(payload = {}) {
     p_default_boxes_per_pallet: payload.defaultBoxesPerPallet != null && payload.defaultBoxesPerPallet !== ''
       ? Number(payload.defaultBoxesPerPallet)
       : null,
+    p_r3_carcass_type_code: toNullableText(payload.r3CarcassTypeCode),
   });
 
   if (error) return { data: null, error };
@@ -105,6 +107,22 @@ export async function listCustomerProductCategories(filters = {}) {
 
   const categories = [...new Set((data ?? []).map((row) => row.product_category).filter(Boolean))].sort();
   return { data: categories, error: null };
+}
+
+// Fixed list of ร.3 carcass types (เนื้อสุกรแช่แข็ง, มันสุกรแช่แข็ง, ...) —
+// unlike product_category this is NOT free text, since it's compared
+// against the type printed on the government permit.
+export async function listR3CarcassTypes() {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase
+    .from('tgd_r3_carcass_types')
+    .select('code, animal_type, label_th, sort_order')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) return { data: null, error };
+  return { data: data ?? [], error: null };
 }
 
 export async function deactivateCustomerProduct(productId) {

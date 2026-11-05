@@ -26,7 +26,13 @@ import {
   setWithdrawalDispatchTime,
   setWithdrawalDispatchTemperature,
   setWithdrawalOvertime,
+  listWithdrawalR3PermitItems,
+  replaceWithdrawalR3PermitItems,
+  setWithdrawalR3Document,
 } from '../../services/customerWithdrawalRequestService.js';
+import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
+import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
+import { buildCatalogR3Map } from '../../utils/r3PermitComparisonUtils.js';
 import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -85,6 +91,8 @@ const ADD_LINE_ELIGIBLE_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 const CONFIRM_DATE_ELIGIBLE_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+// Mirrors tgd_replace_withdrawal_r3_permit_items' staff lock list.
+const R3_PERMIT_LOCKED_STATUSES = ['LOADED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CLOSED', 'COMPLETED', 'CANCELLED', 'ADMIN_REJECTED'];
 
 // Bangkok calendar date as 'YYYY-MM-DD' — the date the confirm-dispatch
 // date picker compares against requested_dispatch_date (also Bangkok).
@@ -191,6 +199,13 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [r3AttachmentFiles, setR3AttachmentFiles] = useState([]);
   const [r3AttachmentError, setR3AttachmentError] = useState('');
   const [uploadingR3Attachment, setUploadingR3Attachment] = useState(false);
+  const [r3Types, setR3Types] = useState([]);
+  const [r3PermitItems, setR3PermitItems] = useState([]);
+  const [r3PermitDirty, setR3PermitDirty] = useState(false);
+  const [savingR3Permit, setSavingR3Permit] = useState(false);
+  const [r3PermitError, setR3PermitError] = useState('');
+  const [r3CatalogMap, setR3CatalogMap] = useState(() => new Map());
+  const [savingR3Flag, setSavingR3Flag] = useState(false);
 
   const customerOptions = [...new Map(
     rows
@@ -329,6 +344,54 @@ export function CustomerAdminWithdrawalReviewPage() {
 
     return () => { active = false; };
   }, [selectedId]);
+
+  useEffect(() => {
+    listR3CarcassTypes().then((result) => setR3Types(result.data ?? []));
+  }, []);
+
+  // ร.3 permit rows + the customer's catalog ร.3 types (fallback for lines
+  // saved before their product had a ร.3 type set).
+  const selectedCustomerId = rows.find((r) => r.id === selectedId)?.customer_id ?? null;
+  useEffect(() => {
+    let active = true;
+    setR3PermitItems([]);
+    setR3PermitDirty(false);
+    setR3PermitError('');
+    if (!selectedId) return undefined;
+    listWithdrawalR3PermitItems(selectedId).then((result) => {
+      if (!active) return;
+      if (result.error) { setR3PermitError(result.error.message ?? 'โหลดยอด ร.3 ไม่สำเร็จ'); return; }
+      setR3PermitItems((result.data ?? []).map((row) => ({
+        r3_no: row.r3_no ?? '',
+        r3_carcass_type_code: row.r3_carcass_type_code,
+        permitted_kg: row.permitted_kg != null ? String(row.permitted_kg) : '',
+      })));
+    });
+    return () => { active = false; };
+  }, [selectedId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedCustomerId) { setR3CatalogMap(new Map()); return undefined; }
+    listCustomerProducts({ customerId: selectedCustomerId }).then((result) => {
+      if (active) setR3CatalogMap(buildCatalogR3Map(result.data ?? []));
+    });
+    return () => { active = false; };
+  }, [selectedCustomerId]);
+
+  async function handleSaveR3Permit() {
+    if (!selectedId) return;
+    setSavingR3Permit(true);
+    setR3PermitError('');
+    const result = await replaceWithdrawalR3PermitItems(selectedId, r3PermitItems);
+    setSavingR3Permit(false);
+    if (result.error) {
+      setR3PermitError(result.error.message ?? 'บันทึกยอด ร.3 ไม่สำเร็จ');
+      return;
+    }
+    setR3PermitDirty(false);
+    refreshTimeline(selectedId);
+  }
 
   function handleR3AttachmentFiles(event) {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -612,6 +675,21 @@ export function CustomerAdminWithdrawalReviewPage() {
     }
     const targetField = field === 'GOODS' ? 'dispatch_goods_temp' : 'dispatch_truck_temp';
     setRows((prev) => prev.map((r) => (r.id === selectedId ? { ...r, [targetField]: data.value } : r)));
+  }
+
+  async function handleToggleR3Document(nextValue) {
+    if (!selectedId) return;
+    setSavingR3Flag(true);
+    const { data, error } = await setWithdrawalR3Document(selectedId, nextValue);
+    setSavingR3Flag(false);
+    if (error) {
+      setError(error.message ?? 'บันทึก ร.3 ไม่สำเร็จ');
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? {
+      ...r, requires_r3_document: data.requires_r3_document, r3_document_set_by_email: data.by_email, r3_document_set_at: data.at,
+    } : r)));
+    refreshTimeline(selectedId);
   }
 
   async function handleSaveOvertime(isOvertime, note, overtimeType) {
@@ -1206,7 +1284,26 @@ export function CustomerAdminWithdrawalReviewPage() {
               </div>
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
-                <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>
+                {canWrite && !['CANCELLED', 'ADMIN_REJECTED'].includes(selected.status) ? (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selected.requires_r3_document)}
+                      disabled={savingR3Flag}
+                      onChange={(e) => handleToggleR3Document(e.target.checked)}
+                      data-testid="admin-withdrawal-r3-fee-checkbox"
+                    />
+                    <span>คิดค่าบริการเอกสาร ร.3</span>
+                  </label>
+                ) : (
+                  <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>
+                )}
+                {selected.r3_document_set_by_email ? (
+                  <div className="form-helper">
+                    โดย {selected.r3_document_set_by_email}
+                    {selected.r3_document_set_at ? ` ${formatDocumentDate(selected.r3_document_set_at)}` : ''}
+                  </div>
+                ) : null}
               </div>
               <WorkPhaseTimeControl
                 canWrite={canWrite}
@@ -1307,6 +1404,25 @@ export function CustomerAdminWithdrawalReviewPage() {
               </ul>
             </div>
 
+            {selected.requires_r3_document || r3PermitItems.length ? (
+              <div style={{ marginBottom: 16 }}>
+                <WithdrawalR3PermitPanel
+                  items={r3PermitItems}
+                  onItemsChange={canWrite && !R3_PERMIT_LOCKED_STATUSES.includes(selected.status)
+                    ? (next) => { setR3PermitItems(next); setR3PermitDirty(true); }
+                    : undefined}
+                  onSave={handleSaveR3Permit}
+                  saving={savingR3Permit}
+                  dirty={r3PermitDirty}
+                  lines={lines}
+                  carcassTypes={r3Types}
+                  catalogR3Map={r3CatalogMap}
+                  usePicked
+                />
+                {r3PermitError ? <p className="field-error" role="alert">{r3PermitError}</p> : null}
+              </div>
+            ) : null}
+
             {/* Print action */}
             <div className="action-row" style={{ marginBottom: 16 }}>
               <ReportPrintActions
@@ -1319,6 +1435,9 @@ export function CustomerAdminWithdrawalReviewPage() {
                     language={language}
                     lines={lines}
                     isStaff={true}
+                    r3PermitItems={r3PermitItems}
+                    r3CarcassTypes={r3Types}
+                    r3CatalogMap={r3CatalogMap}
                   />
                 )}
                 title={selected.withdrawal_no}

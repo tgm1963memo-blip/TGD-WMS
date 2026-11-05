@@ -9,8 +9,11 @@ import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import {
   deactivateCustomerProduct,
   listCustomerProducts,
+  listR3CarcassTypes,
   upsertCustomerProduct,
 } from '../../services/customerProductCatalogService.js';
+import { R3CarcassTypeSelect } from '../../components/customer/R3CarcassTypeSelect.jsx';
+import { formatR3CarcassType, resolveR3CarcassTypeCode } from '../../utils/r3PermitComparisonUtils.js';
 import {
   deleteCustomerProductUnit,
   upsertCustomerProductUnit,
@@ -28,21 +31,25 @@ const TEMPLATE_COLUMNS = [
   'รายละเอียดสารก่อภูมิแพ้',
   'ประเภทสินค้า',
   'หมายเหตุ',
+  // Appended last so templates downloaded before this column existed
+  // still import with every other column in place.
+  'ประเภทซาก ร.3 (เช่น มันสุกรแช่แข็ง)',
 ];
+const TEMPLATE_COL_WIDTHS = [14, 30, 10, 30, 18, 18, 24, 16, 20, 26];
 
 function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_COLUMNS,
-    ['10001', 'ตัวอย่างสินค้า A', 'กก.', 'FROZEN', '1.500', 'ไม่มี', '', 'หมู', ''],
-    ['10002', 'ตัวอย่างสินค้า B', 'กล่อง', 'CHILLED', '0.500', 'มี', 'Gluten, Dairy', 'ไก่', 'หมายเหตุ'],
+    ['10001', 'ตัวอย่างสินค้า A', 'กก.', 'FROZEN', '1.500', 'ไม่มี', '', 'หมู', '', 'เนื้อสุกรแช่แข็ง'],
+    ['10002', 'ตัวอย่างสินค้า B', 'กล่อง', 'CHILLED', '0.500', 'มี', 'Gluten, Dairy', 'ไก่', 'หมายเหตุ', ''],
   ]);
-  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 16, 20].map((w) => ({ wch: w }));
+  ws['!cols'] = TEMPLATE_COL_WIDTHS.map((w) => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template');
   XLSX.writeFile(wb, 'product_catalog_template.xlsx');
 }
 
-function exportProducts(products) {
+function exportProducts(products, r3Types = []) {
   const rows = products.map((p) => ([
     p.customer_product_code ?? '',
     p.product_name ?? '',
@@ -53,15 +60,16 @@ function exportProducts(products) {
     p.allergen ?? '',
     p.product_category ?? '',
     p.note ?? '',
+    r3Types.find((t) => t.code === p.r3_carcass_type_code)?.label_th ?? '',
   ]));
   const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLUMNS, ...rows]);
-  ws['!cols'] = [14, 30, 10, 30, 18, 18, 24, 16, 20].map((w) => ({ wch: w }));
+  ws['!cols'] = TEMPLATE_COL_WIDTHS.map((w) => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'สินค้า');
   XLSX.writeFile(wb, 'product_catalog_export.xlsx');
 }
 
-function parseImportFile(file) {
+function parseImportFile(file, r3Types = []) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -82,6 +90,8 @@ function parseImportFile(file) {
           allergen: String(r[6] ?? '').trim(),
           productCategory: String(r[7] ?? '').trim(),
           note: String(r[8] ?? '').trim(),
+          r3Raw: String(r[9] ?? '').trim(),
+          r3CarcassTypeCode: resolveR3CarcassTypeCode(r[9], r3Types),
         })).filter((r) => r.customerProductCode && r.productName);
         resolve(parsed);
       } catch (err) {
@@ -105,6 +115,7 @@ const EMPTY_FORM = {
   allergenHas: false,
   allergen: '',
   productCategory: '',
+  r3CarcassTypeCode: null,
   note: '',
   units: [],
   originalUnits: [],
@@ -125,7 +136,7 @@ function TempBadge({ type }) {
   );
 }
 
-function ProductFormModal({ form, products, saving, error, onClose, onSave, onFieldChange }) {
+function ProductFormModal({ form, products, r3Types, saving, error, onClose, onSave, onFieldChange }) {
   // Suggests categories already used in this customer's own catalog
   // (free-text field, no fixed enum) so the same label gets reused
   // consistently instead of near-duplicates ("หมู" vs "Pork").
@@ -296,6 +307,19 @@ function ProductFormModal({ form, products, saving, error, onClose, onSave, onFi
             </datalist>
           </label>
 
+          <label className="form-field" style={{ margin: '0 0 12px' }}>
+            <span>ประเภทซากตาม ร.3</span>
+            <R3CarcassTypeSelect
+              carcassTypes={r3Types}
+              value={form.r3CarcassTypeCode}
+              onChange={(code) => onFieldChange('r3CarcassTypeCode', code)}
+              data-testid="catalog-r3-carcass-type"
+            />
+            <small style={{ color: 'var(--tgd-muted-text)', fontSize: 11 }}>
+              ใช้เทียบยอดเบิกกับใบ ร.3 — เลือกตามประเภทที่กรมปศุสัตว์ระบุในใบอนุญาต
+            </small>
+          </label>
+
           <label className="form-field" style={{ margin: '0 0 18px' }}>
             <span>หมายเหตุ</span>
             <textarea
@@ -325,6 +349,7 @@ export function CustomerProductCatalogPage() {
   const canWrite = role === 'customer_admin';
 
   const [products, setProducts] = useState([]);
+  const [r3Types, setR3Types] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [form, setForm] = useState(null);
@@ -359,6 +384,10 @@ export function CustomerProductCatalogPage() {
     }
   }, [profileLoading, customerId]);
 
+  useEffect(() => {
+    listR3CarcassTypes().then((r) => setR3Types(r.data ?? []));
+  }, []);
+
   function openCreate() {
     setForm({ ...EMPTY_FORM });
     setFormError('');
@@ -379,6 +408,7 @@ export function CustomerProductCatalogPage() {
       allergenHas: !!(row.allergen),
       allergen: row.allergen ?? '',
       productCategory: row.product_category ?? '',
+      r3CarcassTypeCode: row.r3_carcass_type_code ?? null,
       note: row.note ?? '',
       units: unitsFromCatalogRow(row),
       originalUnits: row.units ?? [],
@@ -409,6 +439,7 @@ export function CustomerProductCatalogPage() {
       temperatureType: form.temperatureType,
       allergen: form.allergenHas ? form.allergen : '',
       productCategory: form.productCategory,
+      r3CarcassTypeCode: form.r3CarcassTypeCode,
       note: form.note,
       isActive: true,
     });
@@ -456,7 +487,7 @@ export function CustomerProductCatalogPage() {
     setError('');
     setSuccess('');
     try {
-      const parsed = await parseImportFile(file);
+      const parsed = await parseImportFile(file, r3Types);
       if (parsed.length === 0) { setError('ไม่พบข้อมูลในไฟล์ หรือข้อมูลไม่ครบถ้วน'); return; }
       setImportPreview(parsed);
     } catch {
@@ -480,6 +511,10 @@ export function CustomerProductCatalogPage() {
         temperatureType: row.temperatureType,
         allergen: row.allergenHas ? row.allergen : '',
         productCategory: row.productCategory,
+        // Blank ร.3 cell keeps whatever the product already has.
+        r3CarcassTypeCode: row.r3CarcassTypeCode
+          ?? products.find((p) => p.customer_product_code === row.customerProductCode)?.r3_carcass_type_code
+          ?? null,
         note: row.note,
         isActive: true,
       });
@@ -543,7 +578,7 @@ export function CustomerProductCatalogPage() {
               className="btn btn-secondary btn-sm"
               type="button"
               title="ส่งออกรายการสินค้าปัจจุบันเป็น Excel"
-              onClick={() => exportProducts(products)}
+              onClick={() => exportProducts(products, r3Types)}
               disabled={products.length === 0}
             >
               <IconLabel icon={Upload} size={14} gap={6}>Export</IconLabel>
@@ -675,6 +710,7 @@ export function CustomerProductCatalogPage() {
                   <th>น้ำหนัก/หน่วย</th>
                   <th>Allergen</th>
                   <th>ประเภทสินค้า</th>
+                  <th>ประเภท ร.3</th>
                   <th>สถานะ</th>
                   {canWrite && <th style={{ width: 130 }}>การกระทำ</th>}
                 </tr>
@@ -683,7 +719,7 @@ export function CustomerProductCatalogPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canWrite ? 9 : 8}
+                      colSpan={canWrite ? 10 : 9}
                       style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--tgd-muted-text)' }}
                     >
                       {products.length === 0
@@ -715,6 +751,7 @@ export function CustomerProductCatalogPage() {
                         : <span style={{ color: 'var(--tgd-muted-text)' }}>-</span>}
                     </td>
                     <td style={{ fontSize: 12 }}>{row.product_category ?? '-'}</td>
+                    <td style={{ fontSize: 12 }}>{formatR3CarcassType(row.r3_carcass_type_code, r3Types)}</td>
                     <td><StatusBadge value={row.is_active} /></td>
                     {canWrite && (
                       <td>
@@ -751,6 +788,7 @@ export function CustomerProductCatalogPage() {
         <ProductFormModal
           form={form}
           products={products}
+          r3Types={r3Types}
           saving={saving}
           error={formError}
           onClose={() => setForm(null)}
@@ -792,6 +830,7 @@ export function CustomerProductCatalogPage() {
                       <th>น้ำหนัก (กก.)</th>
                       <th>Allergen</th>
                       <th>ประเภทสินค้า</th>
+                      <th>ประเภท ร.3</th>
                       <th>หมายเหตุ</th>
                     </tr>
                   </thead>
@@ -806,6 +845,13 @@ export function CustomerProductCatalogPage() {
                         <td>{row.packWeightKg ?? '-'}</td>
                         <td>{row.allergenHas ? <span style={{ color: '#ef4444' }}>มี</span> : '-'}</td>
                         <td>{row.productCategory || '-'}</td>
+                        <td>
+                          {row.r3CarcassTypeCode
+                            ? formatR3CarcassType(row.r3CarcassTypeCode, r3Types)
+                            : row.r3Raw
+                              ? <span style={{ color: 'var(--tgd-danger)' }}>ไม่รู้จัก "{row.r3Raw}" (คงค่าเดิม)</span>
+                              : '-'}
+                        </td>
                         <td style={{ color: 'var(--tgd-muted-text)' }}>{row.note || '-'}</td>
                       </tr>
                     ))}

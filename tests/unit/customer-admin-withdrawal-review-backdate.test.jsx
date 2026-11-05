@@ -41,6 +41,8 @@ async function renderAs(role) {
     updateWithdrawalLineAdminNote: vi.fn(),
     updateWithdrawalLineSource: vi.fn(),
     addAdminWithdrawalRequestLine: vi.fn(),
+    listWithdrawalR3PermitItems: vi.fn().mockResolvedValue({ data: [], error: null }),
+    replaceWithdrawalR3PermitItems: vi.fn(),
   }));
   const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
   render(<CustomerAdminWithdrawalReviewPage />);

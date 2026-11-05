@@ -32,6 +32,8 @@ const WITHDRAWAL_HEADER_SELECT = [
   'dispatch_goods_temp',
   'dispatch_truck_temp',
   'requires_r3_document',
+  'r3_document_set_by_email',
+  'r3_document_set_at',
   'is_overtime',
   'overtime_type',
   'overtime_note',
@@ -79,6 +81,7 @@ const WITHDRAWAL_LINE_SELECT = [
   'picked_weight',
   'picked_at',
   'picked_by_email',
+  'r3_carcass_type_code',
   'created_at',
 ].join(', ');
 
@@ -422,6 +425,34 @@ export async function deleteCustomerWithdrawalRequestService(id) {
   return { data: normalizeCustomerPortalRpcData(data), error };
 }
 
+// ร.3 permitted kg per carcass type — compared against line weights by
+// compareR3Permit() (src/utils/r3PermitComparisonUtils.js), warn-only.
+export async function listWithdrawalR3PermitItems(requestId) {
+  if (!supabase) return missingSupabaseClientResult();
+  return supabase
+    .from('tgd_customer_withdrawal_r3_permit_items')
+    .select('id, withdrawal_request_id, r3_no, r3_carcass_type_code, permitted_kg, note, created_at')
+    .eq('withdrawal_request_id', requestId)
+    .order('created_at', { ascending: true });
+}
+
+// Replace-all: the RPC deletes the request's rows and inserts `items`.
+export async function replaceWithdrawalR3PermitItems(requestId, items = []) {
+  if (!supabase) return missingSupabaseClientResult();
+  const { data, error } = await supabase.rpc('tgd_replace_withdrawal_r3_permit_items', {
+    p_request_id: requestId,
+    p_items: items
+      .filter((item) => item.r3_carcass_type_code)
+      .map((item) => ({
+        r3_no: toNullableText(item.r3_no),
+        r3_carcass_type_code: item.r3_carcass_type_code,
+        permitted_kg: toNullableNumber(item.permitted_kg) ?? 0,
+        note: toNullableText(item.note),
+      })),
+  });
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
 // Per-product totals for withdrawal lines already subtracted from the live
 // stock balance but not yet COMPLETED — powers the "รอเบิก" tile on the
 // stock balance pages. See migration
@@ -568,6 +599,19 @@ export async function setWithdrawalOvertime(requestId, isOvertime, { note = null
     p_note: toNullableText(note),
     p_actor_profile_id: actorProfileId,
     p_overtime_type: overtimeType === 'HOLIDAY' ? 'HOLIDAY' : 'WORKDAY',
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// TGC staff tick/untick ร.3 at any status (not just the customer's draft) —
+// requires_r3_document is what bills the flat R3_DOCUMENT fee.
+export async function setWithdrawalR3Document(requestId, requiresR3Document) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_r3_document', {
+    p_request_id: requestId,
+    p_requires_r3_document: Boolean(requiresR3Document),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

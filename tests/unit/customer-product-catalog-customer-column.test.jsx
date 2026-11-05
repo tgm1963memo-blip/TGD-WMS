@@ -27,6 +27,7 @@ vi.mock('../../src/services/customerProductCatalogService.js', () => ({
     }],
   }),
   deactivateCustomerProduct: vi.fn(),
+  listR3CarcassTypes: vi.fn().mockResolvedValue({ data: [], error: null }),
   upsertCustomerProduct: vi.fn(),
 }));
 

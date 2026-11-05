@@ -40,6 +40,8 @@ function mockLines(lines) {
     updateWithdrawalLineAdminNote: vi.fn(),
     updateWithdrawalLineSource: vi.fn(),
     addAdminWithdrawalRequestLine: vi.fn(),
+    listWithdrawalR3PermitItems: vi.fn().mockResolvedValue({ data: [], error: null }),
+    replaceWithdrawalR3PermitItems: vi.fn(),
   }));
 }
 

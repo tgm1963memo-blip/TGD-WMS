@@ -44,6 +44,7 @@ vi.mock('../../src/features/customer/useCustomerPortalProfile.js', () => ({
 }));
 
 vi.mock('../../src/services/customerProductCatalogService.js', () => ({
+  listR3CarcassTypes: vi.fn(async () => ({ data: [], error: null })),
   listCustomerProducts: vi.fn(async () => ({
     data: [{
       id: 'cat-prod-1',
@@ -127,6 +128,8 @@ vi.mock('../../src/services/customerWithdrawalRequestService.js', () => ({
   deleteCustomerWithdrawalRequestService: vi.fn(async () => ({ data: true, error: null })),
   getPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
   getAllPendingWithdrawalTotals: vi.fn(async () => ({ data: [], error: null })),
+  listWithdrawalR3PermitItems: vi.fn(async () => ({ data: [], error: null })),
+  replaceWithdrawalR3PermitItems: vi.fn(async () => ({ data: {}, error: null })),
 }));
 
 vi.mock('../../src/services/productServiceRatesService.js', () => ({

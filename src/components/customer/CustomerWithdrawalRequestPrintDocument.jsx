@@ -2,6 +2,7 @@ import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
+import { R3_STATUS, compareR3Permit } from '../../utils/r3PermitComparisonUtils.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
@@ -78,6 +79,11 @@ function CustomerWithdrawalRequestPrintDocumentPage({
   hideCustomerName = false,
   isStaff = false,
   copyType,
+  // Optional: pass both to print the ร.3 per-type summary under the totals
+  // (gate staff compare it against the permit). Omitted on merged prints.
+  r3PermitItems = [],
+  r3CarcassTypes = null,
+  r3CatalogMap = null,
 }) {
   if (!header) return null;
 
@@ -106,6 +112,11 @@ function CustomerWithdrawalRequestPrintDocumentPage({
 
   const totalWeightKg = lines.reduce((s, l) => s + confirmedQty(l).weight, 0);
   const totalBoxes    = lines.reduce((s, l) => s + confirmedQty(l).boxes, 0);
+
+  const r3Summary = header.requires_r3_document && r3CarcassTypes
+    ? compareR3Permit({ lines, permitItems: r3PermitItems, carcassTypes: r3CarcassTypes, catalogR3Map: r3CatalogMap, usePicked: true })
+    : null;
+  const r3Nos = [...new Set(r3PermitItems.map((i) => i.r3_no).filter(Boolean))];
 
   // lot_remaining_boxes/weight (from tgd_get_customer_stock_balance) only
   // reflects withdrawals whose request status is already 'COMPLETED' — so
@@ -399,6 +410,40 @@ function CustomerWithdrawalRequestPrintDocumentPage({
           </tr>
         </tfoot>
       </table>
+
+      {r3Summary ? (
+        <div style={{ margin: '8px 0', pageBreakInside: 'avoid', breakInside: 'avoid' }} data-testid="withdrawal-print-r3-summary">
+          <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3 }}>
+            สรุปตามประเภท ร.3{r3Nos.length ? ` — เลขที่ ${r3Nos.join(', ')}` : ''}
+          </div>
+          <table style={{ width: '60%', borderCollapse: 'collapse', fontSize: 9 }}>
+            <thead>
+              <tr>
+                <th style={{ ...TH, textAlign: 'left' }}>ชนิด / ซากสัตว์</th>
+                <th style={{ ...TH, textAlign: 'right' }}>อนุญาต (KG.)</th>
+                <th style={{ ...TH, textAlign: 'right' }}>เบิก (KG.)</th>
+                <th style={TH}>ผล</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r3Summary.rows.length ? r3Summary.rows.map((row) => (
+                <tr key={row.code ?? '__uncategorized__'}>
+                  <td style={TD}>
+                    {row.code ? `${row.animalType ?? ''}${row.animalType ? ' / ' : ''}${row.label}` : `ไม่ระบุประเภท (${row.productCodes.join(', ')})`}
+                  </td>
+                  <td style={{ ...TD, textAlign: 'right' }}>{row.permittedKg != null ? fmtNum(row.permittedKg) : '-'}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700 }}>{fmtNum(row.actualKg)}</td>
+                  <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: row.status === R3_STATUS.OK ? '#000' : '#dc2626' }}>
+                    {row.status === R3_STATUS.OK ? 'OK' : row.status === R3_STATUS.OVER ? 'เกินยอด' : row.status === R3_STATUS.NOT_ON_PERMIT ? 'ไม่มีใน ร.3' : 'ไม่ระบุ'}
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={4} style={{ ...TD, textAlign: 'center', color: '#888' }}>ยังไม่ได้กรอกยอด ร.3</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {/* ── Page footer: signatures + truck info ──
           No flex spacer: CSS page-break/fragmentation properties are

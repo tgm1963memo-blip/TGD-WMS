@@ -19,9 +19,13 @@ import {
   listCustomerWithdrawalRequestServices,
   upsertCustomerWithdrawalRequestService,
   deleteCustomerWithdrawalRequestService,
+  listWithdrawalR3PermitItems,
+  replaceWithdrawalR3PermitItems,
 } from '../../services/customerWithdrawalRequestService.js';
 import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
-import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
+import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
+import { buildCatalogR3Map, compareR3Permit } from '../../utils/r3PermitComparisonUtils.js';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import {
   getDepositInventoryLines,
@@ -102,6 +106,8 @@ export function CustomerWithdrawalRequestCreatePage() {
   const [selectedAuxServices, setSelectedAuxServices] = useState({}); // rateId -> { checked, quantity, id }
   const [r3Attachments, setR3Attachments] = useState([]);
   const [r3AttachmentError, setR3AttachmentError] = useState('');
+  const [r3Types, setR3Types] = useState([]);
+  const [r3PermitItems, setR3PermitItems] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [importNotice, setImportNotice] = useState('');
   const [importing, setImporting] = useState(false);
@@ -295,10 +301,12 @@ export function CustomerWithdrawalRequestCreatePage() {
     // the customer actually still has.
   }, [effectiveCustomerId, editId]);
 
+  // Loaded in edit/copy mode too — the ร.3 comparison needs each line's
+  // catalog ร.3 type, and unsaved lines carry no snapshot of their own.
   useEffect(() => {
     let active = true;
-    if (!effectiveCustomerId || copyFromId || editId) {
-      if (!copyFromId && !editId) setCatalogProducts([]);
+    if (!effectiveCustomerId) {
+      setCatalogProducts([]);
       return undefined;
     }
 
@@ -308,7 +316,27 @@ export function CustomerWithdrawalRequestCreatePage() {
     });
 
     return () => { active = false; };
-  }, [effectiveCustomerId, copyFromId, editId]);
+  }, [effectiveCustomerId]);
+
+  useEffect(() => {
+    listR3CarcassTypes().then((result) => setR3Types(result.data ?? []));
+  }, []);
+
+  // Copies deliberately start with no permit rows — every shipment has its
+  // own ร.3.
+  useEffect(() => {
+    if (!editId) return undefined;
+    let active = true;
+    listWithdrawalR3PermitItems(editId).then((result) => {
+      if (!active || result.error) return;
+      setR3PermitItems((result.data ?? []).map((row) => ({
+        r3_no: row.r3_no ?? '',
+        r3_carcass_type_code: row.r3_carcass_type_code,
+        permitted_kg: row.permitted_kg != null ? String(row.permitted_kg) : '',
+      })));
+    });
+    return () => { active = false; };
+  }, [editId]);
 
   // Aux service rates (PLUG_IN/OVERTIME/etc.) are unit_basis PER_HOUR/FLAT —
   // the same filter the deposit create page uses, since this is a generic,
@@ -515,6 +543,24 @@ export function CustomerWithdrawalRequestCreatePage() {
         }
       }
 
+      // ร.3 check is warn-only (agreed with ops): confirm, never block.
+      if (shouldSubmit && header.requires_r3_document) {
+        const r3Check = compareR3Permit({
+          lines: activeLines,
+          permitItems: r3PermitItems,
+          carcassTypes: r3Types,
+          catalogR3Map: buildCatalogR3Map(catalogProducts),
+        });
+        const warnings = [];
+        if (!r3PermitItems.some((item) => item.r3_carcass_type_code)) warnings.push('- ยังไม่ได้กรอกยอดตามใบ ร.3');
+        if (r3Check.hasOver) warnings.push('- น้ำหนักเบิกบางประเภทเกินยอดที่ ร.3 อนุญาต');
+        if (r3Check.hasNotOnPermit) warnings.push('- มีสินค้าประเภทที่ไม่ได้ระบุในใบ ร.3');
+        if (r3Check.hasUncategorized) warnings.push('- มีสินค้าที่ยังไม่ได้ตั้งประเภท ร.3 ในแคตตาล็อก');
+        if (warnings.length && !window.confirm(`ตรวจพบเรื่องเอกสาร ร.3:\n${warnings.join('\n')}\n\nต้องการส่งคำขอต่อหรือไม่?`)) {
+          return;
+        }
+      }
+
       setSubmitting(true);
 
       let requestId;
@@ -636,6 +682,18 @@ export function CustomerWithdrawalRequestCreatePage() {
             setSubmitError(deleteResult.error.message ?? t('customer_portal_load_error'));
             return;
           }
+        }
+      }
+
+      // Unticking ร.3 on an existing draft clears its saved permit rows.
+      if (header.requires_r3_document || (isEditMode && r3PermitItems.length)) {
+        const permitResult = await replaceWithdrawalR3PermitItems(
+          requestId,
+          header.requires_r3_document ? r3PermitItems : [],
+        );
+        if (permitResult.error) {
+          setSubmitError(permitResult.error.message ?? 'บันทึกยอด ร.3 ไม่สำเร็จ');
+          return;
         }
       }
 
@@ -838,6 +896,16 @@ export function CustomerWithdrawalRequestCreatePage() {
             <span>{t('customer_field_r3_document')}</span>
           </label>
         </div>
+
+        {header.requires_r3_document ? (
+          <WithdrawalR3PermitPanel
+            items={r3PermitItems}
+            onItemsChange={setR3PermitItems}
+            lines={getFilledWithdrawalLines(lines)}
+            carcassTypes={r3Types}
+            catalogR3Map={buildCatalogR3Map(catalogProducts)}
+          />
+        ) : null}
 
         <div className="customer-attachment-panel">
           <label className="form-field">

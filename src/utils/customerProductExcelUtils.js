@@ -1,4 +1,5 @@
 import { downloadExcelRows, formatExcelDate, readExcelFile } from './excelFileUtils.js';
+import { resolveR3CarcassTypeCode } from './r3PermitComparisonUtils.js';
 
 export const CUSTOMER_PRODUCT_EXCEL_HEADERS = [
   'customer_product_code',
@@ -11,6 +12,7 @@ export const CUSTOMER_PRODUCT_EXCEL_HEADERS = [
   'storage_charge_basis',
   'product_category',
   'note',
+  'r3_carcass_type',
 ];
 
 const TEMPERATURE_TYPES = new Set(['FROZEN', 'CHILLED', 'AMBIENT']);
@@ -29,7 +31,7 @@ export function normalizeCatalogBarcode(row = {}) {
   return stored || customerCode;
 }
 
-export function mapProductToExcelRow(product = {}) {
+export function mapProductToExcelRow(product = {}, r3Types = []) {
   return {
     customer_product_code: product.customer_product_code ?? '',
     product_name: product.product_name ?? '',
@@ -41,6 +43,10 @@ export function mapProductToExcelRow(product = {}) {
     storage_charge_basis: product.storage_charge_basis ?? 'WEIGHT',
     product_category: product.product_category ?? '',
     note: product.note ?? '',
+    // Thai label, not the code — readable for customers, and the importer
+    // accepts either.
+    r3_carcass_type: r3Types.find((t) => t.code === product.r3_carcass_type_code)?.label_th
+      ?? product.r3_carcass_type_code ?? '',
   };
 }
 
@@ -58,6 +64,7 @@ export function downloadCustomerProductTemplate(customer = null, filename = 'cus
         storage_charge_basis: 'WEIGHT',
         product_category: '',
         note: '',
+        r3_carcass_type: '',
       },
     ],
     CUSTOMER_PRODUCT_EXCEL_HEADERS,
@@ -66,16 +73,18 @@ export function downloadCustomerProductTemplate(customer = null, filename = 'cus
   );
 }
 
-export function exportCustomerProductsExcel(products = [], filename = 'customer-products.xlsx') {
+export function exportCustomerProductsExcel(products = [], filename = 'customer-products.xlsx', r3Types = []) {
   downloadExcelRows(
-    products.map(mapProductToExcelRow),
+    products.map((p) => mapProductToExcelRow(p, r3Types)),
     CUSTOMER_PRODUCT_EXCEL_HEADERS,
     filename,
     'Products',
   );
 }
 
-export async function parseCustomerProductImportFile(file) {
+// r3CarcassTypeCode is null for a blank cell — callers keep the product's
+// existing value in that case rather than clearing it.
+export async function parseCustomerProductImportFile(file, r3Types = []) {
   const { headers, rows } = await readExcelFile(file);
   const missingHeaders = ['customer_product_code', 'product_name'].filter((key) => !headers.includes(key));
   if (missingHeaders.length) {
@@ -126,6 +135,13 @@ export async function parseCustomerProductImportFile(file) {
       packWeightKg = parsedWeight;
     }
 
+    const r3Raw = String(row.r3_carcass_type ?? '').trim();
+    const r3CarcassTypeCode = resolveR3CarcassTypeCode(r3Raw, r3Types);
+    if (r3Raw && !r3CarcassTypeCode) {
+      errors.push(`Row ${row.__row}: r3_carcass_type "${r3Raw}" is not a known ร.3 carcass type.`);
+      return;
+    }
+
     parsed.push({
       customerProductCode,
       productName,
@@ -137,6 +153,7 @@ export async function parseCustomerProductImportFile(file) {
       storageChargeBasis: chargeBasis,
       productCategory: String(row.product_category ?? '').trim(),
       note: String(row.note ?? '').trim(),
+      r3CarcassTypeCode,
     });
   });
 

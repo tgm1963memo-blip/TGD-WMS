@@ -164,6 +164,11 @@ export function CustomerProductServiceRatesPage() {
       allergen: selectedProduct.allergen ?? '',
       note: selectedProduct.note ?? '',
       isActive: selectedProduct.is_active !== false,
+      // The RPC overwrites every column, so pass these through unchanged
+      // or a basis change silently clears them.
+      productCategory: selectedProduct.product_category ?? '',
+      defaultBoxesPerPallet: selectedProduct.default_boxes_per_pallet ?? null,
+      r3CarcassTypeCode: selectedProduct.r3_carcass_type_code ?? null,
     });
     setBasisSaving(false);
     if (result.error) {
