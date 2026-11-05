@@ -1146,14 +1146,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                       onChange={() => toggleRequestSelected(row.id)}
                     />
                   </td>
-                  <td>{row.withdrawal_no}</td>
+                  <td className="cell-nowrap">{row.withdrawal_no}</td>
                   <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getWithdrawalStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
+                  <td className="cell-nowrap">{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                   <td>{row.delivery_type ?? '-'}</td>
                   <td>
                     <button

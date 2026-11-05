@@ -3097,3 +3097,176 @@ a.dash-q:hover { background: var(--color-surface-muted); text-decoration: none; 
 @media (prefers-reduced-motion: reduce) {
   .nav-group-chevron, .sidebar .nav-link { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   REDESIGN 2026-11 — phase 2: shared components on every page
+   PageHeader, cards, tables, status badges, KPI cards, buttons, panels,
+   modal chrome. Screen only: print templates and A4 documents keep their
+   own literal styles (DESIGN.md "Print").
+   ═══════════════════════════════════════════════════════════════════════ */
+@media screen {
+  /* Page header: no blue rail, title carries the hierarchy. */
+  .page-header { margin-bottom: 20px; align-items: flex-end; }
+  .page-header-content { border-left: 0; padding: 0; }
+  .page-header h2 {
+    color: var(--color-text);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+  .page-header p { font-size: 13px; color: var(--color-text-muted); }
+
+  /* Surfaces: hairline border, no glass, no hover lift. */
+  .card, .section-card, .form-card, .table-card {
+    background: var(--color-surface);
+    backdrop-filter: none;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: none;
+    transition: none;
+  }
+  .card:hover, .section-card:hover { box-shadow: none; }
+  .table-card .table-card-header,
+  .card-header, .section-card-header { background: var(--color-surface); }
+  .table-card .table-card-header h3,
+  .form-card h3, .form-card-title,
+  .card-title, .section-card-title {
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .document-section {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .document-section > h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--color-text); }
+
+  /* Tables: muted header, readable rows, row hover. */
+  th, .table-header, .table th, .tgd-table th {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  td, .table-cell, .table td, .tgd-table td {
+    font-size: 12.5px;
+    padding: 8px 10px;
+    border-bottom-color: var(--color-border);
+  }
+  .table tbody tr:hover, .tgd-table tbody tr:hover { background-color: var(--color-surface-muted); }
+  .tgd-table th[style*="cursor: pointer"]:hover { color: var(--color-text); }
+
+  /* Status badges: dot + word, gold for "waiting on us". */
+  .status-badge, .badge.status-badge {
+    gap: 5px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    padding: 3px 8px 3px 7px;
+  }
+  .status-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+  .status-badge--open { background-color: var(--color-gold-soft); color: var(--color-gold-text); }
+
+  /* KPI cards: flat, no accent stripe, numbers in mono. */
+  .kpi-grid { gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--color-surface);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 14px 16px;
+    transition: none;
+  }
+  .kpi-card:hover { transform: none; box-shadow: none; }
+  .kpi-card::before { display: none; }
+  .kpi-label, .kpi-title {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-text-muted);
+    margin: 0 0 4px;
+  }
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--color-text);
+  }
+
+  /* Buttons: 32px tall, 13px text — 28px/11px was too small to hit and read. */
+  button, .btn {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-primary { background-color: var(--tgd-sidebar-bg); border-color: var(--tgd-sidebar-bg); }
+  .btn-primary:hover:not(:disabled) { background-color: #2a3036; border-color: #2a3036; }
+  .btn-outline, .btn-secondary { background-color: var(--color-surface); border-color: var(--color-border-strong); color: var(--color-text); }
+  .btn-outline:hover:not(:disabled), .btn-secondary:hover:not(:disabled) { background-color: var(--color-surface-muted); }
+  button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Notice panels: soft fill, no thick left rail. */
+  .warning-panel { border-left-width: 1px; border-radius: 10px; }
+  .uat-banner {
+    background: var(--color-surface-sunken);
+    border-color: var(--color-border);
+    border-radius: 10px;
+    color: var(--color-text-secondary);
+  }
+  .alert-panel { border-radius: 10px; }
+
+  /* Modal chrome (components/ui/Modal). */
+  .operational-report-modal-toolbar { padding: 12px 18px; }
+  .operational-report-modal-toolbar h2 { font-size: 16px; font-weight: 600; color: var(--color-text); }
+}
+
+/* Phone/tablet keeps its 44px touch targets (rule further up). */
+@media screen and (max-width: 1024px) {
+  button, .btn { height: 44px; padding: 0 16px; }
+}
+/* Handheld cards size themselves; 44px stays the minimum (see .handheld-root above). */
+@media screen {
+  .handheld-root button { height: auto; min-height: 44px; }
+}
+
+/* Row actions: a small primary button repeated on every table row reads as
+   a wall of black. Inside a cell it is outlined; the page's one real
+   primary action keeps the solid fill. */
+@media screen {
+  td .btn.btn-primary.btn-sm {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text);
+    height: 28px;
+    font-size: 12.5px;
+  }
+  td .btn.btn-primary.btn-sm:hover:not(:disabled) { background-color: var(--color-surface-muted); border-color: var(--color-text-muted); }
+}
+
+/* Table cell helpers: document numbers and dates stay on one line; numbers
+   right-align in mono so a column of weights or baht lines up. */
+@media screen {
+  .cell-nowrap, .receiving-customer-deposit-table__request-cell { white-space: nowrap; word-break: normal; }
+  td.cell-num, th.cell-num { text-align: right; }
+  .cell-wide { min-width: 200px; }
+  /* Wraps only at spaces (date | time), never inside a number. */
+  .cell-keep { word-break: keep-all; overflow-wrap: normal; }
+  td.cell-num { white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+}

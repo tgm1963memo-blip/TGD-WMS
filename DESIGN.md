@@ -125,5 +125,20 @@ matching menu path wins, so detail routes show their parent menu item.
   `.dash-flow`, `.dash-q`, `.dash-alert`, `.dash-pill--*` and `.dash-table`.
 - A summary strip is one bordered band split by 1px hairlines, not a row of
   separate cards.
-- Pages outside the dashboard still use the older styles. Move them one at a
-  time and check each one visually.
+- Shared components were restyled for every page (phase 2, "REDESIGN 2026-11 —
+  phase 2" block, screen only, so print is untouched):
+  - PageHeader has no blue rail.
+  - Cards and `.document-section` use a hairline border, with no shadow and no hover lift.
+  - Tables have a muted header row.
+  - Status badges show a dot plus a word. `--open` (waiting on us) is gold.
+  - KPI cards are flat, with mono numbers.
+  - Buttons are 32px tall with 13px text, and 44px on phone and tablet.
+- A small primary button in a table row (`td .btn.btn-primary.btn-sm`) is drawn
+  outlined, so a list doesn't turn into a column of black buttons.
+- Table cell helpers: `.cell-nowrap` keeps document numbers and dates on one line.
+  `.cell-num` right-aligns numbers in mono (put it on the `th` too). `.cell-wide`
+  sets a 200px minimum for a name column. `.cell-keep` wraps only at spaces.
+- Status tone for customer requests comes from
+  `getCustomerRequestStatusClass` (deposit and withdrawal statuses).
+- Page-specific inline styles (for example the stock balance KPI cards and the
+  customer header bar) are untouched. Move them page by page.
