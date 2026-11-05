@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import LanguageToggle from '../common/LanguageToggle.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
@@ -9,7 +9,7 @@ import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js'
  * Top bar: "section / page" breadcrumb on the left, environment status and
  * language on the right. The app name stays as an sr-only heading.
  */
-export function Topbar({ currentSection, sectionLabel = null, onMenuToggle }) {
+export function Topbar({ currentSection, sectionLabel = null, onMenuToggle, onSearch }) {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
 
@@ -37,6 +37,19 @@ export function Topbar({ currentSection, sectionLabel = null, onMenuToggle }) {
         <h2 className="sr-only">TGC WMS</h2>
       </div>
       <div className="header-actions">
+        {onSearch ? (
+          <button
+            type="button"
+            className="topbar-search"
+            onClick={onSearch}
+            aria-label={language === 'th' ? 'ค้นหา (Ctrl K)' : 'Search (Ctrl K)'}
+            data-testid="topbar-search"
+          >
+            <Search size={16} aria-hidden="true" />
+            <span className="topbar-search-text">{language === 'th' ? 'ค้นหา Lot, ใบฝาก, ใบเบิก…' : 'Search lots, documents…'}</span>
+            <kbd className="topbar-search-kbd">Ctrl K</kbd>
+          </button>
+        ) : null}
         {!goLive ? (
           <>
             <span className="status-badge status-badge--uat hide-xs">{getTranslation('uat_mode', language)}</span>

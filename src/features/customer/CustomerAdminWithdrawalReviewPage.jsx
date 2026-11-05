@@ -2,6 +2,7 @@ import { AlertTriangle, Check, Plus, Save, ScrollText } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -479,6 +480,16 @@ export function CustomerAdminWithdrawalReviewPage() {
     setError('');
     setDetailOpen(true);
   }
+
+  // ?open=<id> (from the Ctrl K search) opens that request once it has loaded.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openParam = searchParams.get('open');
+  useEffect(() => {
+    if (!openParam || !rows.some((row) => row.id === openParam)) return;
+    openDetail(openParam);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, rows]);
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 

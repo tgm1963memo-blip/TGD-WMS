@@ -154,5 +154,9 @@ matching menu path wins, so detail routes show their parent menu item.
   `.hh-mode*` classes. Cards have no colored left rail; the status pill carries
   the status. An icon-only button needs `padding: 0`, or the phone rule
   `button { padding: 0 16px }` squeezes its icon.
+- Ctrl K search: `components/layout/CommandPalette.jsx` with
+  `services/globalSearchService.js`. Customer roles get menu jump only. Staff can
+  search only the sources whose page their role can open
+  (`getSearchSourcesForRole`). The search only reads.
 - Other pages may still have their own inline styles. Move them page by page and
   check each one on real screens at desktop and phone width.
