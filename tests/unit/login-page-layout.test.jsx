@@ -8,6 +8,7 @@ import { AppRoutes } from '../../src/app/routes.jsx';
 import { LanguageProvider } from '../../src/i18n/languageProvider.jsx';
 
 vi.mock('../../src/services/stagingAuthService.js', () => ({
+  getStoredAuthSession: () => null,
   getStagingSession: vi.fn().mockResolvedValue({ data: null, error: null }),
   subscribeToStagingAuth: vi.fn((onChange) => {
     onChange(null);

@@ -40,13 +40,17 @@ import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState 
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
-import { enqueue as enqueueOfflineAction, listQueued as listQueuedOfflineActions, syncQueue as syncOfflineQueue } from '../../utils/offlineActionQueue.js';
+import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
+import { HandheldInstallPrompt } from './HandheldInstallPrompt.jsx';
+import { OfflineQueueBanner } from './OfflineQueueBanner.jsx';
+import { LOCATION_UPDATE_ACTION_TYPE, drainOfflineQueue, useOfflineQueueDrain } from './offlineQueueSync.js';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
 
 // ── Qty input row ─────────────────────────────────────────────
@@ -508,6 +512,7 @@ function ReceivingWorkflow({ onBack, t }) {
       const allocResult = await addDepositLineLocationAllocation({
         lineId: matchedLine.id, locationId: selectedLocation.id, palletNo: Number(allocPalletNo),
         boxes: boxes !== '' ? Number(boxes) : null, weight: weight !== '' ? Number(weight) : null,
+        actorProfileId: activeProfile?.id,
       });
       if (allocResult.error) { setSaving(false); setSaveError(allocResult.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
       setPalletWarning(buildPalletAllocationWarning({
@@ -627,8 +632,8 @@ function ReceivingWorkflow({ onBack, t }) {
     });
     const hasFilter = filterCustomer || filterDateFrom || filterDateTo;
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+      <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
           {cameraDocEl}
@@ -712,7 +717,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}
 
       <TopBar
@@ -1527,8 +1532,8 @@ function PickingWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>
           {cameraDocEl}
@@ -1627,7 +1632,7 @@ function PickingWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}
       <TopBar
         title={selectedDoc.withdrawal_no}
@@ -1969,10 +1974,10 @@ function PickingWorkflow({ onBack, t }) {
 // check, so a queued write replayed later is safe to retry rather than
 // likely to conflict.
 const LOCATION_UPDATE_SNAPSHOT_KEY = 'locationUpdate';
-const LOCATION_UPDATE_ACTION_TYPE = 'LOCATION_UPDATE';
 
 function LocationUpdateWorkflow({ onBack, t }) {
   const isOnline = useOnlineStatus();
+  const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docLineSummary, setDocLineSummary] = useState({});
@@ -2025,8 +2030,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [palletWarning, setPalletWarning] = useState('');
 
   async function refreshPendingSyncCount() {
-    const queued = await listQueuedOfflineActions();
-    setPendingSyncCount(queued.filter((item) => item.status === 'pending' || item.status === 'failed').length);
+    const { pending } = await summarizeQueue(activeProfile?.id);
+    setPendingSyncCount(pending);
   }
 
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })), [locations]);
@@ -2120,12 +2125,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
     async function syncThenLoadOnline() {
       setSyncing(true);
-      const result = await syncOfflineQueue({
-        [LOCATION_UPDATE_ACTION_TYPE]: (payload) => addDepositLineLocationAllocation({
-          lineId: payload.lineId, locationId: payload.locationId, palletNo: payload.palletNo,
-          boxes: payload.boxes, weight: payload.weight,
-        }),
-      });
+      const result = await drainOfflineQueue(activeProfile?.id);
       if (!active) return;
       setSyncing(false);
       if (result.synced > 0 || result.failed > 0) {
@@ -2315,7 +2315,10 @@ function LocationUpdateWorkflow({ onBack, t }) {
       // offline) surfaces there as a visible sync failure, not silently.
       await enqueueOfflineAction(LOCATION_UPDATE_ACTION_TYPE, {
         lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal,
-      });
+        // For the "not sure it saved" list, so staff can find the pallet.
+        locationCode: selectedLocation.code ?? null,
+        productName: selectedLine.product_name ?? selectedLine.customer_product_code ?? null,
+      }, { ownerId: activeProfile?.id });
       await refreshPendingSyncCount();
 
       const nextLines = lines.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation.id } : l);
@@ -2334,7 +2337,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       return;
     }
 
-    const result = await addDepositLineLocationAllocation({ lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal });
+    const result = await addDepositLineLocationAllocation({ lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal, actorProfileId: activeProfile?.id });
     setSaving(false);
     if (result.error) { setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
@@ -2407,8 +2410,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-      <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, height: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         {renderOfflineStatusBar()}
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
@@ -2522,7 +2525,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <TopBar
         title={selectedDoc.request_no}
         subtitle={`📍 รอระบุ Location ${pendingCount}/${lines.length} รายการ`}
@@ -2776,16 +2779,16 @@ function LocationUpdateWorkflow({ onBack, t }) {
 }
 
 // ── Mode select home ──────────────────────────────────────────
-function ModeSelect({ onSelect }) {
+function ModeSelect({ onSelect, isOnline, banner }) {
   const { activeProfile, logout } = useHandheldAuth();
   
   return (
-    <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
       {/* Header - matches app sidebar branding */}
       <div style={{
         background: C.headerBg,
-        padding: '24px 28px 20px',
+        padding: 'calc(24px + env(safe-area-inset-top)) 28px 20px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -2816,20 +2819,24 @@ function ModeSelect({ onSelect }) {
         )}
       </div>
 
+      {banner}
+
       <div style={{ flex: 1, padding: '32px 28px 40px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <HandheldInstallPrompt />
         <div style={{ color: C.muted, fontSize: 13, fontWeight: 800, letterSpacing: '0.12em',
           textTransform: 'uppercase', marginBottom: 24, paddingLeft: 4 }}>
           เลือกโหมดการทำงาน
         </div>
 
         {/* Receive button */}
-        <button type="button" onClick={() => onSelect('receive')}
+        <button type="button" disabled={!isOnline} onClick={() => onSelect('receive')}
           style={{
             display: 'flex', alignItems: 'center', gap: 16,
             width: '100%', boxSizing: 'border-box',
             background: C.surface, border: `2px solid ${C.border}`,
             borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
+            textAlign: 'left', cursor: isOnline ? 'pointer' : 'not-allowed', color: C.text,
+            opacity: isOnline ? 1 : 0.55,
             marginBottom: 16, overflow: 'hidden',
             boxShadow: C.shadow,
             transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -2839,18 +2846,19 @@ function ModeSelect({ onSelect }) {
           >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>รับเข้า (Receiving)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>รับสินค้าเข้าคลังตามใบงาน</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>{isOnline ? 'รับสินค้าเข้าคลังตามใบงาน' : 'ต้องมีสัญญาณ'}</div>
           </div>
         </button>
 
         {/* Pick button */}
-        <button type="button" onClick={() => onSelect('pick')}
+        <button type="button" disabled={!isOnline} onClick={() => onSelect('pick')}
           style={{
             display: 'flex', alignItems: 'center', gap: 16,
             width: '100%', boxSizing: 'border-box',
             background: C.surface, border: `2px solid ${C.border}`,
             borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
+            textAlign: 'left', cursor: isOnline ? 'pointer' : 'not-allowed', color: C.text,
+            opacity: isOnline ? 1 : 0.55,
             marginBottom: 16, overflow: 'hidden',
             boxShadow: C.shadow,
             transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -2860,7 +2868,7 @@ function ModeSelect({ onSelect }) {
           >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>เบิกออก (Picking)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>หยิบสินค้าตามใบขอเบิก</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>{isOnline ? 'หยิบสินค้าตามใบขอเบิก' : 'ต้องมีสัญญาณ'}</div>
           </div>
         </button>
 
@@ -2881,7 +2889,7 @@ function ModeSelect({ onSelect }) {
           >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>📍 ระบุที่จัดเก็บ (Location)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>ระบุตำแหน่งสินค้าที่รับเข้าแล้ว</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>{isOnline ? 'ระบุตำแหน่งสินค้าที่รับเข้าแล้ว' : 'ใช้ได้แบบออฟไลน์'}</div>
           </div>
         </button>
 
@@ -2902,7 +2910,7 @@ function ModeSelect({ onSelect }) {
           >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>🧮 นับสต็อก (Stock Count)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>เดินนับทีละแถว ดูรูปสินค้าเทียบกับของจริง</div>
+            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>{isOnline ? 'เดินนับทีละแถว ดูรูปสินค้าเทียบกับของจริง' : 'เริ่มและส่งผลนับต้องมีสัญญาณ'}</div>
           </div>
         </button>
 
@@ -2939,25 +2947,56 @@ function ModeSelect({ onSelect }) {
 }
 
 // ── Main Layout ───────────────────────────────────────────────
+const HANDHELD_MODES = ['receive', 'pick', 'location', 'count'];
+
 function HandheldApp() {
   const t = useTranslation();
-  const [mode, setMode] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get('mode');
   const { activeProfile, isLoading } = useHandheldAuth();
+  const isOnline = useOnlineStatus();
+  // Receiving and Picking need signal to start. A job already open keeps
+  // running if signal drops (its form must not vanish), but a reload or a
+  // forward step into one while offline lands on the menu instead.
+  const shownModeRef = useRef(null);
+  const asked = HANDHELD_MODES.includes(requestedMode) ? requestedMode : null;
+  const needsSignal = asked === 'receive' || asked === 'pick';
+  const mode = needsSignal && !isOnline && shownModeRef.current !== asked ? null : asked;
+  shownModeRef.current = mode;
+  const queue = useOfflineQueueDrain(activeProfile?.id, mode);
+
+  const openMode = (nextMode) => navigate(`?mode=${nextMode}`, { state: { fromMenu: true } });
+  // After a refresh or a deep link there is no menu entry behind this one,
+  // so going back in history would leave the handheld altogether.
+  const backToMenu = () => {
+    if (location.state?.fromMenu) navigate(-1);
+    else navigate('/handheld', { replace: true });
+  };
 
   if (isLoading) return <div data-testid="handheld-page" style={{ padding: 40, textAlign: 'center', fontWeight: 700 }}>กำลังโหลด...</div>;
-  if (!activeProfile) return <div data-testid="handheld-page" style={{ minHeight: '100dvh', background: '#f8fafb', display: 'flex', justifyContent: 'center' }}><HandheldLoginPage /></div>;
+  if (!activeProfile) return <div data-testid="handheld-page" style={{ minHeight: 'var(--handheld-screen-height)', background: '#f8fafb', display: 'flex', justifyContent: 'center' }}><HandheldLoginPage /></div>;
 
-  if (mode === 'count') return <StockCountWorkflow onBack={() => setMode(null)} />;
-  if (mode === 'receive') return <ReceivingWorkflow onBack={() => setMode(null)} t={t} />;
-  if (mode === 'pick') return <PickingWorkflow onBack={() => setMode(null)} t={t} />;
-  if (mode === 'location') return <LocationUpdateWorkflow onBack={() => setMode(null)} t={t} />;
-  return <ModeSelect onSelect={setMode} />;
+  if (mode === 'count') return <StockCountWorkflow onBack={backToMenu} />;
+  if (mode === 'receive') return <ReceivingWorkflow onBack={backToMenu} t={t} />;
+  if (mode === 'pick') return <PickingWorkflow onBack={backToMenu} t={t} />;
+  if (mode === 'location') return <LocationUpdateWorkflow onBack={backToMenu} t={t} />;
+  return (
+    <ModeSelect
+      onSelect={openMode}
+      isOnline={isOnline}
+      banner={<OfflineQueueBanner isOnline={queue.isOnline} pending={queue.pending} interrupted={queue.interrupted} lastResult={queue.lastResult} onChanged={queue.refresh} />}
+    />
+  );
 }
 
 export function HandheldPage() {
   return (
     <HandheldProvider>
-      <HandheldApp />
+      <div className="handheld-root">
+        <HandheldApp />
+      </div>
     </HandheldProvider>
   );
 }

@@ -34,6 +34,21 @@ export async function signOutFromStaging() {
   return { data: null, error };
 }
 
+// supabase-js keeps the session in storage when a token refresh fails on the
+// network, but reports null to listeners, which would send someone reopening
+// the app in a cold room to /login. A session that is really over (signed
+// out, refresh token rejected) is gone from storage, so this returns null
+// for those. Used for routing only: requests still go through supabase-js.
+export function getStoredAuthSession() {
+  if (!supabase || typeof localStorage === 'undefined') return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(supabase.auth.storageKey));
+    return stored?.user?.id && stored.refresh_token ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 export function subscribeToStagingAuth(onChange) {
   if (!supabase) {
     return { unsubscribe: () => {} };

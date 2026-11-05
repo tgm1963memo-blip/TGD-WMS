@@ -859,16 +859,30 @@ export async function listDepositLineLocationAllocations(lineId) {
 // slot isn't already taken, and the running allocation total doesn't exceed
 // actual_boxes/actual_weight -- this wrapper is a thin passthrough so the
 // UI can show the RPC's own error text (e.g. "เต็มแล้ว") verbatim.
-export async function addDepositLineLocationAllocation({ lineId, locationId, palletNo, boxes = null, weight = null }) {
+// `clientActionId` lets the offline queue resend safely: the server returns
+// the first result instead of saving the pallet again. `actorProfileId`
+// credits the staff member picked on the shared handheld. Both need the
+// 20261105120000 migration; until a database has it, the call falls back to
+// the old signature so nothing breaks in between.
+export async function addDepositLineLocationAllocation({ lineId, locationId, palletNo, boxes = null, weight = null, clientActionId = null, actorProfileId = null }) {
   if (!supabase) return missingSupabaseClientResult();
 
-  const { data, error } = await supabase.rpc('tgd_add_deposit_line_location_allocation', {
+  const baseParams = {
     p_line_id: lineId,
     p_location_id: locationId,
     p_pallet_no: palletNo,
     p_boxes: toNullableNumber(boxes),
     p_weight: toNullableNumber(weight),
-  });
+  };
+  const extraParams = {
+    ...(clientActionId ? { p_client_action_id: clientActionId } : {}),
+    ...(actorProfileId ? { p_actor_profile_id: actorProfileId } : {}),
+  };
+
+  let { data, error } = await supabase.rpc('tgd_add_deposit_line_location_allocation', { ...baseParams, ...extraParams });
+  if (error?.code === 'PGRST202' && Object.keys(extraParams).length > 0) {
+    ({ data, error } = await supabase.rpc('tgd_add_deposit_line_location_allocation', baseParams));
+  }
 
   return { data: normalizeCustomerPortalRpcData(data), error };
 }

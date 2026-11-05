@@ -373,8 +373,8 @@ export function StockCountWorkflow({ onBack }) {
   const page = (children) => (
     // Fixed-height page with its own scrolling body, like the other Scan
     // Center screens -- the handheld layout doesn't scroll the document.
-    <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-      <div data-testid="handheld-stock-count" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ background: C.bg, height: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      <div data-testid="handheld-stock-count" style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {children}
       </div>
       {scannerEl}

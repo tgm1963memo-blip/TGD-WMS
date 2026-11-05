@@ -53,6 +53,8 @@
 
 body {
   margin: 0;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   min-width: 320px;
   height: 100vh;
   overflow: hidden;
@@ -2718,3 +2720,23 @@ table .status-badge,
   }
 }
 
+/* Handheld inside the installed app: stay clear of the iPhone home indicator,
+   and keep inputs at 16px, below which iOS Safari zooms the page on focus. */
+.handheld-root {
+  --handheld-screen-height: calc(100dvh - env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  background: var(--color-bg);
+}
+
+/* The phone-width rule above fixes every button at 44px, which squashes the
+   tall handheld cards. 44px stays as the minimum touch target here. */
+.handheld-root button {
+  height: auto;
+  min-height: 44px;
+}
+
+.handheld-root input,
+.handheld-root select,
+.handheld-root textarea {
+  font-size: 16px !important;
+}
