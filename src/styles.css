@@ -3270,3 +3270,131 @@ a.dash-q:hover { background: var(--color-surface-muted); text-decoration: none; 
   .cell-keep { word-break: keep-all; overflow-wrap: normal; }
   td.cell-num { white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   REDESIGN 2026-11 — phase 3: stock balance page
+   Customer band → product row → expanded lines. Quantities are plain text:
+   green is reserved for status (DESIGN.md "Shell and dashboard").
+   ═══════════════════════════════════════════════════════════════════════ */
+@media screen {
+  .stock-kpis { margin-bottom: 20px; }
+  .stock-temp-badge {
+    display: inline-block;
+    background: var(--color-frost-soft);
+    color: var(--color-frost);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .stock-customer-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 10px 16px;
+    background: var(--color-surface-sunken);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .stock-customer-name {
+    flex: 1 1 240px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+  .stock-customer-meta { font-size: 12px; color: var(--color-text-secondary); }
+  .stock-product-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    width: 100%;
+    padding: 10px 16px 10px 20px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .stock-product-row:hover { background: var(--color-surface-muted); }
+  .stock-product-row--open { background: var(--color-frost-soft); }
+  .stock-product-row--open:hover { background: var(--color-frost-soft); }
+  .stock-product-chevron { flex: none; color: var(--color-text-muted); transition: transform 0.15s ease; }
+  .stock-product-row--open .stock-product-chevron { transform: rotate(90deg); }
+  .stock-product-code { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; }
+  .stock-qty {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+  .stock-lines {
+    background: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border-strong);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stock-lines th { background: var(--color-surface-muted); }
+  .stock-lines th:first-child, .stock-lines td:first-child { padding-left: 48px; }
+  .stock-lines td.num { font-size: 12.5px; }
+  .stock-note-cell {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-muted);
+  }
+  .stock-footnote {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+  .stock-footnote summary { cursor: pointer; color: var(--color-text-secondary); }
+  .stock-footnote details[open] summary { margin-bottom: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stock-product-chevron, .stock-product-row { transition: none; }
+}
+
+/* Phase 3 fixes found on real screens. */
+@media screen {
+  /* A bare .btn (no variant) had no border or fill and read as plain text. */
+  .btn:not(.btn-primary):not(.btn-secondary):not(.btn-outline):not(.btn-danger):not(.btn-warning):not(.btn-accent):not(.btn-primary-gold):not(.btn-link) {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text);
+  }
+  .btn-secondary { min-height: 0; padding: 0 12px; font-size: 13px; font-weight: 500; border-color: var(--color-border-strong); }
+
+  /* The header's flex-wrap made the browser reserve two rows for the filter
+     row, leaving a blank band above the filters. */
+  .withdrawal-review-page .table-card-header { flex-wrap: nowrap; }
+}
+/* Desktop only: compact row buttons. Touch screens keep 44px. */
+@media screen and (min-width: 1025px) {
+  td .btn.btn-sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+}
+/* .page-header stacks below 1024px; flex-end would push the title right. */
+@media screen and (max-width: 1024px) {
+  .page-header { align-items: stretch; }
+}
+
+/* The withdrawal lines table is table-layout: fixed, so column width comes
+   from the header cell. A tracking code needs room to read in full. */
+@media screen {
+  .admin-withdrawal-lines-table__product-col { width: 200px; }
+  .admin-withdrawal-lines-table__tracking-col { width: 170px; }
+}
+@media screen and (min-width: 1025px) {
+  td .btn.btn-sm { min-height: 0; }
+}

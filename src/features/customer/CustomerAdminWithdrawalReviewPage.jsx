@@ -1553,7 +1553,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th className="admin-withdrawal-lines-table__row-col">#</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th className="admin-withdrawal-lines-table__product-col">{t('catalog_col_product_name')}</th>
-                      <th>รหัสติดตาม</th>
+                      <th className="admin-withdrawal-lines-table__tracking-col">รหัสติดตาม</th>
                       <th>{t('lot')}</th>
                       <th>อุณหภูมิ</th>
                       <th title="คิดค่าละลายต่อกิโลกรัมจากน้ำหนักที่หยิบจริง">ละลาย</th>

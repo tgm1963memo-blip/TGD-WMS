@@ -140,5 +140,13 @@ matching menu path wins, so detail routes show their parent menu item.
   sets a 200px minimum for a name column. `.cell-keep` wraps only at spaces.
 - Status tone for customer requests comes from
   `getCustomerRequestStatusClass` (deposit and withdrawal statuses).
-- Page-specific inline styles (for example the stock balance KPI cards and the
-  customer header bar) are untouched. Move them page by page.
+- The stock balance page is done: `.dash-kpis` summary strip, then `.stock-*`
+  rows (customer band, product row, expanded lines). Quantities are plain text,
+  because green means status only. Temperature shows the Thai short label in
+  `.stock-temp-badge`.
+- A bare `.btn` with no variant gets a border and a surface fill. Add new variants
+  to that `:not()` list in styles.css.
+- `.admin-withdrawal-lines-table` is `table-layout: fixed`, so a `min-width` on a
+  cell does nothing. Set the width on the header cell.
+- Other pages may still have their own inline styles. Move them page by page and
+  check each one on real screens at desktop and phone width.
