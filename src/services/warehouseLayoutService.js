@@ -195,6 +195,8 @@ function hasRemainingAllocationStock(allocation, picked = { boxes: 0, weight: 0 
   return true;
 }
 
+const PALLET_READ_ERROR_MESSAGE = 'อ่านข้อมูลพาเลทไม่ครบ ลองโหลดหน้าใหม่อีกครั้ง';
+
 export async function getSectionsWithOccupancy() {
   if (!supabase) return { data: [], error: null };
 
@@ -214,10 +216,20 @@ export async function getSectionsWithOccupancy() {
   // and every new "add storage" action write to it, so it always reflects
   // reality without needing the old dual tgd_stock_balances/deposit-line
   // fallback.
-  const [{ data: allocations }, { picked: pickedByAllocationId, isEstimate }] = await Promise.all([
-    fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id')),
+  const readAllocations = () => fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id'));
+  const [firstAllocationRead, { picked: pickedByAllocationId, isEstimate }] = await Promise.all([
+    readAllocations(),
     readPickedQuantities(),
   ]);
+
+  // A failed read leaves only the pages that arrived, so pallets used would
+  // read too low and full rows would look free. Show an error, not a total.
+  const allocationRead = firstAllocationRead.error ? await readAllocations() : firstAllocationRead;
+  if (allocationRead.error) {
+    console.warn('tgd_customer_deposit_line_locations unavailable:', allocationRead.error.message ?? allocationRead.error);
+    return { data: [], error: new Error(PALLET_READ_ERROR_MESSAGE), isEstimate: false };
+  }
+  const allocations = allocationRead.data;
 
   // Count DISTINCT pallet numbers with remaining stock, not allocation rows
   // -- a pallet slot can now hold more than one tracking code (duplicate

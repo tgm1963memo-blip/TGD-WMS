@@ -1046,6 +1046,9 @@ export function WarehouseLocationSetupPage() {
 
   const totalRows = sections.reduce((s, z) => s + z.total, 0);
   const totalCapacity = sections.reduce((s, z) => s + z.totalCapacity, 0);
+  // No sections yet means nothing is known, so a 0 here would read as an
+  // empty warehouse. Reloads keep the last numbers on screen.
+  const statPlaceholder = sections.length > 0 ? null : (loading ? '...' : (error ? '—' : null));
 
   return (
     <section className={getPageShellClassName()}>
@@ -1073,7 +1076,7 @@ export function WarehouseLocationSetupPage() {
             background: 'var(--color-surface)', border: '1px solid #e5e7eb', borderRadius: 10,
             padding: '14px 18px', minWidth: 130,
           }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: stat.color }}>{statPlaceholder ?? stat.value}</div>
             <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>{stat.label}</div>
           </div>
         ))}
