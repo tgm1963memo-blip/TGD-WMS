@@ -4,10 +4,29 @@ import { Topbar } from './Topbar.jsx';
 import { CommandPalette, isCommandPaletteShortcut } from './CommandPalette.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 
+const THEME_STORAGE_KEY = 'tgd.theme';
+
+function readTheme() {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
 export function AppShell({ currentSection, sectionLabel = null, children }) {
   const goLive = isGoLivePresentationEnabled();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [theme, setTheme] = useState(readTheme);
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const next = current === 'dark' ? 'light' : 'dark';
+      try { window.localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* per-viewer convenience only */ }
+      return next;
+    });
+  }
 
   useEffect(() => {
     const onKey = (e) => {
@@ -20,7 +39,7 @@ export function AppShell({ currentSection, sectionLabel = null, children }) {
   }, []);
 
   return (
-    <div className={`app-shell${goLive ? ' app-shell--golive' : ''}`} data-testid="app-shell">
+    <div className={`app-shell${goLive ? ' app-shell--golive' : ''}`} data-testid="app-shell" data-theme={theme}>
       {!goLive ? (
         <div
           className="banner banner-warning uat-safety-banner"
@@ -41,7 +60,7 @@ export function AppShell({ currentSection, sectionLabel = null, children }) {
         )}
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="app-main">
-          <Topbar currentSection={currentSection} sectionLabel={sectionLabel} onMenuToggle={() => setSidebarOpen((o) => !o)} onSearch={() => setSearchOpen(true)} />
+          <Topbar currentSection={currentSection} sectionLabel={sectionLabel} onMenuToggle={() => setSidebarOpen((o) => !o)} onSearch={() => setSearchOpen(true)} theme={theme} onToggleTheme={toggleTheme} />
           <main className="main-content app-content">{children}</main>
         </div>
       </div>

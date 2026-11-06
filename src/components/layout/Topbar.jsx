@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Moon, Search, Sun } from 'lucide-react';
 import LanguageToggle from '../common/LanguageToggle.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { useLanguage } from '../../i18n/languageProvider.jsx';
@@ -9,7 +9,7 @@ import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js'
  * Top bar: "section / page" breadcrumb on the left, environment status and
  * language on the right. The app name stays as an sr-only heading.
  */
-export function Topbar({ currentSection, sectionLabel = null, onMenuToggle, onSearch }) {
+export function Topbar({ currentSection, sectionLabel = null, onMenuToggle, onSearch, theme = 'light', onToggleTheme }) {
   const { language } = useLanguage();
   const goLive = isGoLivePresentationEnabled();
 
@@ -58,6 +58,18 @@ export function Topbar({ currentSection, sectionLabel = null, onMenuToggle, onSe
         ) : (
           <span className="status-badge status-badge--confirmed">{getTranslation('system_online', language)}</span>
         )}
+        {onToggleTheme ? (
+          <button
+            type="button"
+            className="topbar-theme"
+            onClick={onToggleTheme}
+            aria-pressed={theme === 'dark'}
+            aria-label={language === 'th' ? 'โหมดมืด' : 'Dark mode'}
+            data-testid="topbar-theme"
+          >
+            {theme === 'dark' ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+          </button>
+        ) : null}
         <LanguageToggle />
       </div>
     </header>

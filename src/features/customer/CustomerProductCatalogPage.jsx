@@ -124,7 +124,7 @@ const EMPTY_FORM = {
 };
 
 const UOM_PRESETS = ['กก.', 'กล่อง', 'ถุง', 'ชิ้น', 'แพ็ค', 'โหล', 'ลัง'];
-const TEMP_COLORS = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
+const TEMP_COLORS = { FROZEN: '#1d6fcf', CHILLED: 'var(--color-success-text)', AMBIENT: '#c97d00' };
 
 function TempBadge({ type }) {
   const bg = TEMP_COLORS[type] ?? '#888';

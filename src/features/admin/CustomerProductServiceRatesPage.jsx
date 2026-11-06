@@ -55,15 +55,15 @@ const EMPTY_FORM = {
 };
 
 const SERVICE_COLORS = {
-  STORAGE:      { bg: 'var(--color-accent-soft)', color: '#1d6fcf' },
-  HANDLING_IN:  { bg: 'var(--color-success-soft)', color: '#0e7a3a' },
+  STORAGE:      { bg: '#eff6ff', color: '#1d6fcf' },
+  HANDLING_IN:  { bg: '#f0fdf4', color: '#0e7a3a' },
   HANDLING_OUT: { bg: '#fff7ed', color: '#c2570b' },
   THAW:         { bg: '#ecfeff', color: '#0e7490' },
   LABEL:       { bg: '#fdf4ff', color: '#7c3aed' },
   FREEZING:     { bg: '#f0f9ff', color: '#0369a1' },
   OVERTIME:         { bg: '#fff7ed', color: '#c2570b' },
-  OVERTIME_HOLIDAY: { bg: 'var(--color-danger-soft)', color: '#b91c1c' },
-  OTHER:        { bg: 'var(--color-surface-muted)', color: '#475569' },
+  OVERTIME_HOLIDAY: { bg: '#fef2f2', color: '#b91c1c' },
+  OTHER:        { bg: '#f8fafc', color: '#475569' },
 };
 
 function ServiceBadge({ type }) {
@@ -73,7 +73,7 @@ function ServiceBadge({ type }) {
     <span style={{
       display: 'inline-block', fontSize: 11, fontWeight: 600,
       padding: '3px 8px', borderRadius: 6,
-      background: c.bg, color: c.color, border: `1px solid ${c.color}33`,
+      background: c.bg, color: c.color, border: `1px solid color-mix(in srgb, ${c.color} 20%, transparent)`,
     }}>
       {st?.label ?? type}
     </span>
@@ -493,7 +493,7 @@ export function CustomerProductServiceRatesPage() {
       ) : null}
 
       {/* Rates table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="storage-rate-table">
           <thead>
             <tr style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e5e7eb' }}>
@@ -543,11 +543,11 @@ export function CustomerProductServiceRatesPage() {
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
                     {ub?.label ?? row.unit_basis}
-                    {row.period_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ทุก {row.period_days} วัน</div> : null}
+                    {row.period_days ? <div style={{ fontSize: 11, color: 'var(--color-success-text)' }}>ทุก {row.period_days} วัน</div> : null}
                     {row.max_quantity ? <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>สูงสุด {row.max_quantity}</div> : null}
                     {row.min_charge_amount ? <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>ขั้นต่ำ {row.min_charge_amount} ฿</div> : null}
-                    {row.free_days ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ฟรี {row.free_days} วันแรก</div> : null}
-                    {row.discount_percent ? <div style={{ fontSize: 11, color: '#0e7a3a' }}>ส่วนลด {row.discount_percent}%</div> : null}
+                    {row.free_days ? <div style={{ fontSize: 11, color: 'var(--color-success-text)' }}>ฟรี {row.free_days} วันแรก</div> : null}
+                    {row.discount_percent ? <div style={{ fontSize: 11, color: 'var(--color-success-text)' }}>ส่วนลด {row.discount_percent}%</div> : null}
                     {(row.contract_start_date || row.contract_end_date) ? (
                       <div style={{ fontSize: 11, color: '#7c3aed' }}>
                         สัญญา: {row.contract_start_date ?? '…'} ถึง {row.contract_end_date ?? '…'}

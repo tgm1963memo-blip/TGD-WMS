@@ -296,7 +296,7 @@ export function InventoryMovementReportTemplate({
                   const divider = line._isLastOfLotGroup ? { borderBottom: '2px solid #888' } : null;
                   const cell = (extra) => ({ ...CELL, ...divider, ...extra });
                   return (
-                    <tr key={line.id ?? index} style={{ background: index % 2 === 1 ? '#fafafa' : '#fff' }}>
+                    <tr key={line.id ?? index} style={{ background: index % 2 === 1 ? '#fafafa' : 'var(--color-surface)' }}>
                       <td style={cell({ textAlign: 'center', fontSize: 8 })}>{index + 1}</td>
                       <td style={cell({ textAlign: 'center', fontSize: 8 })}>{fmtDate(line.receivedDate)}</td>
                       <td style={cell({ textAlign: 'center', fontSize: 8 })}>{fmtDate(line.deliveryDate)}</td>
