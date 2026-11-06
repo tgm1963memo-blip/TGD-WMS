@@ -2,6 +2,8 @@ import { AlertTriangle, Check, Plus, Save, ScrollText } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { RequestProgress } from '../../components/customer/RequestProgress.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -479,6 +481,16 @@ export function CustomerAdminWithdrawalReviewPage() {
     setError('');
     setDetailOpen(true);
   }
+
+  // ?open=<id> (from the Ctrl K search) opens that request once it has loaded.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openParam = searchParams.get('open');
+  useEffect(() => {
+    if (!openParam || !rows.some((row) => row.id === openParam)) return;
+    openDetail(openParam);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, rows]);
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 
@@ -1135,7 +1147,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <tr
                   key={row.id}
                   onClick={() => openDetail(row.id)}
-                  style={{ cursor: 'pointer', background: selectedId === row.id ? '#f0f9ff' : 'inherit' }}
+                  style={{ cursor: 'pointer', background: selectedId === row.id ? 'var(--color-row-selected)' : 'inherit' }}
                 >
                   <td onClick={(e) => e.stopPropagation()}>
                     <input
@@ -1245,6 +1257,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             {actionMsg ? <div className="alert-success-panel" role="status" style={{ marginBottom: 12 }}>{actionMsg}</div> : null}
             {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
 
+            <RequestProgress kind="withdrawal" status={selected.status} />
             {/* Header info */}
             <div className="form-grid" style={{ marginBottom: 16 }}>
               <div>

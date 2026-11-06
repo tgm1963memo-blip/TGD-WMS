@@ -13,7 +13,7 @@ import { formatFixed2 } from '../../utils/numberFormat.js';
 import { exportCustomerStockBalanceExcel } from '../../utils/customerStockBalanceExcelUtils.js';
 
 function TempBadge({ type }) {
-  const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
+  const map = { FROZEN: '#1d6fcf', CHILLED: 'var(--color-success-text)', AMBIENT: '#c97d00' };
   return (
     <span style={{
       display: 'inline-block',
@@ -345,7 +345,7 @@ export function CustomerStockBalancePage() {
                   </div>
 
                   {isExpanded && (
-                    <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e2e8f0' }}>
+                    <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid var(--color-border)' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: 'var(--color-surface-sunken)' }}>
@@ -364,8 +364,8 @@ export function CustomerStockBalancePage() {
                         </thead>
                         <tbody>
                           {pg.lines.map((l) => (
-                            <tr key={l.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                              <td style={{ padding: '10px 16px 10px 32px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
+                            <tr key={l.id} style={{ borderTop: '1px solid var(--color-border)' }}>
+                              <td style={{ padding: '10px 16px 10px 32px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, var(--color-accent))' }}>
                                 {l.request?.request_no ?? '-'}
                               </td>
                               <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>

@@ -903,6 +903,7 @@ export function CustomerAdminDepositReviewPage() {
                         />
                       </th>
                       <th>#</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>รหัสติดตาม</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th>{t('customer_col_weight_per_box')}</th>
@@ -915,7 +916,7 @@ export function CustomerAdminDepositReviewPage() {
                   </thead>
                   <tbody>
                     {linesLoading ? (
-                      <tr><td colSpan={10}><LoadingState /></td></tr>
+                      <tr><td colSpan={11}><LoadingState /></td></tr>
                     ) : lines.length ? lines.map((line) => (
                       <tr key={line.id}>
                         <td>
@@ -928,6 +929,7 @@ export function CustomerAdminDepositReviewPage() {
                           />
                         </td>
                         <td>{line.line_no}</td>
+                        <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">{line.tracking_code ?? '-'}</td>
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.weight_per_box != null ? Number(line.weight_per_box).toFixed(2) : '-'}</td>
@@ -990,7 +992,7 @@ export function CustomerAdminDepositReviewPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={10}>{t('customer_request_detail_lines_empty')}</td></tr>
+                      <tr><td colSpan={11}>{t('customer_request_detail_lines_empty')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1012,7 +1014,7 @@ export function CustomerAdminDepositReviewPage() {
 
             {/* Persistent email notification section */}
             {selected && ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED'].includes(selected.status) ? (
-              <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--tgd-surface-alt, #f8fafc)', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
+              <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--tgd-surface-alt, var(--color-surface-muted))', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>แจ้งลูกค้าทางอีเมล</div>

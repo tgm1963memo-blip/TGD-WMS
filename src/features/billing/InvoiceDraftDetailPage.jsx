@@ -331,7 +331,7 @@ export function InvoiceDraftDetailPage() {
       />
 
       <UatOnly>
-      <section className="safety-panel" style={{ padding: 16, background: 'var(--color-danger-soft)', border: '1px solid #fecaca', borderRadius: 8, marginTop: 16 }}>
+      <section className="safety-panel" style={{ padding: 16, background: 'var(--color-danger-soft)', border: '1px solid var(--color-danger-border)', borderRadius: 8, marginTop: 16 }}>
         <h3 style={{ color: 'var(--tgd-danger)', fontSize: 16 }}>Gate 3B-4 boundary</h3>
         <ul style={{ paddingLeft: 20, fontSize: 14, color: 'var(--color-danger-strong)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <li>Bplus export readiness preview only</li>
