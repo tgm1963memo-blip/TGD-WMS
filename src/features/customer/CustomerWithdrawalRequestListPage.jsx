@@ -453,8 +453,8 @@ export function CustomerWithdrawalRequestListPage() {
                   <td style={{ maxWidth: 140 }}>
                     {row.note ? (
                       row.note.length > 24 ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }} title={row.note}>
+                        <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 124 }} title={row.note}>
                             {row.note}
                           </span>
                           <button

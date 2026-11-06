@@ -500,7 +500,7 @@ export function InventoryBalancePage() {
                                 <td className="cell-nowrap num">
                                   {l.tracking_code ?? '-'}
                                 </td>
-                                <td style={{ minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere' }}>
+                                <td style={{ minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
                                   <div>{locationsLoading ? 'กำลังโหลด...' : locationsError ? 'โหลด Location ไม่สำเร็จ' : inventoryLocationLabel(locationMap.get(l.id)) || 'ยังไม่กำหนด Location'}</div>
                                   {!asOfDate && canManageInventoryLocation(role) && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} disabled={locationsLoading || !!locationsError} onClick={() => setLocationLine(l)}>จัดการ Location</button>}
                                 </td>

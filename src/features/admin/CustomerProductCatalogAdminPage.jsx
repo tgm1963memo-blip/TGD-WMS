@@ -616,7 +616,7 @@ export function CustomerProductCatalogAdminPage() {
             onChange={(e) => setSearchText(e.target.value)}
           />
         </label>
-        <div className="form-field" style={{ margin: 0, flex: '0 0 auto' }}>
+        <div className="form-field" style={{ margin: 0, flex: '0 1 auto', minWidth: 0 }}>
           <span style={{ fontSize: 12 }}>{t('catalog_excel_tools')}</span>
           <ExcelImportExportToolbar
             disabled={saving || importing}

@@ -68,6 +68,7 @@ export function AuthReadinessPanel({
 
       <div className="document-section">
         <h3>รายการตรวจสอบ</h3>
+        <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -86,6 +87,7 @@ export function AuthReadinessPanel({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="document-section">

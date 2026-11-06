@@ -494,6 +494,7 @@ export function CustomerProductServiceRatesPage() {
 
       {/* Rates table */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+        <div className="table-responsive">
         <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="storage-rate-table">
           <thead>
             <tr style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e5e7eb' }}>
@@ -586,6 +587,7 @@ export function CustomerProductServiceRatesPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Form modal */}
