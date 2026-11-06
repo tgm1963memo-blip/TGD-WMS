@@ -221,7 +221,7 @@ export function DashboardPage() {
               label={t('open_receiving')}
               value={show(goLive ? d.openReceivingRows : '—')}
               helper={goLive ? t('open_documents') : t('demo_uat_placeholder')}
-              to="/operations/receiving"
+              to="/customer/admin/deposit-review"
             />
             <FlowStep label={th ? 'รอจัดเก็บ (Putaway)' : 'Pending putaway'} value={show(d.openPutawayRows)} helper={th ? 'งาน' : 'sessions'} />
             <FlowStep label={th ? 'รอหยิบสินค้า' : 'Pending picking'} value={show(d.openPickingRows)} helper={th ? 'คิว' : 'queue'} to="/customer/admin/withdrawal-review" />
