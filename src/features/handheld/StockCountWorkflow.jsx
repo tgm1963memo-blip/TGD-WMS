@@ -112,7 +112,7 @@ function PalletCard({ pallet, locationCode, photo, entry, onChange, highlighted,
             {photo.source === 'PACKAGING' ? 'รูป Packaging' : 'รูปตอนรับเข้า'}
           </span>
         )}
-        <span style={{ position: 'absolute', right: 10, top: 10, background: C.primary, color: C.gold, borderRadius: 10, padding: '4px 10px', fontSize: 13, fontWeight: 900, fontFamily: 'monospace' }}>
+        <span style={{ position: 'absolute', right: 10, top: 10, background: C.primary, color: C.gold, borderRadius: 10, padding: '4px 10px', fontSize: 13, fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
           {buildPalletCode(locationCode, pallet.pallet_no)}
         </span>
       </button>
@@ -122,7 +122,7 @@ function PalletCard({ pallet, locationCode, photo, entry, onChange, highlighted,
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6, fontSize: 12, fontWeight: 700, color: C.textSec }}>
           {pallet.customer_product_code && <span style={{ background: C.blueLight, borderRadius: 8, padding: '3px 8px' }}>รหัส {pallet.customer_product_code}</span>}
           {pallet.lot_no && <span style={{ background: C.blueLight, borderRadius: 8, padding: '3px 8px' }}>LOT {pallet.lot_no}</span>}
-          {pallet.tracking_code && <span style={{ background: C.blueLight, borderRadius: 8, padding: '3px 8px', fontFamily: 'monospace' }}>{pallet.tracking_code}</span>}
+          {pallet.tracking_code && <span style={{ background: C.blueLight, borderRadius: 8, padding: '3px 8px', fontFamily: 'var(--font-mono)' }}>{pallet.tracking_code}</span>}
         </div>
         {pallet.customer_name && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{pallet.customer_name}</div>}
 
@@ -528,7 +528,7 @@ export function StockCountWorkflow({ onBack }) {
                       <button key={l.id} type="button" onClick={() => openLocation(l)} data-testid="stock-count-row"
                         style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${color}`, background: counted ? (status === 'VARIANCE' ? 'var(--color-warning-soft)' : C.greenLight) : C.surface, cursor: 'pointer', fontWeight: 900, color: C.text }}>
                         <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{counted ? (status === 'VARIANCE' ? <AlertTriangle size={15} aria-hidden="true" color="#f59e0b" /> : <CheckCircle2 size={15} aria-hidden="true" color={C.green} />) : null}{formatRowLabel(l.parsed.row)}</div>
-                        <div style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace' }}>{l.code}</div>
+                        <div style={{ fontSize: 11, color: C.muted, fontFamily: 'var(--font-mono)' }}>{l.code}</div>
                       </button>
                     );
                   })}

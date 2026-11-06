@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,7 +46,7 @@ async function renderAs(role) {
     replaceWithdrawalR3PermitItems: vi.fn(),
   }));
   const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
-  render(<CustomerAdminWithdrawalReviewPage />);
+  render(<MemoryRouter><CustomerAdminWithdrawalReviewPage /></MemoryRouter>);
   fireEvent.click(await screen.findByTestId('admin-withdrawal-review-select-wr-1'));
   fireEvent.click(await screen.findByTestId('btn-confirm-withdrawal'));
   return screen.findByTestId('input-confirm-withdrawal-date');

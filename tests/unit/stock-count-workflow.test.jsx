@@ -69,7 +69,7 @@ describe('StockCountWorkflow', () => {
     const [firstCard, secondCard] = screen.getAllByTestId('stock-count-pallet-card');
     fireEvent.click(within(firstCard).getByRole('button', { name: 'ตรง' }));
     // The chosen button fills with its own color so its white label stays readable.
-    expect(within(firstCard).getByRole('button', { name: 'ตรง' })).toHaveStyle({ background: '#059669' });
+    expect(within(firstCard).getByRole('button', { name: 'ตรง' })).toHaveStyle({ background: '#047857' });
     fireEvent.click(within(secondCard).getByRole('button', { name: 'ไม่ตรง' }));
     const [boxesInput, weightInput] = within(secondCard).getAllByRole('spinbutton');
     fireEvent.change(boxesInput, { target: { value: '3' } });

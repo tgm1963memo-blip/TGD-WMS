@@ -7,7 +7,7 @@ export function getCustomerRequestStatusClass(status) {
   if (status === 'ADMIN_ACCEPTED' || status === 'WAREHOUSE_PICKING') return 'open';
   if (status === 'RECEIVED_CONFIRMED' || status === 'CUSTOMER_NOTIFIED' || status === 'CLOSED') return 'success';
   if (status === 'DISPATCHED' || status === 'COMPLETED') return 'success';
-  if (status === 'ADMIN_REJECTED' || status === 'CANCELLED') return 'blocked';
+  if (status === 'ADMIN_REJECTED' || status === 'REJECTED' || status === 'CANCELLED') return 'blocked';
   if (status === 'RECEIVING_VARIANCE' || status === 'COUNT_VARIANCE_REVIEW') return 'warning';
   return 'hold';
 }

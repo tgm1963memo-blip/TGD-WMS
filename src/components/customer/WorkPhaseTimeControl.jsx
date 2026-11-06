@@ -38,7 +38,7 @@ function CompactFieldCell({ label, valueNode, byline, canWrite, editing, onToggl
       {byline && <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>{byline}</div>}
       {editing && (
         <div style={{
-          marginTop: 6, background: '#fff', border: '1px dashed var(--tgd-border, #e2e8f0)',
+          marginTop: 6, background: 'var(--color-surface)', border: '1px dashed var(--tgd-border, var(--color-border))',
           borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 190,
         }}>
           {children}
@@ -127,14 +127,14 @@ function PhaseRow({ label, at, byEmail, canWrite, onRecordNow, onEditSave, fallb
           type="date"
           value={editDate}
           onChange={(e) => setEditDate(e.target.value)}
-          style={{ flex: 1, minWidth: 0, font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+          style={{ flex: 1, minWidth: 0, font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--color-border)' }}
         />
         <input
           aria-label={`${label} time`}
           type="time"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
-          style={{ flex: 1, minWidth: 0, font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+          style={{ flex: 1, minWidth: 0, font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--color-border)' }}
         />
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
@@ -204,7 +204,7 @@ function TemperatureRow({ label, value, canWrite, onSave }) {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder="เช่น -18°C"
-        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--color-border)' }}
       />
       <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
         บันทึก
@@ -267,7 +267,7 @@ export function OvertimeControl({ canWrite, isOvertime, overtimeType, note, setB
             <input type="radio" checked={draftChoice === choice.value} onChange={() => setDraftChoice(choice.value)} />
             <span>{choice.label}</span>
             {choice.value !== 'NONE' && estimate && !estimate.loading && (
-              <span style={{ color: choice.rate ? 'var(--tgd-muted-text)' : 'var(--tgd-warning, #b45309)', fontSize: 11 }}>
+              <span style={{ color: choice.rate ? 'var(--tgd-muted-text)' : 'var(--tgd-warning, var(--color-warning))', fontSize: 11 }}>
                 {choice.rate ? formatRateInfo(choice.rate) : 'ยังไม่ตั้ง rate'}
               </span>
             )}
@@ -279,7 +279,7 @@ export function OvertimeControl({ canWrite, isOvertime, overtimeType, note, setB
         value={draftNote}
         onChange={(e) => setDraftNote(e.target.value)}
         placeholder="หมายเหตุ เช่น ลงงานหลัง 18:00"
-        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--color-border)' }}
       />
       <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
         บันทึก
@@ -305,7 +305,7 @@ function OvertimeEstimateText({ estimate }) {
   const muted = { fontSize: 11, fontWeight: 400, color: 'var(--tgd-muted-text)' };
   if (estimate.loading) return <div style={muted}>กำลังคำนวณ...</div>;
   if (!estimate.pool) {
-    return <div style={{ ...muted, color: 'var(--tgd-warning, #b45309)' }}>ไม่พบ rate OT (ต่อ กก.) ของประเภทนี้</div>;
+    return <div style={{ ...muted, color: 'var(--tgd-warning, var(--color-warning))' }}>ไม่พบ rate OT (ต่อ กก.) ของประเภทนี้</div>;
   }
   const { pool, share } = estimate;
   return (

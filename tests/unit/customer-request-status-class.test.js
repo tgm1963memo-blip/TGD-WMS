@@ -12,6 +12,7 @@ describe('getCustomerRequestStatusClass', () => {
     ['DISPATCHED', 'success'],
     ['COMPLETED', 'success'],
     ['ADMIN_REJECTED', 'blocked'],
+    ['REJECTED', 'blocked'],
     ['CANCELLED', 'blocked'],
     ['RECEIVING_VARIANCE', 'warning'],
     ['SOMETHING_NEW', 'hold'],

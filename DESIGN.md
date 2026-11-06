@@ -148,5 +148,24 @@ matching menu path wins, so detail routes show their parent menu item.
   to that `:not()` list in styles.css.
 - `.admin-withdrawal-lines-table` is `table-layout: fixed`, so a `min-width` on a
   cell does nothing. Set the width on the header cell.
+- Handheld uses the same ink, gold and frost through the hex palette `C` in
+  `handheldUi.jsx`. `C.green` and `C.amber` are darker than the desktop tones,
+  because small status text must stay readable in dim cold rooms. The menu uses
+  `.hh-mode*` classes. Cards have no colored left rail; the status pill carries
+  the status. An icon-only button needs `padding: 0`, or the phone rule
+  `button { padding: 0 16px }` squeezes its icon.
+- Ctrl K search: `components/layout/CommandPalette.jsx` with
+  `services/globalSearchService.js`. Customer roles get menu jump only. Staff can
+  search only the sources whose page their role can open
+  (`getSearchSourcesForRole`). The search only reads.
+- Dark mode is opt-in from the top bar and saved per browser (`tgd.theme`). It lives
+  on `.app-shell[data-theme="dark"]` for screen only, so login, the handheld and
+  paper stay light. Use tokens for new colors. A hard-coded light fill with
+  token text is the usual dark-mode bug. Tokens that alias another token at
+  `:root` resolve there, so override them directly in the dark block.
+- Document previews stay white: their classes reset the tokens to light values at
+  the end of the dark block. Add a new paper class to that `:is()` list.
+- `RequestProgress` shows a request's stage in the detail popups. It renders nothing
+  for rejected, cancelled or unknown statuses. Add new statuses to its stage lists.
 - Other pages may still have their own inline styles. Move them page by page and
   check each one on real screens at desktop and phone width.

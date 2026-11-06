@@ -1,6 +1,7 @@
+import { ChevronLeft, ChevronRight, Delete } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useHandheldAuth } from './HandheldContext.jsx';
-import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useLanguage } from '../../i18n/languageProvider.jsx';
 
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -27,7 +28,7 @@ export function HandheldLoginPage() {
   const [pinError, setPinError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { listHandheldStaff, loginWithPin } = useHandheldAuth();
-  const { language } = useTranslation();
+  const { language } = useLanguage();
 
   useEffect(() => {
     let active = true;
@@ -97,7 +98,7 @@ export function HandheldLoginPage() {
       <div data-testid="handheld-login-page" style={containerStyle}>
         <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--color-gold)', letterSpacing: '-0.01em', marginBottom: 2 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-gold-text)', marginBottom: 2 }}>
               TGC Cold Storage
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 8 }}>Handheld</div>
@@ -111,7 +112,7 @@ export function HandheldLoginPage() {
               กำลังโหลดรายชื่อพนักงาน…
             </div>
           ) : staffError ? (
-            <div style={{ textAlign: 'center', color: '#ef4444', paddingTop: 48 }}>
+            <div role="alert" style={{ textAlign: 'center', color: 'var(--color-danger)', paddingTop: 48 }}>
               {staffError}
             </div>
           ) : staffList.length === 0 ? (
@@ -130,9 +131,9 @@ export function HandheldLoginPage() {
                     alignItems: 'center',
                     gap: 16,
                     padding: '20px 24px',
-                    background: 'var(--color-surface-muted)',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: 20,
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 12,
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
@@ -140,13 +141,13 @@ export function HandheldLoginPage() {
                     transition: 'all 0.15s',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-text)'; e.currentTarget.style.background = 'var(--color-surface-sunken)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-surface-muted)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-surface)'; }}
                 >
                   <div style={{
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    background: 'var(--color-text)',
+                    background: 'var(--color-sidebar)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
@@ -162,11 +163,11 @@ export function HandheldLoginPage() {
                     <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.3 }}>
                       {staff.displayName}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
                       {ROLE_LABELS[staff.role] ?? staff.role}
                     </div>
                   </div>
-                  <div style={{ color: 'var(--color-border-strong)', fontSize: 20 }}>›</div>
+                  <ChevronRight size={20} aria-hidden="true" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
                 </button>
               ))}
             </div>
@@ -200,7 +201,7 @@ export function HandheldLoginPage() {
             padding: '8px 4px',
           }}
         >
-          ‹ กลับ
+          <ChevronLeft size={18} aria-hidden="true" /> กลับ
         </button>
 
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
@@ -208,7 +209,7 @@ export function HandheldLoginPage() {
             width: 64,
             height: 64,
             borderRadius: '50%',
-            background: 'var(--color-text)',
+            background: 'var(--color-sidebar)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
@@ -235,14 +236,14 @@ export function HandheldLoginPage() {
               width: 20,
               height: 20,
               borderRadius: '50%',
-              background: i < pin.length ? 'var(--color-text)' : 'var(--color-surface-sunken)',
+              background: i < pin.length ? 'var(--color-sidebar)' : 'var(--color-border)',
               transition: 'all 0.2s',
             }} />
           ))}
         </div>
 
         {pinError && (
-          <div style={{ color: '#ef4444', fontSize: 14, fontWeight: 700, marginBottom: 20 }}>
+          <div role="alert" style={{ color: 'var(--color-danger)', fontSize: 14, fontWeight: 700, marginBottom: 20 }}>
             {pinError}
           </div>
         )}
@@ -258,7 +259,7 @@ export function HandheldLoginPage() {
               style={{
                 background: 'var(--color-surface-muted)',
                 border: 'none',
-                borderRadius: 16,
+                borderRadius: 12,
                 padding: '24px 0',
                 fontSize: 24,
                 fontWeight: 600,
@@ -274,16 +275,18 @@ export function HandheldLoginPage() {
             type="button"
             onClick={handleBackspace}
             disabled={isLoading || !pin}
+            aria-label="ลบตัวเลขล่าสุด"
             style={{
               background: 'transparent',
               border: 'none',
-              fontSize: 20,
               color: 'var(--color-text-muted)',
               cursor: 'pointer',
-              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            ⌫
+            <Delete size={24} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -292,7 +295,7 @@ export function HandheldLoginPage() {
             style={{
               background: 'var(--color-surface-muted)',
               border: 'none',
-              borderRadius: 16,
+              borderRadius: 12,
               padding: '24px 0',
               fontSize: 24,
               fontWeight: 600,
@@ -308,8 +311,8 @@ export function HandheldLoginPage() {
             onClick={handleSubmit}
             disabled={isLoading || !pin}
             style={{
-              background: pin ? 'var(--color-text)' : 'var(--color-surface-sunken)',
-              color: pin ? '#ffffff' : 'var(--color-text-subtle)',
+              background: pin ? 'var(--color-sidebar)' : 'var(--color-surface-sunken)',
+              color: pin ? '#ffffff' : 'var(--color-text-muted)',
               border: 'none',
               borderRadius: 16,
               fontSize: 18,

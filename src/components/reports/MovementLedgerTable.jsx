@@ -147,7 +147,7 @@ const summaryColumns = [
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
       const qty = Number(row.qty ?? row.quantity ?? 0);
-      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{qty}</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, var(--color-danger))' }}>{qty}</span>;
     },
   },
   {
@@ -156,7 +156,7 @@ const summaryColumns = [
     width: '95px',
     render: (row) => {
       if (isInbound(row)) return <span style={{ color: '#ccc' }}>-</span>;
-      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, #dc2626)' }}>{fmtWt(row.weight)}</span>;
+      return <span className="compact-cell-qty" style={{ color: 'var(--tgd-danger, var(--color-danger))' }}>{fmtWt(row.weight)}</span>;
     },
   },
   {
