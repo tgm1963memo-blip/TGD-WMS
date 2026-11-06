@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -54,7 +55,7 @@ describe('CustomerAdminWithdrawalReviewPage confirm-dispatch guard', () => {
     }]);
 
     const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
-    render(<CustomerAdminWithdrawalReviewPage />);
+    render(<MemoryRouter><CustomerAdminWithdrawalReviewPage /></MemoryRouter>);
 
     fireEvent.click(await screen.findByTestId('admin-withdrawal-review-select-wr-1'));
 
@@ -71,7 +72,7 @@ describe('CustomerAdminWithdrawalReviewPage confirm-dispatch guard', () => {
     ]);
 
     const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
-    render(<CustomerAdminWithdrawalReviewPage />);
+    render(<MemoryRouter><CustomerAdminWithdrawalReviewPage /></MemoryRouter>);
 
     fireEvent.click(await screen.findByTestId('admin-withdrawal-review-select-wr-1'));
 

@@ -355,7 +355,7 @@ export function CustomerMovementLedgerPage() {
               <div className="kpi-label">รับเข้า (ลัง)</div>
             </div>
             <div className="kpi-card">
-              <div className="kpi-value" style={{ color: 'var(--tgd-danger, #dc2626)' }}>-{filteredSummary.totalOutboundQty}</div>
+              <div className="kpi-value" style={{ color: 'var(--tgd-danger, var(--color-danger))' }}>-{filteredSummary.totalOutboundQty}</div>
               <div className="kpi-label">เบิกออก (ลัง)</div>
             </div>
           </div>

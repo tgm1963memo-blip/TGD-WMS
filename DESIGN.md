@@ -19,7 +19,9 @@ Use the semantic `--color-*` tokens. The older `--tgm-*` / `--tgd-*` names still
 | Role | Token | Value |
 |---|---|---|
 | Brand accent | `--color-gold` / `--color-gold-hover` | #d4af37 / #b5952f |
-| Shell (sidebar, handheld header) | `--color-sidebar` | #09111c |
+| Shell (sidebar, handheld header) | `--color-sidebar` | #111417 |
+| Cold / temperature, stock fills | `--color-frost` / `--color-frost-soft` | #1f6fa8 / #e2eef7 |
+| Gold as text on light | `--color-gold-text` | #7a5f0c |
 | Page background | `--color-bg` | #f8fafb |
 | Surfaces | `--color-surface`, `--color-surface-muted`, `--color-surface-sunken` | #fff, #f8fafc, #f1f5f9 |
 | Borders | `--color-border-subtle`, `--color-border`, `--color-border-strong` | #e5e7eb, #e2e8f0, #cbd5e1 |
@@ -89,7 +91,81 @@ stay as text, and print documents keep their glyphs.
 
 ## Navigation
 
-The sidebar group labels are English on purpose (17B); item labels follow the
-language toggle through `nav.*` keys in `src/i18n/translationCatalog.js`. Every new
-menu item needs a `nav.<camelKey>` entry and a `routePermissionCatalog` entry
-(`tests/unit/route-permission-audit.test.js` fails otherwise).
+`src/app/navigation.js` holds the permission groups. Their keys drive role
+permissions, the role-permissions admin page and the legacy visibility rules, so
+don't rename them. The sidebar doesn't show those groups directly:
+`src/app/navigationSections.js` folds them into five job-based sections (งานของฉัน,
+งานคลัง, พอร์ทัลลูกค้า, การเงินและรายงาน, ตั้งค่าระบบ) and gives every item a
+lucide icon. Section headings follow the language toggle. "ตั้งค่าระบบ" collapses,
+and it opens by itself when the current page is inside it.
+
+A new menu item needs:
+- a `nav.<camelKey>` entry in `src/i18n/translationCatalog.js`;
+- a `routePermissionCatalog` entry (`tests/unit/route-permission-audit.test.js` fails otherwise);
+- an icon in `ITEM_ICONS` in `navigationSections.js` (it falls back to a generic one).
+
+A new permission group must also be added to a section in `SIDEBAR_SECTIONS`.
+Until then it shows as its own section under its English label.
+
+The top bar shows "section / page" from `findNavigationContext`. The longest
+matching menu path wins, so detail routes show their parent menu item.
+
+## Shell and dashboard (redesign 2026-11)
+
+- Shell: ink rail (`--tgd-sidebar-bg` #111417) with a gold inset bar on the active
+  item. No gradients, no hover slide.
+- Color roles: gold marks brand and the current selection (`--color-gold-text` when
+  gold is used as text on white). Frost (`--color-frost`, `-soft`) marks cold and
+  temperature, and "has stock" fills. Green, amber and red mean status only.
+- Numbers that line up (KPIs, weights, money, document numbers) use the `.num`
+  class (IBM Plex Mono, tabular figures).
+- Dashboard order: summary strip → warehouse flow → revenue (admin and accounting
+  only) → today's queue and alerts → layout map. Use `.dash-*` classes from the
+  "REDESIGN 2026-11" block at the end of styles.css: `.dash-panel`, `.dash-kpis`,
+  `.dash-flow`, `.dash-q`, `.dash-alert`, `.dash-pill--*` and `.dash-table`.
+- A summary strip is one bordered band split by 1px hairlines, not a row of
+  separate cards.
+- Shared components were restyled for every page (phase 2, "REDESIGN 2026-11 —
+  phase 2" block, screen only, so print is untouched):
+  - PageHeader has no blue rail.
+  - Cards and `.document-section` use a hairline border, with no shadow and no hover lift.
+  - Tables have a muted header row.
+  - Status badges show a dot plus a word. `--open` (waiting on us) is gold.
+  - KPI cards are flat, with mono numbers.
+  - Buttons are 32px tall with 13px text, and 44px on phone and tablet.
+- A small primary button in a table row (`td .btn.btn-primary.btn-sm`) is drawn
+  outlined, so a list doesn't turn into a column of black buttons.
+- Table cell helpers: `.cell-nowrap` keeps document numbers and dates on one line.
+  `.cell-num` right-aligns numbers in mono (put it on the `th` too). `.cell-wide`
+  sets a 200px minimum for a name column. `.cell-keep` wraps only at spaces.
+- Status tone for customer requests comes from
+  `getCustomerRequestStatusClass` (deposit and withdrawal statuses).
+- The stock balance page is done: `.dash-kpis` summary strip, then `.stock-*`
+  rows (customer band, product row, expanded lines). Quantities are plain text,
+  because green means status only. Temperature shows the Thai short label in
+  `.stock-temp-badge`.
+- A bare `.btn` with no variant gets a border and a surface fill. Add new variants
+  to that `:not()` list in styles.css.
+- `.admin-withdrawal-lines-table` is `table-layout: fixed`, so a `min-width` on a
+  cell does nothing. Set the width on the header cell.
+- Handheld uses the same ink, gold and frost through the hex palette `C` in
+  `handheldUi.jsx`. `C.green` and `C.amber` are darker than the desktop tones,
+  because small status text must stay readable in dim cold rooms. The menu uses
+  `.hh-mode*` classes. Cards have no colored left rail; the status pill carries
+  the status. An icon-only button needs `padding: 0`, or the phone rule
+  `button { padding: 0 16px }` squeezes its icon.
+- Ctrl K search: `components/layout/CommandPalette.jsx` with
+  `services/globalSearchService.js`. Customer roles get menu jump only. Staff can
+  search only the sources whose page their role can open
+  (`getSearchSourcesForRole`). The search only reads.
+- Dark mode is opt-in from the top bar and saved per browser (`tgd.theme`). It lives
+  on `.app-shell[data-theme="dark"]` for screen only, so login, the handheld and
+  paper stay light. Use tokens for new colors. A hard-coded light fill with
+  token text is the usual dark-mode bug. Tokens that alias another token at
+  `:root` resolve there, so override them directly in the dark block.
+- Document previews stay white: their classes reset the tokens to light values at
+  the end of the dark block. Add a new paper class to that `:is()` list.
+- `RequestProgress` shows a request's stage in the detail popups. It renders nothing
+  for rejected, cancelled or unknown statuses. Add new statuses to its stage lists.
+- Other pages may still have their own inline styles. Move them page by page and
+  check each one on real screens at desktop and phone width.

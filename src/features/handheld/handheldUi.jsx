@@ -5,7 +5,8 @@ import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 
-// ── Theme tokens (aligned with main app: dark navy + gold) ───────────
+// ── Theme tokens (aligned with main app: ink + gold + frost) ─────────
+// Stay hex: Pill appends an alpha suffix to these (see DESIGN.md).
 export const C = {
   bg: '#f8fafb',
   surface: '#ffffff',
@@ -13,14 +14,17 @@ export const C = {
   card: '#ffffff',
   border: '#e2e8f0',
   borderLight: '#f1f5f9',
-  shadow: '0 4px 20px rgba(15, 23, 42, 0.05)',
-  shadowMd: '0 8px 30px rgba(15, 23, 42, 0.08)',
-  primary: '#09111c',
-  primaryDark: '#050505',
+  shadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
+  shadowMd: '0 2px 6px rgba(15, 23, 42, 0.08)',
+  primary: '#111417',
+  primaryDark: '#111417',
   gold: '#d4af37',
+  goldText: '#7a5f0c',
+  frost: '#1f6fa8',
+  frostLight: '#e2eef7',
   goldHover: '#b5952f',
-  amber: '#d97706',
-  green: '#059669',
+  amber: '#b45309',
+  green: '#047857',
   greenLight: '#ecfdf5',
   greenBorder: '#6ee7b7',
   red: '#dc2626',
@@ -28,11 +32,11 @@ export const C = {
   blueLight: '#f1f5f9',
   text: '#0f172a',
   textSec: '#475569',
-  muted: '#94a3b8',
+  muted: '#64748b',
   inputBg: '#f8fafc',
-  headerBg: '#09111c',
-  receiveAccent: '#09111c',
-  pickAccent: '#09111c',
+  headerBg: '#111417',
+  receiveAccent: '#111417',
+  pickAccent: '#111417',
   glassmorphism: {
     // backdropFilter removed for performance
     // WebkitBackdropFilter removed for performance
@@ -154,7 +158,7 @@ export function useCameraScanner(onScanned) {
           placeholder="หรือพิมพ์รหัสเอง" autoFocus={Boolean(scanError)}
           style={{ flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none', fontSize: 15, outline: 'none' }} />
         <button type="button" onClick={submitManual}
-          style={{ padding: '12px 20px', borderRadius: 14, border: 'none', background: '#d4af37', color: '#09111c', fontWeight: 800, cursor: 'pointer' }}>
+          style={{ padding: '12px 20px', borderRadius: 14, border: 'none', background: '#d4af37', color: '#111417', fontWeight: 700, cursor: 'pointer' }}>
           ตกลง
         </button>
       </div>
@@ -191,24 +195,22 @@ export function TopBar({ title, subtitle, onBack, badge }) {
       borderBottom: 'none',
       padding: 'calc(16px + env(safe-area-inset-top)) 24px 16px',
       display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
     }}>
       {onBack && (
         <button type="button" onClick={onBack} aria-label="ย้อนกลับ"
           style={{
             background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
             color: '#ffffff', fontSize: 20, cursor: 'pointer',
-            width: 44, height: 44, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 12, padding: 0, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          aria-label="ย้อนกลับ">
-          <ArrowLeft size={20} aria-hidden="true" />
+          }}>
+          <ArrowLeft size={22} aria-hidden="true" />
         </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           color: '#ffffff',
-          fontWeight: 800, fontSize: 18,
+          fontWeight: 700, fontSize: 18,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{title}</div>
         {subtitle && (

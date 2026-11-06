@@ -14,14 +14,16 @@ import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
 
+// Fill tones (redesign 2026-11): frost = has room, gold → amber → red as a
+// row/section fills up. Status words/icons still carry the meaning.
 function pctColor(pct) {
-  if (pct >= 80) return '#e74c3c';
-  if (pct >= 60) return '#e07b00';
-  if (pct >= 40) return '#f0c419';
-  return '#3498db';
+  if (pct >= 80) return 'var(--color-danger)';
+  if (pct >= 60) return 'var(--color-warning)';
+  if (pct >= 40) return '#b8941f';
+  return 'var(--color-frost)';
 }
 
-function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#f0a500' }) {
+function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#d4af37' }) {
   const r = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * r;
   const dashOffset = circ - (pct / 100) * circ;
@@ -66,10 +68,10 @@ function RowBar({ location, onClick }) {
       title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
-        borderRadius: 8, border: overCapacity ? '1px solid #fca5a5' : '1px solid #e5e7eb', cursor: 'pointer',
-        background: overCapacity ? 'var(--color-danger-soft)' : '#fff', transition: 'background 0.15s',
+        borderRadius: 8, border: overCapacity ? '1px solid #fca5a5' : '1px solid var(--color-border-subtle)', cursor: 'pointer',
+        background: overCapacity ? 'var(--color-danger-soft)' : 'var(--color-surface)', transition: 'background 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? '#fee2e2' : 'var(--color-surface-muted)'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? 'var(--color-danger-tint)' : 'var(--color-surface-muted)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = overCapacity ? 'var(--color-danger-soft)' : '#fff'; }}
     >
       <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : 'var(--color-text-muted)', width: 64, flexShrink: 0 }}>
@@ -145,7 +147,7 @@ function PalletCells({ capacity, used, color }) {
             style={{
               height: 14, borderRadius: 3, background: fill,
               border: `1px solid ${filled ? fill : 'var(--color-border-strong)'}`,
-              outline: over ? '1px dashed #dc2626' : 'none', outlineOffset: 1,
+              outline: over ? '1px dashed var(--color-danger)' : 'none', outlineOffset: 1,
             }}
           />
         );
@@ -177,7 +179,7 @@ function VirtualRow({ location, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 10, height: 26, padding: '0 8px', width: '100%',
         border: `1px solid ${overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : 'var(--color-border-subtle)')}`, borderRadius: 6,
-        background: overCapacity ? 'var(--color-danger-soft)' : (isStaging ? 'var(--color-warning-soft)' : (used > 0 ? 'var(--color-surface-muted)' : '#fff')),
+        background: overCapacity ? 'var(--color-danger-soft)' : (isStaging ? 'var(--color-warning-soft)' : (used > 0 ? 'var(--color-surface-muted)' : 'var(--color-surface)')),
         cursor: 'pointer', font: 'inherit', textAlign: 'left', boxSizing: 'border-box',
       }}
     >
@@ -226,14 +228,14 @@ function VirtualSectionGrid({ section, onLocClick }) {
 
   return (
     <div data-testid="virtual-section-grid" style={{ padding: 12 }}>
-      <div style={{ textAlign: 'center', padding: '6px 0', borderBottom: '3px solid #94a3b8', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
+      <div style={{ textAlign: 'center', padding: '6px 0', borderBottom: '3px solid var(--color-text-subtle)', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
         ผนังด้านในสุดของห้อง
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: columns, gap: 0 }}>
         {rows.hasL ? sideColumn('L') : null}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
-          margin: '22px 12px 0', borderLeft: '2px dashed #cbd5e1', borderRight: '2px dashed #cbd5e1', background: 'var(--color-surface-sunken)',
+          margin: '22px 12px 0', borderLeft: '2px dashed var(--color-border-strong)', borderRight: '2px dashed var(--color-border-strong)', background: 'var(--color-surface-sunken)',
         }}>
           <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: '0.1em' }}>
             ทางเดินรถโฟล์คลิฟท์
@@ -242,12 +244,12 @@ function VirtualSectionGrid({ section, onLocClick }) {
         {rows.hasR ? sideColumn('R') : null}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px minmax(0, 1fr)', alignItems: 'end', marginTop: 8 }}>
-        <div style={{ borderTop: '3px solid #94a3b8' }} />
+        <div style={{ borderTop: '3px solid var(--color-text-subtle)' }} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: '100%', height: 8, border: '3px solid #16a34a', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success-strong)' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
+          <div style={{ width: '100%', height: 8, border: '3px solid var(--tgd-sidebar-bg)', borderTop: 'none', borderRadius: '0 0 8px 8px', boxSizing: 'border-box' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)' }}>▲ ประตูห้อง / ทางเข้า-ออก</span>
         </div>
-        <div style={{ borderTop: '3px solid #94a3b8' }} />
+        <div style={{ borderTop: '3px solid var(--color-text-subtle)' }} />
       </div>
       <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>
         แต่ละช่องเล็ก = 1 pallet · ช่องสีแดงขอบประ = pallet ที่เกินความจุ · คลิกแถวเพื่อดูรายละเอียด pallet
@@ -400,7 +402,7 @@ export function WarehouseLayoutWidget() {
         <button
           type="button"
           onClick={() => navigate('/admin/warehouse-locations')}
-          style={{ padding: '10px 20px', borderRadius: 10, background: '#2d9348', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+          style={{ padding: '10px 20px', borderRadius: 10, background: 'var(--tgd-sidebar-bg)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
         >
           ตั้งค่า Location คลัง
         </button>
@@ -426,8 +428,8 @@ export function WarehouseLayoutWidget() {
         {overCapacityLocations.length > 0 && (
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 10,
-            background: '#fef3c7', border: '1px solid #f5c451', borderRadius: 10,
-            padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#8a5300',
+            background: 'var(--color-warning-tint)', border: '1px solid var(--color-warning-tint-border)', borderRadius: 10,
+            padding: '10px 14px', marginBottom: 14, fontSize: 13, color: 'var(--color-warning-tint-text)',
           }}>
             <span style={{ fontSize: 16, lineHeight: 1, display: 'flex' }}><AlertTriangle size={16} aria-hidden="true" /></span>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -441,8 +443,8 @@ export function WarehouseLayoutWidget() {
                     type="button"
                     onClick={() => { setSelectedId(loc.sectionId); handleLocClick(loc.id, loc.code); }}
                     style={{
-                      border: '1px solid #f5c451', background: '#fff', borderRadius: 6,
-                      padding: '3px 8px', fontSize: 12, fontWeight: 600, color: '#8a5300', cursor: 'pointer',
+                      border: '1px solid var(--color-warning-tint-border)', background: 'var(--color-surface)', borderRadius: 6,
+                      padding: '3px 8px', fontSize: 12, fontWeight: 600, color: 'var(--color-warning-tint-text)', cursor: 'pointer',
                     }}
                   >
                     {loc.code} ({loc.used}/{loc.capacity})
@@ -462,9 +464,9 @@ export function WarehouseLayoutWidget() {
               onClick={() => setSelectedId(sec.id)}
               style={{
                 padding: '6px 14px',
-                border: sec.id === selected.id ? '2px solid #2d9348' : '2px solid #e5e7eb',
+                border: sec.id === selected.id ? '1px solid var(--tgd-sidebar-bg)' : '1px solid var(--color-border)',
                 borderRadius: 20,
-                background: sec.id === selected.id ? '#2d9348' : '#fff',
+                background: sec.id === selected.id ? 'var(--tgd-sidebar-bg)' : 'var(--color-surface)',
                 color: sec.id === selected.id ? '#fff' : 'var(--color-text-body)',
                 cursor: 'pointer', fontSize: 13, fontWeight: sec.id === selected.id ? 700 : 400,
                 transition: 'all 0.15s',
@@ -487,8 +489,8 @@ export function WarehouseLayoutWidget() {
                   onClick={() => changeViewMode(mode)}
                   style={{
                     padding: '4px 12px', border: 'none', borderRadius: 16, cursor: 'pointer', fontSize: 12,
-                    background: viewMode === mode ? '#fff' : 'transparent',
-                    color: viewMode === mode ? 'var(--color-success-strong)' : 'var(--color-text-secondary)',
+                    background: viewMode === mode ? 'var(--color-surface)' : 'transparent',
+                    color: viewMode === mode ? 'var(--color-text)' : 'var(--color-text-secondary)',
                     fontWeight: viewMode === mode ? 700 : 500,
                     boxShadow: viewMode === mode ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',
                   }}
@@ -502,8 +504,8 @@ export function WarehouseLayoutWidget() {
               onClick={() => setRefreshKey((k) => k + 1)}
               disabled={loading}
               style={{
-                padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
-                background: '#fff', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
+                padding: '6px 12px', border: '2px solid var(--color-border-subtle)', borderRadius: 20,
+                background: 'var(--color-surface)', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
               }}
               title="รีเฟรชผังคลัง"
             >
@@ -513,8 +515,8 @@ export function WarehouseLayoutWidget() {
               type="button"
               onClick={() => navigate('/admin/warehouse-locations')}
               style={{
-                padding: '6px 12px', border: '2px solid #e5e7eb', borderRadius: 20,
-                background: '#fff', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
+                padding: '6px 12px', border: '2px solid var(--color-border-subtle)', borderRadius: 20,
+                background: 'var(--color-surface)', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
               }}
             >
               <IconLabel icon={Settings} size={14} gap={4}>ตั้งค่า Location</IconLabel>
@@ -531,11 +533,11 @@ export function WarehouseLayoutWidget() {
             </span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-border-strong)', display: 'inline-block' }} />
                 ว่าง
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-muted)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)', display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-frost)', display: 'inline-block' }} />
                 มีสินค้า
               </span>
             </div>
@@ -543,7 +545,7 @@ export function WarehouseLayoutWidget() {
         </div>
 
         {/* Grid */}
-        <div style={{ background: '#f8fafb', borderRadius: 12, padding: 14, border: '1px solid #e5e7eb', marginBottom: 20 }}>
+        <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 14, border: '1px solid var(--color-border-subtle)', marginBottom: 20 }}>
           {selected.total > 0 ? (
             viewMode === 'virtual'
               ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
@@ -567,8 +569,8 @@ export function WarehouseLayoutWidget() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 10,
-                  background: sec.id === selected.id ? 'var(--color-success-soft)' : '#fff',
-                  border: `1px solid ${sec.id === selected.id ? '#bbf7d0' : 'var(--color-surface-sunken)'}`,
+                  background: sec.id === selected.id ? 'var(--color-gold-soft)' : 'var(--color-surface)',
+                  border: `1px solid ${sec.id === selected.id ? '#e9d9a0' : 'var(--color-surface-sunken)'}`,
                   marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >
@@ -591,8 +593,8 @@ export function WarehouseLayoutWidget() {
 
       {/* Right: stats panel */}
       <div style={{
-        background: 'linear-gradient(135deg, #059669 0%, #064e3b 100%)',
-        borderRadius: '0 16px 16px 0',
+        background: 'var(--tgd-sidebar-bg)',
+        borderRadius: 0,
         padding: '32px 24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         color: '#fff',
@@ -604,7 +606,7 @@ export function WarehouseLayoutWidget() {
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 24, alignSelf: 'flex-start' }}>การใช้งาน</div>
 
         <div style={{ position: 'relative', width: 130, height: 130, marginBottom: 20 }}>
-          <CircularProgress pct={selected.usedPct} size={130} strokeWidth={12} color="#f0a500" />
+          <CircularProgress pct={selected.usedPct} size={130} strokeWidth={12} color="#d4af37" />
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -641,7 +643,7 @@ export function WarehouseLayoutWidget() {
                 {sec.code}
               </div>
               <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${sec.usedPct}%`, background: sec.usedPct >= 80 ? '#ef4444' : '#f0a500', borderRadius: 4 }} />
+                <div style={{ height: '100%', width: `${sec.usedPct}%`, background: sec.usedPct >= 80 ? '#ef4444' : '#d4af37', borderRadius: 4 }} />
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, width: 30, textAlign: 'right', opacity: sec.id === selected.id ? 1 : 0.75 }}>
                 {sec.usedPct}%
@@ -707,7 +709,7 @@ export function WarehouseLayoutWidget() {
                   ) : null}
                 </div>
                 {resetMsg ? (
-                  <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : '#fee2e2', color: resetMsg.type === 'ok' ? 'var(--color-success-strong)' : '#b91c1c' }}>
+                  <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : 'var(--color-danger-tint)', color: resetMsg.type === 'ok' ? 'var(--color-success-strong)' : '#b91c1c' }}>
                     {resetMsg.text}
                   </div>
                 ) : null}
@@ -716,7 +718,7 @@ export function WarehouseLayoutWidget() {
                     <thead>
                       <tr>
                         {['Pallet', 'รหัสติดตาม', 'สินค้า', 'จำนวน'].map((h) => (
-                          <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-subtle)', padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                          <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-subtle)', padding: '6px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -729,14 +731,14 @@ export function WarehouseLayoutWidget() {
                         const overRowCapacity = palletNo > palletCapacity;
                         return (
                           <tr key={palletNo}>
-                            <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: overRowCapacity ? 'var(--color-danger)' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
+                            <td style={{ padding: 8, borderBottom: '1px solid var(--color-border-subtle)', color: overRowCapacity ? 'var(--color-danger)' : undefined, fontWeight: overRowCapacity ? 700 : undefined }}>
                               {palletNo}{overRowCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
                             </td>
                             {items.length > 0 ? (
                               <>
-                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.trackingCode ?? '-').join(', ')}</td>
-                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{items.map((p) => p.productName ?? p.customerProductCode ?? '-').join(', ')}</td>
-                                <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: 8, borderBottom: '1px solid var(--color-border-subtle)' }}>{items.map((p) => p.trackingCode ?? '-').join(', ')}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid var(--color-border-subtle)' }}>{items.map((p) => p.productName ?? p.customerProductCode ?? '-').join(', ')}</td>
+                                <td style={{ padding: 8, borderBottom: '1px solid var(--color-border-subtle)' }}>
                                   {items.map((p) => {
                                     const boxText = p.remainingBoxes != null ? `${p.remainingBoxes} กล่อง` : null;
                                     const weightValue = p.remainingWeight ?? p.weight;
@@ -746,7 +748,7 @@ export function WarehouseLayoutWidget() {
                                 </td>
                               </>
                             ) : (
-                              <td colSpan={3} style={{ padding: 8, borderBottom: '1px solid #e5e7eb', color: 'var(--color-border-strong)', fontStyle: 'italic' }}>— ว่าง —</td>
+                              <td colSpan={3} style={{ padding: 8, borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-border-strong)', fontStyle: 'italic' }}>— ว่าง —</td>
                             )}
                           </tr>
                         );
