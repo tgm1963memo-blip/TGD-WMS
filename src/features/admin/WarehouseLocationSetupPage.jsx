@@ -984,6 +984,7 @@ export function WarehouseLocationSetupPage() {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEstimate, setIsEstimate] = useState(false);
   const [warehouseId, setWarehouseId] = useState(null);
 
   useEffect(() => { load(); }, []);
@@ -994,9 +995,10 @@ export function WarehouseLocationSetupPage() {
     if (we) { setError(we); setLoading(false); return; }
     setWarehouseId(wh.id);
 
-    const { data, error: se } = await getSectionsWithOccupancy();
+    const { data, error: se, isEstimate: estimated } = await getSectionsWithOccupancy();
     setSections(data ?? []);
     setError(se);
+    setIsEstimate(Boolean(estimated));
     setLoading(false);
   }
 
@@ -1051,6 +1053,12 @@ export function WarehouseLocationSetupPage() {
         title="ตั้งค่า Location คลังสินค้า"
         description="กำหนดห้อง ฝั่ง และแถว — รหัสรูปแบบ: {ห้อง}-{ฝั่ง}-{แถว} เช่น H1-L-01 (1 แถวบรรจุได้หลาย pallet ตามความจุที่ตั้งไว้)"
       />
+
+      {isEstimate && !loading && (
+        <div className="banner banner-warning" role="status" data-testid="pallet-estimate-notice" style={{ marginBottom: 12 }}>
+          ตัวเลขนี้เป็นค่าประมาณ อาจสูงกว่าจริง เพราะอ่านยอดเบิกไม่ครบ ลองโหลดหน้าใหม่อีกครั้ง
+        </div>
+      )}
 
       {/* Summary stats */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>

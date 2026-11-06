@@ -274,6 +274,7 @@ export function WarehouseLayoutWidget() {
   const [resetMsg, setResetMsg] = useState(null);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isEstimate, setIsEstimate] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewMode, setViewMode] = useState(readStoredViewMode);
@@ -290,8 +291,9 @@ export function WarehouseLayoutWidget() {
 
   useEffect(() => {
     setLoading(true);
-    getSectionsWithOccupancy().then(({ data }) => {
+    getSectionsWithOccupancy().then(({ data, isEstimate: estimated }) => {
       setSections(data ?? []);
+      setIsEstimate(Boolean(estimated));
       if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
       setLoading(false);
     });
@@ -413,6 +415,11 @@ export function WarehouseLayoutWidget() {
 
       {/* Left: grid + section list */}
       <div style={{ padding: '20px' }}>
+        {isEstimate && (
+          <div className="banner banner-warning" role="status" data-testid="pallet-estimate-notice" style={{ marginBottom: 14 }}>
+            ตัวเลขนี้เป็นค่าประมาณ อาจสูงกว่าจริง เพราะอ่านยอดเบิกไม่ครบ ลองโหลดหน้าใหม่อีกครั้ง
+          </div>
+        )}
         {/* Over-capacity notification -- capacity is advisory only, so this
             is the one place staff see every row that's currently past its
             own configured limit, across every section, at a glance. */}
