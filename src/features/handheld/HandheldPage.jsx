@@ -29,6 +29,7 @@ import {
   reviewCustomerWithdrawalRequest,
   recordWithdrawalLinePick,
   listPickablePalletsForDepositLine,
+  canAutoConfirmPalletPick,
   recordWithdrawalLinePalletPick,
   removeWithdrawalLinePalletPick,
   listWithdrawalLinePalletPicks,
@@ -1247,6 +1248,7 @@ function PickingWorkflow({ onBack, t }) {
   // one they're physically taking boxes off of.
   const [pickablePallets, setPickablePallets] = useState([]);
   const [pickablePalletsLoading, setPickablePalletsLoading] = useState(false);
+  const [palletsAreEstimate, setPalletsAreEstimate] = useState(false);
   const [selectedPalletId, setSelectedPalletId] = useState('');
   const [existingPicks, setExistingPicks] = useState([]);
   const [existingPicksLoading, setExistingPicksLoading] = useState(false);
@@ -1323,8 +1325,9 @@ function PickingWorkflow({ onBack, t }) {
   async function loadPickablePalletsForLine(line) {
     setPickablePalletsLoading(true);
     const depositLineId = await resolveDepositLineIdForPick(line);
-    const { data } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+    const { data, isEstimate } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
     setPickablePallets(data ?? []);
+    setPalletsAreEstimate(Boolean(isEstimate));
     setSelectedPalletId(data?.length === 1 ? data[0].allocationId : '');
     setPickablePalletsLoading(false);
   }
@@ -1466,8 +1469,9 @@ function PickingWorkflow({ onBack, t }) {
     // through to the manual panel below and let staff pick the right one.
     if (matchedByTrackingCode && match.picked_at == null) {
       const depositLineId = await resolveDepositLineIdForPick(match);
-      const { data: pallets } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
-      if (pallets.length <= 1) {
+      const palletResult = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+      const pallets = palletResult.data;
+      if (canAutoConfirmPalletPick(palletResult)) {
         const ok = await confirmPick(match, match.requested_boxes, match.requested_weight, pallets[0] ?? null);
         if (ok) {
           setScanValue('');
@@ -1844,6 +1848,12 @@ function PickingWorkflow({ onBack, t }) {
               <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12 }}>
                 <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 2 }}><IconLabel icon={AlertTriangle} size={16} gap={6}>รายการนี้ยืนยันแล้ว</IconLabel></div>
                 <div style={{ color: '#78350f', fontSize: 13 }}>กดยืนยันการแก้ไขอีกครั้งเพื่อบันทึกค่าใหม่</div>
+              </div>
+            )}
+
+            {palletsAreEstimate && !pickablePalletsLoading && (
+              <div role="status" data-testid="pick-pallet-estimate-notice" style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12, color: '#92400e', fontWeight: 800, fontSize: 14 }}>
+                <IconLabel icon={AlertTriangle} size={16} gap={6}>ยอดใน pallet อาจไม่ตรง ตรวจของจริงก่อนหยิบ</IconLabel>
               </div>
             )}
 
