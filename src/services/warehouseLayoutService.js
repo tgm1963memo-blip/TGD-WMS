@@ -135,7 +135,7 @@ async function fetchPalletPickRows(allocationIds) {
 // from the fallback. They then miss line-level withdrawals, so stock that has
 // left still counts as present: pallets used reads too high. Screens showing
 // a total must say so instead of presenting it as fact.
-async function readPickedQuantities(allocationIds = null) {
+export async function readPickedQuantities(allocationIds = null) {
   const pickedByAllocationId = new Map();
   if (!supabase) return { picked: pickedByAllocationId, isEstimate: false };
   if (allocationIds && allocationIds.length === 0) return { picked: pickedByAllocationId, isEstimate: false };

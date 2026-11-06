@@ -6,7 +6,7 @@ import {
   toNullableText,
 } from './customerPortalServiceUtils.js';
 import { getDepositInventoryLines } from './customerDepositRequestService.js';
-import { getPickedBoxesByAllocationId } from './warehouseLayoutService.js';
+import { readPickedQuantities } from './warehouseLayoutService.js';
 import { chunkArray } from './billingRateEngineService.js';
 import { buildPalletCode } from '../utils/locationCodeUtils.js';
 
@@ -653,11 +653,11 @@ export async function listPickablePalletsForDepositLine(depositLineId) {
   if (error) return { data: [], error };
 
   const allocationIds = (allocations ?? []).map((a) => a.id);
-  const pickedByAllocationId = await getPickedBoxesByAllocationId(allocationIds);
+  const { picked: pickedByAllocationId, isEstimate } = await readPickedQuantities(allocationIds);
 
   const pallets = (allocations ?? [])
     .map((a) => {
-      const picked = pickedByAllocationId.get(a.id) ?? 0;
+      const picked = pickedByAllocationId.get(a.id)?.boxes ?? 0;
       const remainingBoxes = a.boxes != null ? Math.max(0, Number(a.boxes) - picked) : null;
       return {
         allocationId: a.id,
@@ -671,7 +671,14 @@ export async function listPickablePalletsForDepositLine(depositLineId) {
     })
     .filter((p) => p.remainingBoxes == null || p.remainingBoxes > 0);
 
-  return { data: pallets, error: null };
+  return { data: pallets, error: null, isEstimate };
+}
+
+// A tracking-code scan may confirm a pick by itself only when 0 or 1 pallet
+// still holds the stock. An estimated list can include pallets that are
+// already empty, and the server wouldn't stop that pick, so staff must choose.
+export function canAutoConfirmPalletPick({ data: pallets, isEstimate }) {
+  return !isEstimate && pallets.length <= 1;
 }
 
 // Saves one "หยิบจาก pallet" pick against a specific allocation -- one
