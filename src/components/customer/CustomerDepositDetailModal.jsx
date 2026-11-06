@@ -914,6 +914,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                         />
                       </th>
                       <th style={{ whiteSpace: 'nowrap' }}>#</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>รหัสติดตาม</th>
                       <th style={{ whiteSpace: 'nowrap' }}>{t('catalog_col_customer_code')}</th>
                       <th>{t('catalog_col_product_name')}</th>
                       <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>LOT</th>
@@ -954,6 +955,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                             />
                           </td>
                           <td>{line.line_no}</td>
+                          <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">{line.tracking_code ?? '-'}</td>
                           <td>{line.customer_product_code ?? '-'}</td>
                           <td>{line.product_name ?? '-'}</td>
                           <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>
