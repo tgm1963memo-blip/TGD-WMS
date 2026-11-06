@@ -39,7 +39,7 @@ function makeQueuedSupabaseMock(responsesByTable) {
     };
     return builder;
   });
-  return { from, rpc: vi.fn() };
+  return { from, rpc: vi.fn(async () => ({ data: null, error: { message: 'refused' } })) };
 }
 
 describe('getOccupiedPalletCountByLocationId', () => {

@@ -24,6 +24,7 @@ describe('getSectionsWithOccupancy', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_zones') {
             return chainableSelect({
@@ -59,6 +60,7 @@ describe('getSectionsWithOccupancy', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_zones') {
             return chainableSelect({
@@ -91,6 +93,7 @@ describe('getSectionsWithOccupancy', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_zones') {
             return chainableSelect({
@@ -123,6 +126,7 @@ describe('getSectionsWithOccupancy', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_zones') {
             return chainableSelect({
@@ -164,6 +168,7 @@ describe('getSectionsWithOccupancy', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_zones') {
             return chainableSelect({
@@ -192,6 +197,7 @@ describe('getPalletDetailsAtLocation', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_locations') {
             return chainableSelect({ data: { capacity: 14 }, error: null });
@@ -234,6 +240,7 @@ describe('getPalletDetailsAtLocation', () => {
     vi.resetModules();
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: async () => ({ data: null, error: { message: 'refused' } }),
         from: (table) => {
           if (table === 'tgd_locations') {
             return chainableSelect({ data: { capacity: 14 }, error: null });
