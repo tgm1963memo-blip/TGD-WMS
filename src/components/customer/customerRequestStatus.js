@@ -4,15 +4,20 @@
 const STATUS_TONES = {
   DRAFT: 'draft',
   WITHDRAWAL_DRAFT: 'draft',
+  DEPOSIT_DRAFT: 'draft',
   SUBMITTED_BY_CUSTOMER: 'submitted',
   ADMIN_REVIEWING: 'reviewing',
   ADMIN_ACCEPTED: 'accepted',
   WAREHOUSE_PICKING: 'working',
   WAREHOUSE_RECEIVING: 'working',
   PALLETIZING: 'working',
+  PICKED: 'working',
+  PACKING_LIST_RECORDED: 'working',
+  LOADING: 'working',
   DISPATCHED: 'shipped',
-  RECEIVED_CONFIRMED: 'shipped',
   COMPLETED: 'done',
+  LOADED_CONFIRMED: 'done',
+  RECEIVED_CONFIRMED: 'done',
   CUSTOMER_NOTIFIED: 'done',
   CLOSED: 'done',
   ADMIN_REJECTED: 'stopped',
@@ -20,7 +25,7 @@ const STATUS_TONES = {
   CANCELLED: 'stopped',
   RECEIVING_VARIANCE: 'attention',
   COUNT_VARIANCE_REVIEW: 'attention',
-  RECOUNT_REQUESTED: 'attention',
+  ADMIN_RECOUNT_REQUESTED: 'attention',
 };
 
 export function getCustomerRequestStatusClass(status) {

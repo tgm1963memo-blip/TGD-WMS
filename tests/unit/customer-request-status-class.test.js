@@ -14,7 +14,11 @@ const TONES = [
   ['WAREHOUSE_RECEIVING', 'working'],
   ['PALLETIZING', 'working'],
   ['DISPATCHED', 'shipped'],
-  ['RECEIVED_CONFIRMED', 'shipped'],
+  ['RECEIVED_CONFIRMED', 'done'],
+  ['LOADED_CONFIRMED', 'done'],
+  ['PICKED', 'working'],
+  ['LOADING', 'working'],
+  ['DEPOSIT_DRAFT', 'draft'],
   ['COMPLETED', 'done'],
   ['CUSTOMER_NOTIFIED', 'done'],
   ['CLOSED', 'done'],
@@ -23,7 +27,7 @@ const TONES = [
   ['CANCELLED', 'stopped'],
   ['RECEIVING_VARIANCE', 'attention'],
   ['COUNT_VARIANCE_REVIEW', 'attention'],
-  ['RECOUNT_REQUESTED', 'attention'],
+  ['ADMIN_RECOUNT_REQUESTED', 'attention'],
   ['SOMETHING_NEW', 'hold'],
 ];
 
@@ -42,7 +46,10 @@ describe('getCustomerRequestStatusClass', () => {
   });
 
   it.each(['submitted', 'reviewing', 'accepted', 'working', 'shipped', 'done', 'stopped', 'attention'])('%s has light and dark colours', (tone) => {
-    expect(css.split(`--status-${tone}-bg:`).length).toBe(3);
-    expect(css.split(`--status-${tone}-text:`).length).toBe(3);
+    const dark = css.slice(css.indexOf('.app-shell[data-theme="dark"] {'));
+    for (const part of ['bg', 'text']) {
+      expect(css.indexOf(`--status-${tone}-${part}:`)).toBeLessThan(css.indexOf('.app-shell[data-theme="dark"] {'));
+      expect(dark).toContain(`--status-${tone}-${part}:`);
+    }
   });
 });

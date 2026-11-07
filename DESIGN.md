@@ -142,7 +142,7 @@ matching menu path wins, so detail routes show their parent menu item.
   `getCustomerRequestStatusClass` (deposit and withdrawal statuses).
   Each stage has its own colour, as a `--status-*` token pair with a dark value:
   gray draft, gold `submitted`, orange `reviewing`, blue `accepted`,
-  violet `working` (in the warehouse), teal `shipped`, green `done`,
+  violet `working` (in the warehouse), teal `shipped` (dispatched), green `done`,
   red `stopped`, pink `attention` (a variance to resolve). Add a new status to
   `STATUS_TONES`; anything unmapped falls back to amber `hold`.
 - The stock balance page is done: `.dash-kpis` summary strip, then `.stock-*`
