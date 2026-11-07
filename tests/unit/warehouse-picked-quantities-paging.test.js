@@ -20,12 +20,26 @@ function pagedTable(allRows, { error = null } = {}) {
   };
 }
 
+const rpcRefused = async () => ({ data: null, error: { message: 'ไม่มีสิทธิ์นับสต็อก' } });
+
 describe('getPickedQuantitiesByAllocationId', () => {
+  it('uses the fast function and skips the view when it answers', async () => {
+    vi.resetModules();
+    const rpc = vi.fn(async () => ({ data: [{ allocation_id: 'alloc-1', picked_boxes: 4, picked_weight: 2 }], error: null }));
+    vi.doMock('../../src/services/supabaseClient.js', () => ({
+      supabase: { rpc, from: (table) => { throw new Error(table); } },
+    }));
+    const { getPickedQuantitiesByAllocationId } = await import('../../src/services/warehouseLayoutService.js');
+    const map = await getPickedQuantitiesByAllocationId(['alloc-1']);
+    expect(rpc).toHaveBeenCalledWith('tgd_get_deposit_line_location_picked', { p_allocation_ids: ['alloc-1'] });
+    expect(map.get('alloc-1')).toEqual({ boxes: 4, weight: 2 });
+  });
+
   it('reads every page of the view (more than 1000 rows)', async () => {
     vi.resetModules();
     const rows = Array.from({ length: 2500 }, (_, i) => ({ allocation_id: `a${i}`, picked_boxes: 1, picked_weight: 0 }));
     vi.doMock('../../src/services/supabaseClient.js', () => ({
-      supabase: { from: (table) => { if (table !== 'tgd_deposit_line_location_picked') throw new Error(table); return pagedTable(rows)(); } },
+      supabase: { rpc: rpcRefused, from: (table) => { if (table !== 'tgd_deposit_line_location_picked') throw new Error(table); return pagedTable(rows)(); } },
     }));
     const { getPickedQuantitiesByAllocationId } = await import('../../src/services/warehouseLayoutService.js');
     const map = await getPickedQuantitiesByAllocationId();
@@ -38,6 +52,7 @@ describe('getPickedQuantitiesByAllocationId', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: rpcRefused,
         from: (table) => {
           if (table === 'tgd_deposit_line_location_picked') return pagedTable([], { error: { message: 'relation does not exist' } })();
           if (table === 'tgd_customer_withdrawal_line_pallet_picks') {
@@ -63,6 +78,7 @@ describe('getPickedQuantitiesByAllocationId', () => {
     let viewReads = 0;
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: rpcRefused,
         from: (table) => {
           if (table !== 'tgd_deposit_line_location_picked') throw new Error(table);
           viewReads += 1;
@@ -88,6 +104,7 @@ describe('getSectionsWithOccupancy isEstimate', () => {
   function mockSupabase({ viewError = null, viewRows = [] }) {
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
+        rpc: rpcRefused,
         from: (table) => {
           if (table === 'tgd_zones') {
             const query = { select: () => query, eq: () => query, order: () => Promise.resolve({ data: zones, error: null }) };
