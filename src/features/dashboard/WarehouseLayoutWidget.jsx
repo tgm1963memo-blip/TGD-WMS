@@ -293,18 +293,24 @@ export function WarehouseLayoutWidget() {
   const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
+    // Realtime, the 30 s poll and resets can overlap. Only the newest request
+    // may update the map, so an older reply can't undo a newer one.
+    let current = true;
     setLoading(true);
-    getSectionsWithOccupancy().then(({ data, error, isEstimate: estimated }) => {
-      setLoadError(error ?? null);
-      // This reloads every 30 s, so one failed read keeps the last good map
-      // instead of blanking it.
-      if (!error) {
-        setSections(data ?? []);
-        setIsEstimate(Boolean(estimated));
-        if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
-      }
-      setLoading(false);
-    });
+    getSectionsWithOccupancy()
+      .catch((error) => ({ data: [], error, isEstimate: false }))
+      .then(({ data, error, isEstimate: estimated }) => {
+        if (!current) return;
+        setLoadError(error ?? null);
+        // One failed read keeps the last good map instead of blanking it.
+        if (!error) {
+          setSections(data ?? []);
+          setIsEstimate(Boolean(estimated));
+          if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
+        }
+        setLoading(false);
+      });
+    return () => { current = false; };
   }, [refreshKey]);
 
   useEffect(() => {
@@ -391,7 +397,7 @@ export function WarehouseLayoutWidget() {
     ])).sort((a, b) => a - b);
   }, [pallets, palletCapacity]);
 
-  if (loading && sections.length === 0) {
+  if (loading && sections.length === 0 && !loadError) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-subtle)' }}>กำลังโหลดผังคลัง...</div>
     );

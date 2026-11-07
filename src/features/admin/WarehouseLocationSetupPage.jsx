@@ -996,9 +996,13 @@ export function WarehouseLocationSetupPage() {
     setWarehouseId(wh.id);
 
     const { data, error: se, isEstimate: estimated } = await getSectionsWithOccupancy();
-    setSections(data ?? []);
+    // A failed reload keeps the rooms already on screen, so admins can still
+    // manage them; the error banner says the numbers may be out of date.
+    if (!se) {
+      setSections(data ?? []);
+      setIsEstimate(Boolean(estimated));
+    }
     setError(se);
-    setIsEstimate(Boolean(estimated));
     setLoading(false);
   }
 
@@ -1090,9 +1094,9 @@ export function WarehouseLocationSetupPage() {
 
       <AddSectionForm onAdd={handleAdd} />
 
-      {loading ? (
+      {loading && sections.length === 0 ? (
         <div style={{ color: 'var(--color-text-subtle)', padding: 24, textAlign: 'center' }}>กำลังโหลด...</div>
-      ) : error ? (
+      ) : error && sections.length === 0 ? (
         <div className="banner banner-danger">{error.message}</div>
       ) : sections.length === 0 ? (
         <div style={{ color: 'var(--color-text-subtle)', textAlign: 'center', padding: 32, background: 'var(--color-surface-muted)', borderRadius: 12 }}>
@@ -1100,6 +1104,11 @@ export function WarehouseLocationSetupPage() {
         </div>
       ) : (
         <div>
+          {error && (
+            <div className="banner banner-danger" role="alert" data-testid="location-setup-stale-error">
+              {error.message} ตัวเลขด้านล่างเป็นข้อมูลครั้งก่อน
+            </div>
+          )}
           <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-strong)', marginBottom: 12 }}>
             ห้องที่มีอยู่ ({sections.length})
           </div>

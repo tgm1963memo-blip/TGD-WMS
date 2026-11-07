@@ -64,6 +64,24 @@ describe('WarehouseLocationSetupPage stats', () => {
 describe('WarehouseLayoutWidget read failure', () => {
   beforeEach(() => getSectionsWithOccupancy.mockReset());
 
+  it('ignores an older reply that arrives after a newer one', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let finishFirst;
+      getSectionsWithOccupancy.mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve; }));
+      getSectionsWithOccupancy.mockResolvedValue({ data: sections, error: null, isEstimate: false });
+      render(<MemoryRouter><WarehouseLayoutWidget /></MemoryRouter>);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+      await screen.findByTestId('layout-view-list');
+
+      await act(async () => { finishFirst({ data: [], error: new Error('อ่านข้อมูลพาเลทไม่ครบ') }); });
+      expect(screen.queryByTestId('layout-stale-notice')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows the error, not "not set up", when the first read fails', async () => {
     getSectionsWithOccupancy.mockResolvedValue({ data: [], error: new Error('อ่านข้อมูลพาเลทไม่ครบ') });
     render(<MemoryRouter><WarehouseLayoutWidget /></MemoryRouter>);

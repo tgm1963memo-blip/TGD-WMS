@@ -217,14 +217,13 @@ export async function getSectionsWithOccupancy() {
   // reality without needing the old dual tgd_stock_balances/deposit-line
   // fallback.
   const readAllocations = () => fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id'));
-  const [firstAllocationRead, { picked: pickedByAllocationId, isEstimate }] = await Promise.all([
-    readAllocations(),
+  // A failed read leaves only the pages that arrived, so pallets used would
+  // read too low and full rows would look free. Retry once, alongside the
+  // slower picked-quantity read, then show an error rather than a total.
+  const [allocationRead, { picked: pickedByAllocationId, isEstimate }] = await Promise.all([
+    readAllocations().then((first) => (first.error ? readAllocations() : first)),
     readPickedQuantities(),
   ]);
-
-  // A failed read leaves only the pages that arrived, so pallets used would
-  // read too low and full rows would look free. Show an error, not a total.
-  const allocationRead = firstAllocationRead.error ? await readAllocations() : firstAllocationRead;
   if (allocationRead.error) {
     console.warn('tgd_customer_deposit_line_locations unavailable:', allocationRead.error.message ?? allocationRead.error);
     return { data: [], error: new Error(PALLET_READ_ERROR_MESSAGE), isEstimate: false };
