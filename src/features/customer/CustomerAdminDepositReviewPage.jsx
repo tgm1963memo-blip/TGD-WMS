@@ -672,7 +672,7 @@ export function CustomerAdminDepositReviewPage() {
                       onChange={() => toggleRequestSelected(row.id)}
                     />
                   </td>
-                  <td className="admin-deposit-review-table__request-cell">{row.request_no}</td>
+                  <td className="admin-deposit-review-table__request-cell" title={row.request_no}>{row.request_no}</td>
                   <td className="admin-deposit-review-table__customer-cell">{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
