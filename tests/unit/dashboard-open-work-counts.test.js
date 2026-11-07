@@ -41,12 +41,14 @@ describe('getReadOnlyDashboardSummary open work', () => {
     expect(statusFilters).not.toHaveProperty('tgd_picking_documents');
   });
 
-  it('reports a failed count instead of showing 0', async () => {
+  it('shows a failed count as unknown, not 0, and keeps the other numbers', async () => {
     vi.resetModules();
     mockSupabase({ failTable: 'tgd_customer_withdrawal_requests' });
     const { getReadOnlyDashboardSummary } = await import('../../src/services/readOnlyDashboardService.js');
-    const { error } = await getReadOnlyDashboardSummary();
+    const { data, error } = await getReadOnlyDashboardSummary();
 
-    expect(error).toEqual({ message: 'denied' });
+    expect(error).toBeNull();
+    expect(data.openPickingRows).toBeNull();
+    expect(data.openReceivingRows).toBe(3);
   });
 });

@@ -22,7 +22,7 @@ const PUTAWAY_ROWS_UNAVAILABLE = 0;
 // Work in progress lives on the customer requests. tgd_receiving_documents
 // rows stay DRAFT forever and tgd_picking_documents is never written, so
 // counting those showed every deposit ever received, and 0 picks.
-const OPEN_DEPOSIT_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'ADMIN_RECOUNT_REQUESTED', 'RECEIVING_VARIANCE', 'COUNT_VARIANCE_REVIEW'];
+const OPEN_DEPOSIT_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'ADMIN_RECOUNT_REQUESTED', 'COUNT_VARIANCE_REVIEW'];
 const OPEN_WITHDRAWAL_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
 
 function missingClientResult() {
@@ -95,7 +95,12 @@ async function getRequestCountByStatus(tableName, statuses) {
     .from(tableName)
     .select('*', { count: 'exact', head: true })
     .in('status', statuses);
-  if (error) throw error;
+  // null, not 0: the tile shows "—" so a failed read never looks like no work,
+  // and one failed count doesn't blank the rest of the dashboard.
+  if (error) {
+    console.warn(`${tableName} count unavailable:`, error.message ?? error);
+    return null;
+  }
   return count ?? 0;
 }
 

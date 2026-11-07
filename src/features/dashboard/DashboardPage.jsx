@@ -219,12 +219,12 @@ export function DashboardPage() {
           <div className="dash-flow">
             <FlowStep
               label={t('open_receiving')}
-              value={show(goLive ? d.openReceivingRows : '—')}
+              value={show(goLive ? (d.openReceivingRows ?? '—') : '—')}
               helper={goLive ? t('open_documents') : t('demo_uat_placeholder')}
               to="/customer/admin/deposit-review"
             />
             <FlowStep label={th ? 'รอจัดเก็บ (Putaway)' : 'Pending putaway'} value={show(d.openPutawayRows)} helper={th ? 'งาน' : 'sessions'} />
-            <FlowStep label={th ? 'รอหยิบสินค้า' : 'Pending picking'} value={show(d.openPickingRows)} helper={th ? 'คิว' : 'queue'} to="/customer/admin/withdrawal-review" />
+            <FlowStep label={th ? 'รอหยิบสินค้า' : 'Pending picking'} value={show(d.openPickingRows ?? '—')} helper={th ? 'คิว' : 'queue'} to="/customer/admin/withdrawal-review" />
             <FlowStep label={th ? 'รอจ่ายออก' : 'Pending dispatch'} value={show(d.openDispatchRows)} helper={th ? 'เอกสาร' : 'documents'} to="/customer/admin/withdrawal-review" />
           </div>
         </div>
