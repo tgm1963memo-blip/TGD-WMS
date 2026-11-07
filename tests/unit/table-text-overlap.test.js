@@ -8,8 +8,16 @@ import { describe, expect, it } from 'vitest';
 const css = fs.readFileSync(path.resolve('src/styles.css'), 'utf8');
 
 function columnWidth(selector) {
-  const match = css.match(new RegExp(`\\.${selector} \\{ width: (\\d+)px; \\}`));
-  return Number(match?.[1]);
+  const match = css.match(new RegExp(`\\.${selector}\\s*\\{[^}]*?width:\\s*(\\d+)px`));
+  if (!match) throw new Error(`no width rule for .${selector}`);
+  return Number(match[1]);
+}
+
+// The selector list that ends in `{ white-space: normal; }`, so a later,
+// unrelated `white-space: normal` can't make the check pass.
+function wrapsOnSmallScreens(cellSelector) {
+  const escaped = cellSelector.replace(/[.]/g, '\\.');
+  return new RegExp(`${escaped}[,\\s][^{}]*\\{ white-space: normal; \\}`).test(css);
 }
 
 describe('table text stays inside its column', () => {
@@ -20,9 +28,17 @@ describe('table text stays inside its column', () => {
     expect(columnWidth(selector)).toBeGreaterThanOrEqual(150);
   });
 
-  it('lets customer names wrap in fixed tables on small screens', () => {
-    expect(css).toMatch(/\.data-table td\.receiving-customer-deposit-table__customer-cell[\s\S]*?white-space: normal/);
-    expect(css).toMatch(/\.data-table td\.admin-deposit-review-table__customer-cell[\s\S]*?white-space: normal/);
+  it.each([
+    '.data-table td.receiving-customer-deposit-table__customer-cell',
+    '.data-table td.admin-deposit-review-table__customer-cell',
+    '.data-table td.admin-withdrawal-lines-table__product-cell',
+    '.tgd-table.compact-table--fixed td',
+  ])('%s wraps in fixed tables on small screens', (selector) => {
+    expect(wrapsOnSmallScreens(selector)).toBe(true);
+  });
+
+  it('cuts an over-long receiving number with an ellipsis instead of spilling', () => {
+    expect(css).toMatch(/\.receiving-customer-deposit-table__request-cell \{ overflow: hidden; text-overflow: ellipsis; \}/);
   });
 
   it('gives .table-wrapper a scrollbar, so wide tables are not cut off', () => {

@@ -2561,7 +2561,7 @@ table .status-badge,
 }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.summary-card { min-width: 0; overflow-wrap: anywhere; }
+.summary-card { min-width: 0; overflow-wrap: break-word; }
 .summary-grid--4col { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 900px) { .summary-grid--4col { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 500px) { .summary-grid--4col { grid-template-columns: 1fr; } }
@@ -3281,7 +3281,11 @@ a.dash-q:hover { background: var(--color-surface-muted); text-decoration: none; 
   .data-table td.admin-deposit-review-table__customer-cell,
   .data-table td.admin-deposit-review-table__compact-cell,
   .data-table td.receiving-customer-deposit-table__customer-cell,
-  .data-table td.receiving-customer-deposit-table__compact-cell { white-space: normal; }
+  .data-table td.receiving-customer-deposit-table__compact-cell,
+  .data-table td.admin-withdrawal-lines-table__product-cell,
+  .tgd-table.compact-table--fixed td { white-space: normal; }
+  /* A number longer than its column is cut with an ellipsis; the full number is in the title. */
+  .receiving-customer-deposit-table__request-cell { overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
