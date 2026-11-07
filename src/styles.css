@@ -81,6 +81,23 @@
   --color-success-text: #0e7a3a;
   /* Gold as text on light surfaces (plain gold is under 3:1 on white). */
   --color-gold-text: #7a5f0c;
+  /* Request status: one pair per stage of the work. */
+  --status-submitted-bg: #fef3c7;
+  --status-submitted-text: #854d0e;
+  --status-reviewing-bg: #ffedd5;
+  --status-reviewing-text: #9a3412;
+  --status-accepted-bg: #dbeafe;
+  --status-accepted-text: #1e40af;
+  --status-working-bg: #ede9fe;
+  --status-working-text: #5b21b6;
+  --status-shipped-bg: #ccfbf1;
+  --status-shipped-text: #115e59;
+  --status-done-bg: #dcfce7;
+  --status-done-text: #166534;
+  --status-stopped-bg: #fee2e2;
+  --status-stopped-text: #991b1b;
+  --status-attention-bg: #fce7f3;
+  --status-attention-text: #9d174d;
   --color-shell-text: #c7cbc5;
   --color-shell-muted: #8e959c;
   --color-shell-line: #262c32;
@@ -1167,6 +1184,14 @@ table .status-badge,
 .status-badge--uat { background: var(--tgd-navy-soft); color: var(--tgd-navy); }
 .status-badge--success { background-color: var(--color-success-soft); color: var(--color-success-strong); }
 .status-badge--warning { background-color: var(--color-warning-soft); color: var(--color-warning-strong); }
+.status-badge--submitted { background-color: var(--status-submitted-bg); color: var(--status-submitted-text); }
+.status-badge--reviewing { background-color: var(--status-reviewing-bg); color: var(--status-reviewing-text); }
+.status-badge--accepted { background-color: var(--status-accepted-bg); color: var(--status-accepted-text); }
+.status-badge--working { background-color: var(--status-working-bg); color: var(--status-working-text); }
+.status-badge--shipped { background-color: var(--status-shipped-bg); color: var(--status-shipped-text); }
+.status-badge--done { background-color: var(--status-done-bg); color: var(--status-done-text); }
+.status-badge--stopped { background-color: var(--status-stopped-bg); color: var(--status-stopped-text); }
+.status-badge--attention { background-color: var(--status-attention-bg); color: var(--status-attention-text); }
 
 .warning-panel {
   background: var(--color-warning-soft);
@@ -3584,6 +3609,22 @@ a.dash-q:hover { background: var(--color-surface-muted); text-decoration: none; 
     --color-success-text: #86d8ac;
     --color-gold-soft: #2e2710;
     --color-gold-text: #e3c35c;
+    --status-submitted-bg: #3a2e08;
+    --status-submitted-text: #f4d35e;
+    --status-reviewing-bg: #3d2208;
+    --status-reviewing-text: #fdba74;
+    --status-accepted-bg: #15294a;
+    --status-accepted-text: #93c5fd;
+    --status-working-bg: #2a1f52;
+    --status-working-text: #c4b5fd;
+    --status-shipped-bg: #0d3330;
+    --status-shipped-text: #5eead4;
+    --status-done-bg: #12331f;
+    --status-done-text: #86efac;
+    --status-stopped-bg: #421a1e;
+    --status-stopped-text: #fca5a5;
+    --status-attention-bg: #431630;
+    --status-attention-text: #f9a8d4;
     background: var(--color-bg);
     color: var(--color-text);
   }
