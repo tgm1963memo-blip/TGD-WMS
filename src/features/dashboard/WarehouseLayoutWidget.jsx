@@ -277,6 +277,7 @@ export function WarehouseLayoutWidget() {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEstimate, setIsEstimate] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewMode, setViewMode] = useState(readStoredViewMode);
@@ -292,13 +293,24 @@ export function WarehouseLayoutWidget() {
   const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
+    // Realtime, the 30 s poll and resets can overlap. Only the newest request
+    // may update the map, so an older reply can't undo a newer one.
+    let current = true;
     setLoading(true);
-    getSectionsWithOccupancy().then(({ data, isEstimate: estimated }) => {
-      setSections(data ?? []);
-      setIsEstimate(Boolean(estimated));
-      if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
-      setLoading(false);
-    });
+    getSectionsWithOccupancy()
+      .catch((error) => ({ data: [], error, isEstimate: false }))
+      .then(({ data, error, isEstimate: estimated }) => {
+        if (!current) return;
+        setLoadError(error ?? null);
+        // One failed read keeps the last good map instead of blanking it.
+        if (!error) {
+          setSections(data ?? []);
+          setIsEstimate(Boolean(estimated));
+          if (data?.length) setSelectedId((prev) => prev ?? data[0].id);
+        }
+        setLoading(false);
+      });
+    return () => { current = false; };
   }, [refreshKey]);
 
   useEffect(() => {
@@ -385,9 +397,17 @@ export function WarehouseLayoutWidget() {
     ])).sort((a, b) => a - b);
   }, [pallets, palletCapacity]);
 
-  if (loading && sections.length === 0) {
+  if (loading && sections.length === 0 && !loadError) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-subtle)' }}>กำลังโหลดผังคลัง...</div>
+    );
+  }
+
+  if (sections.length === 0 && loadError) {
+    return (
+      <div className="banner banner-danger" role="alert" data-testid="layout-load-error" style={{ margin: 20 }}>
+        {loadError.message ?? String(loadError)}
+      </div>
     );
   }
 
@@ -417,6 +437,11 @@ export function WarehouseLayoutWidget() {
 
       {/* Left: grid + section list */}
       <div style={{ padding: '20px' }}>
+        {loadError && (
+          <div className="banner banner-warning" role="status" data-testid="layout-stale-notice" style={{ marginBottom: 14 }}>
+            โหลดข้อมูลล่าสุดไม่สำเร็จ ผังนี้เป็นข้อมูลครั้งก่อน
+          </div>
+        )}
         {isEstimate && (
           <div className="banner banner-warning" role="status" data-testid="pallet-estimate-notice" style={{ marginBottom: 14 }}>
             ตัวเลขนี้เป็นค่าประมาณ อาจสูงกว่าจริง เพราะอ่านยอดเบิกไม่ครบ ลองโหลดหน้าใหม่อีกครั้ง

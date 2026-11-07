@@ -85,7 +85,7 @@ describe('getSectionsWithOccupancy isEstimate', () => {
   const zones = [{ id: 'z1', zone_code: 'A', zone_name: 'A', is_active: true, tgd_rooms: [{ id: 'r1', tgd_locations: [{ id: 'l1', location_code: 'A-1', capacity: 2 }] }] }];
   const allocations = [{ id: 'alloc-1', location_id: 'l1', pallet_no: 1, boxes: 5, weight: null }];
 
-  function mockSupabase({ viewError = null, viewRows = [] }) {
+  function mockSupabase({ viewError = null, viewRows = [], allocationTable = pagedTable(allocations) }) {
     vi.doMock('../../src/services/supabaseClient.js', () => ({
       supabase: {
         from: (table) => {
@@ -93,7 +93,7 @@ describe('getSectionsWithOccupancy isEstimate', () => {
             const query = { select: () => query, eq: () => query, order: () => Promise.resolve({ data: zones, error: null }) };
             return query;
           }
-          if (table === 'tgd_customer_deposit_line_locations') return pagedTable(allocations)();
+          if (table === 'tgd_customer_deposit_line_locations') return allocationTable();
           if (table === 'tgd_deposit_line_location_picked') return pagedTable(viewRows, { error: viewError })();
           if (table === 'tgd_customer_withdrawal_line_pallet_picks') return pagedTable([])();
           throw new Error(table);
@@ -120,5 +120,31 @@ describe('getSectionsWithOccupancy isEstimate', () => {
     expect(result.isEstimate).toBe(true);
     expect(result.data[0].used).toBe(1);
     warn.mockRestore();
+  });
+
+  it('returns an error, not a low total, when the pallet rows cannot be read', async () => {
+    vi.resetModules();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSupabase({ allocationTable: pagedTable([], { error: { message: 'timeout' } }) });
+    const { getSectionsWithOccupancy } = await import('../../src/services/warehouseLayoutService.js');
+    const result = await getSectionsWithOccupancy();
+    expect(result.data).toEqual([]);
+    expect(result.error.message).toContain('อ่านข้อมูลพาเลทไม่ครบ');
+    warn.mockRestore();
+  });
+
+  it('retries the pallet rows once, so a passing failure still gives the total', async () => {
+    vi.resetModules();
+    let reads = 0;
+    const allocationTable = () => {
+      reads += 1;
+      return pagedTable(allocations, { error: reads === 1 ? { message: 'timeout' } : null })();
+    };
+    mockSupabase({ allocationTable });
+    const { getSectionsWithOccupancy } = await import('../../src/services/warehouseLayoutService.js');
+    const result = await getSectionsWithOccupancy();
+    expect(reads).toBe(2);
+    expect(result.error).toBeNull();
+    expect(result.data[0].used).toBe(1);
   });
 });
