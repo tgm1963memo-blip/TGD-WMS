@@ -553,28 +553,48 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
   const rates = ratesResult.data ?? [];
   const months = monthRangeDates(monthsBack).map(({ monthKey, periodStart, periodEnd }) => {
     const lines = computeStorageInvoiceLines({ depositLines, rates, periodStart, periodEnd });
-    const amount = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
-
-    const amountByCustomer = new Map();
-    for (const line of lines) {
-      const key = line.customerId ?? 'UNASSIGNED';
-      amountByCustomer.set(key, (amountByCustomer.get(key) ?? 0) + (Number(line.amount) || 0));
-    }
-    const byCustomer = [...amountByCustomer.entries()]
-      .map(([customerId, custAmount]) => ({
-        customerId,
-        customerName: customerNameById.get(customerId) ?? customerId,
-        amount: Math.round(custAmount * 100) / 100,
-      }))
-      .sort((a, b) => b.amount - a.amount);
-
-    return { monthKey, periodStart, periodEnd, amount: Math.round(amount * 100) / 100, byCustomer };
+    return { monthKey, periodStart, periodEnd, ...summarizeStorageMonth(lines, customerNameById) };
   });
 
   const currentMonth = months[months.length - 1] ?? null;
-  const totalAmount = Math.round(months.reduce((sum, m) => sum + m.amount, 0) * 100) / 100;
+  const totalAmount = roundTo2(months.reduce((sum, m) => sum + m.amount, 0));
 
   return { data: { months, currentMonth, totalAmount }, error: null };
+}
+
+function roundTo2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+// Totals one month of computeStorageInvoiceLines output, overall and per
+// customer. `weight` is the billed weight: each charged cycle's weight on
+// hand when it began. Free-period cycles are billed at 0 THB, so their
+// weight is left out too; otherwise ฿/kg would be dragged down by goods
+// nobody is paying for yet.
+export function summarizeStorageMonth(lines = [], customerNameById = new Map()) {
+  let amount = 0;
+  let weight = 0;
+  const byCustomerId = new Map();
+  for (const line of lines) {
+    const lineAmount = Number(line.amount) || 0;
+    const lineWeight = line.freePeriodApplied ? 0 : (Number(line.weight) || 0);
+    amount += lineAmount;
+    weight += lineWeight;
+    const key = line.customerId ?? 'UNASSIGNED';
+    const entry = byCustomerId.get(key) ?? { amount: 0, weight: 0 };
+    entry.amount += lineAmount;
+    entry.weight += lineWeight;
+    byCustomerId.set(key, entry);
+  }
+  const byCustomer = [...byCustomerId.entries()]
+    .map(([customerId, totals]) => ({
+      customerId,
+      customerName: customerNameById.get(customerId) ?? customerId,
+      amount: roundTo2(totals.amount),
+      weight: roundTo2(totals.weight),
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  return { amount: roundTo2(amount), weight: roundTo2(weight), byCustomer };
 }
 
 // Computes the storage + auxiliary-service invoice lines a customer would
