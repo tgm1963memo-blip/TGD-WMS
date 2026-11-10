@@ -2,7 +2,7 @@ import { downloadExcelRows } from './excelFileUtils.js';
 import { formatDocumentDate } from './documentDisplayUtils.js';
 import { isInbound, fmtWt } from '../components/reports/MovementLedgerTable.jsx';
 
-const HEADERS = [
+export const MOVEMENT_LEDGER_EXCEL_HEADERS = [
   'วันที่', 'ประเภท', 'ลูกค้า', 'รหัสติดตาม', 'สินค้า', 'ประเภทสินค้า', 'lot', 'วันผลิต',
   'อุณหภูมิ', 'Location',
   'รับเข้า(กล่อง)', 'รับเข้า(น้ำหนัก)', 'จ่ายออก(กล่อง)', 'จ่ายออก(น้ำหนัก)',
@@ -13,7 +13,7 @@ const HEADERS = [
 // the exported sheet reads well without manual resizing — sized to the
 // widest realistic content per column (Thai product names/customer names
 // need more room than short codes/dates).
-const COLUMN_WIDTHS = [
+export const MOVEMENT_LEDGER_EXCEL_COLUMN_WIDTHS = [
   16, // วันที่ (dd/mm/yyyy, HH:mm)
   14, // ประเภท
   28, // ลูกค้า
@@ -350,5 +350,5 @@ export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Ma
 export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger', authoritativeTotals = null) {
   const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode, authoritativeTotals);
   const stamp = new Date().toISOString().slice(0, 10);
-  downloadExcelRows(excelRows, HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger', COLUMN_WIDTHS);
+  downloadExcelRows(excelRows, MOVEMENT_LEDGER_EXCEL_HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger', MOVEMENT_LEDGER_EXCEL_COLUMN_WIDTHS);
 }
