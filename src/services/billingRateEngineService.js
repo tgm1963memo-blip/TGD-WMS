@@ -177,7 +177,7 @@ async function fetchRateEngineInputs({ customerId }) {
       .from('tgd_customer_withdrawal_requests')
       .select(`
         id, withdrawal_no, customer_id, requested_dispatch_date, requires_r3_document,
-        is_overtime, overtime_type, dispatch_started_at,
+        is_overtime, overtime_type, dispatch_started_at, destination,
         tgd_customer_withdrawal_request_lines(
           id, source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at, requires_thaw
@@ -240,6 +240,8 @@ async function fetchRateEngineInputs({ customerId }) {
         ...line,
         customer_id: req.customer_id,
         receipt_date: receiptDate,
+        request_id: req.id,
+        request_no: req.request_no ?? null,
       });
     }
   }
@@ -276,7 +278,43 @@ async function fetchRateEngineInputs({ customerId }) {
     product_name: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
     lot_no: line.lot_no ?? null,
     product_category: categoryByCode.get(line.customer_product_code) ?? null,
+    // Display-only fields for the customer-format Excel statement
+    // (billingStatementModel.js) -- never read by any rate calculation.
+    tracking_code: line.tracking_code ?? null,
+    received_boxes: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+    request_id: line.request_id ?? null,
+    request_no: line.request_no ?? null,
   }));
+
+  // Per-document facts the Excel statement prints next to a per-request
+  // charge (ร.3, aux services, OT) -- display-only, same as above.
+  const requestInfoById = new Map();
+  for (const req of (depositResult.data ?? [])) {
+    const reqLines = req.tgd_customer_deposit_request_lines ?? [];
+    requestInfoById.set(req.id, {
+      id: req.id,
+      requestType: 'DEPOSIT',
+      requestNo: req.request_no ?? null,
+      date: receiptDateByRequestId.get(req.id) ?? null,
+      destination: null,
+      lineCount: reqLines.length,
+      totalWeight: reqLines.reduce((sum, l) => sum + Number(l.actual_weight ?? l.expected_weight ?? 0), 0),
+      totalBoxes: reqLines.reduce((sum, l) => sum + Number(l.actual_boxes ?? l.expected_boxes ?? 0), 0),
+    });
+  }
+  for (const req of (withdrawalResult.data ?? [])) {
+    const reqLines = req.tgd_customer_withdrawal_request_lines ?? [];
+    requestInfoById.set(req.id, {
+      id: req.id,
+      requestType: 'WITHDRAWAL',
+      requestNo: req.withdrawal_no ?? null,
+      date: dispatchDateByRequestId.get(req.id) ?? null,
+      destination: req.destination ?? null,
+      lineCount: reqLines.length,
+      totalWeight: reqLines.reduce((sum, l) => sum + Number(l.picked_weight ?? 0), 0),
+      totalBoxes: reqLines.reduce((sum, l) => sum + Number(l.picked_boxes ?? 0), 0),
+    });
+  }
 
   // Each request's heaviest product group — where its per-document charges
   // (ร.3, FLAT/PER_HOUR aux services) go when billing is split by group.
@@ -404,7 +442,7 @@ async function fetchRateEngineInputs({ customerId }) {
   return {
     depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
     requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
-    handlingOutLineInputs, requestCategoryById, error: null,
+    handlingOutLineInputs, requestCategoryById, requestInfoById, error: null,
   };
 }
 
@@ -612,7 +650,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const {
     depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
     requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
-    handlingOutLineInputs, requestCategoryById,
+    handlingOutLineInputs, requestCategoryById, requestInfoById,
   } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
@@ -852,6 +890,10 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     data: {
       storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines: [...handlingOutLines, ...thawLines], overtimeLines,
       depositLines, unratedDepositLines, handlingOutMissingWeightLines,
+      // For the customer-format Excel statement only (billingStatementModel.js):
+      // the OT pool lines of the whole period BEFORE scoping (the OT file
+      // shows every product group side by side), plus the lookups it prints.
+      overtimePoolLines: pooledOvertimeLines, rates, requestInfoById,
     },
     error: null,
   };
