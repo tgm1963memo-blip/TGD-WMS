@@ -118,4 +118,23 @@ describe('CustomerStockBalancePage product category filter', () => {
     await waitFor(() => expect(screen.queryByText('Frozen widget')).not.toBeInTheDocument());
     expect(screen.getByText('Chilled widget')).toBeInTheDocument();
   });
+
+  it('splits one product code into one group per temperature type, like the admin page', async () => {
+    getCustomerStockBalanceMock.mockResolvedValue({
+      data: [
+        makeBalanceRow({ id: 'l-chilled', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'CHILLED' }),
+        makeBalanceRow({ id: 'l-ff', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'FREEZE_FROZEN' }),
+        makeBalanceRow({ id: 'l-frozen', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'FROZEN' }),
+      ],
+      error: null,
+    });
+    listCustomerProductsMock.mockResolvedValue({ data: [], error: null });
+
+    render(<CustomerStockBalancePage />);
+
+    await waitFor(() => expect(screen.getAllByText('Egg')).toHaveLength(3));
+    expect(screen.getByText('แช่เย็น')).toBeInTheDocument();
+    expect(screen.getByText('ฟรีสและฝากแช่')).toBeInTheDocument();
+    expect(screen.getByText('แช่แข็ง')).toBeInTheDocument();
+  });
 });
