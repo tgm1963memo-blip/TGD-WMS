@@ -11,22 +11,10 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { exportCustomerStockBalanceExcel } from '../../utils/customerStockBalanceExcelUtils.js';
+import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 
 function TempBadge({ type }) {
-  const map = { FROZEN: '#1d6fcf', CHILLED: 'var(--color-success-text)', AMBIENT: '#c97d00' };
-  return (
-    <span style={{
-      display: 'inline-block',
-      background: map[type] ?? '#888',
-      color: '#fff',
-      borderRadius: 4,
-      padding: '1px 8px',
-      fontSize: 11,
-      fontWeight: 600,
-    }}>
-      {type ?? '-'}
-    </span>
-  );
+  return <span className="stock-temp-badge">{getTemperatureTypeShortLabel(type)}</span>;
 }
 
 function formatDate(iso) {
@@ -133,10 +121,13 @@ export function CustomerStockBalancePage() {
     );
   });
 
-  // Group by product (code + name)
+  // Group by product (code + name + temperature_type) — same key as the
+  // admin InventoryBalancePage: one product code can be stored CHILLED in
+  // some lots and FROZEN / FREEZE_FROZEN in others, and the group header
+  // shows a single temperature badge, so mixing them mislabels the lots.
   const productMap = {};
   for (const line of filtered) {
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${line.temperature_type ?? ''}`;
     if (!productMap[pk]) productMap[pk] = [];
     productMap[pk].push(line);
   }
@@ -154,6 +145,7 @@ export function CustomerStockBalancePage() {
     };
   });
 
+  const uniqueProducts = new Set(filtered.map((l) => l.customer_product_code ?? l.product_name)).size;
   const grandBoxes = productGroups.reduce((s, g) => s + g.totalBoxes, 0);
   const grandWeight = productGroups.reduce((s, g) => s + g.totalWeight, 0);
 
@@ -202,7 +194,7 @@ export function CustomerStockBalancePage() {
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #8b5cf6' }}>
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>ประเภทสินค้า</div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{productGroups.length} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{uniqueProducts} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
             </div>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #22c55e' }}>
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>กล่องคงเหลือรวม</div>
