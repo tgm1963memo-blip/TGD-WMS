@@ -1,4 +1,5 @@
 import { downloadExcelRows } from './excelFileUtils.js';
+import { toStockBalanceTemperatureType } from './temperatureTypeLabels.js';
 
 export const CUSTOMER_STOCK_BALANCE_EXCEL_HEADERS = [
   'request_no',
@@ -27,7 +28,7 @@ export function mapStockBalanceLineToExcelRow(line = {}) {
     received_date: toDateOnly(line.request?.last_action_at ?? line.request?.expected_arrival_date),
     customer_product_code: line.customer_product_code ?? '',
     product_name: line.product_name ?? '',
-    temperature_type: line.temperature_type ?? '',
+    temperature_type: toStockBalanceTemperatureType(line.temperature_type) ?? '',
     lot_no: line.lot_no ?? '',
     tracking_code: line.tracking_code ?? '',
     mfg_date: toDateOnly(line.mfg_date),

@@ -21,3 +21,14 @@ export function getTemperatureTypeShortLabel(value) {
   if (!value) return '-';
   return TEMPERATURE_TYPE_SHORT_LABELS[value] ?? value;
 }
+
+// Stock-balance pages show what is physically in the room, not the service
+// that was billed on the way in: FREEZE and Freeze&Frozen lots were frozen
+// on receipt and sit in storage as frozen goods, so they are presented as
+// FROZEN there (badge, grouping, temperature filter, Excel). Billing,
+// deposit and withdrawal documents keep the original value.
+const STOCK_BALANCE_FROZEN_TYPES = new Set(['FREEZE', 'FREEZE_FROZEN']);
+
+export function toStockBalanceTemperatureType(value) {
+  return STOCK_BALANCE_FROZEN_TYPES.has(value) ? 'FROZEN' : value;
+}

@@ -10,7 +10,7 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
-import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { getTemperatureTypeShortLabel, toStockBalanceTemperatureType } from '../../utils/temperatureTypeLabels.js';
 import { splitBalanceByLocation, UNASSIGNED_LOCATION_LABEL } from '../../utils/stockBalanceExportUtils.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { InventoryLocationModal } from './InventoryLocationModal.jsx';
@@ -34,7 +34,7 @@ function balanceLineFields(line, customerLabel) {
     'ลูกค้า': customerLabel,
     'รหัสสินค้า': line.customer_product_code ?? '-',
     'ชื่อสินค้า': line.product_name ?? '-',
-    'อุณหภูมิ': line.temperature_type ?? '-',
+    'อุณหภูมิ': toStockBalanceTemperatureType(line.temperature_type) ?? '-',
     'เลขที่ใบฝาก': line.request?.request_no ?? '-',
     'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
     'LOT': line.lot_no ?? '-',
@@ -185,7 +185,7 @@ export function InventoryBalancePage() {
   // Filter (customer filter is client-side now that all data is loaded at once)
   const filtered = lines.filter((l) => {
     if (selectedCustomerId && l.request?.customer_id !== selectedCustomerId) return false;
-    if (selectedTemperature && l.temperature_type !== selectedTemperature) return false;
+    if (selectedTemperature && toStockBalanceTemperatureType(l.temperature_type) !== selectedTemperature) return false;
     if (selectedCategory) {
       const cid = l.request?.customer_id;
       const category = cid && l.customer_product_code ? categoryMap.get(`${cid}::${l.customer_product_code}`) : null;
@@ -210,7 +210,7 @@ export function InventoryBalancePage() {
   const customerMap = {};
   for (const line of filtered) {
     const cid = line.request?.customer_id ?? '__unknown__';
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${line.temperature_type ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${toStockBalanceTemperatureType(line.temperature_type) ?? ''}`;
     if (!customerMap[cid]) customerMap[cid] = {};
     if (!customerMap[cid][pk]) customerMap[cid][pk] = [];
     customerMap[cid][pk].push(line);
@@ -224,7 +224,7 @@ export function InventoryBalancePage() {
         productKey: `${cid}::${pk}`,
         productCode: first?.customer_product_code ?? '-',
         productName: first?.product_name ?? '-',
-        temperatureType: first?.temperature_type,
+        temperatureType: toStockBalanceTemperatureType(first?.temperature_type),
         productCategory: first?.customer_product_code ? categoryMap.get(`${cid}::${first.customer_product_code}`) : null,
         totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
         totalWeight: pLines.reduce((s, l) => s + (l.actual_weight ?? 0), 0),
