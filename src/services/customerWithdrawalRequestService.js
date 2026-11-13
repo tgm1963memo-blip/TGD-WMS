@@ -24,6 +24,9 @@ const WITHDRAWAL_HEADER_SELECT = [
   'pickup_contact',
   'destination',
   'vehicle_registration',
+  'declared_vehicle_registration',
+  'vehicle_registration_set_by_email',
+  'vehicle_registration_set_at',
   'note',
   'dispatch_started_at',
   'dispatch_started_by_email',
@@ -585,6 +588,19 @@ export async function setWithdrawalDispatchTemperature(requestId, field, value) 
     p_request_id: requestId,
     p_field: field,
     p_value: toNullableText(value),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Mirrors setDepositVehicleRegistration.
+export async function setWithdrawalVehicleRegistration(requestId, vehicleRegistration, note = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_withdrawal_vehicle_registration', {
+    p_request_id: requestId,
+    p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_note: toNullableText(note),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };

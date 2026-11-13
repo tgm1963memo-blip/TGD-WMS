@@ -28,6 +28,7 @@ import {
   setWithdrawalDispatchTime,
   setWithdrawalDispatchTemperature,
   setWithdrawalOvertime,
+  setWithdrawalVehicleRegistration,
   listWithdrawalR3PermitItems,
   replaceWithdrawalR3PermitItems,
   setWithdrawalR3Document,
@@ -36,7 +37,8 @@ import {
 import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
 import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
 import { buildCatalogR3Map } from '../../utils/r3PermitComparisonUtils.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
@@ -75,6 +77,7 @@ const TIMELINE_ACTION_LABELS = {
   ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
   ADMIN_RECALL_COMPLETED: 'เรียกคืนเอกสารที่เสร็จสิ้นแล้ว',
   SET_OVERTIME: 'แก้ไข OT',
+  SET_VEHICLE_REGISTRATION: 'แก้ไขทะเบียนรถ',
 };
 
 function timelineActionLabel(action) {
@@ -732,6 +735,24 @@ export function CustomerAdminWithdrawalReviewPage() {
     } : r)));
   }
 
+  async function handleSaveVehicleRegistration(value, note) {
+    if (!selectedId) return false;
+    const { data, error } = await setWithdrawalVehicleRegistration(selectedId, value, note);
+    if (error) {
+      setError(error.message ?? 'บันทึกทะเบียนรถไม่สำเร็จ');
+      return false;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? {
+      ...r,
+      vehicle_registration: data.vehicle_registration,
+      declared_vehicle_registration: data.declared_vehicle_registration,
+      vehicle_registration_set_by_email: data.by_email,
+      vehicle_registration_set_at: data.at,
+    } : r)));
+    refreshTimeline(selectedId);
+    return true;
+  }
+
   // Saves the TGC-confirmed dispatch date. Returns false (and shows the
   // error) on failure. Before ACCEPT this is silent -- the accepted email
   // carries the date; afterwards the RPC emails the customer the change.
@@ -1307,10 +1328,15 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <div className="form-label">{t('customer_field_pickup_contact')}</div>
                 <div>{selected.pickup_contact ?? '-'}</div>
               </div>
-              <div>
-                <div className="form-label">{t('customer_field_vehicle_registration')}</div>
-                <div>{selected.vehicle_registration || '-'}</div>
-              </div>
+              <VehicleRegistrationControl
+                label={t('customer_field_vehicle_registration')}
+                value={selected.vehicle_registration}
+                r3Plate={getR3VehicleRegistration(selected)}
+                hasR3={Boolean(selected.requires_r3_document) || r3PermitItems.length > 0}
+                setByEmail={selected.vehicle_registration_set_by_email}
+                canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
+                onSave={handleSaveVehicleRegistration}
+              />
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 {canWrite && !['CANCELLED', 'ADMIN_REJECTED'].includes(selected.status) ? (

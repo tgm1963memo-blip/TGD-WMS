@@ -1,4 +1,5 @@
-import { Check, Clock, Pencil } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Pencil } from 'lucide-react';
+import { isVehicleRegistrationMismatch } from '../../utils/vehicleRegistrationUtils.js';
 import { IconLabel } from '../ui/IconLabel.jsx';
 import { useEffect, useState } from 'react';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
@@ -206,6 +207,81 @@ function TemperatureRow({ label, value, canWrite, onSave }) {
         placeholder="เช่น -18°C"
         style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--color-border)' }}
       />
+      <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
+        บันทึก
+      </button>
+    </CompactFieldCell>
+  );
+}
+
+// "ทะเบียนรถ" cell — staff correct the plate when the truck that actually
+// turns up isn't the declared one. `r3Plate` is the plate on the ร.3
+// (getR3VehicleRegistration); when the document has a ร.3 (`hasR3`) and the
+// plate no longer matches it, a warning shows in the editor before saving
+// and under the value afterwards. It only warns — saving is never blocked.
+function R3PlateWarning({ r3Plate }) {
+  return (
+    <div role="alert" style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+      <AlertTriangle size={13} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+      <span>ไม่ตรงกับทะเบียนรถในเอกสาร ร.3 ({r3Plate}) — ตรวจสอบ/ขอ ร.3 ฉบับแก้ไข</span>
+    </div>
+  );
+}
+
+export function VehicleRegistrationControl({ label, value, r3Plate, hasR3, setByEmail, canWrite, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [draftNote, setDraftNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function openEdit() {
+    setDraft(value ?? '');
+    setDraftNote('');
+    setEditing(true);
+  }
+
+  async function save() {
+    setBusy(true);
+    const ok = await onSave(draft, draftNote);
+    setBusy(false);
+    if (ok !== false) setEditing(false);
+  }
+
+  const currentMismatch = hasR3 && isVehicleRegistrationMismatch(value, r3Plate);
+  const draftMismatch = hasR3 && isVehicleRegistrationMismatch(draft, r3Plate);
+
+  return (
+    <CompactFieldCell
+      label={label}
+      valueNode={currentMismatch ? <span style={{ color: '#b45309', fontWeight: 700 }}>{value || '-'}</span> : (value || '-')}
+      byline={(currentMismatch || setByEmail) ? (
+        <>
+          {currentMismatch ? <R3PlateWarning r3Plate={r3Plate} /> : null}
+          {setByEmail ? <div>แก้ไขโดย {setByEmail}</div> : null}
+        </>
+      ) : null}
+      canWrite={canWrite}
+      editing={editing}
+      onToggleEdit={() => (editing ? setEditing(false) : openEdit())}
+    >
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="เช่น 81-5480"
+        aria-label="ทะเบียนรถ"
+        data-testid="vehicle-registration-input"
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+      />
+      <input
+        type="text"
+        value={draftNote}
+        onChange={(e) => setDraftNote(e.target.value)}
+        placeholder="เหตุผล (ไม่บังคับ)"
+        aria-label="เหตุผลที่แก้ไขทะเบียนรถ"
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+      />
+      {draftMismatch ? <R3PlateWarning r3Plate={r3Plate} /> : null}
       <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
         บันทึก
       </button>

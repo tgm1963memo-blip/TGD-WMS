@@ -21,6 +21,7 @@ import {
   setDepositReceivingTime,
   setDepositReceivingTemperature,
   setDepositOvertime,
+  setDepositVehicleRegistration,
   recallConfirmedDepositRequest,
   enqueueCustomerDepositNotification,
   cancelCustomerDepositRequest,
@@ -48,7 +49,8 @@ import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
 import { hasWeightVariance } from '../../utils/customerRequestCancelUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from './WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from './WorkPhaseTimeControl.jsx';
+import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 
 function fmtDate(v) {
   if (!v) return '-';
@@ -89,6 +91,7 @@ const TIMELINE_ACTION_LABELS = {
   ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
   ADMIN_RECALL_CONFIRMED: 'เรียกคืนเอกสารที่ยืนยันแล้ว',
   SET_OVERTIME: 'แก้ไข OT',
+  SET_VEHICLE_REGISTRATION: 'แก้ไขทะเบียนรถ',
 };
 
 function timelineActionLabel(action) {
@@ -461,6 +464,26 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     setActionMsg('บันทึก OT เรียบร้อยแล้ว');
   }
 
+  async function handleSaveVehicleRegistration(value, note) {
+    if (!requestId) return false;
+    setError('');
+    const r = await setDepositVehicleRegistration(requestId, value, note);
+    if (r.error) {
+      setError(r.error.message ?? 'บันทึกทะเบียนรถไม่สำเร็จ');
+      return false;
+    }
+    setHeader((prev) => prev ? {
+      ...prev,
+      vehicle_registration: r.data.vehicle_registration,
+      declared_vehicle_registration: r.data.declared_vehicle_registration,
+      vehicle_registration_set_by_email: r.data.by_email,
+      vehicle_registration_set_at: r.data.at,
+    } : prev);
+    setActionMsg('บันทึกทะเบียนรถเรียบร้อยแล้ว');
+    refreshTimeline();
+    return true;
+  }
+
   async function handleRecallConfirmed() {
     if (!requestId) return;
     setRecalling(true); setError('');
@@ -765,10 +788,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                 <div className="form-label">{t('customer_field_contact_name')}</div>
                 <div>{header.contact_name ?? '-'}</div>
               </div>
-              <div>
-                <div className="form-label">{t('customer_field_vehicle_registration')}</div>
-                <div>{header.vehicle_registration ?? '-'}</div>
-              </div>
+              <VehicleRegistrationControl
+                label={t('customer_field_vehicle_registration')}
+                value={header.vehicle_registration}
+                r3Plate={getR3VehicleRegistration(header)}
+                hasR3={Boolean(header.requires_r3_document) || r3Attachments.length > 0}
+                setByEmail={header.vehicle_registration_set_by_email}
+                canWrite={canWriteReceiving && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(header.status)}
+                onSave={handleSaveVehicleRegistration}
+              />
               <WorkPhaseTimeControl
                 canWrite={canWriteReceiving}
                 startedLabel="เริ่มลงสินค้า"
