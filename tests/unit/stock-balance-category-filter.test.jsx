@@ -119,11 +119,12 @@ describe('CustomerStockBalancePage product category filter', () => {
     expect(screen.getByText('Chilled widget')).toBeInTheDocument();
   });
 
-  it('splits one product code into one group per temperature type, like the admin page (Freeze&Frozen counts as frozen)', async () => {
+  it('splits one product code into one group per temperature type, like the admin page (Freeze and Freeze&Frozen count as frozen)', async () => {
     getCustomerStockBalanceMock.mockResolvedValue({
       data: [
         makeBalanceRow({ id: 'l-chilled', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'CHILLED' }),
         makeBalanceRow({ id: 'l-ff', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'FREEZE_FROZEN' }),
+        makeBalanceRow({ id: 'l-fz-only', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'FREEZE' }),
         makeBalanceRow({ id: 'l-frozen', customer_product_code: 'P-EGG', product_name: 'Egg', temperature_type: 'FROZEN' }),
       ],
       error: null,
@@ -135,6 +136,7 @@ describe('CustomerStockBalancePage product category filter', () => {
     await waitFor(() => expect(screen.getAllByText('Egg')).toHaveLength(2));
     expect(screen.getByText('แช่เย็น')).toBeInTheDocument();
     expect(screen.queryByText('ฟรีสและฝากแช่')).not.toBeInTheDocument();
+    expect(screen.queryByText('ฝากฟรีส')).not.toBeInTheDocument();
     expect(screen.getByText('แช่แข็ง')).toBeInTheDocument();
   });
 });
@@ -142,11 +144,12 @@ describe('CustomerStockBalancePage product category filter', () => {
 // Freeze&Frozen lots are frozen on receipt and stored as frozen goods, so
 // the admin balance page presents them as FROZEN: same badge, same group as
 // the product's plain FROZEN lots, and matched by the FROZEN filter.
-describe('InventoryBalancePage shows FREEZE_FROZEN lots as frozen', () => {
-  it('merges Freeze&Frozen lots into the frozen group and the FROZEN filter', async () => {
+describe('InventoryBalancePage shows FREEZE and FREEZE_FROZEN lots as frozen', () => {
+  it('merges Freeze and Freeze&Frozen lots into the frozen group and the FROZEN filter', async () => {
     getAllCustomerStockBalancesMock.mockResolvedValue({
       data: [
         makeBalanceRow({ id: 'line-ff', temperature_type: 'FREEZE_FROZEN', lot_no: 'L-FF' }),
+        makeBalanceRow({ id: 'line-f', temperature_type: 'FREEZE', lot_no: 'L-F' }),
         makeBalanceRow({ id: 'line-fz', temperature_type: 'FROZEN', lot_no: 'L-FZ' }),
       ],
       error: null,
@@ -158,11 +161,12 @@ describe('InventoryBalancePage shows FREEZE_FROZEN lots as frozen', () => {
     await screen.findByText('Frozen widget');
     expect(screen.getAllByText('Frozen widget')).toHaveLength(1);
     expect(screen.queryByText('ฟรีสและฝากแช่')).not.toBeInTheDocument();
+    expect(screen.queryByText('ฝากฟรีส')).not.toBeInTheDocument();
     expect(screen.getByText('แช่แข็ง')).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'อุณหภูมิ' }), { target: { value: 'FROZEN' } });
     // Both lots survive the FROZEN filter and stay in one group.
     expect(screen.getAllByText('Frozen widget')).toHaveLength(1);
-    expect(screen.getByText(/2\s*ใบฝาก/)).toBeInTheDocument();
+    expect(screen.getByText(/3\s*ใบฝาก/)).toBeInTheDocument();
   });
 });
