@@ -54,6 +54,16 @@ const ACTION_PERMISSIONS = [
     label: 'บันทึกอุณหภูมิสินค้า/รถขนส่งตอนเบิก-จ่าย',
     defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
   },
+  {
+    functionKey: 'customer_deposit_set_vehicle_registration',
+    label: 'แก้ไขทะเบียนรถ (ฝากสินค้า)',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
+  },
+  {
+    functionKey: 'customer_withdrawal_set_vehicle_registration',
+    label: 'แก้ไขทะเบียนรถ (เบิกสินค้า)',
+    defaultAllowedRoles: ['admin', 'accounting', 'warehouse_manager', 'warehouse_admin', 'warehouse_staff'],
+  },
 ];
 
 function registerFunction(entry) {
