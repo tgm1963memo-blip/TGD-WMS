@@ -11,7 +11,7 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { exportCustomerStockBalanceExcel } from '../../utils/customerStockBalanceExcelUtils.js';
-import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { getTemperatureTypeShortLabel, toStockBalanceTemperatureType } from '../../utils/temperatureTypeLabels.js';
 
 function TempBadge({ type }) {
   return <span className="stock-temp-badge">{getTemperatureTypeShortLabel(type)}</span>;
@@ -123,11 +123,12 @@ export function CustomerStockBalancePage() {
 
   // Group by product (code + name + temperature_type) — same key as the
   // admin InventoryBalancePage: one product code can be stored CHILLED in
-  // some lots and FROZEN / FREEZE_FROZEN in others, and the group header
-  // shows a single temperature badge, so mixing them mislabels the lots.
+  // some lots and FROZEN in others, and the group header shows a single
+  // temperature badge, so mixing them mislabels the lots. FREEZE_FROZEN
+  // lots count as FROZEN here (see toStockBalanceTemperatureType).
   const productMap = {};
   for (const line of filtered) {
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${line.temperature_type ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${toStockBalanceTemperatureType(line.temperature_type) ?? ''}`;
     if (!productMap[pk]) productMap[pk] = [];
     productMap[pk].push(line);
   }
@@ -137,10 +138,10 @@ export function CustomerStockBalancePage() {
       productKey: pk,
       productCode: first?.customer_product_code ?? '-',
       productName: first?.product_name ?? '-',
-      temperatureType: first?.temperature_type,
+      temperatureType: toStockBalanceTemperatureType(first?.temperature_type),
       productCategory: first?.customer_product_code ? categoryMap.get(first.customer_product_code) : null,
       totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
-      totalWeight: pLines.reduce((s, l) => s + (Number(l.actual_weight) ?? 0), 0),
+      totalWeight: pLines.reduce((s, l) => s + Number(l.actual_weight ?? 0), 0),
       lines: pLines,
     };
   });
