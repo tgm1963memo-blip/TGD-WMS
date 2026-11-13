@@ -25,8 +25,10 @@ import {
   setDepositReceivingTime,
   setDepositReceivingTemperature,
   setDepositOvertime,
+  setDepositVehicleRegistration,
 } from '../../services/customerDepositRequestService.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -296,6 +298,23 @@ export function CustomerAdminDepositReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === selectedId ? {
       ...r, is_overtime: data.is_overtime, overtime_type: data.overtime_type, overtime_note: data.note, overtime_set_by_email: data.by_email, overtime_set_at: data.at,
     } : r)));
+  }
+
+  async function handleSaveVehicleRegistration(value, note) {
+    if (!selectedId) return false;
+    const { data, error } = await setDepositVehicleRegistration(selectedId, value, note);
+    if (error) {
+      setError(error.message ?? 'บันทึกทะเบียนรถไม่สำเร็จ');
+      return false;
+    }
+    setRows((prev) => prev.map((r) => (r.id === selectedId ? {
+      ...r,
+      vehicle_registration: data.vehicle_registration,
+      declared_vehicle_registration: data.declared_vehicle_registration,
+      vehicle_registration_set_by_email: data.by_email,
+      vehicle_registration_set_at: data.at,
+    } : r)));
+    return true;
   }
 
   async function handleRequestRecount() {
@@ -785,10 +804,15 @@ export function CustomerAdminDepositReviewPage() {
                 <div className="form-label">{t('customer_field_contact_name')}</div>
                 <div>{selected.contact_name ?? '-'}</div>
               </div>
-              <div>
-                <div className="form-label">{t('customer_field_vehicle_registration')}</div>
-                <div>{selected.vehicle_registration ?? '-'}</div>
-              </div>
+              <VehicleRegistrationControl
+                label={t('customer_field_vehicle_registration')}
+                value={selected.vehicle_registration}
+                r3Plate={getR3VehicleRegistration(selected)}
+                hasR3={Boolean(selected.requires_r3_document)}
+                setByEmail={selected.vehicle_registration_set_by_email}
+                canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
+                onSave={handleSaveVehicleRegistration}
+              />
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>

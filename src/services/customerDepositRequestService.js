@@ -22,6 +22,9 @@ const DEPOSIT_HEADER_SELECT = [
   'contact_phone',
   'note',
   'vehicle_registration',
+  'declared_vehicle_registration',
+  'vehicle_registration_set_by_email',
+  'vehicle_registration_set_at',
   'arrival_time',
   'receiving_started_at',
   'receiving_started_by_email',
@@ -742,6 +745,22 @@ export async function setDepositReceivingTemperature(requestId, field, value) {
     p_request_id: requestId,
     p_field: field,
     p_value: toNullableText(value),
+  });
+
+  return { data: normalizeCustomerPortalRpcData(data), error };
+}
+
+// Staff correct the plate when the truck that turns up isn't the declared
+// one. The first edit snapshots the customer's declared plate (= the plate on
+// their ร.3) into declared_vehicle_registration so the UI can warn on a
+// mismatch — see isVehicleRegistrationMismatch in vehicleRegistrationUtils.js.
+export async function setDepositVehicleRegistration(requestId, vehicleRegistration, note = null) {
+  if (!supabase) return missingSupabaseClientResult();
+
+  const { data, error } = await supabase.rpc('tgd_set_deposit_vehicle_registration', {
+    p_request_id: requestId,
+    p_vehicle_registration: toNullableText(vehicleRegistration),
+    p_note: toNullableText(note),
   });
 
   return { data: normalizeCustomerPortalRpcData(data), error };
