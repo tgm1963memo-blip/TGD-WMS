@@ -48,6 +48,8 @@ import { mergeWithdrawalRequestsForPrint } from '../../utils/mergeRequestLinesFo
 import { exportCustomerWithdrawalDocumentExcel, exportCustomerWithdrawalDocumentFormExcel } from '../../utils/customerWithdrawalLineExcelUtils.js';
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import {
+  describeAttachmentUploader,
+  downloadCustomerDocumentAttachment,
   getCustomerDocumentAttachmentUrl,
   listCustomerDocumentAttachments,
   uploadCustomerDocumentAttachments,
@@ -418,6 +420,11 @@ export function CustomerAdminWithdrawalReviewPage() {
       return;
     }
     window.open(result.data, '_blank', 'noopener');
+  }
+
+  async function handleDownloadR3Attachment(attachment) {
+    const result = await downloadCustomerDocumentAttachment(attachment);
+    if (result.error) setR3AttachmentError(result.error.message ?? 'ดาวน์โหลดไฟล์ไม่สำเร็จ');
   }
 
   async function handleUploadR3Attachments() {
@@ -1446,10 +1453,19 @@ export function CustomerAdminWithdrawalReviewPage() {
                   <li key={file.id}>
                     <span>{file.file_name} ({file.file_mime_type || 'unknown'}, {formatAttachmentSize(file.file_size_bytes)})</span>
                     <span className="form-helper" style={{ margin: 0 }}>
-                      {file.uploaded_at ? formatDocumentDate(file.uploaded_at) : ''}
+                      อัปโหลดโดย {describeAttachmentUploader(file)}
+                      {file.uploaded_at ? ` · ${formatDocumentDate(file.uploaded_at)}` : ''}
                     </span>
                     <button className="btn btn-secondary btn-sm" onClick={() => handleOpenR3Attachment(file)} type="button">
                       เปิดไฟล์
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      data-testid="admin-withdrawal-r3-attachment-download"
+                      onClick={() => handleDownloadR3Attachment(file)}
+                      type="button"
+                    >
+                      ดาวน์โหลด
                     </button>
                   </li>
                 ))}
