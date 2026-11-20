@@ -16,6 +16,7 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
 import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
+import { R3AttachmentDownloadPanel } from '../../components/customer/R3AttachmentDownloadPanel.jsx';
 import { getCustomerRequestPolicy } from '../../services/customerRequestPolicyService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getWithdrawalCancelEligibility } from '../../utils/customerRequestCancelUtils.js';
@@ -180,6 +181,8 @@ export function CustomerWithdrawalRequestDetailPage() {
           usePicked
         />
       ) : null}
+
+      <R3AttachmentDownloadPanel documentId={header.id} showWhenEmpty={Boolean(header.requires_r3_document)} />
 
       <CustomerRequestCancelPanel
         eligibility={eligibility}

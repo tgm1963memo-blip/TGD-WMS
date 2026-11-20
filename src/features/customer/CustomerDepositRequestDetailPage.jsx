@@ -8,6 +8,7 @@ import { CustomerDepositRequestLinesDisplay } from '../../components/customer/Cu
 import { CustomerDepositRequestPrintDocument } from '../../components/customer/CustomerDepositRequestPrintDocument.jsx';
 import { CustomerRequestCancelPanel } from '../../components/customer/CustomerRequestCancelPanel.jsx';
 import { CustomerRequestRecallPanel } from '../../components/customer/CustomerRequestRecallPanel.jsx';
+import { R3AttachmentDownloadPanel } from '../../components/customer/R3AttachmentDownloadPanel.jsx';
 import { ReportPrintActions } from '../../components/reports/ReportPrintActions.jsx';
 import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
@@ -192,6 +193,12 @@ export function CustomerDepositRequestDetailPage() {
         </div>
         <CustomerDepositRequestLinesDisplay lines={lines} />
       </div>
+
+      <R3AttachmentDownloadPanel
+        documentType="CUSTOMER_DEPOSIT_REQUEST"
+        documentId={header.id}
+        showWhenEmpty={Boolean(header.requires_r3_document)}
+      />
 
       <CustomerRequestRecallPanel
         eligibility={recallEligibility}

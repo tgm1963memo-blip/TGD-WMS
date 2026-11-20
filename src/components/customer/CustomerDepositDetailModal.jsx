@@ -33,6 +33,8 @@ import {
 import { listCustomerDocumentTimelineEvents } from '../../services/customerDocumentTimelineService.js';
 import {
   DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE,
+  describeAttachmentUploader,
+  downloadCustomerDocumentAttachment,
   getCustomerDocumentAttachmentUrl,
   getCustomerDocumentAttachmentUrls,
   listCustomerDocumentAttachments,
@@ -284,6 +286,11 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       return;
     }
     window.open(result.data, '_blank', 'noopener');
+  }
+
+  async function handleDownloadR3Attachment(attachment) {
+    const result = await downloadCustomerDocumentAttachment(attachment);
+    if (result.error) setR3AttachmentError(result.error.message ?? 'ดาวน์โหลดไฟล์ไม่สำเร็จ');
   }
 
   useEffect(() => {
@@ -1250,10 +1257,19 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   <li key={file.id}>
                     <span>{file.file_name} ({file.file_mime_type || 'unknown'}, {formatAttachmentSize(file.file_size_bytes)})</span>
                     <span className="form-helper" style={{ margin: 0 }}>
-                      {file.uploaded_at ? formatDocumentDate(file.uploaded_at) : ''}
+                      อัปโหลดโดย {describeAttachmentUploader(file)}
+                      {file.uploaded_at ? ` · ${formatDocumentDate(file.uploaded_at)}` : ''}
                     </span>
                     <button className="btn btn-secondary btn-sm" onClick={() => handleOpenR3Attachment(file)} type="button">
                       เปิดไฟล์
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      data-testid="admin-deposit-r3-attachment-download"
+                      onClick={() => handleDownloadR3Attachment(file)}
+                      type="button"
+                    >
+                      ดาวน์โหลด
                     </button>
                   </li>
                 ))}

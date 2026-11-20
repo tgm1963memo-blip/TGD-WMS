@@ -109,6 +109,39 @@ export async function getCustomerDocumentAttachmentUrl(attachment, expiresInSeco
   return { data: data?.signedUrl ?? null, error };
 }
 
+// Saves the file to the user's device instead of opening it in a tab. The
+// `download` option makes Storage answer with Content-Disposition:
+// attachment, which works even though the signed URL is cross-origin (where
+// an <a download> attribute alone would be ignored).
+export async function downloadCustomerDocumentAttachment(attachment, expiresInSeconds = 300) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!attachment?.storage_path) return { data: null, error: new Error('Missing attachment storage path.') };
+
+  const fileName = attachment.file_name || 'attachment';
+  const { data, error } = await supabase.storage
+    .from(attachment.storage_bucket || CUSTOMER_DOCUMENT_ATTACHMENT_BUCKET)
+    .createSignedUrl(attachment.storage_path, expiresInSeconds, { download: fileName });
+
+  if (error || !data?.signedUrl) return { data: null, error: error ?? new Error('ดาวน์โหลดไฟล์ไม่สำเร็จ') };
+
+  if (typeof document !== 'undefined') {
+    const link = document.createElement('a');
+    link.href = data.signedUrl;
+    link.download = fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+  return { data: data.signedUrl, error: null };
+}
+
+// Customer uploads (create page) always record the uploader's email; TGC
+// staff uploads from the admin review page leave it empty.
+export function describeAttachmentUploader(attachment) {
+  return attachment?.uploaded_by_email ? `ลูกค้า (${attachment.uploaded_by_email})` : 'TGC';
+}
+
 // Receiving photos are keyed by deposit request LINE id (see migration
 // 20261007100000_deposit_receiving_photos.sql).
 export const DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE = 'CUSTOMER_DEPOSIT_RECEIVING_PHOTO';
