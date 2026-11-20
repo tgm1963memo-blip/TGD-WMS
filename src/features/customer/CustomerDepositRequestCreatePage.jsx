@@ -52,6 +52,8 @@ import {
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { uploadCustomerDocumentAttachments } from '../../services/customerDocumentAttachmentService.js';
+import { R3AttachmentDownloadPanel } from '../../components/customer/R3AttachmentDownloadPanel.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
@@ -362,6 +364,7 @@ export function CustomerDepositRequestCreatePage() {
       ...current,
       ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
     ]);
+    if (selected.length) updateHeaderField('requires_r3_document', true);
     event.target.value = '';
   }
 
@@ -540,6 +543,31 @@ export function CustomerDepositRequestCreatePage() {
           return;
         }
       }
+    }
+
+    if (attachments.length) {
+      const attachmentResult = await uploadCustomerDocumentAttachments({
+        documentType: 'CUSTOMER_DEPOSIT_REQUEST',
+        documentId: requestId,
+        customerId: effectiveCustomerId,
+        files: attachments,
+        uploadedByUserId: profile?.id ?? null,
+        uploadedByEmail: profile?.email ?? null,
+      });
+
+      if (attachmentResult.error) {
+        setSubmitting(false);
+        // Drop the files that did make it, so a retry doesn't upload them twice.
+        const uploadedCount = attachmentResult.data?.length ?? 0;
+        setAttachments((current) => current.slice(uploadedCount));
+        setSubmitError(`${attachmentResult.error.message ?? 'อัปโหลดใบ ร.3 ไม่สำเร็จ'} — บันทึกใบฝากเป็นร่างแล้ว กรุณากดบันทึกหรือส่งคำขออีกครั้งเพื่อแนบไฟล์`);
+        // The request already exists now: keep working on it as a draft so the
+        // retry updates it instead of creating a second request.
+        if (!isEditMode) navigate(`/customer/deposit-request/new?editId=${requestId}`, { replace: true });
+        return;
+      }
+
+      setAttachments([]);
     }
 
     if (!shouldSubmit) {
@@ -753,9 +781,13 @@ export function CustomerDepositRequestCreatePage() {
           </label>
         </div>
 
+        {isEditMode ? (
+          <R3AttachmentDownloadPanel documentType="CUSTOMER_DEPOSIT_REQUEST" documentId={editId} />
+        ) : null}
+
         <div className="customer-attachment-panel">
           <label className="form-field">
-            <span>{t('customer_deposit_attachments_title')}</span>
+            <span>แนบใบ ร.3</span>
             <input
               accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
               data-testid="customer-deposit-attachment-input"
@@ -765,7 +797,7 @@ export function CustomerDepositRequestCreatePage() {
             />
           </label>
           <p className="form-helper" data-testid="customer-deposit-attachment-demo-note">
-            {t('customer_deposit_attachments_deferred_note')}
+            ไฟล์จะถูกอัปโหลดและแนบกับใบฝากนี้เมื่อบันทึกหรือส่งคำขอ
           </p>
           {attachmentError ? <p className="field-error" role="alert">{attachmentError}</p> : null}
           <ul className="customer-attachment-list" data-testid="customer-deposit-attachment-list">
