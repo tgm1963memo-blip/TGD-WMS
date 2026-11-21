@@ -14,7 +14,8 @@ import {
   listCustomerWithdrawalRequestLines,
   listWithdrawalR3PermitItems,
 } from '../../services/customerWithdrawalRequestService.js';
-import { listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
+import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
+import { buildCatalogR3Map } from '../../utils/r3PermitComparisonUtils.js';
 import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
 import { R3AttachmentDownloadPanel } from '../../components/customer/R3AttachmentDownloadPanel.jsx';
 import { getCustomerRequestPolicy } from '../../services/customerRequestPolicyService.js';
@@ -35,6 +36,9 @@ export function CustomerWithdrawalRequestDetailPage() {
   const [policy, setPolicy] = useState(null);
   const [r3PermitItems, setR3PermitItems] = useState([]);
   const [r3Types, setR3Types] = useState([]);
+  // Lines saved before their product got a ร.3 type in the catalog have an
+  // empty snapshot; fall back to the catalog's current type for those.
+  const [r3CatalogMap, setR3CatalogMap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -77,6 +81,16 @@ export function CustomerWithdrawalRequestDetailPage() {
       active = false;
     };
   }, [requestId, t]);
+
+  const headerCustomerId = header?.customer_id;
+  useEffect(() => {
+    let active = true;
+    if (!headerCustomerId) { setR3CatalogMap(null); return undefined; }
+    listCustomerProducts({ customerId: headerCustomerId }).then((result) => {
+      if (active) setR3CatalogMap(buildCatalogR3Map(result.data ?? []));
+    });
+    return () => { active = false; };
+  }, [headerCustomerId]);
 
   if (loading) {
     return (
@@ -129,6 +143,7 @@ export function CustomerWithdrawalRequestDetailPage() {
                   hideCustomerName={!isRequestProxy}
                   r3PermitItems={r3PermitItems}
                   r3CarcassTypes={r3Types}
+                  r3CatalogMap={r3CatalogMap}
                 />
               )}
               title={header.withdrawal_no}
@@ -178,6 +193,7 @@ export function CustomerWithdrawalRequestDetailPage() {
           items={r3PermitItems}
           lines={lines}
           carcassTypes={r3Types}
+          catalogR3Map={r3CatalogMap}
           usePicked
         />
       ) : null}

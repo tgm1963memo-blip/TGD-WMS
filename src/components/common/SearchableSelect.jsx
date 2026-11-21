@@ -107,7 +107,7 @@ export function SearchableSelect({
         <div
           style={{
             position: 'absolute', top: '100%', left: 0, marginTop: 2,
-            background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8,
+            background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', borderRadius: 8,
             boxShadow: '0 8px 24px rgba(15,23,42,0.15)', zIndex: 50,
             maxHeight: 240, overflowY: 'auto', minWidth: '100%', width: 'max-content', maxWidth: 360,
           }}
@@ -122,7 +122,7 @@ export function SearchableSelect({
                 onMouseEnter={() => setHighlight(idx)}
                 style={{
                   padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                  background: idx === highlight ? 'var(--color-surface-sunken)' : '#fff',
+                  background: idx === highlight ? 'var(--color-surface-sunken)' : 'var(--color-surface)',
                   color: 'var(--color-text)', fontWeight: String(opt.value) === String(value) ? 700 : 400,
                   whiteSpace: 'normal', wordBreak: 'break-word',
                 }}

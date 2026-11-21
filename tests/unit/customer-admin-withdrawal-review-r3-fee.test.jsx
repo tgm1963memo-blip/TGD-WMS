@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -43,7 +44,7 @@ describe('CustomerAdminWithdrawalReviewPage ร.3 fee checkbox', () => {
     vi.resetModules();
     mockService('WAREHOUSE_PICKING');
     const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
-    render(<CustomerAdminWithdrawalReviewPage />);
+    render(<MemoryRouter><CustomerAdminWithdrawalReviewPage /></MemoryRouter>);
 
     fireEvent.click(await screen.findByTestId('admin-withdrawal-review-select-wr-1'));
     const checkbox = await screen.findByTestId('admin-withdrawal-r3-fee-checkbox');
@@ -61,7 +62,7 @@ describe('CustomerAdminWithdrawalReviewPage ร.3 fee checkbox', () => {
     vi.resetModules();
     mockService('CANCELLED');
     const { CustomerAdminWithdrawalReviewPage } = await import('../../src/features/customer/CustomerAdminWithdrawalReviewPage.jsx');
-    render(<CustomerAdminWithdrawalReviewPage />);
+    render(<MemoryRouter><CustomerAdminWithdrawalReviewPage /></MemoryRouter>);
 
     fireEvent.click(await screen.findByTestId('admin-withdrawal-review-select-wr-1'));
     await screen.findByTestId('admin-withdrawal-r3-attachment-panel');

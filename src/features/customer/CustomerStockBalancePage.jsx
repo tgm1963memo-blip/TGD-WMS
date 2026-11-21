@@ -11,22 +11,10 @@ import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { exportCustomerStockBalanceExcel } from '../../utils/customerStockBalanceExcelUtils.js';
+import { getTemperatureTypeShortLabel, toStockBalanceTemperatureType } from '../../utils/temperatureTypeLabels.js';
 
 function TempBadge({ type }) {
-  const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
-  return (
-    <span style={{
-      display: 'inline-block',
-      background: map[type] ?? '#888',
-      color: '#fff',
-      borderRadius: 4,
-      padding: '1px 8px',
-      fontSize: 11,
-      fontWeight: 600,
-    }}>
-      {type ?? '-'}
-    </span>
-  );
+  return <span className="stock-temp-badge">{getTemperatureTypeShortLabel(type)}</span>;
 }
 
 function formatDate(iso) {
@@ -133,10 +121,14 @@ export function CustomerStockBalancePage() {
     );
   });
 
-  // Group by product (code + name)
+  // Group by product (code + name + temperature_type) — same key as the
+  // admin InventoryBalancePage: one product code can be stored CHILLED in
+  // some lots and FROZEN in others, and the group header shows a single
+  // temperature badge, so mixing them mislabels the lots. FREEZE_FROZEN
+  // lots count as FROZEN here (see toStockBalanceTemperatureType).
   const productMap = {};
   for (const line of filtered) {
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${toStockBalanceTemperatureType(line.temperature_type) ?? ''}`;
     if (!productMap[pk]) productMap[pk] = [];
     productMap[pk].push(line);
   }
@@ -146,14 +138,15 @@ export function CustomerStockBalancePage() {
       productKey: pk,
       productCode: first?.customer_product_code ?? '-',
       productName: first?.product_name ?? '-',
-      temperatureType: first?.temperature_type,
+      temperatureType: toStockBalanceTemperatureType(first?.temperature_type),
       productCategory: first?.customer_product_code ? categoryMap.get(first.customer_product_code) : null,
       totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
-      totalWeight: pLines.reduce((s, l) => s + (Number(l.actual_weight) ?? 0), 0),
+      totalWeight: pLines.reduce((s, l) => s + Number(l.actual_weight ?? 0), 0),
       lines: pLines,
     };
   });
 
+  const uniqueProducts = new Set(filtered.map((l) => l.customer_product_code ?? l.product_name)).size;
   const grandBoxes = productGroups.reduce((s, g) => s + g.totalBoxes, 0);
   const grandWeight = productGroups.reduce((s, g) => s + g.totalWeight, 0);
 
@@ -202,7 +195,7 @@ export function CustomerStockBalancePage() {
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #8b5cf6' }}>
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>ประเภทสินค้า</div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{productGroups.length} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{uniqueProducts} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>รายการ</span></div>
             </div>
             <div style={{ flex: '1 1 140px', background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid #22c55e' }}>
               <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>กล่องคงเหลือรวม</div>
@@ -345,7 +338,7 @@ export function CustomerStockBalancePage() {
                   </div>
 
                   {isExpanded && (
-                    <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e2e8f0' }}>
+                    <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid var(--color-border)' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: 'var(--color-surface-sunken)' }}>
@@ -364,8 +357,8 @@ export function CustomerStockBalancePage() {
                         </thead>
                         <tbody>
                           {pg.lines.map((l) => (
-                            <tr key={l.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                              <td style={{ padding: '10px 16px 10px 32px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
+                            <tr key={l.id} style={{ borderTop: '1px solid var(--color-border)' }}>
+                              <td style={{ padding: '10px 16px 10px 32px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, var(--color-accent))' }}>
                                 {l.request?.request_no ?? '-'}
                               </td>
                               <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>

@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { ChevronRight, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
@@ -11,6 +11,7 @@ import { CustomerDepositDetailModal } from '../../components/customer/CustomerDe
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { bangkokDateOf } from '../../utils/billingRateCalc.js';
+import { getTemperatureTypeShortLabel, toStockBalanceTemperatureType } from '../../utils/temperatureTypeLabels.js';
 import { splitBalanceByLocation, UNASSIGNED_LOCATION_LABEL } from '../../utils/stockBalanceExportUtils.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { InventoryLocationModal } from './InventoryLocationModal.jsx';
@@ -34,7 +35,7 @@ function balanceLineFields(line, customerLabel) {
     'ลูกค้า': customerLabel,
     'รหัสสินค้า': line.customer_product_code ?? '-',
     'ชื่อสินค้า': line.product_name ?? '-',
-    'อุณหภูมิ': line.temperature_type ?? '-',
+    'อุณหภูมิ': toStockBalanceTemperatureType(line.temperature_type) ?? '-',
     'เลขที่ใบฝาก': line.request?.request_no ?? '-',
     'วันที่รับเข้า': bangkokDateOf(line.request?.last_action_at ?? line.request?.expected_arrival_date) || '-',
     'LOT': line.lot_no ?? '-',
@@ -69,31 +70,15 @@ function balanceExportRows(line, customerLabel, allocations) {
 }
 
 function TempBadge({ type }) {
-  const map = { FROZEN: '#1d6fcf', CHILLED: '#0e7a3a', AMBIENT: '#c97d00' };
-  const bg = map[type] ?? '#888';
-  return (
-    <span style={{
-      display: 'inline-block', background: bg, color: '#fff',
-      borderRadius: 4, padding: '1px 8px', fontSize: 11, fontWeight: 600,
-    }}>
-      {type ?? '-'}
-    </span>
-  );
+  return <span className="stock-temp-badge">{getTemperatureTypeShortLabel(type)}</span>;
 }
 
-function StatCard({ label, value, unit, color }) {
+function StatCard({ label, value, unit }) {
   return (
-    <div style={{
-      flex: '1 1 140px', minWidth: 130,
-      background: 'var(--tgd-surface)', border: '1px solid var(--tgd-border)',
-      borderRadius: 10, padding: '12px 16px',
-      borderTop: color ? `3px solid ${color}` : undefined,
-    }}>
-      <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>
-        {value}{' '}
-        <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tgd-muted-text)' }}>{unit}</span>
-      </div>
+    <div className="dash-kpi">
+      <div className="dash-kpi-label">{label}</div>
+      <div className="dash-kpi-value">{value}</div>
+      {unit ? <div className="dash-kpi-helper">{unit}</div> : null}
     </div>
   );
 }
@@ -201,7 +186,7 @@ export function InventoryBalancePage() {
   // Filter (customer filter is client-side now that all data is loaded at once)
   const filtered = lines.filter((l) => {
     if (selectedCustomerId && l.request?.customer_id !== selectedCustomerId) return false;
-    if (selectedTemperature && l.temperature_type !== selectedTemperature) return false;
+    if (selectedTemperature && toStockBalanceTemperatureType(l.temperature_type) !== selectedTemperature) return false;
     if (selectedCategory) {
       const cid = l.request?.customer_id;
       const category = cid && l.customer_product_code ? categoryMap.get(`${cid}::${l.customer_product_code}`) : null;
@@ -226,7 +211,7 @@ export function InventoryBalancePage() {
   const customerMap = {};
   for (const line of filtered) {
     const cid = line.request?.customer_id ?? '__unknown__';
-    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${line.temperature_type ?? ''}`;
+    const pk = `${line.customer_product_code ?? ''}|${line.product_name ?? ''}|${toStockBalanceTemperatureType(line.temperature_type) ?? ''}`;
     if (!customerMap[cid]) customerMap[cid] = {};
     if (!customerMap[cid][pk]) customerMap[cid][pk] = [];
     customerMap[cid][pk].push(line);
@@ -240,7 +225,7 @@ export function InventoryBalancePage() {
         productKey: `${cid}::${pk}`,
         productCode: first?.customer_product_code ?? '-',
         productName: first?.product_name ?? '-',
-        temperatureType: first?.temperature_type,
+        temperatureType: toStockBalanceTemperatureType(first?.temperature_type),
         productCategory: first?.customer_product_code ? categoryMap.get(`${cid}::${first.customer_product_code}`) : null,
         totalBoxes: pLines.reduce((s, l) => s + (l.actual_boxes ?? 0), 0),
         totalWeight: pLines.reduce((s, l) => s + (l.actual_weight ?? 0), 0),
@@ -396,24 +381,22 @@ export function InventoryBalancePage() {
 
       {/* Summary cards */}
       {!loading && !error && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
-          <StatCard label="ลูกค้า" value={customerGroups.length} unit="ราย" color="#3b82f6" />
-          <StatCard label="ประเภทสินค้า" value={uniqueProducts} unit="รายการ" color="#8b5cf6" />
-          <StatCard label="กล่องคงเหลือรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" color="#22c55e" />
-          <StatCard label="น้ำหนักคงเหลือรวม" value={formatFixed2(grandTotalWeight)} unit="กก." color="#f59e0b" />
+        <div className="dash-kpis stock-kpis">
+          <StatCard label="ลูกค้า" value={customerGroups.length} unit="ราย" />
+          <StatCard label="ประเภทสินค้า" value={uniqueProducts} unit="รายการ" />
+          <StatCard label="กล่องคงเหลือรวม" value={grandTotalBoxes.toLocaleString()} unit="กล่อง" />
+          <StatCard label="น้ำหนักคงเหลือรวม" value={formatFixed2(grandTotalWeight)} unit="กก." />
           {!asOfDate && (
             <>
               <StatCard
                 label="รอรับเข้า"
                 value={pendingDepositBoxes.toLocaleString()}
                 unit={`กล่อง · ${formatFixed2(pendingDepositWeight)} กก.`}
-                color="#06b6d4"
               />
               <StatCard
                 label="รอเบิก (รวมอยู่ในยอดคงเหลือแล้ว)"
                 value={pendingWithdrawalBoxes.toLocaleString()}
                 unit={`กล่อง · ${formatFixed2(pendingWithdrawalWeight)} กก.`}
-                color="#ef4444"
               />
             </>
           )}
@@ -435,17 +418,12 @@ export function InventoryBalancePage() {
           {customerGroups.map((cg) => (
             <div key={cg.customerId}>
               {/* Customer header row */}
-              <div style={{
-                background: 'var(--tgd-primary-dark, #1a2236)',
-                color: '#fff',
-                padding: '10px 16px',
-                display: 'flex', alignItems: 'center', gap: 12,
-              }}>
-                <span style={{ fontWeight: 700, fontSize: 14, flex: 1 }}><User size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{cg.customerName}</span>
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  รวม {cg.totalBoxes.toLocaleString()} กล่อง · {formatFixed2(cg.totalWeight)} กก.
+              <div className="stock-customer-row">
+                <span className="stock-customer-name"><User size={14} aria-hidden="true" />{cg.customerName}</span>
+                <span className="stock-customer-meta">
+                  รวม <span className="num">{cg.totalBoxes.toLocaleString()}</span> กล่อง · <span className="num">{formatFixed2(cg.totalWeight)}</span> กก.
                 </span>
-                <span style={{ fontSize: 12, opacity: 0.6 }}>{cg.products.length} ประเภทสินค้า</span>
+                <span className="stock-customer-meta">{cg.products.length} ประเภทสินค้า</span>
               </div>
 
               {/* Products under this customer */}
@@ -459,20 +437,12 @@ export function InventoryBalancePage() {
                       tabIndex={0}
                       onClick={() => toggleKey(pg.productKey)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleKey(pg.productKey); } }}
-                      style={{
-                        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, width: '100%',
-                        textAlign: 'left', background: isExpanded ? '#f0f7ff' : 'var(--tgd-surface)',
-                        border: 'none', borderBottom: '1px solid var(--tgd-border)',
-                        padding: '16px 16px 16px 32px',
-                        cursor: 'pointer', color: 'var(--tgd-text)',
-                        transition: 'background 0.15s',
-                      }}
+                      aria-expanded={isExpanded}
+                      className={`stock-product-row${isExpanded ? ' stock-product-row--open' : ''}`}
                     >
-                      <span style={{ fontSize: 14, color: 'var(--tgd-muted-text)', width: 16, flexShrink: 0 }}>
-                        {isExpanded ? '▼' : '▶'}
-                      </span>
+                      <ChevronRight size={16} aria-hidden="true" className="stock-product-chevron" />
                       <div style={{ flex: '1 1 180px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{pg.productCode}</span>
+                        <span className="stock-product-code">{pg.productCode}</span>
                         {pg.productCode !== pg.productName && (
                           <span style={{ color: 'var(--tgd-muted-text)', fontSize: 13 }}>{pg.productName}</span>
                         )}
@@ -486,11 +456,11 @@ export function InventoryBalancePage() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>กล่อง</div>
-                          <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{pg.totalBoxes.toLocaleString()}</div>
+                          <div className="stock-qty">{pg.totalBoxes.toLocaleString()}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 11, color: 'var(--tgd-muted-text)' }}>น้ำหนัก (กก.)</div>
-                          <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 15 }}>{formatFixed2(pg.totalWeight)}</div>
+                          <div className="stock-qty">{formatFixed2(pg.totalWeight)}</div>
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{pg.lines.length} ใบฝาก</span>
                       </div>
@@ -498,66 +468,66 @@ export function InventoryBalancePage() {
 
                     {/* Expanded CDR lines */}
                     {isExpanded && (
-                      <div style={{ background: 'var(--color-surface-muted)', borderBottom: '2px solid #e2e8f0', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <div className="stock-lines">
+                        <table>
                           <thead>
-                            <tr style={{ background: 'var(--color-surface-sunken)' }}>
-                              <th style={{ padding: '12px 16px 12px 48px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>เลขที่ใบฝาก</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>วันที่รับเข้า</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>LOT</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รหัสติดตาม</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontSize: 11 }}>{asOfDate ? 'Location ปัจจุบัน' : 'Location / พาเลท'}</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กล่อง)</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>คงเหลือ (กก.)</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุลูกค้า</th>
-                              <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase', maxWidth: 160 }}>หมายเหตุ Admin</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--tgd-muted-text)', fontSize: 11, textTransform: 'uppercase' }}>รายละเอียด</th>
+                            <tr>
+                              <th>เลขที่ใบฝาก</th>
+                              <th>วันที่รับเข้า</th>
+                              <th>LOT</th>
+                              <th>รหัสติดตาม</th>
+                              <th>{asOfDate ? 'Location ปัจจุบัน' : 'Location / พาเลท'}</th>
+                              <th className="cell-num">คงเหลือ (กล่อง)</th>
+                              <th className="cell-num">คงเหลือ (กก.)</th>
+                              <th>หมายเหตุลูกค้า</th>
+                              <th>หมายเหตุ Admin</th>
+                              <th>รายละเอียด</th>
                             </tr>
                           </thead>
                           <tbody>
                             {pg.lines.map((l) => (
-                              <tr key={l.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                                <td style={{ padding: '16px 16px 16px 48px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--tgd-primary, #2563eb)' }}>
+                              <tr key={l.id}>
+                                <td className="cell-nowrap num">
                                   {l.request?.request_no ?? '-'}
                                 </td>
-                                <td style={{ padding: '16px 12px', color: 'var(--tgd-text)' }}>
+                                <td className="cell-nowrap">
                                   {l.request?.last_action_at
                                     ? formatDate(l.request.last_action_at)
                                     : formatDate(l.request?.expected_arrival_date)}
                                 </td>
-                                <td style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', fontFamily: 'monospace' }}>
+                                <td className="cell-nowrap num">
                                   {l.lot_no ?? '-'}
                                 </td>
-                                <td style={{ padding: '16px 12px', color: 'var(--tgd-text)', fontFamily: 'monospace', fontWeight: 600 }}>
+                                <td className="cell-nowrap num">
                                   {l.tracking_code ?? '-'}
                                 </td>
-                                <td style={{ padding: '16px 12px', minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere' }}>
+                                <td style={{ minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
                                   <div>{locationsLoading ? 'กำลังโหลด...' : locationsError ? 'โหลด Location ไม่สำเร็จ' : inventoryLocationLabel(locationMap.get(l.id)) || 'ยังไม่กำหนด Location'}</div>
                                   {!asOfDate && canManageInventoryLocation(role) && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} disabled={locationsLoading || !!locationsError} onClick={() => setLocationLine(l)}>จัดการ Location</button>}
                                 </td>
-                                <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                <td className="cell-num">
                                   {l.actual_boxes?.toLocaleString() ?? (
                                     <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{l.expected_boxes ?? '-'}</span>
                                   )}
                                 </td>
-                                <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 700, color: '#22c55e' }}>
+                                <td className="cell-num">
                                   {l.actual_weight != null ? formatFixed2(l.actual_weight) : (
                                     <span style={{ color: 'var(--tgd-muted-text)', fontWeight: 400 }}>{formatFixed2(l.expected_weight)}</span>
                                   )}
                                 </td>
                                 <td
-                                  style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  className="stock-note-cell"
                                   title={l.note ?? ''}
                                 >
                                   {l.note ?? '-'}
                                 </td>
                                 <td
-                                  style={{ padding: '16px 12px', color: 'var(--tgd-muted-text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  className="stock-note-cell"
                                   title={l.actual_note ?? ''}
                                 >
                                   {l.actual_note ?? '-'}
                                 </td>
-                                <td style={{ padding: '16px 16px', textAlign: 'center' }}>
+                                <td style={{ textAlign: 'center' }}>
                                   {l.request?.id && (
                                     <button
                                       type="button"
@@ -580,10 +550,11 @@ export function InventoryBalancePage() {
             </div>
           ))}
 
-          <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)', padding: '8px 16px', lineHeight: 1.7 }}>
+          <div className="stock-footnote">
             <p style={{ margin: 0 }}>แสดง {filtered.length} รายการ (เฉพาะรายการที่มียอดคงเหลือ)</p>
             {!asOfDate && (
-              <>
+              <details>
+                <summary>ตัวเลขในหน้านี้คำนวณอย่างไร</summary>
                 <p style={{ margin: 0 }}>
                   ยอดคงเหลือด้านบนหักลบคำขอเบิกที่ยังไม่ถูกยกเลิกทั้งหมดแล้ว ไม่ใช่เฉพาะรายการที่เบิกสำเร็จ —
                   รวมถึงคำขอที่ยังรออนุมัติ/กำลังจัดเตรียมด้วย เพื่อป้องกันการจัดสรรสินค้าเดียวกันซ้ำระหว่างที่มีคำขอเบิกพร้อมกันหลายใบ
@@ -597,7 +568,7 @@ export function InventoryBalancePage() {
                 <p style={{ margin: 0 }}>
                   ด้วยเหตุนี้ ตัวเลขหน้านี้จึงต่างจากรายงาน "การเคลื่อนไหว" ซึ่งนับเฉพาะรายการที่เสร็จสิ้น/ยืนยันแล้วเท่านั้น
                 </p>
-              </>
+              </details>
             )}
           </div>
         </div>

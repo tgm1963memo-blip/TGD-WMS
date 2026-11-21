@@ -34,7 +34,7 @@ export function AdminCustomerPortalSwitcher() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '4px 8px', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', padding: '4px 8px', borderRadius: 8, border: '1px solid var(--tgd-border)' }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--tgd-text-sec)', whiteSpace: 'nowrap' }}>[Admin View] ลูกค้า:</span>
       <select
         value={selectedId}

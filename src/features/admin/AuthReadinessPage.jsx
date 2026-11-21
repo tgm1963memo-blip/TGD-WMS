@@ -117,6 +117,7 @@ export function AuthReadinessPage() {
       </SectionCard>
 
       <SectionCard title="Production Role Model">
+        <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -135,6 +136,7 @@ export function AuthReadinessPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </SectionCard>
 
       <section className="document-section tgm-warning-section">

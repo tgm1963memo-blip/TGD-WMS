@@ -66,7 +66,7 @@ export function MultiSelectDropdown({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--color-surface)',
           cursor: 'pointer'
         }}
       >
@@ -85,7 +85,7 @@ export function MultiSelectDropdown({
           left: 0,
           right: 0,
           marginTop: '4px',
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--tgd-border)',
           borderRadius: '4px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -96,7 +96,7 @@ export function MultiSelectDropdown({
           flexDirection: 'column'
         }}>
           {options.length > 5 && (
-            <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 2 }}>
+            <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, backgroundColor: 'var(--color-surface)', zIndex: 2 }}>
               <input
                 type="text"
                 className="form-control"

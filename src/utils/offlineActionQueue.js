@@ -9,7 +9,13 @@
 // otherwise has no client-storage dependency at all.
 //
 // A queued record looks like:
-//   { id, type, payload, queuedAt, status: 'pending'|'syncing'|'synced'|'failed', errorMessage }
+//   { id, type, payload, ownerId, clientActionId, queuedAt, status: 'pending'|'syncing'|'synced'|'failed'|'interrupted', errorMessage }
+// `clientActionId` is sent with the action so the server can recognise a
+// resend of something it already saved (see the 20261105120000 migration).
+// `ownerId` is the handheld PIN profile that queued it: several staff share
+// one device (and one Supabase session), so each person's work waits for
+// that person. Records queued before this field existed have none and sync
+// for whoever is signed in, as they always did.
 // `type` is an open string so unrelated features can share one queue/db
 // without coordinating on a shared schema -- each registers its own sync
 // handler keyed by its own `type`.
@@ -60,9 +66,15 @@ function requestToPromise(request) {
   });
 }
 
-export async function enqueue(type, payload) {
+function newActionId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const hex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
+}
+
+export async function enqueue(type, payload, { ownerId = null } = {}) {
   return withStore('readwrite', (store) => {
-    store.add({ type, payload, queuedAt: new Date().toISOString(), status: 'pending', errorMessage: null });
+    store.add({ type, payload, ownerId, clientActionId: newActionId(), queuedAt: new Date().toISOString(), status: 'pending', errorMessage: null });
   });
 }
 
@@ -78,15 +90,19 @@ export async function listQueued() {
   }
 }
 
-export async function updateStatus(id, status, errorMessage = null) {
+async function patchRecord(id, patch) {
   return withStore('readwrite', (store) => {
     const getRequest = store.get(id);
     getRequest.onsuccess = () => {
       const record = getRequest.result;
       if (!record) return;
-      store.put({ ...record, status, errorMessage });
+      store.put({ ...record, ...patch });
     };
   });
+}
+
+export async function updateStatus(id, status, errorMessage = null) {
+  return patchRecord(id, { status, errorMessage });
 }
 
 export async function removeAction(id) {
@@ -95,25 +111,92 @@ export async function removeAction(id) {
   });
 }
 
+function belongsTo(item, ownerId) {
+  return !item.ownerId || !ownerId || item.ownerId === ownerId;
+}
+
+export async function summarizeQueue(ownerId = null) {
+  const mine = (await listQueued()).filter((item) => belongsTo(item, ownerId));
+  return {
+    pending: mine.filter((item) => item.status === 'pending' || item.status === 'failed').length,
+    interrupted: mine.filter((item) => item.status === 'interrupted').length,
+  };
+}
+
+export async function listInterrupted(ownerId = null) {
+  return (await listQueued()).filter((item) => item.status === 'interrupted' && belongsTo(item, ownerId));
+}
+
 // Replays every 'pending' or 'failed' item (a failed item is retried, not
 // abandoned -- the caller decides when to stop retrying, e.g. by leaving it
 // visible in a "needs attention" list) against the handler registered for
 // its type, strictly in the order it was queued. `handlers` is
-// `{ [type]: async (payload) => { error?: Error } }` -- a handler resolving
+// `{ [type]: async (payload, item) => { error?: Error } }` -- a handler resolving
 // with no error (or a falsy one) counts as success; anything else is
 // recorded as a per-item failure and the queue moves on to the next item
 // rather than stopping the whole batch.
-export async function syncQueue(handlers) {
-  const items = (await listQueued()).filter((item) => item.status === 'pending' || item.status === 'failed');
+//
+// Every send carries the item's clientActionId, so a resend after a lost
+// response (or an app killed mid-send, which leaves the item 'syncing') is
+// recognised by the server instead of saved twice. Only records queued
+// before that id existed, and left 'syncing', are parked as 'interrupted'
+// for a person to check: for those the server could not tell.
+//
+// One run at a time, across tabs too where the browser supports Web Locks.
+// A call made while a run is going gets a fresh run after it, with its own
+// arguments, so an item set back to pending mid-run is not skipped.
+let activeRun = null;
+let nextRun = null;
+let nextArgs = null;
+
+function startRun(handlers, options) {
+  const run = () => runSync(handlers, options);
+  const locked = globalThis.navigator?.locks?.request
+    ? globalThis.navigator.locks.request('tgd-offline-queue', run)
+    : run();
+  activeRun = locked.finally(() => { activeRun = null; });
+  return activeRun;
+}
+
+export function syncQueue(handlers, options = {}) {
+  if (!activeRun) return startRun(handlers, options);
+  nextArgs = [handlers, options];
+  if (!nextRun) {
+    nextRun = activeRun.catch(() => {}).then(() => {
+      nextRun = null;
+      return startRun(...nextArgs);
+    });
+  }
+  return nextRun;
+}
+
+async function runSync(handlers, { ownerId = null }) {
+  const queued = (await listQueued()).filter((item) => belongsTo(item, ownerId));
+  for (const item of queued.filter((entry) => entry.status === 'syncing')) {
+    if (item.clientActionId) {
+      item.status = 'pending';
+      await updateStatus(item.id, 'pending');
+    } else {
+      await updateStatus(item.id, 'interrupted', 'ถูกตัดระหว่างส่ง');
+    }
+  }
+
+  const items = queued.filter((item) => item.status === 'pending' || item.status === 'failed');
   const results = { synced: 0, failed: 0, failures: [] };
 
   for (const item of items) {
     const handler = handlers[item.type];
     if (!handler) continue;
 
+    // An older record that failed before ids existed gets one now, before
+    // its next send, so every later retry of it is safe.
+    if (!item.clientActionId) {
+      item.clientActionId = newActionId();
+      await patchRecord(item.id, { clientActionId: item.clientActionId });
+    }
     await updateStatus(item.id, 'syncing');
     try {
-      const { error } = await handler(item.payload);
+      const { error } = await handler(item.payload, item);
       if (error) {
         await updateStatus(item.id, 'failed', error.message ?? String(error));
         results.failed += 1;

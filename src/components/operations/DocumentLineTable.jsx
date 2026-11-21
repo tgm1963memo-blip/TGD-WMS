@@ -7,7 +7,7 @@ export function DocumentLineTable({ lines = [], columns, loading = false, error 
   return (
     <section
       className="document-lines"
-      style={{ background: '#ffffff', border: '1px solid #d9e2ec', borderRadius: 8, overflowX: 'auto', padding: 16 }}
+      style={{ background: 'var(--color-surface)', border: '1px solid #d9e2ec', borderRadius: 8, overflowX: 'auto', padding: 16 }}
     >
       <h3 style={{ marginTop: 0 }}>{t('document_lines') || 'Lines'}</h3>
       <DataTable

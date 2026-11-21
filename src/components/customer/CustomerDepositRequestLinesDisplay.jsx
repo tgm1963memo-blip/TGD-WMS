@@ -19,6 +19,8 @@ export function CustomerDepositRequestLinesDisplay({
 
   const hasActual = lines.some((l) => l.actual_boxes != null || l.actual_weight != null);
   const hasLot = lines.some((l) => l.lot_no || l.mfg_date || l.exp_date);
+  // Codes are assigned when the customer submits, so a draft has none yet.
+  const hasTracking = lines.some((l) => l.tracking_code);
 
   return (
     <div className="responsive-table">
@@ -26,6 +28,7 @@ export function CustomerDepositRequestLinesDisplay({
         <thead>
           <tr>
             <th onClick={() => requestSort('line_no')} style={{ cursor: 'pointer' }}># {getSortIndicator('line_no')}</th>
+            {hasTracking && <th onClick={() => requestSort('tracking_code')} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>รหัสติดตาม {getSortIndicator('tracking_code')}</th>}
             <th onClick={() => requestSort('customer_product_code')} style={{ cursor: 'pointer' }}>{t('catalog_col_customer_code')} {getSortIndicator('customer_product_code')}</th>
             <th onClick={() => requestSort('product_name')} style={{ cursor: 'pointer' }}>{t('catalog_col_product_name')} {getSortIndicator('product_name')}</th>
             <th onClick={() => requestSort('weight_per_box')} style={{ cursor: 'pointer' }}>{t('customer_col_weight_per_box')} {getSortIndicator('weight_per_box')}</th>
@@ -44,6 +47,7 @@ export function CustomerDepositRequestLinesDisplay({
           {sortedData.length ? sortedData.map((line) => (
             <tr key={line.id ?? `${line.line_no}-${line.customer_product_code}`}>
               <td>{line.line_no}</td>
+              {hasTracking && <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">{line.tracking_code ?? '-'}</td>}
               <td>{line.customer_product_code ?? '-'}</td>
               <td>{line.product_name ?? '-'}</td>
               <td>{formatRequestWeight(line.weight_per_box)}</td>
@@ -81,7 +85,7 @@ export function CustomerDepositRequestLinesDisplay({
               <td>{line.note ?? line.actual_note ?? '-'}</td>
             </tr>
           )) : (
-            <tr><td colSpan={8 + (hasLot ? 3 : 0) + (hasActual ? 2 : 0)}>{t('customer_request_detail_lines_empty')}</td></tr>
+            <tr><td colSpan={8 + (hasTracking ? 1 : 0) + (hasLot ? 3 : 0) + (hasActual ? 2 : 0)}>{t('customer_request_detail_lines_empty')}</td></tr>
           )}
         </tbody>
       </table>

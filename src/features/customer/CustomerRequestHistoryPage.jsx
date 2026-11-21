@@ -9,6 +9,7 @@ import { listCustomerDocumentTimelineEvents } from '../../services/customerDocum
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
 import { formatDocumentDate } from '../../utils/documentDisplayUtils.js';
+import { getCustomerRequestStatusClass } from '../../components/customer/customerRequestStatus.js';
 
 const REQUEST_TYPE_OPTIONS = ['ALL', 'DEPOSIT', 'WITHDRAWAL'];
 const STATUS_OPTIONS = [
@@ -17,16 +18,14 @@ const STATUS_OPTIONS = [
   'WITHDRAWAL_DRAFT',
   'SUBMITTED_BY_CUSTOMER',
   'ADMIN_REVIEWING',
-  'APPROVED',
-  'REJECTED',
+  'ADMIN_ACCEPTED',
+  'WAREHOUSE_RECEIVING',
+  'WAREHOUSE_PICKING',
+  'RECEIVED_CONFIRMED',
   'COMPLETED',
+  'ADMIN_REJECTED',
+  'CANCELLED',
 ];
-
-function statusBadgeClass(status) {
-  if (status === 'DRAFT' || status === 'WITHDRAWAL_DRAFT') return 'draft';
-  if (status === 'SUBMITTED_BY_CUSTOMER' || status === 'ADMIN_REVIEWING') return 'open';
-  return 'hold';
-}
 
 function RequestTimelineCell({ documentType, documentId }) {
   const [events, setEvents] = useState([]);
@@ -310,7 +309,7 @@ export function CustomerRequestHistoryPage() {
                 <tr key={`${row.request_type}-${row.request_no}`}>
                   <td>{row.request_no}</td>
                   <td>{row.request_type}</td>
-                  <td><span className={`status-badge status-badge--${statusBadgeClass(row.status)}`}>{row.status}</span></td>
+                  <td><span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>{row.status}</span></td>
                   <td>{row.requested_date}</td>
                   <td>{row.note || '-'}</td>
                   <td>

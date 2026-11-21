@@ -145,3 +145,33 @@ export function applyPackFieldChange({ mode, field, value, weightPerBox, expecte
 
   return next;
 }
+
+// A deposit form line (CustomerDepositLinesTable's shape) -> the upsert RPC's
+// fields. line.pack_entry_mode drives the dropdown UI and can hold a
+// packaging-unit code (e.g. CASE) as well as BOXES/WEIGHT -- but the DB
+// column only ever accepts BOXES/WEIGHT, so a unit-code selection is sent as
+// BOXES (the precisely-known derived value) plus the actual unit + qty in the
+// separate entry_unit_* columns for audit.
+export function toDepositLineUpsertPayload(line, lineNo) {
+  const isCustomUnitMode = line.pack_entry_mode !== PACK_ENTRY_MODES.BOXES && line.pack_entry_mode !== PACK_ENTRY_MODES.WEIGHT;
+  return {
+    lineId: line.lineId ?? null,
+    lineNo,
+    customerProductCode: line.customer_product_code,
+    internalProductCode: line.product_code,
+    productId: null,
+    productName: line.product_name,
+    expectedQty: line.expected_boxes,
+    expectedBoxes: line.expected_boxes,
+    expectedWeight: line.expected_weight,
+    weightPerBox: line.weight_per_box,
+    temperatureType: line.temperature_type,
+    lotNo: line.lot_no || null,
+    mfgDate: line.mfg_date || null,
+    expDate: line.exp_date || null,
+    note: line.line_note,
+    packEntryMode: isCustomUnitMode ? PACK_ENTRY_MODES.BOXES : line.pack_entry_mode,
+    entryUnitCode: isCustomUnitMode ? line.pack_entry_mode : null,
+    entryUnitQty: isCustomUnitMode ? line.entry_unit_qty : null,
+  };
+}

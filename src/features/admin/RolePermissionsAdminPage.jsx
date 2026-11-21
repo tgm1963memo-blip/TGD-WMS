@@ -74,7 +74,7 @@ function EditablePermissionMatrix({
     <div>
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
-        padding: '14px 18px', borderBottom: '1px solid #f1f5f9', background: '#fafafa',
+        padding: '14px 18px', borderBottom: '1px solid var(--color-surface-sunken)', background: '#fafafa',
       }}>
         <div style={{ fontSize: 13, color: 'var(--color-text-body)' }}>
           เลือกฟังก์ชันที่แต่ละบทบาทเข้าใช้งานได้ — ติ๊กเพื่อเปิด/ปิดสิทธิ์อิสระ
@@ -100,7 +100,7 @@ function EditablePermissionMatrix({
         </div>
       </div>
 
-      <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--color-text-muted)', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-surface-sunken)' }}>
         <span style={{ color: '#2d9348' }}>●</span> ค่าเริ่มต้น &nbsp;
         <span style={{ color: '#1d6fcf' }}>●</span> ปรับแต่งแล้ว &nbsp;|&nbsp;
         บทบาท Admin มีสิทธิ์ครบทุกฟังก์ชัน
@@ -113,7 +113,7 @@ function EditablePermissionMatrix({
         >
           <thead>
             <tr style={{ background: 'var(--color-surface-muted)', position: 'sticky', top: 0, zIndex: 1 }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-body)', borderBottom: '2px solid #e5e7eb', minWidth: 220 }}>
+              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-body)', borderBottom: '2px solid var(--color-border-subtle)', minWidth: 220 }}>
                 ฟังก์ชัน
               </th>
               {matrixRoles.map((role) => (
@@ -124,7 +124,7 @@ function EditablePermissionMatrix({
                     textAlign: 'center',
                     fontWeight: 700,
                     color: 'var(--color-text-body)',
-                    borderBottom: '2px solid #e5e7eb',
+                    borderBottom: '2px solid var(--color-border-subtle)',
                     minWidth: 96,
                     fontSize: 11,
                   }}
@@ -147,7 +147,7 @@ function EditablePermissionMatrix({
                   </td>
                 </tr>
                 {group.items.map((fn) => (
-                  <tr key={fn.functionKey} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={fn.functionKey} style={{ borderBottom: '1px solid var(--color-surface-sunken)' }}>
                     <td style={{ padding: '8px 14px', color: 'var(--color-text-strong)' }}>
                       <div style={{ fontWeight: 600 }}>{fn.label}</div>
                       <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>
@@ -190,7 +190,7 @@ function EditablePermissionMatrix({
                                 borderRadius: 6,
                                 border: `1px solid ${isOverride ? '#1d6fcf' : 'var(--color-border-subtle)'}`,
                                 color: isOverride ? '#1d6fcf' : 'var(--color-text-body)',
-                                background: '#fff',
+                                background: 'var(--color-surface)',
                                 cursor: 'pointer',
                               }}
                             >
@@ -309,7 +309,7 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                       padding: '10px 14px',
-                      background: '#fff', borderRadius: 8,
+                      background: 'var(--color-surface)', borderRadius: 8,
                       border: `1px solid ${isCustomized ? '#93c5fd' : 'var(--color-border-subtle)'}`,
                     }}
                   >
@@ -317,7 +317,7 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                     <select
                       value={state}
                       onChange={(e) => setAccessState(fn.functionKey, e.target.value)}
-                      style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid #e5e7eb', cursor: 'pointer' }}
+                      style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', cursor: 'pointer' }}
                     >
                       {ACCESS_STATE_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -336,7 +336,7 @@ function RolePermissionInlineEditor({ role, permissions, matrixRoleCodes, saving
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     cursor: 'pointer', padding: '10px 14px',
-                    background: '#fff', borderRadius: 8,
+                    background: 'var(--color-surface)', borderRadius: 8,
                     border: `1px solid ${isCustomized ? '#93c5fd' : 'var(--color-border-subtle)'}`,
                     userSelect: 'none',
                   }}
@@ -368,7 +368,7 @@ function RoleCard({ role, userCount, customerMap, onEdit, onEditPermissions, isP
   const scopedCustomerName = role.customer_id ? (customerMap[role.customer_id] ?? role.customer_id) : null;
   return (
     <div style={{
-      background: '#fff',
+      background: 'var(--color-surface)',
       border: `1px solid ${isPermissionExpanded ? '#bbf7d0' : 'var(--color-border-subtle)'}`,
       borderRadius: isPermissionExpanded ? '12px 12px 0 0' : 12,
       borderBottom: isPermissionExpanded ? 'none' : undefined,
@@ -659,8 +659,8 @@ export function RolePermissionsAdminPage() {
 
       {/* ── Tab: Permission Matrix ── */}
       {tab === 'matrix' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14 }}>
+        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--color-surface-sunken)', fontWeight: 700, fontSize: 14 }}>
             ตารางสิทธิ์เข้าถึงฟังก์ชัน (เมนูระบบ)
           </div>
           <EditablePermissionMatrix
@@ -691,11 +691,11 @@ export function RolePermissionsAdminPage() {
                     ({roleUsers.length} คน)
                   </span>
                 </div>
-                <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, overflow: 'hidden' }}>
                   {roleUsers.map((u, i) => (
                     <div key={u.id} style={{
                       padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12,
-                      borderBottom: i < roleUsers.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      borderBottom: i < roleUsers.length - 1 ? '1px solid var(--color-surface-sunken)' : 'none',
                     }}>
                       <div style={{
                         width: 32, height: 32, borderRadius: '50%', background: 'var(--color-accent-soft)',

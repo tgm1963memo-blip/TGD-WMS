@@ -25,9 +25,6 @@ export function ExcelImportExportToolbar({
       <button className="btn btn-secondary" data-testid={templateTestId} disabled={disabled} onClick={() => onTemplate?.()} type="button">
         {t('excel_download_template')}
       </button>
-      <button className="btn btn-secondary" data-testid={exportTestId} disabled={disabled} onClick={onExport} type="button">
-        {t('excel_export')}
-      </button>
       <label className="btn btn-secondary csv-import-button">
         {t('excel_import')}
         <input
@@ -40,6 +37,9 @@ export function ExcelImportExportToolbar({
           type="file"
         />
       </label>
+      <button className="btn btn-secondary" data-testid={exportTestId} disabled={disabled} onClick={onExport} type="button">
+        {t('excel_export')}
+      </button>
     </div>
   );
 }

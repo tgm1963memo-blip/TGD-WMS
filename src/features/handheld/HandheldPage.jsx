@@ -1,4 +1,4 @@
-import { AlertTriangle, Calculator, Camera, Check, CheckCircle2, Circle, Hourglass, MapPin, Pencil, Printer, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Camera, Check, CheckCircle2, ChevronRight, Circle, ClipboardCheck, Hourglass, MapPin, Pencil, Printer, RefreshCw, X } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { C, Pill, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
@@ -29,6 +29,7 @@ import {
   reviewCustomerWithdrawalRequest,
   recordWithdrawalLinePick,
   listPickablePalletsForDepositLine,
+  canAutoConfirmPalletPick,
   recordWithdrawalLinePalletPick,
   removeWithdrawalLinePalletPick,
   listWithdrawalLinePalletPicks,
@@ -42,13 +43,17 @@ import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState 
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
-import { enqueue as enqueueOfflineAction, listQueued as listQueuedOfflineActions, syncQueue as syncOfflineQueue } from '../../utils/offlineActionQueue.js';
+import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { HandheldProvider, useHandheldAuth } from './HandheldContext.jsx';
+import { HandheldInstallPrompt } from './HandheldInstallPrompt.jsx';
+import { OfflineQueueBanner } from './OfflineQueueBanner.jsx';
+import { LOCATION_UPDATE_ACTION_TYPE, drainOfflineQueue, useOfflineQueueDrain } from './offlineQueueSync.js';
 import { HandheldLoginPage } from './HandheldLoginPage.jsx';
 
 // ── Qty input row ─────────────────────────────────────────────
@@ -62,12 +67,13 @@ function QtyRow({ boxes, setBoxes, weight, setWeight, weightPerBox = null, weigh
   function inputStyle(val) {
     return {
       width: '100%', boxSizing: 'border-box',
-      background: val ? C.greenLight : C.inputBg,
-      border: `2px solid ${val ? C.green : C.border}`,
-      borderRadius: 16, padding: '16px 12px',
-      color: val ? C.green : C.text,
-      fontSize: 26, fontWeight: 800, textAlign: 'center', outline: 'none',
-      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+      background: val ? C.surface : C.inputBg,
+      border: `2px solid ${val ? C.primary : C.border}`,
+      borderRadius: 12, padding: '16px 12px',
+      color: C.text,
+      fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+      fontSize: 26, fontWeight: 600, textAlign: 'center', outline: 'none',
+      transition: 'border-color 0.15s ease',
     };
   }
 
@@ -159,12 +165,9 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
         display: 'flex', alignItems: 'center', gap: 14, width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: isDone ? C.surfaceSolid : C.card,
         border: `1px solid ${isDone ? C.greenBorder : C.border}`,
-        borderRadius: 16, padding: '24px 16px', marginBottom: 10,
+        borderRadius: 12, padding: '16px', marginBottom: 10,
         cursor: 'pointer', color: C.text,
         boxShadow: isDone ? 'none' : C.shadow,
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        borderLeft: `5px solid ${isDone ? C.green : C.primary}`,
-        opacity: isDone ? 0.7 : 1,
       }}>
       <div style={{
         width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
@@ -179,8 +182,8 @@ function LineListItem({ line, index, isDone, doneLabel, onSelect }) {
           {line.product_name ?? line.customer_product_code}
         </div>
         {line.tracking_code && (
-          <div style={{ fontSize: 12, color: C.primary, fontWeight: 700, marginTop: 2 }}>
-            รหัสติดตาม: {line.tracking_code}
+          <div style={{ fontSize: 12, color: C.frost, fontWeight: 600, marginTop: 2 }}>
+            รหัสติดตาม: <span style={{ fontFamily: 'var(--font-mono)' }}>{line.tracking_code}</span>
           </div>
         )}
         <div style={{ fontSize: 13, color: C.textSec, marginTop: 4, fontWeight: 500, lineHeight: 1.5 }}>
@@ -211,18 +214,15 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, c
         width: '100%', boxSizing: 'border-box', textAlign: 'left',
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 20,
-        padding: '20px 24px',
-        paddingBottom: hasBadges ? 22 : 20,
-        marginBottom: 16,
+        borderRadius: 12,
+        padding: '16px',
+        marginBottom: 10,
         cursor: 'pointer', color: C.text,
         boxShadow: C.shadow,
-        borderLeft: `6px solid ${statusColor}`,
-        transition: 'transform 0.2s, box-shadow 0.2s',
       }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8, width: '100%' }}>
         <span style={{
-          fontFamily: 'monospace', fontWeight: 900, fontSize: 15, color: C.text, letterSpacing: '0.02em',
+          fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15, color: C.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, lineHeight: 1.4,
         }}>{docNo}</span>
         <Pill label={statusLabel} color={statusColor} />
@@ -237,7 +237,7 @@ function DocCard({ onClick, docNo, statusLabel, statusColor, dateStr, subText, c
       {hasBadges && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {lotText && <span style={{ display: 'inline-block', fontSize: 12, color: C.textSec, fontWeight: 600, background: C.blueLight, borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>LOT: {lotText}</span>}
-          {expText && <span style={{ display: 'inline-block', fontSize: 12, color: C.amber, fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>หมดอายุ: {expText}</span>}
+          {expText && <span style={{ display: 'inline-block', fontSize: 12, color: '#92400e', fontWeight: 600, background: '#fef3c7', borderRadius: 8, padding: '3px 10px', lineHeight: 1.5 }}>หมดอายุ: {expText}</span>}
         </div>
       )}
     </div>
@@ -510,6 +510,7 @@ function ReceivingWorkflow({ onBack, t }) {
       const allocResult = await addDepositLineLocationAllocation({
         lineId: matchedLine.id, locationId: selectedLocation.id, palletNo: Number(allocPalletNo),
         boxes: boxes !== '' ? Number(boxes) : null, weight: weight !== '' ? Number(weight) : null,
+        actorProfileId: activeProfile?.id,
       });
       if (allocResult.error) { setSaving(false); setSaveError(allocResult.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
       setPalletWarning(buildPalletAllocationWarning({
@@ -629,8 +630,8 @@ function ReceivingWorkflow({ onBack, t }) {
     });
     const hasFilter = filterCustomer || filterDateFrom || filterDateTo;
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+      <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="รับสินค้าเข้า" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
           {cameraDocEl}
@@ -715,7 +716,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}
 
       <TopBar
@@ -1242,6 +1243,7 @@ function PickingWorkflow({ onBack, t }) {
   // one they're physically taking boxes off of.
   const [pickablePallets, setPickablePallets] = useState([]);
   const [pickablePalletsLoading, setPickablePalletsLoading] = useState(false);
+  const [palletsAreEstimate, setPalletsAreEstimate] = useState(false);
   const [selectedPalletId, setSelectedPalletId] = useState('');
   const [existingPicks, setExistingPicks] = useState([]);
   const [existingPicksLoading, setExistingPicksLoading] = useState(false);
@@ -1318,8 +1320,9 @@ function PickingWorkflow({ onBack, t }) {
   async function loadPickablePalletsForLine(line) {
     setPickablePalletsLoading(true);
     const depositLineId = await resolveDepositLineIdForPick(line);
-    const { data } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+    const { data, isEstimate } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
     setPickablePallets(data ?? []);
+    setPalletsAreEstimate(Boolean(isEstimate));
     setSelectedPalletId(data?.length === 1 ? data[0].allocationId : '');
     setPickablePalletsLoading(false);
   }
@@ -1461,8 +1464,9 @@ function PickingWorkflow({ onBack, t }) {
     // through to the manual panel below and let staff pick the right one.
     if (matchedByTrackingCode && match.picked_at == null) {
       const depositLineId = await resolveDepositLineIdForPick(match);
-      const { data: pallets } = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
-      if (pallets.length <= 1) {
+      const palletResult = depositLineId ? await listPickablePalletsForDepositLine(depositLineId) : { data: [] };
+      const pallets = palletResult.data;
+      if (canAutoConfirmPalletPick(palletResult)) {
         const ok = await confirmPick(match, match.requested_boxes, match.requested_weight, pallets[0] ?? null);
         if (ok) {
           setScanValue('');
@@ -1532,8 +1536,8 @@ function PickingWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="เบิกสินค้าออก" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>
           {cameraDocEl}
@@ -1633,7 +1637,7 @@ function PickingWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {cameraItemEl}
       <TopBar
         title={selectedDoc.withdrawal_no}
@@ -1813,14 +1817,14 @@ function PickingWorkflow({ onBack, t }) {
                 <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, overflowWrap: 'break-word', wordBreak: 'break-all' }}>รหัส {matchedLine.customer_product_code}</span>
                 {matchedLine.lot_no && <span style={{ background: '#f3f4f6', color: C.textSec, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>LOT {matchedLine.lot_no}</span>}
               </div>
-              <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              <div style={{ background: C.frostLight, borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กล่อง)</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#0369a1' }}>{matchedLine.requested_boxes ?? '-'}</div>
+                  <div style={{ fontSize: 11, color: C.frost, fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กล่อง)</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: C.frost }}>{matchedLine.requested_boxes ?? '-'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กก.)</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#0369a1' }}>
+                  <div style={{ fontSize: 11, color: C.frost, fontWeight: 700, marginBottom: 2 }}>ลูกค้าสั่ง (กก.)</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: C.frost }}>
                     {matchedLine.requested_weight != null
                       ? Number(matchedLine.requested_weight).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : '-'}
@@ -1839,6 +1843,12 @@ function PickingWorkflow({ onBack, t }) {
               <div style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12 }}>
                 <div style={{ color: '#92400e', fontWeight: 800, fontSize: 14, marginBottom: 2 }}><IconLabel icon={AlertTriangle} size={16} gap={6}>รายการนี้ยืนยันแล้ว</IconLabel></div>
                 <div style={{ color: '#78350f', fontSize: 13 }}>กดยืนยันการแก้ไขอีกครั้งเพื่อบันทึกค่าใหม่</div>
+              </div>
+            )}
+
+            {palletsAreEstimate && !pickablePalletsLoading && (
+              <div role="status" data-testid="pick-pallet-estimate-notice" style={{ padding: '12px 16px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 16, marginBottom: 12, color: '#92400e', fontWeight: 800, fontSize: 14 }}>
+                <IconLabel icon={AlertTriangle} size={16} gap={6}>ยอดใน pallet อาจไม่ตรง ตรวจของจริงก่อนหยิบ</IconLabel>
               </div>
             )}
 
@@ -1977,10 +1987,10 @@ function PickingWorkflow({ onBack, t }) {
 // check, so a queued write replayed later is safe to retry rather than
 // likely to conflict.
 const LOCATION_UPDATE_SNAPSHOT_KEY = 'locationUpdate';
-const LOCATION_UPDATE_ACTION_TYPE = 'LOCATION_UPDATE';
 
 function LocationUpdateWorkflow({ onBack, t }) {
   const isOnline = useOnlineStatus();
+  const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docLineSummary, setDocLineSummary] = useState({});
@@ -2033,8 +2043,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [palletWarning, setPalletWarning] = useState('');
 
   async function refreshPendingSyncCount() {
-    const queued = await listQueuedOfflineActions();
-    setPendingSyncCount(queued.filter((item) => item.status === 'pending' || item.status === 'failed').length);
+    const { pending } = await summarizeQueue(activeProfile?.id);
+    setPendingSyncCount(pending);
   }
 
   const parsedLocs = useMemo(() => locations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })), [locations]);
@@ -2128,12 +2138,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
     async function syncThenLoadOnline() {
       setSyncing(true);
-      const result = await syncOfflineQueue({
-        [LOCATION_UPDATE_ACTION_TYPE]: (payload) => addDepositLineLocationAllocation({
-          lineId: payload.lineId, locationId: payload.locationId, palletNo: payload.palletNo,
-          boxes: payload.boxes, weight: payload.weight,
-        }),
-      });
+      const result = await drainOfflineQueue(activeProfile?.id);
       if (!active) return;
       setSyncing(false);
       if (result.synced > 0 || result.failed > 0) {
@@ -2323,7 +2328,10 @@ function LocationUpdateWorkflow({ onBack, t }) {
       // offline) surfaces there as a visible sync failure, not silently.
       await enqueueOfflineAction(LOCATION_UPDATE_ACTION_TYPE, {
         lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal,
-      });
+        // For the "not sure it saved" list, so staff can find the pallet.
+        locationCode: selectedLocation.code ?? null,
+        productName: selectedLine.product_name ?? selectedLine.customer_product_code ?? null,
+      }, { ownerId: activeProfile?.id });
       await refreshPendingSyncCount();
 
       const nextLines = lines.map((l) => l.id === selectedLine.id ? { ...l, location_id: selectedLocation.id } : l);
@@ -2342,7 +2350,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       return;
     }
 
-    const result = await addDepositLineLocationAllocation({ lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal });
+    const result = await addDepositLineLocationAllocation({ lineId: selectedLine.id, locationId: selectedLocation.id, palletNo, boxes: boxesVal, weight: weightVal, actorProfileId: activeProfile?.id });
     setSaving(false);
     if (result.error) { setSaveError(result.error.message ?? 'บันทึกไม่สำเร็จ'); return; }
     triggerSuccessFeedback();
@@ -2415,8 +2423,8 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   if (!selectedDoc) {
     return (
-      <div style={{ background: C.bg, height: '100dvh', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-      <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.bg, height: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
         <TopBar title="อัปเดต Location" subtitle="เลือกใบงานที่ต้องการ" onBack={onBack} />
         {renderOfflineStatusBar()}
         <div style={{ padding: '16px 10px', flex: 1, overflowY: 'auto' }}>
@@ -2509,7 +2517,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                         <DocCard key={doc.id} onClick={() => pickDoc(doc)}
                           docNo={doc.request_no}
                           statusLabel={getDepositStatusLabel(doc.status, t)}
-                          statusColor="#6366f1"
+                          statusColor={C.frost}
                           dateStr={doc.expected_arrival_date ?? '-'}
                           subText={doc.contact_name}
                           customerName={doc.customer?.customer_name || doc.customer?.name || null}
@@ -2531,7 +2539,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
 
   return (
     <div style={{ background: C.bg, display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 720, height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 720, height: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <TopBar
         title={selectedDoc.request_no}
         subtitle={<IconLabel icon={MapPin} size={14} gap={4}>รอระบุ Location {pendingCount}/{lines.length} รายการ</IconLabel>}
@@ -2566,7 +2574,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                   onClick={() => { setSelectedLine(l); setSelectedLocation(null); setLocZone(''); setLocSide(''); setLocRow(''); setPalletWarning(''); }}
                   style={{
                     background: hasloc ? C.greenLight : C.surface,
-                    border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? '#6366f1' : C.border)}`,
+                    border: `2px solid ${hasloc ? C.greenBorder : (selectedLine?.id === l.id ? C.frost : C.border)}`,
                     borderRadius: 18, padding: '24px 16px', marginBottom: 12,
                     cursor: 'pointer',
                     boxShadow: C.shadow, transition: 'border-color 0.15s',
@@ -2587,7 +2595,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       {hasloc ? (
                         <span style={{ color: C.green, fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Check size={14} aria-hidden="true" />{locations.find((loc) => loc.id === l.location_id)?.code ?? l.location_id}</span>
                       ) : (
-                        <span style={{ color: '#6366f1', fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}><MapPin size={14} aria-hidden="true" />ระบุ Location</span>
+                        <span style={{ color: C.frost, fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}><MapPin size={14} aria-hidden="true" />ระบุ Location</span>
                       )}
                       <button
                         type="button"
@@ -2769,10 +2777,10 @@ function LocationUpdateWorkflow({ onBack, t }) {
           <button type="button" disabled={!selectedLocation || !allocPalletNo || saving} onClick={handleAddAllocation}
             style={{
               width: '100%', padding: '20px', borderRadius: 20,
-              background: (!selectedLocation || !allocPalletNo) ? C.border : '#6366f1',
+              background: (!selectedLocation || !allocPalletNo) ? C.border : C.primary,
               color: (!selectedLocation || !allocPalletNo) ? C.muted : '#fff',
               border: 'none', fontSize: 18, fontWeight: 900, cursor: (!selectedLocation || !allocPalletNo) ? 'not-allowed' : 'pointer',
-              boxShadow: (!selectedLocation || !allocPalletNo) ? 'none' : '0 8px 24px rgba(99,102,241,0.4)',
+              boxShadow: 'none',
               transition: 'all 0.2s',
             }}>
             {saving ? <IconLabel icon={Hourglass} size={20} gap={8}>กำลังบันทึก...</IconLabel> : <IconLabel icon={MapPin} size={20} gap={8}>เพิ่มการจัดเก็บ + พิมพ์สติกเกอร์</IconLabel>}
@@ -2785,23 +2793,35 @@ function LocationUpdateWorkflow({ onBack, t }) {
 }
 
 // ── Mode select home ──────────────────────────────────────────
-function ModeSelect({ onSelect }) {
+function ModeButton({ icon: Icon, title, hint, disabled = false, onClick, testId }) {
+  return (
+    <button type="button" className="hh-mode" disabled={disabled} onClick={onClick} data-testid={testId}>
+      <span className="hh-mode-icon"><Icon size={22} aria-hidden="true" /></span>
+      <span className="hh-mode-text">
+        <span className="hh-mode-title">{title}</span>
+        <span className="hh-mode-hint">{hint}</span>
+      </span>
+      <ChevronRight size={20} aria-hidden="true" className="hh-mode-chevron" />
+    </button>
+  );
+}
+
+function ModeSelect({ onSelect, isOnline, banner }) {
   const { activeProfile, logout } = useHandheldAuth();
   
   return (
-    <div style={{ background: C.bg, minHeight: '100dvh', display: 'flex', justifyContent: 'center' }}>
-    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: C.bg, minHeight: 'var(--handheld-screen-height)', display: 'flex', justifyContent: 'center' }}>
+    <div data-testid="handheld-page" style={{ width: '100%', maxWidth: 720, minHeight: 'var(--handheld-screen-height)', display: 'flex', flexDirection: 'column' }}>
       {/* Header - matches app sidebar branding */}
       <div style={{
         background: C.headerBg,
-        padding: '24px 28px 20px',
+        padding: 'calc(20px + env(safe-area-inset-top)) 20px 16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }}>
         <div>
-          <div style={{ color: C.gold, fontWeight: 900, fontSize: 22, letterSpacing: '-0.01em' }}>
+          <div style={{ color: C.gold, fontWeight: 700, fontSize: 20 }}>
             TGC Cold Storage
           </div>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3, fontWeight: 600 }}>
@@ -2825,104 +2845,49 @@ function ModeSelect({ onSelect }) {
         )}
       </div>
 
-      <div style={{ flex: 1, padding: '32px 28px 40px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <div style={{ color: C.muted, fontSize: 13, fontWeight: 800, letterSpacing: '0.12em',
-          textTransform: 'uppercase', marginBottom: 24, paddingLeft: 4 }}>
-          เลือกโหมดการทำงาน
+      {banner}
+
+      <div className="hh-mode-body">
+        <HandheldInstallPrompt />
+        <div className="hh-mode-heading">เลือกโหมดการทำงาน</div>
+
+        <div className="hh-mode-list">
+          <ModeButton
+            icon={ArrowDownToLine}
+            title="รับเข้า (Receiving)"
+            hint={isOnline ? 'รับสินค้าเข้าคลังตามใบงาน' : 'ต้องมีสัญญาณ'}
+            disabled={!isOnline}
+            onClick={() => onSelect('receive')}
+          />
+          <ModeButton
+            icon={ArrowUpFromLine}
+            title="เบิกออก (Picking)"
+            hint={isOnline ? 'หยิบสินค้าตามใบขอเบิก' : 'ต้องมีสัญญาณ'}
+            disabled={!isOnline}
+            onClick={() => onSelect('pick')}
+          />
+          <ModeButton
+            icon={MapPin}
+            title="ระบุที่จัดเก็บ (Location)"
+            hint={isOnline ? 'ระบุตำแหน่งสินค้าที่รับเข้าแล้ว' : 'ใช้ได้แบบออฟไลน์'}
+            onClick={() => onSelect('location')}
+          />
+          <ModeButton
+            icon={ClipboardCheck}
+            title="นับสต็อก (Stock Count)"
+            hint={isOnline ? 'เดินนับทีละแถว ดูรูปสินค้าเทียบกับของจริง' : 'เริ่มและส่งผลนับต้องมีสัญญาณ'}
+            onClick={() => onSelect('count')}
+            testId="handheld-mode-count"
+          />
         </div>
-
-        {/* Receive button */}
-        <button type="button" onClick={() => onSelect('receive')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            width: '100%', boxSizing: 'border-box',
-            background: C.surface, border: `2px solid ${C.border}`,
-            borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 16, overflow: 'hidden',
-            boxShadow: C.shadow,
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.gold; e.currentTarget.style.boxShadow = `0 4px 16px rgba(212,175,55,0.25)`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
-          >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>รับเข้า (Receiving)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>รับสินค้าเข้าคลังตามใบงาน</div>
-          </div>
-        </button>
-
-        {/* Pick button */}
-        <button type="button" onClick={() => onSelect('pick')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            width: '100%', boxSizing: 'border-box',
-            background: C.surface, border: `2px solid ${C.border}`,
-            borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 16, overflow: 'hidden',
-            boxShadow: C.shadow,
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.gold; e.currentTarget.style.boxShadow = `0 4px 16px rgba(212,175,55,0.25)`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
-          >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}>เบิกออก (Picking)</div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>หยิบสินค้าตามใบขอเบิก</div>
-          </div>
-        </button>
-
-        {/* Location Update button */}
-        <button type="button" onClick={() => onSelect('location')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            width: '100%', boxSizing: 'border-box',
-            background: C.surface, border: `2px solid ${C.border}`,
-            borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 16, overflow: 'hidden',
-            boxShadow: C.shadow,
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = `0 4px 16px rgba(99,102,241,0.25)`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
-          >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}><IconLabel icon={MapPin} size={20} gap={8}>ระบุที่จัดเก็บ (Location)</IconLabel></div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>ระบุตำแหน่งสินค้าที่รับเข้าแล้ว</div>
-          </div>
-        </button>
-
-        {/* Stock count button */}
-        <button type="button" onClick={() => onSelect('count')} data-testid="handheld-mode-count"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            width: '100%', boxSizing: 'border-box',
-            background: C.surface, border: `2px solid ${C.border}`,
-            borderRadius: 20, padding: '28px 24px',
-            textAlign: 'left', cursor: 'pointer', color: C.text,
-            marginBottom: 36, overflow: 'hidden',
-            boxShadow: C.shadow,
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.green; e.currentTarget.style.boxShadow = `0 4px 16px rgba(5,150,105,0.25)`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = C.shadow; }}
-          >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.text, marginBottom: 4, lineHeight: 1.3 }}><IconLabel icon={Calculator} size={20} gap={8}>นับสต็อก (Stock Count)</IconLabel></div>
-            <div style={{ fontSize: 13, color: C.textSec, fontWeight: 600, lineHeight: 1.5 }}>เดินนับทีละแถว ดูรูปสินค้าเทียบกับของจริง</div>
-          </div>
-        </button>
 
         {/* Tip card */}
         <div style={{
-          background: C.surfaceSolid, borderRadius: 20,
+          background: C.surfaceSolid, borderRadius: 12,
           border: `1px solid ${C.border}`,
-          padding: '20px',
-          boxShadow: C.shadow,
+          padding: '16px',
         }}>
-          <div style={{ color: C.primaryDark, fontSize: 14, fontWeight: 900, marginBottom: 12 }}>
+          <div style={{ color: C.primaryDark, fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
             วิธีใช้งาน
           </div>
           {[
@@ -2948,25 +2913,56 @@ function ModeSelect({ onSelect }) {
 }
 
 // ── Main Layout ───────────────────────────────────────────────
+const HANDHELD_MODES = ['receive', 'pick', 'location', 'count'];
+
 function HandheldApp() {
   const t = useTranslation();
-  const [mode, setMode] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get('mode');
   const { activeProfile, isLoading } = useHandheldAuth();
+  const isOnline = useOnlineStatus();
+  // Receiving and Picking need signal to start. A job already open keeps
+  // running if signal drops (its form must not vanish), but a reload or a
+  // forward step into one while offline lands on the menu instead.
+  const shownModeRef = useRef(null);
+  const asked = HANDHELD_MODES.includes(requestedMode) ? requestedMode : null;
+  const needsSignal = asked === 'receive' || asked === 'pick';
+  const mode = needsSignal && !isOnline && shownModeRef.current !== asked ? null : asked;
+  shownModeRef.current = mode;
+  const queue = useOfflineQueueDrain(activeProfile?.id, mode);
+
+  const openMode = (nextMode) => navigate(`?mode=${nextMode}`, { state: { fromMenu: true } });
+  // After a refresh or a deep link there is no menu entry behind this one,
+  // so going back in history would leave the handheld altogether.
+  const backToMenu = () => {
+    if (location.state?.fromMenu) navigate(-1);
+    else navigate('/handheld', { replace: true });
+  };
 
   if (isLoading) return <div data-testid="handheld-page" style={{ padding: 40, textAlign: 'center', fontWeight: 700 }}>กำลังโหลด...</div>;
-  if (!activeProfile) return <div data-testid="handheld-page" style={{ minHeight: '100dvh', background: '#f8fafb', display: 'flex', justifyContent: 'center' }}><HandheldLoginPage /></div>;
+  if (!activeProfile) return <div data-testid="handheld-page" style={{ minHeight: 'var(--handheld-screen-height)', background: '#f8fafb', display: 'flex', justifyContent: 'center' }}><HandheldLoginPage /></div>;
 
-  if (mode === 'count') return <StockCountWorkflow onBack={() => setMode(null)} />;
-  if (mode === 'receive') return <ReceivingWorkflow onBack={() => setMode(null)} t={t} />;
-  if (mode === 'pick') return <PickingWorkflow onBack={() => setMode(null)} t={t} />;
-  if (mode === 'location') return <LocationUpdateWorkflow onBack={() => setMode(null)} t={t} />;
-  return <ModeSelect onSelect={setMode} />;
+  if (mode === 'count') return <StockCountWorkflow onBack={backToMenu} />;
+  if (mode === 'receive') return <ReceivingWorkflow onBack={backToMenu} t={t} />;
+  if (mode === 'pick') return <PickingWorkflow onBack={backToMenu} t={t} />;
+  if (mode === 'location') return <LocationUpdateWorkflow onBack={backToMenu} t={t} />;
+  return (
+    <ModeSelect
+      onSelect={openMode}
+      isOnline={isOnline}
+      banner={<OfflineQueueBanner isOnline={queue.isOnline} pending={queue.pending} interrupted={queue.interrupted} lastResult={queue.lastResult} onChanged={queue.refresh} />}
+    />
+  );
 }
 
 export function HandheldPage() {
   return (
     <HandheldProvider>
-      <HandheldApp />
+      <div className="handheld-root">
+        <HandheldApp />
+      </div>
     </HandheldProvider>
   );
 }

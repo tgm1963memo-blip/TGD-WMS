@@ -15,6 +15,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/services/stagingAuthService.js', () => ({
+  getStoredAuthSession: () => null,
   getStagingSession: authMocks.getStagingSession,
   subscribeToStagingAuth: authMocks.subscribeToStagingAuth,
   signInToStaging: vi.fn(),

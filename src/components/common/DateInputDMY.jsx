@@ -160,7 +160,7 @@ export function DateInputDMY({
         style={{
           background: 'none',
           border: 'none',
-          color: 'var(--tgd-muted-text, #64748b)',
+          color: 'var(--tgd-muted-text, var(--color-text-muted))',
           cursor: disabled ? 'default' : 'pointer',
           lineHeight: 0,
           padding: 2,

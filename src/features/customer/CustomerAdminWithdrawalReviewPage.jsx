@@ -2,6 +2,8 @@ import { AlertTriangle, Check, Plus, Save, ScrollText } from 'lucide-react';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { useTableSort } from '../../hooks/useTableSort.js';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { RequestProgress } from '../../components/customer/RequestProgress.jsx';
 import { CustomerPortalLiveBanner } from '../../components/customer/CustomerPortalLiveBanner.jsx';
 import { CustomerWithdrawalRequestPrintDocument } from '../../components/customer/CustomerWithdrawalRequestPrintDocument.jsx';
 import { PageHeader } from '../../components/ui/PageHeader.jsx';
@@ -100,7 +102,10 @@ const CONFIRM_DATE_ELIGIBLE_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWIN
 const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 // Mirrors tgd_replace_withdrawal_r3_permit_items' staff lock list.
-const R3_PERMIT_LOCKED_STATUSES = ['LOADED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CLOSED', 'COMPLETED', 'CANCELLED', 'ADMIN_REJECTED'];
+// The ร.3 paperwork often arrives after dispatch, so staff can still key the
+// permit rows in on a COMPLETED withdrawal (warn-only, never affects stock or
+// billing). Matches tgd_replace_withdrawal_r3_permit_items' staff guard.
+const R3_PERMIT_LOCKED_STATUSES = ['CANCELLED', 'ADMIN_REJECTED'];
 
 // Bangkok calendar date as 'YYYY-MM-DD' — the date the confirm-dispatch
 // date picker compares against requested_dispatch_date (also Bangkok).
@@ -494,6 +499,16 @@ export function CustomerAdminWithdrawalReviewPage() {
     setError('');
     setDetailOpen(true);
   }
+
+  // ?open=<id> (from the Ctrl K search) opens that request once it has loaded.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openParam = searchParams.get('open');
+  useEffect(() => {
+    if (!openParam || !rows.some((row) => row.id === openParam)) return;
+    openDetail(openParam);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, rows]);
 
   const selected = sortedData.find((row) => row.id === selectedId) ?? null;
 
@@ -1197,7 +1212,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <tr
                   key={row.id}
                   onClick={() => openDetail(row.id)}
-                  style={{ cursor: 'pointer', background: selectedId === row.id ? '#f0f9ff' : 'inherit' }}
+                  style={{ cursor: 'pointer', background: selectedId === row.id ? 'var(--color-row-selected)' : 'inherit' }}
                 >
                   <td onClick={(e) => e.stopPropagation()}>
                     <input
@@ -1208,14 +1223,14 @@ export function CustomerAdminWithdrawalReviewPage() {
                       onChange={() => toggleRequestSelected(row.id)}
                     />
                   </td>
-                  <td>{row.withdrawal_no}</td>
+                  <td className="cell-nowrap">{row.withdrawal_no}</td>
                   <td>{row.customer?.customer_name || row.customer?.name || row.customer_id}</td>
                   <td>
                     <span className={`status-badge status-badge--${getCustomerRequestStatusClass(row.status)}`}>
                       {getWithdrawalStatusLabel(row.status, t)}
                     </span>
                   </td>
-                  <td>{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
+                  <td className="cell-nowrap">{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
                   <td style={{ maxWidth: 280, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{row.note?.trim() || '-'}</td>
                   <td>
                     <button
@@ -1319,6 +1334,7 @@ export function CustomerAdminWithdrawalReviewPage() {
             {actionMsg ? <div className="alert-success-panel" role="status" style={{ marginBottom: 12 }}>{actionMsg}</div> : null}
             {error ? <div className="banner banner-danger" role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
 
+            <RequestProgress kind="withdrawal" status={selected.status} />
             {/* Header info */}
             <div className="form-grid" style={{ marginBottom: 16 }}>
               <div>
@@ -1641,7 +1657,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                       <th className="admin-withdrawal-lines-table__row-col">#</th>
                       <th>{t('catalog_col_customer_code')}</th>
                       <th className="admin-withdrawal-lines-table__product-col">{t('catalog_col_product_name')}</th>
-                      <th>รหัสติดตาม</th>
+                      <th className="admin-withdrawal-lines-table__tracking-col">รหัสติดตาม</th>
                       <th>{t('lot')}</th>
                       <th>อุณหภูมิ</th>
                       <th title="คิดค่าละลายต่อกิโลกรัมจากน้ำหนักที่หยิบจริง">ละลาย</th>

@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   dayOfYear,
   formatTgmLot,
+  groupTgmPoFilesByShipDate,
   isTgmCustomerCode,
   mapTgmPoRowsToDepositLines,
   parseBplusAmount,
   parseTgmPoFile,
+  resolveSupCode,
 } from '../../src/utils/tgmPoImportUtils.js';
 
 const CATALOG = [
@@ -108,6 +110,35 @@ describe('mapTgmPoRowsToDepositLines', () => {
   });
 });
 
+describe('TGM supplier sup codes', () => {
+  it('maps B-Plus supplier codes from TGM\'s table', () => {
+    expect(resolveSupCode('BB-T')).toBe('18');
+    expect(resolveSupCode(' 1-cp-f ')).toBe('24');
+    expect(resolveSupCode('1-TF-P')).toBe('39');
+    expect(resolveSupCode('UNKNOWN')).toBe('');
+  });
+
+  it('needs the plant picked for a B-Plus code shared by two plants', () => {
+    expect(resolveSupCode('1-BT-G')).toBe('');
+    expect(resolveSupCode('1-BT-G', undefined, { '1-BT-G': '49' })).toBe('49');
+    expect(resolveSupCode('1-BT-G', undefined, { '1-BT-G': '99' })).toBe('');
+  });
+
+  it('uses the default table and reports the pending plant pick', () => {
+    const rows = [poRow(), poRow({ __row: 3, AP_CODE: '1-BT-G' })];
+    const before = mapTgmPoRowsToDepositLines(rows, CATALOG, 1);
+    expect(before.lines.map((l) => l.lot_no)).toEqual(['Lot 306 Sup 18', 'Lot 306']);
+    expect(before.preview[1].messages.join(' ')).toMatch(/เลือกโรงงาน/);
+    expect(before.supplierPicksNeeded).toEqual([
+      expect.objectContaining({ apCode: '1-BT-G', chosen: '' }),
+    ]);
+
+    const after = mapTgmPoRowsToDepositLines(rows, CATALOG, 1, undefined, { '1-BT-G': '1' });
+    expect(after.lines[1].lot_no).toBe('Lot 306 Sup 1');
+    expect(after.supplierPicksNeeded[0].chosen).toBe('1');
+  });
+});
+
 describe('parseTgmPoFile', () => {
   it('reads the B-Plus PO template', async () => {
     const buffer = readFileSync(resolve(process.cwd(), 'Template/PO.xls'));
@@ -127,5 +158,45 @@ describe('parseTgmPoFile', () => {
     const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
     const { errors } = await parseTgmPoFile({ arrayBuffer: async () => buffer });
     expect(errors[0]).toMatch(/SKU_CODE/);
+  });
+});
+
+describe('groupTgmPoFilesByShipDate', () => {
+  const BOUNDS = { minDate: '2026-11-01', maxDate: '2027-04-30', maxDaysAhead: 180 };
+
+  it('makes one draft per ship date across several PO files, with the TGM lot', () => {
+    const { slips, skipped, missingProducts } = groupTgmPoFilesByShipDate([
+      { name: 'PO-A.xls', rows: [poRow({ __row: 2 }), poRow({ __row: 3, SKU_CODE: 'RCC016', TRD_QTY: '$420.00' })] },
+      { name: 'PO-B.xls', rows: [poRow({ __row: 2, DI_REF: 'OR2', TRH_SHIP_DATE: '05/11/2026', TRD_QTY: '$100.00' })] },
+    ], CATALOG, BOUNDS);
+
+    expect(skipped).toEqual([]);
+    expect(missingProducts).toEqual([]);
+    expect(slips.map((s) => [s.date, s.lines.map((l) => [l.key, l.customer_product_code, l.lot_no, l.expected_weight])])).toEqual([
+      ['2026-11-02', [[1, 'RCC020', 'Lot 306 Sup 18', '390'], [2, 'RCC016', 'Lot 306 Sup 18', '420']]],
+      ['2026-11-05', [[1, 'RCC020', 'Lot 309 Sup 18', '100']]],
+    ]);
+    expect(slips[1].lines[0].line_note).toBe('PO OR2');
+    // RCC016 has no unit weight in the catalog -> a warning on that slip.
+    expect(slips[0].warnings).toEqual([expect.stringMatching(/PO-A\.xls แถว 3: RCC016 — .*กก\.\/กล่อง/)]);
+  });
+
+  it('lists unknown SKUs for the create-product links and skips out-of-range dates', () => {
+    const { slips, skipped, missingProducts } = groupTgmPoFilesByShipDate([
+      { name: 'PO.xls', rows: [poRow({ __row: 2, SKU_CODE: 'NEW9' }), poRow({ __row: 3, TRH_SHIP_DATE: '15/10/2026' })] },
+    ], CATALOG, BOUNDS);
+    expect(slips).toEqual([]);
+    expect(missingProducts).toEqual([{ code: 'NEW9', rows: [2], productName: '', weightPerBox: '', temperatureType: 'FROZEN' }]);
+    expect(skipped).toEqual([expect.stringMatching(/แถว 3: RCC020 — วันที่ส่งย้อนหลัง/)]);
+  });
+
+  it('asks for the plant of a shared supplier code before the lot gets its sup', () => {
+    const files = [{ name: 'PO.xls', rows: [poRow({ AP_CODE: '1-BT-G' })] }];
+    const before = groupTgmPoFilesByShipDate(files, CATALOG, BOUNDS);
+    expect(before.supplierPicksNeeded).toMatchObject([{ apCode: '1-BT-G', chosen: '' }]);
+    expect(before.slips[0].lines[0].lot_no).toBe('Lot 306');
+    const after = groupTgmPoFilesByShipDate(files, CATALOG, { ...BOUNDS, supplierChoices: { '1-BT-G': '49' } });
+    expect(after.supplierPicksNeeded[0].chosen).toBe('49');
+    expect(after.slips[0].lines[0].lot_no).toBe('Lot 306 Sup 49');
   });
 });

@@ -43,7 +43,7 @@ const movementColumns = [
 ];
 
 const cardStyle = {
-  background: '#ffffff',
+  background: 'var(--color-surface)',
   border: '1px solid #d9e2ec',
   borderRadius: 8,
   marginBottom: 18,

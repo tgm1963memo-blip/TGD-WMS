@@ -125,5 +125,52 @@ matching menu path wins, so detail routes show their parent menu item.
   `.dash-flow`, `.dash-q`, `.dash-alert`, `.dash-pill--*` and `.dash-table`.
 - A summary strip is one bordered band split by 1px hairlines, not a row of
   separate cards.
-- Pages outside the dashboard still use the older styles. Move them one at a
-  time and check each one visually.
+- Shared components were restyled for every page (phase 2, "REDESIGN 2026-11 —
+  phase 2" block, screen only, so print is untouched):
+  - PageHeader has no blue rail.
+  - Cards and `.document-section` use a hairline border, with no shadow and no hover lift.
+  - Tables have a muted header row.
+  - Status badges show a dot plus a word. `--open` (waiting on us) is gold.
+  - KPI cards are flat, with mono numbers.
+  - Buttons are 32px tall with 13px text, and 44px on phone and tablet.
+- A small primary button in a table row (`td .btn.btn-primary.btn-sm`) is drawn
+  outlined, so a list doesn't turn into a column of black buttons.
+- Table cell helpers: `.cell-nowrap` keeps document numbers and dates on one line.
+  `.cell-num` right-aligns numbers in mono (put it on the `th` too). `.cell-wide`
+  sets a 200px minimum for a name column. `.cell-keep` wraps only at spaces.
+- Status tone for customer requests comes from
+  `getCustomerRequestStatusClass` (deposit and withdrawal statuses).
+  Each stage has its own colour, as a `--status-*` token pair with a dark value:
+  gray draft, gold `submitted`, orange `reviewing`, blue `accepted`,
+  violet `working` (in the warehouse), teal `shipped` (dispatched), green `done`,
+  red `stopped`, pink `attention` (a variance to resolve). Add a new status to
+  `STATUS_TONES`; anything unmapped falls back to amber `hold`.
+- The stock balance page is done: `.dash-kpis` summary strip, then `.stock-*`
+  rows (customer band, product row, expanded lines). Quantities are plain text,
+  because green means status only. Temperature shows the Thai short label in
+  `.stock-temp-badge`.
+- A bare `.btn` with no variant gets a border and a surface fill. Add new variants
+  to that `:not()` list in styles.css.
+- `.admin-withdrawal-lines-table` is `table-layout: fixed`, so a `min-width` on a
+  cell does nothing. Set the width on the header cell.
+- Handheld uses the same ink, gold and frost through the hex palette `C` in
+  `handheldUi.jsx`. `C.green` and `C.amber` are darker than the desktop tones,
+  because small status text must stay readable in dim cold rooms. The menu uses
+  `.hh-mode*` classes. Cards have no colored left rail; the status pill carries
+  the status. An icon-only button needs `padding: 0`, or the phone rule
+  `button { padding: 0 16px }` squeezes its icon.
+- Ctrl K search: `components/layout/CommandPalette.jsx` with
+  `services/globalSearchService.js`. Customer roles get menu jump only. Staff can
+  search only the sources whose page their role can open
+  (`getSearchSourcesForRole`). The search only reads.
+- Dark mode is opt-in from the top bar and saved per browser (`tgd.theme`). It lives
+  on `.app-shell[data-theme="dark"]` for screen only, so login, the handheld and
+  paper stay light. Use tokens for new colors. A hard-coded light fill with
+  token text is the usual dark-mode bug. Tokens that alias another token at
+  `:root` resolve there, so override them directly in the dark block.
+- Document previews stay white: their classes reset the tokens to light values at
+  the end of the dark block. Add a new paper class to that `:is()` list.
+- `RequestProgress` shows a request's stage in the detail popups. It renders nothing
+  for rejected, cancelled or unknown statuses. Add new statuses to its stage lists.
+- Other pages may still have their own inline styles. Move them page by page and
+  check each one on real screens at desktop and phone width.

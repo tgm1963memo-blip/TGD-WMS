@@ -70,7 +70,7 @@ describe('customerDepositLineExcelUtils', () => {
 
   it('template headers use the same Thai labels as the on-screen deposit lines table', () => {
     expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS[0]).toBe('รหัสสินค้าลูกค้า *');
-    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('การจัดเก็บ *');
+    expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('การจัดเก็บ (เว้นว่างได้)');
     expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('จำนวนกล่อง');
     expect(CUSTOMER_DEPOSIT_LINE_EXCEL_HEADERS).toContain('น้ำหนักฝากทั้งหมด (กก.)');
   });

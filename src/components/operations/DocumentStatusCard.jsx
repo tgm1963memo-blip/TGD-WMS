@@ -5,7 +5,7 @@ export function DocumentStatusCard({ title, status, fields = [] }) {
   return (
     <section
       className="document-card"
-      style={{ background: '#ffffff', border: '1px solid #d9e2ec', borderRadius: 8, padding: 16 }}
+      style={{ background: 'var(--color-surface)', border: '1px solid #d9e2ec', borderRadius: 8, padding: 16 }}
     >
       <div className="document-card-header" style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}>
         <h3 style={{ margin: 0 }}>{title}</h3>

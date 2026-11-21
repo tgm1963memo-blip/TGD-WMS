@@ -432,7 +432,7 @@ export function CustomerDepositNotificationsSection({ testId = 'receiving-custom
                     onChange={() => toggleRequestSelected(row.id)}
                   />
                 </td>
-                <td className="receiving-customer-deposit-table__request-cell">
+                <td className="receiving-customer-deposit-table__request-cell" title={row.request_no}>
                   <a className="table-action-link" href={`/customer/deposit-request/${row.id}`} onClick={(e) => {
                     e.preventDefault();
                     setDetailId(row.id);

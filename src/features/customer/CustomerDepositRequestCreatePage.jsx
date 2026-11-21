@@ -14,7 +14,8 @@ import {
   CUSTOMER_DEPOSIT_STATUSES,
   getDepositStatusLabel,
 } from '../../utils/customerDepositStatusLabels.js';
-import { PACK_ENTRY_MODES } from '../../utils/customerDepositPackCalcUtils.js';
+import { toDepositLineUpsertPayload } from '../../utils/customerDepositPackCalcUtils.js';
+import { maxArrivalDateIso } from '../../utils/customerDepositBatchExcelUtils.js';
 import {
   createCustomerDepositRequest,
   getCustomerDepositRequest,
@@ -52,19 +53,10 @@ import {
 import { CustomerRequestCustomerPicker } from '../../components/customer/CustomerRequestCustomerPicker.jsx';
 import { useCustomerPortalProfile } from './useCustomerPortalProfile.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
+import { uploadCustomerDocumentAttachments } from '../../services/customerDocumentAttachmentService.js';
+import { R3AttachmentDownloadPanel } from '../../components/customer/R3AttachmentDownloadPanel.jsx';
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-
-// Bounds a manually-typed arrival date to a plausible near-term window — catches
-// a mistyped year (e.g. 2027 instead of 2026) before it saves, since a real
-// arrival is never planned this far out. See DateInputDMY's BUDDHIST_ERA_OFFSET
-// comment for the sibling class of year-typo it already guards against.
-const MAX_ARRIVAL_DATE_DAYS_AHEAD = 180;
-function maxArrivalDateIso() {
-  const d = new Date();
-  d.setDate(d.getDate() + MAX_ARRIVAL_DATE_DAYS_AHEAD);
-  return d.toISOString().split('T')[0];
-}
 
 const INITIAL_HEADER = {
   expected_arrival_date: '',
@@ -376,6 +368,7 @@ export function CustomerDepositRequestCreatePage() {
       ...current,
       ...selected.filter((file) => file.size <= MAX_ATTACHMENT_SIZE),
     ]);
+    if (selected.length) updateHeaderField('requires_r3_document', true);
     event.target.value = '';
   }
 
@@ -512,32 +505,7 @@ export function CustomerDepositRequestCreatePage() {
 
     for (let index = 0; index < activeLines.length; index += 1) {
       const line = activeLines[index];
-      // line.pack_entry_mode drives the dropdown UI and can hold a
-      // packaging-unit code (e.g. CASE) as well as BOXES/WEIGHT -- but the
-      // DB column only ever accepts BOXES/WEIGHT, so a unit-code selection
-      // is sent as BOXES (the precisely-known derived value) plus the
-      // actual unit + qty in the separate entry_unit_* columns for audit.
-      const isCustomUnitMode = line.pack_entry_mode !== PACK_ENTRY_MODES.BOXES && line.pack_entry_mode !== PACK_ENTRY_MODES.WEIGHT;
-      const lineResult = await upsertCustomerDepositRequestLine(requestId, {
-        lineId: line.lineId ?? null,
-        lineNo: index + 1,
-        customerProductCode: line.customer_product_code,
-        internalProductCode: line.product_code,
-        productId: null,
-        productName: line.product_name,
-        expectedQty: line.expected_boxes,
-        expectedBoxes: line.expected_boxes,
-        expectedWeight: line.expected_weight,
-        weightPerBox: line.weight_per_box,
-        temperatureType: line.temperature_type,
-        lotNo: line.lot_no || null,
-        mfgDate: line.mfg_date || null,
-        expDate: line.exp_date || null,
-        note: line.line_note,
-        packEntryMode: isCustomUnitMode ? PACK_ENTRY_MODES.BOXES : line.pack_entry_mode,
-        entryUnitCode: isCustomUnitMode ? line.pack_entry_mode : null,
-        entryUnitQty: isCustomUnitMode ? line.entry_unit_qty : null,
-      });
+      const lineResult = await upsertCustomerDepositRequestLine(requestId, toDepositLineUpsertPayload(line, index + 1));
 
       if (lineResult.error) {
         setSubmitting(false);
@@ -579,6 +547,31 @@ export function CustomerDepositRequestCreatePage() {
           return;
         }
       }
+    }
+
+    if (attachments.length) {
+      const attachmentResult = await uploadCustomerDocumentAttachments({
+        documentType: 'CUSTOMER_DEPOSIT_REQUEST',
+        documentId: requestId,
+        customerId: effectiveCustomerId,
+        files: attachments,
+        uploadedByUserId: profile?.id ?? null,
+        uploadedByEmail: profile?.email ?? null,
+      });
+
+      if (attachmentResult.error) {
+        setSubmitting(false);
+        // Drop the files that did make it, so a retry doesn't upload them twice.
+        const uploadedCount = attachmentResult.data?.length ?? 0;
+        setAttachments((current) => current.slice(uploadedCount));
+        setSubmitError(`${attachmentResult.error.message ?? 'อัปโหลดใบ ร.3 ไม่สำเร็จ'} — บันทึกใบฝากเป็นร่างแล้ว กรุณากดบันทึกหรือส่งคำขออีกครั้งเพื่อแนบไฟล์`);
+        // The request already exists now: keep working on it as a draft so the
+        // retry updates it instead of creating a second request.
+        if (!isEditMode) navigate(`/customer/deposit-request/new?editId=${requestId}`, { replace: true });
+        return;
+      }
+
+      setAttachments([]);
     }
 
     if (!shouldSubmit) {
@@ -686,6 +679,7 @@ export function CustomerDepositRequestCreatePage() {
                   startKey={nextLineKey}
                 />
               ) : null}
+              {isTgmCustomerCode(customerCode) ? <span aria-hidden="true" className="toolbar-divider" /> : null}
               <ExcelImportExportToolbar
                 disabled={!canWriteCustomerRequests || importing}
                 exportTestId="customer-deposit-export-button"
@@ -695,6 +689,7 @@ export function CustomerDepositRequestCreatePage() {
                 onTemplate={() => downloadCustomerDepositLineTemplate(catalogProducts)}
                 templateTestId="customer-deposit-template-button"
               />
+              <span aria-hidden="true" className="toolbar-divider" />
               <button className="btn btn-secondary" data-testid="customer-deposit-add-line-button" disabled={importing} onClick={addLine} type="button">
                 {t('customer_deposit_add_line')}
               </button>
@@ -776,20 +771,27 @@ export function CustomerDepositRequestCreatePage() {
             <span>{t('customer_field_note')}</span>
             <textarea className="form-control" onChange={(e) => updateHeaderField('note', e.target.value)} rows={3} value={header.note} />
           </label>
-          <label className="form-field form-field-span-2" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <label className="form-field-span-2 form-checkbox-field">
             <input
               type="checkbox"
               data-testid="customer-deposit-r3-document"
               checked={header.requires_r3_document}
               onChange={(e) => updateHeaderField('requires_r3_document', e.target.checked)}
             />
-            <span>{t('customer_field_r3_document')}</span>
+            <span className="form-checkbox-text">
+              <span className="form-checkbox-title">{t('customer_field_r3_document')}</span>
+              <span className="form-helper">{t('customer_field_r3_document_help')}</span>
+            </span>
           </label>
         </div>
 
+        {isEditMode ? (
+          <R3AttachmentDownloadPanel documentType="CUSTOMER_DEPOSIT_REQUEST" documentId={editId} />
+        ) : null}
+
         <div className="customer-attachment-panel">
           <label className="form-field">
-            <span>{t('customer_deposit_attachments_title')}</span>
+            <span>แนบใบ ร.3</span>
             <input
               accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
               data-testid="customer-deposit-attachment-input"
@@ -799,7 +801,7 @@ export function CustomerDepositRequestCreatePage() {
             />
           </label>
           <p className="form-helper" data-testid="customer-deposit-attachment-demo-note">
-            {t('customer_deposit_attachments_deferred_note')}
+            ไฟล์จะถูกอัปโหลดและแนบกับใบฝากนี้เมื่อบันทึกหรือส่งคำขอ
           </p>
           {attachmentError ? <p className="field-error" role="alert">{attachmentError}</p> : null}
           <ul className="customer-attachment-list" data-testid="customer-deposit-attachment-list">

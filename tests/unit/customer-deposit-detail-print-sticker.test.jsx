@@ -82,4 +82,13 @@ describe('CustomerDepositDetailModal print sticker', () => {
 
     openSpy.mockRestore();
   });
+
+  it('shows each line\'s tracking code in the lines table', async () => {
+    render(
+      <CustomerDepositDetailModal requestId="req-1" isOpen onClose={() => {}} onStatusChange={() => {}} />
+    );
+
+    expect(await screen.findByTestId('deposit-line-tracking-code')).toHaveTextContent('FR260704007');
+    expect(screen.getByRole('columnheader', { name: 'รหัสติดตาม' })).toBeInTheDocument();
+  });
 });

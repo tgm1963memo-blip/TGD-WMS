@@ -4,6 +4,7 @@ export function AgingBucketSummary({ data = [], loading, error, label }) {
   if (!data.length) return <p className="sprint-status">ไม่พบข้อมูล {label}</p>;
 
   return (
+    <div className="table-responsive">
     <table className="tgd-table">
       <thead>
         <tr>
@@ -30,5 +31,6 @@ export function AgingBucketSummary({ data = [], loading, error, label }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

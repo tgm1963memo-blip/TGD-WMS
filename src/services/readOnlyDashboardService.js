@@ -19,6 +19,12 @@ const emptySummary = {
 // This constant prevents a 404 console error from the dashboard summary query.
 const PUTAWAY_ROWS_UNAVAILABLE = 0;
 
+// Work in progress lives on the customer requests. tgd_receiving_documents
+// rows stay DRAFT forever and tgd_picking_documents is never written, so
+// counting those showed every deposit ever received, and 0 picks.
+const OPEN_DEPOSIT_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_RECEIVING', 'PALLETIZING', 'ADMIN_RECOUNT_REQUESTED', 'COUNT_VARIANCE_REVIEW'];
+const OPEN_WITHDRAWAL_STATUSES = ['ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'];
+
 function missingClientResult() {
   return {
     data: { ...emptySummary },
@@ -84,6 +90,20 @@ async function getOpenDocumentCount(tableName) {
   return count ?? 0;
 }
 
+async function getRequestCountByStatus(tableName, statuses) {
+  const { count, error } = await supabase
+    .from(tableName)
+    .select('*', { count: 'exact', head: true })
+    .in('status', statuses);
+  // null, not 0: the tile shows "—" so a failed read never looks like no work,
+  // and one failed count doesn't blank the rest of the dashboard.
+  if (error) {
+    console.warn(`${tableName} count unavailable:`, error.message ?? error);
+    return null;
+  }
+  return count ?? 0;
+}
+
 export async function getReadOnlyDashboardSummary() {
   if (!supabase) {
     return missingClientResult();
@@ -109,8 +129,8 @@ export async function getReadOnlyDashboardSummary() {
       getRowCount('tgd_products'),
       getRowCount('tgd_lots'),
       getActiveLocationCount(),
-      getOpenDocumentCount('tgd_receiving_documents'),
-      getOpenDocumentCount('tgd_picking_documents'),
+      getRequestCountByStatus('tgd_customer_deposit_requests', OPEN_DEPOSIT_STATUSES),
+      getRequestCountByStatus('tgd_customer_withdrawal_requests', OPEN_WITHDRAWAL_STATUSES),
       getOpenDocumentCount('tgd_dispatch_documents'),
     ]);
     const openPutawayRows = PUTAWAY_ROWS_UNAVAILABLE;

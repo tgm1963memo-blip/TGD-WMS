@@ -131,18 +131,27 @@ async function fetchPalletPickRows(allocationIds) {
   return allocationIds ? fetchByIdChunks(allocationIds, build) : fetchAllPages(() => build(null));
 }
 
-export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
+// isEstimate is true when the view could not be read and the numbers came
+// from the fallback. They then miss line-level withdrawals, so stock that has
+// left still counts as present: pallets used reads too high. Screens showing
+// a total must say so instead of presenting it as fact.
+export async function readPickedQuantities(allocationIds = null) {
   const pickedByAllocationId = new Map();
-  if (!supabase) return pickedByAllocationId;
-  if (allocationIds && allocationIds.length === 0) return pickedByAllocationId;
+  if (!supabase) return { picked: pickedByAllocationId, isEstimate: false };
+  if (allocationIds && allocationIds.length === 0) return { picked: pickedByAllocationId, isEstimate: false };
 
   const build = (ids) => {
     const q = supabase.from('tgd_deposit_line_location_picked').select('allocation_id, picked_boxes, picked_weight').order('allocation_id');
     return ids ? q.in('allocation_id', ids) : q;
   };
-  const { data: rows, error } = allocationIds
-    ? await fetchByIdChunks(allocationIds, build)
-    : await fetchAllPages(() => build(null));
+  const readView = () => (allocationIds
+    ? fetchByIdChunks(allocationIds, build)
+    : fetchAllPages(() => build(null)));
+
+  // The view recomputes every allocation on each read, so it is slow and can
+  // fail when several screens load at once. One retry covers a passing spike.
+  let { data: rows, error } = await readView();
+  if (error) ({ data: rows, error } = await readView());
 
   if (!error) {
     for (const row of rows) {
@@ -152,7 +161,7 @@ export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
         weight: Number(row.picked_weight || 0),
       });
     }
-    return pickedByAllocationId;
+    return { picked: pickedByAllocationId, isEstimate: false };
   }
 
   // View missing/failing (e.g. migration 117 not applied yet): fall back to
@@ -167,7 +176,12 @@ export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
       weight: current.weight + Number(p.weight || 0),
     });
   }
-  return pickedByAllocationId;
+  return { picked: pickedByAllocationId, isEstimate: true };
+}
+
+export async function getPickedQuantitiesByAllocationId(allocationIds = null) {
+  const { picked } = await readPickedQuantities(allocationIds);
+  return picked;
 }
 
 export async function getPickedBoxesByAllocationId(allocationIds = null) {
@@ -180,6 +194,8 @@ function hasRemainingAllocationStock(allocation, picked = { boxes: 0, weight: 0 
   if (allocation?.weight != null) return Number(allocation.weight) - Number(picked.weight || 0) > 0;
   return true;
 }
+
+const PALLET_READ_ERROR_MESSAGE = 'อ่านข้อมูลพาเลทไม่ครบ ลองโหลดหน้าใหม่อีกครั้ง';
 
 export async function getSectionsWithOccupancy() {
   if (!supabase) return { data: [], error: null };
@@ -200,10 +216,19 @@ export async function getSectionsWithOccupancy() {
   // and every new "add storage" action write to it, so it always reflects
   // reality without needing the old dual tgd_stock_balances/deposit-line
   // fallback.
-  const [{ data: allocations }, pickedByAllocationId] = await Promise.all([
-    fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id')),
-    getPickedQuantitiesByAllocationId(),
+  const readAllocations = () => fetchAllPages(() => supabase.from('tgd_customer_deposit_line_locations').select('id, location_id, pallet_no, boxes, weight').order('id'));
+  // A failed read leaves only the pages that arrived, so pallets used would
+  // read too low and full rows would look free. Retry once, alongside the
+  // slower picked-quantity read, then show an error rather than a total.
+  const [allocationRead, { picked: pickedByAllocationId, isEstimate }] = await Promise.all([
+    readAllocations().then((first) => (first.error ? readAllocations() : first)),
+    readPickedQuantities(),
   ]);
+  if (allocationRead.error) {
+    console.warn('tgd_customer_deposit_line_locations unavailable:', allocationRead.error.message ?? allocationRead.error);
+    return { data: [], error: new Error(PALLET_READ_ERROR_MESSAGE), isEstimate: false };
+  }
+  const allocations = allocationRead.data;
 
   // Count DISTINCT pallet numbers with remaining stock, not allocation rows
   // -- a pallet slot can now hold more than one tracking code (duplicate
@@ -256,7 +281,7 @@ export async function getSectionsWithOccupancy() {
     };
   });
 
-  return { data: sections, error: null };
+  return { data: sections, error: null, isEstimate };
 }
 
 // Per-pallet breakdown of one location's row -- drives the dashboard's
