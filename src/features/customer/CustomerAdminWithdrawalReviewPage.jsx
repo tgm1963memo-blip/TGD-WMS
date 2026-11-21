@@ -100,7 +100,10 @@ const CONFIRM_DATE_ELIGIBLE_STATUSES = ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWIN
 const WITHDRAWAL_LINE_TEMPERATURE_TYPES = ['FROZEN', 'FREEZE', 'CHILLED', 'AMBIENT', 'FREEZE_FROZEN'];
 const MAX_R3_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 // Mirrors tgd_replace_withdrawal_r3_permit_items' staff lock list.
-const R3_PERMIT_LOCKED_STATUSES = ['LOADED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'CLOSED', 'COMPLETED', 'CANCELLED', 'ADMIN_REJECTED'];
+// The ร.3 paperwork often arrives after dispatch, so staff can still key the
+// permit rows in on a COMPLETED withdrawal (warn-only, never affects stock or
+// billing). Matches tgd_replace_withdrawal_r3_permit_items' staff guard.
+const R3_PERMIT_LOCKED_STATUSES = ['CANCELLED', 'ADMIN_REJECTED'];
 
 // Bangkok calendar date as 'YYYY-MM-DD' — the date the confirm-dispatch
 // date picker compares against requested_dispatch_date (also Bangkok).
