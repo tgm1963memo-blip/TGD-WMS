@@ -88,7 +88,7 @@ export function CustomerWithdrawalRequestListPage() {
     };
   }, [customerId, profileLoading, isRequestProxy, refreshKey]);
 
-  const columnCount = (isRequestProxy ? 9 : 8) + 1;
+  const columnCount = (isRequestProxy ? 8 : 7) + 1;
   const DELETABLE_STATUSES = new Set(['DRAFT', 'WITHDRAWAL_DRAFT', 'DEPOSIT_DRAFT', 'SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING']);
 
   async function handleDelete(requestId) {
@@ -420,7 +420,6 @@ export function CustomerWithdrawalRequestListPage() {
                 {isRequestProxy ? <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>{t('customer_col_customer_name')} {getSortIndicator('customer_id')}</th> : null}
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th>{t('customer_field_requested_dispatch_date')}</th>
-                <th>{t('customer_field_delivery_type')}</th>
                 <th>{t('customer_field_pickup_contact')}</th>
                 <th onClick={() => requestSort('note')} style={{ cursor: 'pointer', maxWidth: 140 }}>{t('customer_col_note')} {getSortIndicator('note')}</th>
                 <th onClick={() => requestSort('updated_at')} style={{ cursor: 'pointer' }}>{t('customer_history_latest_action')} {getSortIndicator('updated_at')}</th>
@@ -448,7 +447,6 @@ export function CustomerWithdrawalRequestListPage() {
                       <div className="form-helper">{t('customer_field_confirmed_dispatch_date')}: {formatDocumentDate(row.confirmed_dispatch_date, { dateOnly: true })}</div>
                     ) : null}
                   </td>
-                  <td>{row.delivery_type ?? '-'}</td>
                   <td>{row.pickup_contact ?? '-'}</td>
                   <td style={{ maxWidth: 140 }}>
                     {row.note ? (

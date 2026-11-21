@@ -5,7 +5,7 @@ import { resolveDocumentConfirmedDates } from './movementLedgerReportService.js'
 import {
   computeStorageInvoiceLines, computeAuxiliaryServiceLines, generateLotBillingCycles, resolveServiceRate,
   computeHandlingFeeLines, computeHandlingOutFeeLines, findHandlingOutLinesMissingWeight, computeOvertimePoolLines, groupOvertimeLinesByDocument, bangkokDateOf, resolveStorageRateForLine,
-  matchesProductCategory, pickDominantCategory,
+  matchesProductCategory, pickDominantCategory, isSlowFreezeRate, resolveStorageReceiptDate,
 } from '../utils/billingRateCalc.js';
 import { INVOICE_DRAFT_LINE_TABLE, INVOICE_DRAFT_STATUS } from '../utils/billingInvoiceDraftUtils.js';
 
@@ -87,7 +87,9 @@ export function buildCatalogMaps(catalogRows = []) {
 // Which physical room a temperature_type is stored in. FREEZE/FREEZE_FROZEN
 // lots sit in the frozen room (see the FREEZING comment in
 // getBillingPeriodPreview), so they're the same room as FROZEN.
-export const FREEZING_LOT_VALUE_FROM = '2026-11-01';
+// Moved back from 2026-11-01 to 2026-10-01: the customer's October 2569
+// statement bills Blast Freeze / Slow Freeze, so October must too.
+export const FREEZING_LOT_VALUE_FROM = '2026-10-01';
 
 function storageRoomOf(temperatureType) {
   if (temperatureType === 'CHILLED' || temperatureType === 'AMBIENT') return temperatureType;
@@ -165,7 +167,7 @@ async function fetchRateEngineInputs({ customerId }) {
       .from('tgd_customer_deposit_requests')
       .select(`
         id, request_no, customer_id, expected_arrival_date, last_action_at, requires_r3_document,
-        is_overtime, overtime_type, receiving_started_at,
+        is_overtime, overtime_type, receiving_started_at, receiving_finished_at,
         tgd_customer_deposit_request_lines(
           id, customer_product_code, product_name, temperature_type, tracking_code, lot_no,
           actual_boxes, actual_weight, expected_boxes, expected_weight
@@ -177,7 +179,7 @@ async function fetchRateEngineInputs({ customerId }) {
       .from('tgd_customer_withdrawal_requests')
       .select(`
         id, withdrawal_no, customer_id, requested_dispatch_date, requires_r3_document,
-        is_overtime, overtime_type, dispatch_started_at,
+        is_overtime, overtime_type, dispatch_started_at, destination,
         tgd_customer_withdrawal_request_lines(
           id, source_customer_deposit_request_line_id, tracking_code, customer_product_code,
           picked_boxes, picked_weight, picked_at, requires_thaw
@@ -230,16 +232,30 @@ async function fetchRateEngineInputs({ customerId }) {
     ),
   ]);
 
+  // Nov 2026+: a deposit's storage cycle and its per-document fees
+  // (handling-in, ร.3, aux services) all date from the physical receipt —
+  // see resolveStorageReceiptDate. Earlier deposits keep the confirmed date.
+  const confirmedReceiptDateById = receiptDateByRequestId;
+  const effectiveReceiptDateById = new Map();
+  for (const req of (depositResult.data ?? [])) {
+    effectiveReceiptDateById.set(req.id, resolveStorageReceiptDate(confirmedReceiptDateById.get(req.id) ?? null, {
+      receivingStartedAt: req.receiving_started_at,
+      receivingFinishedAt: req.receiving_finished_at,
+    }));
+  }
+
   const rawDepositLines = [];
   const depositRequestIds = [];
   for (const req of (depositResult.data ?? [])) {
     depositRequestIds.push(req.id);
-    const receiptDate = receiptDateByRequestId.get(req.id) ?? null;
+    const receiptDate = effectiveReceiptDateById.get(req.id) ?? null;
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
       rawDepositLines.push({
         ...line,
         customer_id: req.customer_id,
         receipt_date: receiptDate,
+        request_id: req.id,
+        request_no: req.request_no ?? null,
       });
     }
   }
@@ -276,7 +292,43 @@ async function fetchRateEngineInputs({ customerId }) {
     product_name: productNameByCode.get(line.customer_product_code) ?? line.product_name ?? null,
     lot_no: line.lot_no ?? null,
     product_category: categoryByCode.get(line.customer_product_code) ?? null,
+    // Display-only fields for the customer-format Excel statement
+    // (billingStatementModel.js) -- never read by any rate calculation.
+    tracking_code: line.tracking_code ?? null,
+    received_boxes: Number(line.actual_boxes ?? line.expected_boxes ?? 0),
+    request_id: line.request_id ?? null,
+    request_no: line.request_no ?? null,
   }));
+
+  // Per-document facts the Excel statement prints next to a per-request
+  // charge (ร.3, aux services, OT) -- display-only, same as above.
+  const requestInfoById = new Map();
+  for (const req of (depositResult.data ?? [])) {
+    const reqLines = req.tgd_customer_deposit_request_lines ?? [];
+    requestInfoById.set(req.id, {
+      id: req.id,
+      requestType: 'DEPOSIT',
+      requestNo: req.request_no ?? null,
+      date: effectiveReceiptDateById.get(req.id) ?? null,
+      destination: null,
+      lineCount: reqLines.length,
+      totalWeight: reqLines.reduce((sum, l) => sum + Number(l.actual_weight ?? l.expected_weight ?? 0), 0),
+      totalBoxes: reqLines.reduce((sum, l) => sum + Number(l.actual_boxes ?? l.expected_boxes ?? 0), 0),
+    });
+  }
+  for (const req of (withdrawalResult.data ?? [])) {
+    const reqLines = req.tgd_customer_withdrawal_request_lines ?? [];
+    requestInfoById.set(req.id, {
+      id: req.id,
+      requestType: 'WITHDRAWAL',
+      requestNo: req.withdrawal_no ?? null,
+      date: dispatchDateByRequestId.get(req.id) ?? null,
+      destination: req.destination ?? null,
+      lineCount: reqLines.length,
+      totalWeight: reqLines.reduce((sum, l) => sum + Number(l.picked_weight ?? 0), 0),
+      totalBoxes: reqLines.reduce((sum, l) => sum + Number(l.picked_boxes ?? 0), 0),
+    });
+  }
 
   // Each request's heaviest product group — where its per-document charges
   // (ร.3, FLAT/PER_HOUR aux services) go when billing is split by group.
@@ -297,7 +349,7 @@ async function fetchRateEngineInputs({ customerId }) {
   // Same resolved-timeline-event dates used for cycle anchoring above, kept
   // under their existing names since the rest of this function (and its
   // callers) already reads requestReceiptDateById/requestDispatchDateById.
-  const requestReceiptDateById = receiptDateByRequestId;
+  const requestReceiptDateById = effectiveReceiptDateById;
   const requestDispatchDateById = dispatchDateByRequestId;
 
   // Deposit/withdrawal requests flagged as needing ร.3 processing — each
@@ -404,7 +456,7 @@ async function fetchRateEngineInputs({ customerId }) {
   return {
     depositLines, depositRequestIds, withdrawalRequestIds, rates: ratesResult.data ?? [],
     requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
-    handlingOutLineInputs, requestCategoryById, error: null,
+    handlingOutLineInputs, requestCategoryById, requestInfoById, error: null,
   };
 }
 
@@ -456,7 +508,7 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
     supabase
       .from('tgd_customer_deposit_requests')
       .select(`
-        id, customer_id, expected_arrival_date, last_action_at,
+        id, customer_id, expected_arrival_date, last_action_at, receiving_started_at, receiving_finished_at,
         tgd_customer_deposit_request_lines(
           id, customer_product_code, temperature_type, tracking_code, lot_no,
           actual_boxes, actual_weight, expected_boxes, expected_weight
@@ -521,7 +573,10 @@ export async function getMonthlyStorageRevenueSummary({ monthsBack = 6 } = {}) {
 
   const rawDepositLines = [];
   for (const req of (depositResult.data ?? [])) {
-    const receiptDate = receiptDateByRequestId.get(req.id) ?? null;
+    const receiptDate = resolveStorageReceiptDate(receiptDateByRequestId.get(req.id) ?? null, {
+      receivingStartedAt: req.receiving_started_at,
+      receivingFinishedAt: req.receiving_finished_at,
+    });
     for (const line of (req.tgd_customer_deposit_request_lines ?? [])) {
       rawDepositLines.push({ ...line, customer_id: req.customer_id, receipt_date: receiptDate });
     }
@@ -592,7 +647,7 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   const {
     depositLines: allDepositLines, depositRequestIds, withdrawalRequestIds, rates,
     requestReceiptDateById, requestDispatchDateById, r3FlaggedDocuments, overtimeLineInputs,
-    handlingOutLineInputs, requestCategoryById,
+    handlingOutLineInputs, requestCategoryById, requestInfoById,
   } = inputs;
 
   // Storage/ค่าฝาก is billed per lot, and each lot has its own storage
@@ -663,50 +718,6 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     depositLines, rates, periodStart, periodEnd, serviceType: 'HANDLING_IN',
   });
 
-  // FREEZING (ค่าฟรีส): same one-time weight-based fee mechanism as
-  // HANDLING_IN above, scoped to only the FREEZE_FROZEN lots -- these are
-  // billed for STORAGE under the FROZEN rate bucket (resolveStorageRateForLine)
-  // since physically they sit in the same frozen room, but the freezing
-  // service itself is a real, separate cost that must show as its own line
-  // rather than being folded into (or lost from) the storage charge.
-  //
-  // Catalog-wins (resolveLotTemperatureType) turns a FREEZE_FROZEN lot of a
-  // catalog-FROZEN product into FROZEN -- and the catalog can't hold
-  // FREEZE_FROZEN at all -- so the fee never fired for a real lot. The lot's
-  // own value decides it instead, but only for lots received from
-  // FREEZING_LOT_VALUE_FROM on: recreating an older draft must not suddenly
-  // bill fees it never showed.
-  const freezeFrozenLines = depositLines
-    .filter((dl) => dl.temperature_type === 'FREEZE_FROZEN'
-      || (dl.lot_temperature_type === 'FREEZE_FROZEN' && dl.receipt_date >= FREEZING_LOT_VALUE_FROM))
-    .map((dl) => ({ ...dl, temperature_type: 'FREEZE_FROZEN' }));
-  const freezingLines = computeHandlingFeeLines({
-    depositLines: freezeFrozenLines, rates, periodStart, periodEnd, serviceType: 'FREEZING',
-  });
-
-  // HANDLING_OUT (ค่านำออก): per withdrawal line dispatched in this period,
-  // scoped by the lot's storage room / product group like the lines above.
-  const scopedHandlingOutInputs = (handlingOutLineInputs ?? []).filter((l) =>
-    (!temperatureType || l.temperatureType === temperatureType)
-    && matchesProductCategory(productCategory, l.productCategory));
-  const handlingOutLines = computeHandlingOutFeeLines({
-    lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
-  });
-  // THAW (ค่าละลาย): same per-line, per-kg mechanism, over only the lines
-  // ticked "ละลาย". Returned alongside handlingOutLines (each line carries its
-  // own rate.service_type, which the draft-line builder labels by).
-  const scopedThawInputs = scopedHandlingOutInputs.filter((l) => l.requiresThaw);
-  const thawLines = computeHandlingOutFeeLines({
-    lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW',
-  });
-  // A line with boxes but no picked weight blocks both fees — list it once.
-  const missingWeightById = new Map();
-  for (const l of [
-    ...findHandlingOutLinesMissingWeight({ lines: scopedHandlingOutInputs, rates, periodStart, periodEnd }),
-    ...findHandlingOutLinesMissingWeight({ lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW' }),
-  ]) missingWeightById.set(l.id, l);
-  const handlingOutMissingWeightLines = [...missingWeightById.values()];
-
   // Scope the aux-service lookup to requests whose receipt/dispatch date
   // actually falls in this billing period *before* querying, not after.
   // depositRequestIds/withdrawalRequestIds cover a customer's entire
@@ -735,8 +746,65 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
   // already does (REQUEST_ID_CHUNK_SIZE mirrors that file's LOT_ID_CHUNK_SIZE).
   const REQUEST_ID_CHUNK_SIZE = 150;
 
-  let auxLines = [];
-  if (periodDepositRequestIds.length > 0) {
+  // FREEZING (ค่าฟรีส): same one-time weight-based fee mechanism as
+  // HANDLING_IN above, scoped to only the FREEZE_FROZEN lots -- these are
+  // billed for STORAGE under the FROZEN rate bucket (resolveStorageRateForLine)
+  // since physically they sit in the same frozen room, but the freezing
+  // service itself is a real, separate cost that must show as its own line
+  // rather than being folded into (or lost from) the storage charge.
+  //
+  // Catalog-wins (resolveLotTemperatureType) turns a FREEZE_FROZEN lot of a
+  // catalog-FROZEN product into FROZEN -- and the catalog can't hold
+  // FREEZE_FROZEN at all -- so the fee never fired for a real lot. The lot's
+  // own value decides it instead, but only for lots received from
+  // FREEZING_LOT_VALUE_FROM on: recreating an older draft must not suddenly
+  // bill fees it never showed.
+  //
+  // Lots of a request ticked for Slow Freeze are Freeze & Frozen too, but
+  // they're charged the Slow Freeze service (per kg, on the request) instead
+  // of the Blast Freeze fee -- never both. Needs the deposit-side request
+  // services, so those are fetched here rather than further down.
+  const depositAux = await fetchDepositAuxLines();
+  if (depositAux.error) return { data: null, error: depositAux.error };
+  const slowFreezeRequestIds = new Set(depositAux.lines
+    .filter((al) => isSlowFreezeRate(al.rate))
+    .map((al) => al.sourceRequestId));
+  const freezeFrozenLines = depositLines
+    .filter((dl) => dl.temperature_type === 'FREEZE_FROZEN'
+      || (dl.lot_temperature_type === 'FREEZE_FROZEN' && dl.receipt_date >= FREEZING_LOT_VALUE_FROM))
+    .filter((dl) => !slowFreezeRequestIds.has(dl.request_id))
+    .map((dl) => ({ ...dl, temperature_type: 'FREEZE_FROZEN' }));
+  const freezingLines = computeHandlingFeeLines({
+    depositLines: freezeFrozenLines, rates, periodStart, periodEnd, serviceType: 'FREEZING',
+  });
+
+  // HANDLING_OUT (ค่านำออก): per withdrawal line dispatched in this period,
+  // scoped by the lot's storage room / product group like the lines above.
+  const scopedHandlingOutInputs = (handlingOutLineInputs ?? []).filter((l) =>
+    (!temperatureType || l.temperatureType === temperatureType)
+    && matchesProductCategory(productCategory, l.productCategory));
+  const handlingOutLines = computeHandlingOutFeeLines({
+    lines: scopedHandlingOutInputs, rates, periodStart, periodEnd,
+  });
+  // THAW (ค่าละลาย): same per-line, per-kg mechanism, over only the lines
+  // ticked "ละลาย". Returned alongside handlingOutLines (each line carries its
+  // own rate.service_type, which the draft-line builder labels by).
+  const scopedThawInputs = scopedHandlingOutInputs.filter((l) => l.requiresThaw);
+  const thawLines = computeHandlingOutFeeLines({
+    lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW',
+  });
+  // A line with boxes but no picked weight blocks both fees — list it once.
+  const missingWeightById = new Map();
+  for (const l of [
+    ...findHandlingOutLinesMissingWeight({ lines: scopedHandlingOutInputs, rates, periodStart, periodEnd }),
+    ...findHandlingOutLinesMissingWeight({ lines: scopedThawInputs, rates, periodStart, periodEnd, serviceType: 'THAW' }),
+  ]) missingWeightById.set(l.id, l);
+  const handlingOutMissingWeightLines = [...missingWeightById.values()];
+
+  // Deposit-side aux services: fetched earlier by fetchDepositAuxLines (the
+  // FREEZING fee needs to know which requests were ticked for Slow Freeze).
+  async function fetchDepositAuxLines() {
+    if (periodDepositRequestIds.length === 0) return { lines: [], error: null };
     const rateById = new Map(rates.map((r) => [r.id, r]));
     const auxRows = [];
     for (const chunk of chunkArray(periodDepositRequestIds, REQUEST_ID_CHUNK_SIZE)) {
@@ -745,23 +813,39 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
         .from('tgd_customer_deposit_request_services')
         .select('id, deposit_request_id, service_rate_id, quantity, note')
         .in('deposit_request_id', chunk);
-      if (auxResult.error) return { data: null, error: auxResult.error };
+      if (auxResult.error) return { lines: [], error: auxResult.error };
       auxRows.push(...(auxResult.data ?? []));
     }
 
+    // A per-kg request service (Slow Freeze) is billed on the request's
+    // whole received weight -- every received lot, whatever bill scope --
+    // not on whatever quantity happened to be saved with the tick.
+    const receivedWeightByRequest = new Map();
+    for (const dl of allDepositLines) {
+      if (!dl.request_id || !(Number(dl.received_weight) > 0)) continue;
+      receivedWeightByRequest.set(dl.request_id, (receivedWeightByRequest.get(dl.request_id) ?? 0) + Number(dl.received_weight));
+    }
+
     const selections = auxRows
-      .map((row) => ({
-        sourceRequestId: row.deposit_request_id,
-        customerId,
-        rate: rateById.get(row.service_rate_id),
-        quantity: row.quantity,
-        note: row.note,
-        selectionId: row.id,
-      }))
+      .map((row) => {
+        const rate = rateById.get(row.service_rate_id);
+        return {
+          sourceRequestId: row.deposit_request_id,
+          customerId,
+          rate,
+          quantity: rate?.unit_basis === 'PER_KG'
+            ? Math.round((receivedWeightByRequest.get(row.deposit_request_id) ?? 0) * 1000) / 1000
+            : row.quantity,
+          note: row.note,
+          selectionId: row.id,
+        };
+      })
       .filter((sel) => sel.rate);
 
-    auxLines = computeAuxiliaryServiceLines({ selections });
+    return { lines: computeAuxiliaryServiceLines({ selections }), error: null };
   }
+
+  let auxLines = [...depositAux.lines];
 
   // Withdrawal-side auxiliary services (plug-in/OT/etc. selected against a
   // withdrawal request rather than a deposit — see
@@ -832,6 +916,10 @@ export async function getBillingPeriodPreview({ customerId, periodStart, periodE
     data: {
       storageLines, auxLines, handlingLines: [...handlingLines, ...freezingLines], handlingOutLines: [...handlingOutLines, ...thawLines], overtimeLines,
       depositLines, unratedDepositLines, handlingOutMissingWeightLines,
+      // For the customer-format Excel statement only (billingStatementModel.js):
+      // the OT pool lines of the whole period BEFORE scoping (the OT file
+      // shows every product group side by side), plus the lookups it prints.
+      overtimePoolLines: pooledOvertimeLines, rates, requestInfoById,
     },
     error: null,
   };

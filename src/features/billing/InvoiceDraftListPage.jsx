@@ -9,6 +9,7 @@ import { InvoiceDraftFilterPanel } from '../../components/billing/InvoiceDraftFi
 import { InvoiceDraftListTable } from '../../components/billing/InvoiceDraftListTable.jsx';
 import { InvoiceDraftStatusBadge } from '../../components/billing/InvoiceDraftStatusBadge.jsx';
 import { InvoiceDraftPrintTemplate } from '../../components/billing/InvoiceDraftPrintTemplate.jsx';
+import { BillingStatementExportBar } from '../../components/billing/BillingStatementExportBar.jsx';
 import { exportInvoiceDraftPdf, exportInvoiceDraftDetailPdf } from '../../utils/invoiceDraftPdfExport.js';
 import { ReportPreviewModal } from '../../components/reports/ReportPreviewModal.jsx';
 import { getTranslation } from '../../i18n/translationCatalog.js';
@@ -638,6 +639,21 @@ export function InvoiceDraftListPage() {
               {exportingSummary ? 'กำลังสร้าง PDF...' : 'Export PDF'}
             </button>
           </div>
+          {/* Customer-format Excel statement for this draft's own customer /
+              period / scope -- recalculated from the rate engine and checked
+              against the total saved on the draft. */}
+          <div style={{ marginBottom: 12 }}>
+            <BillingStatementExportBar
+              customerId={viewDraft.customer_id}
+              customerCode={customers.find((c) => c.id === viewDraft.customer_id)?.customer_code}
+              periodStart={viewDraft.billing_period_start}
+              periodEnd={viewDraft.billing_period_end}
+              temperatureType={viewDraft.temperature_type || null}
+              productCategory={viewDraft.product_category || null}
+              savedTotal={viewDraft.total_amount}
+              disabled={viewLoading}
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, fontSize: 14 }}>
             <div><strong>Draft No:</strong> {viewDraft.draft_no ?? '-'}</div>
             <div><strong>ลูกค้า:</strong> {viewDraft.customer_name ?? '-'}</div>
@@ -1152,6 +1168,16 @@ export function InvoiceDraftListPage() {
               ) : null}
               <div style={{ textAlign: 'right', fontWeight: 700, marginBottom: 16 }}>
                 รวมทั้งสิ้น: {storageBillPreview.totals.total_amount != null ? storageBillPreview.totals.total_amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'} บาท
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <BillingStatementExportBar
+                  customerId={storageBillCustomerId}
+                  customerCode={customers.find((c) => c.id === storageBillCustomerId)?.customer_code}
+                  periodStart={storageBillStart}
+                  periodEnd={storageBillEnd}
+                  temperatureType={storageBillTemperatureType || null}
+                  productCategory={storageBillProductCategory || null}
+                />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button type="button" className="btn btn-outline" data-testid="storage-bill-download-reports-button" onClick={handleDownloadPreviewReports}>

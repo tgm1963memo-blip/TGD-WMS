@@ -19,7 +19,9 @@ Use the semantic `--color-*` tokens. The older `--tgm-*` / `--tgd-*` names still
 | Role | Token | Value |
 |---|---|---|
 | Brand accent | `--color-gold` / `--color-gold-hover` | #d4af37 / #b5952f |
-| Shell (sidebar, handheld header) | `--color-sidebar` | #09111c |
+| Shell (sidebar, handheld header) | `--color-sidebar` | #111417 |
+| Cold / temperature, stock fills | `--color-frost` / `--color-frost-soft` | #1f6fa8 / #e2eef7 |
+| Gold as text on light | `--color-gold-text` | #7a5f0c |
 | Page background | `--color-bg` | #f8fafb |
 | Surfaces | `--color-surface`, `--color-surface-muted`, `--color-surface-sunken` | #fff, #f8fafc, #f1f5f9 |
 | Borders | `--color-border-subtle`, `--color-border`, `--color-border-strong` | #e5e7eb, #e2e8f0, #cbd5e1 |
@@ -89,7 +91,39 @@ stay as text, and print documents keep their glyphs.
 
 ## Navigation
 
-The sidebar group labels are English on purpose (17B); item labels follow the
-language toggle through `nav.*` keys in `src/i18n/translationCatalog.js`. Every new
-menu item needs a `nav.<camelKey>` entry and a `routePermissionCatalog` entry
-(`tests/unit/route-permission-audit.test.js` fails otherwise).
+`src/app/navigation.js` holds the permission groups. Their keys drive role
+permissions, the role-permissions admin page and the legacy visibility rules, so
+don't rename them. The sidebar doesn't show those groups directly:
+`src/app/navigationSections.js` folds them into five job-based sections (งานของฉัน,
+งานคลัง, พอร์ทัลลูกค้า, การเงินและรายงาน, ตั้งค่าระบบ) and gives every item a
+lucide icon. Section headings follow the language toggle. "ตั้งค่าระบบ" collapses,
+and it opens by itself when the current page is inside it.
+
+A new menu item needs:
+- a `nav.<camelKey>` entry in `src/i18n/translationCatalog.js`;
+- a `routePermissionCatalog` entry (`tests/unit/route-permission-audit.test.js` fails otherwise);
+- an icon in `ITEM_ICONS` in `navigationSections.js` (it falls back to a generic one).
+
+A new permission group must also be added to a section in `SIDEBAR_SECTIONS`.
+Until then it shows as its own section under its English label.
+
+The top bar shows "section / page" from `findNavigationContext`. The longest
+matching menu path wins, so detail routes show their parent menu item.
+
+## Shell and dashboard (redesign 2026-11)
+
+- Shell: ink rail (`--tgd-sidebar-bg` #111417) with a gold inset bar on the active
+  item. No gradients, no hover slide.
+- Color roles: gold marks brand and the current selection (`--color-gold-text` when
+  gold is used as text on white). Frost (`--color-frost`, `-soft`) marks cold and
+  temperature, and "has stock" fills. Green, amber and red mean status only.
+- Numbers that line up (KPIs, weights, money, document numbers) use the `.num`
+  class (IBM Plex Mono, tabular figures).
+- Dashboard order: summary strip → warehouse flow → revenue (admin and accounting
+  only) → today's queue and alerts → layout map. Use `.dash-*` classes from the
+  "REDESIGN 2026-11" block at the end of styles.css: `.dash-panel`, `.dash-kpis`,
+  `.dash-flow`, `.dash-q`, `.dash-alert`, `.dash-pill--*` and `.dash-table`.
+- A summary strip is one bordered band split by 1px hairlines, not a row of
+  separate cards.
+- Pages outside the dashboard still use the older styles. Move them one at a
+  time and check each one visually.

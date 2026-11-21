@@ -40,9 +40,9 @@ describe('Sprint 12D UI/UX visual polish', () => {
       </AppShell>,
     );
 
-    // 17B: sidebar uses professional English group labels
-    expect(screen.getByText('Main Operation')).toBeInTheDocument();
-    expect(screen.getByText('Reports')).toBeInTheDocument();
+    // Redesign 2026-11: sidebar section headings follow the UI language (Thai default)
+    expect(screen.getByText('งานของฉัน')).toBeInTheDocument();
+    expect(screen.getByText('การเงินและรายงาน')).toBeInTheDocument();
   });
 
   it('renders ReportsPage with Thai title and report cards', () => {

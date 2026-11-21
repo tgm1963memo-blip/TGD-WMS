@@ -168,8 +168,13 @@ describe('getBillingPeriodPreview — Freeze & Frozen storage + freezing fee', (
     });
 
     it('does not back-bill the fee for a lot received before the cut-over date', async () => {
-      const { data } = await previewFor({ receiptDate: '2026-10-15', rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE] });
+      const { data } = await previewFor({ receiptDate: '2026-09-15', rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE] });
       expect(freezing(data)).toHaveLength(0);
+    });
+
+    it('bills October 2026 lots (the cut-over is 2026-10-01)', async () => {
+      const { data } = await previewFor({ receiptDate: '2026-10-15', rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE] });
+      expect(freezing(data)).toHaveLength(1);
     });
 
     it('falls back to a FROZEN-scoped FREEZING rate', async () => {
@@ -178,6 +183,46 @@ describe('getBillingPeriodPreview — Freeze & Frozen storage + freezing fee', (
         rates: [FROZEN_STORAGE_RATE, { ...FREEZING_FEE_RATE, temperature_type: 'FROZEN' }],
       });
       expect(freezing(data)).toHaveLength(1);
+    });
+
+    describe('Slow Freeze ticked on the deposit request', () => {
+      const SLOW_FREEZE_RATE = {
+        id: 'rate-slow', customer_id: CUSTOMER_ID, customer_product_id: null,
+        service_type: 'บริการปรับอุณหภูมิสินค้าเพื่อจัดเก็บห้องอุณหภูมิแช่แข็ง (Slow Freeze) ', rate: 2, unit_basis: 'PER_KG',
+        currency: 'THB', note: '', is_active: true, period_days: null,
+        temperature_type: null, max_quantity: null, created_at: '2026-01-01T00:00:00Z',
+      };
+
+      async function previewWithSlowFreeze({ ticked }) {
+        vi.resetModules();
+        const db = makeDb({ rates: [FROZEN_STORAGE_RATE, FREEZING_FEE_RATE, SLOW_FREEZE_RATE] });
+        db.tgd_customer_products = [{ id: 'cp-1', customer_id: CUSTOMER_ID, customer_product_code: 'PROD-FF', temperature_type: 'FROZEN' }];
+        db.tgd_customer_deposit_requests[0].expected_arrival_date = '2026-10-20';
+        // Saved quantity is whatever the tick stored (1) -- billing must use the received weight.
+        db.tgd_customer_deposit_request_services = ticked
+          ? [{ id: 'svc-1', deposit_request_id: 'dep-1', service_rate_id: 'rate-slow', quantity: 1, note: null }]
+          : [];
+        vi.doMock('../../src/services/supabaseClient.js', () => ({ supabase: makeSupabaseMock(db) }));
+        const { getBillingPeriodPreview } = await import('../../src/services/billingRateEngineService.js');
+        return getBillingPeriodPreview({ customerId: CUSTOMER_ID, periodStart: '2026-10-01', periodEnd: '2026-10-31' });
+      }
+
+      it('bills Slow Freeze on the request received weight and skips the Blast Freeze fee', async () => {
+        const { data, error } = await previewWithSlowFreeze({ ticked: true });
+        expect(error).toBeFalsy();
+        expect(freezing(data)).toHaveLength(0);
+        const slow = data.auxLines.filter((l) => l.rate?.id === 'rate-slow');
+        expect(slow).toHaveLength(1);
+        expect(slow[0].quantity).toBe(1000);
+        expect(slow[0].amount).toBeCloseTo(2000, 2);
+        expect(data.storageLines).toHaveLength(1);
+      });
+
+      it('bills Blast Freeze, not Slow Freeze, when the request is not ticked', async () => {
+        const { data } = await previewWithSlowFreeze({ ticked: false });
+        expect(freezing(data)).toHaveLength(1);
+        expect(data.auxLines.filter((l) => l.rate?.id === 'rate-slow')).toHaveLength(0);
+      });
     });
 
     it('never multiplies a FLAT FREEZING rate by kg', async () => {

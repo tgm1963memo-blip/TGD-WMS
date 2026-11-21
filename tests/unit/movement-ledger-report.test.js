@@ -98,10 +98,16 @@ describe('Sprint 6B movement ledger report foundation', () => {
       'movement_ledger_report',
       'movement_ledger',
       'Entry-Delivery Inventory Report',
-      'getConfirmedDepositReceiptRows',
-      'getConfirmedWithdrawalRows',
+      'fetchMergedMovementLedgerRows',
     ].forEach((term) => {
       expect(source).toContain(term);
+    });
+
+    // The three-source merge the page runs is shared with the billing
+    // statement export, so it lives in its own module.
+    const mergeSource = readProjectFile('src/services/movementLedgerMergedRows.js');
+    ['getMovementLedgerRows', 'getConfirmedDepositReceiptRows', 'getConfirmedWithdrawalRows'].forEach((term) => {
+      expect(mergeSource).toContain(term);
     });
   });
 

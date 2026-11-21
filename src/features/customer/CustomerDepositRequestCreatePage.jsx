@@ -7,6 +7,9 @@ import { CustomerProcessTimeline } from '../../components/customer/CustomerProce
 import { CustomerDepositLinesTable } from '../../components/customer/CustomerDepositLinesTable.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
+import { TgmPoImportButton } from '../../components/customer/TgmPoImportButton.jsx';
+import { isTgmCustomerCode } from '../../utils/tgmPoImportUtils.js';
+import { getCustomerCode } from '../../services/masterDataService.js';
 import {
   CUSTOMER_DEPOSIT_STATUSES,
   getDepositStatusLabel,
@@ -26,6 +29,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
+import { isSlowFreezeRate } from '../../utils/billingRateCalc.js';
 import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
 import {
   downloadCustomerDepositLineTemplate,
@@ -94,6 +98,7 @@ export function CustomerDepositRequestCreatePage() {
   const [nextLineKey, setNextLineKey] = useState(DEPOSIT_LINE_DEFAULT_COUNT + 1);
   const [editOriginalLineIds, setEditOriginalLineIds] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [customerCode, setCustomerCode] = useState('');
   // Auxiliary per-request services (container reefer plug-in, overnight flat
   // fee, Slow Freeze prep, etc.) not tied to any single product's weight —
   // see tgd_customer_deposit_request_services / billingRateCalc.js.
@@ -275,6 +280,8 @@ export function CustomerDepositRequestCreatePage() {
   // Auxiliary services offered to this customer — any configured rate whose
   // unit isn't weight-based (FLAT/PER_HOUR), since PER_KG rates are already
   // billed automatically from received weight, not selected manually here.
+  // Exception: Slow Freeze is per kg but only for the requests ticked for it
+  // -- the engine bills it on that request's received weight.
   useEffect(() => {
     if (!effectiveCustomerId) {
       setAuxServiceOptions([]);
@@ -283,7 +290,8 @@ export function CustomerDepositRequestCreatePage() {
     let active = true;
     listAllProductServiceRates({ customerId: effectiveCustomerId, isActive: true }).then((result) => {
       if (!active) return;
-      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR');
+      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR'
+        || (r.unit_basis === 'PER_KG' && !r.customer_product_id && isSlowFreezeRate(r)));
       setAuxServiceOptions(options);
     });
     return () => { active = false; };
@@ -319,6 +327,19 @@ export function CustomerDepositRequestCreatePage() {
       active = false;
     };
   }, [effectiveCustomerId, copyFromId]);
+
+  // Only used to decide whether to offer TGM's own PO upload.
+  useEffect(() => {
+    let active = true;
+    setCustomerCode('');
+    if (!effectiveCustomerId) return undefined;
+    getCustomerCode(effectiveCustomerId).then((result) => {
+      if (active) setCustomerCode(result.data ?? '');
+    });
+    return () => {
+      active = false;
+    };
+  }, [effectiveCustomerId]);
 
   if (copyLoading) {
     return (
@@ -652,6 +673,19 @@ export function CustomerDepositRequestCreatePage() {
           <div className="customer-deposit-lines-header">
             <h3>{t('customer_deposit_lines_title')}</h3>
             <div className="action-row">
+              {isTgmCustomerCode(customerCode) ? (
+                <TgmPoImportButton
+                  catalogProducts={catalogProducts}
+                  disabled={!canWriteCustomerRequests || importing}
+                  onApply={(importedLines, notice) => {
+                    setLines(importedLines);
+                    setNextLineKey(importedLines[importedLines.length - 1].key + 1);
+                    setImportNotice(notice);
+                  }}
+                  onError={setSubmitError}
+                  startKey={nextLineKey}
+                />
+              ) : null}
               <ExcelImportExportToolbar
                 disabled={!canWriteCustomerRequests || importing}
                 exportTestId="customer-deposit-export-button"
@@ -692,7 +726,7 @@ export function CustomerDepositRequestCreatePage() {
                       }))}
                     />
                     <span style={{ flex: 1, fontSize: 13 }}>
-                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}
+                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}{opt.unit_basis === 'PER_KG' ? '/กก. (คิดตามน้ำหนักรับเข้าจริงของใบนี้ — ไม่คิดค่า Blast Freeze ซ้ำ)' : ''}
                       {opt.max_quantity ? ` (สูงสุด ${opt.max_quantity}${opt.unit_basis === 'PER_HOUR' ? ' ชม.' : ''})` : ''}
                     </span>
                     {opt.unit_basis === 'PER_HOUR' && sel.checked && (

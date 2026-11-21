@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { isGoLivePresentationEnabled } from '../../config/goLivePresentation.js';
 
-export function AppShell({ currentSection, children }) {
+export function AppShell({ currentSection, sectionLabel = null, children }) {
   const goLive = isGoLivePresentationEnabled();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -29,7 +29,7 @@ export function AppShell({ currentSection, children }) {
         )}
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="app-main">
-          <Topbar currentSection={currentSection} onMenuToggle={() => setSidebarOpen((o) => !o)} />
+          <Topbar currentSection={currentSection} sectionLabel={sectionLabel} onMenuToggle={() => setSidebarOpen((o) => !o)} />
           <main className="main-content app-content">{children}</main>
         </div>
       </div>

@@ -52,17 +52,15 @@ describe('17B App Shell and Navigation UI', () => {
     });
   });
 
-  describe('Sidebar contains professional group labels', () => {
+  // Permission groups (navigation.js) are folded into job-based sidebar
+  // sections (navigationSections.js); these are the section headings.
+  describe('Sidebar contains job-based section labels', () => {
     const requiredGroups = [
-      'Main Operation',
-      'Inbound Management',
-      'Inventory Control',
-      'Outbound Management',
-      'Barcode / Handheld',
+      'My Work',
+      'Warehouse',
       'Customer Portal',
-      'Billing',
-      'Reports',
-      'System Administration',
+      'Billing & Reports',
+      'System Settings',
     ];
 
     it.each(requiredGroups)('contains group label: %s', (group) => {
