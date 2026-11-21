@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered by src/components/layout/PwaUpdateBanner.jsx, which also
+      // tells open tabs when a new deploy has taken over.
+      injectRegister: false,
       // Installable on phones, and the handheld "ระบุ Location" page (and
       // everything else) still loads when reopened with zero connectivity,
       // e.g. inside a signal-dead cold room. Precaches only the app's own
