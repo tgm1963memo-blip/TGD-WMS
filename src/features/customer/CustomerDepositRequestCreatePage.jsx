@@ -30,6 +30,7 @@ import {
 } from '../../services/customerDepositRequestService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
+import { isSlowFreezeRate } from '../../utils/billingRateCalc.js';
 import { canWriteCustomerRequestServices } from '../../services/customerPortalServiceUtils.js';
 import {
   downloadCustomerDepositLineTemplate,
@@ -271,6 +272,8 @@ export function CustomerDepositRequestCreatePage() {
   // Auxiliary services offered to this customer — any configured rate whose
   // unit isn't weight-based (FLAT/PER_HOUR), since PER_KG rates are already
   // billed automatically from received weight, not selected manually here.
+  // Exception: Slow Freeze is per kg but only for the requests ticked for it
+  // -- the engine bills it on that request's received weight.
   useEffect(() => {
     if (!effectiveCustomerId) {
       setAuxServiceOptions([]);
@@ -279,7 +282,8 @@ export function CustomerDepositRequestCreatePage() {
     let active = true;
     listAllProductServiceRates({ customerId: effectiveCustomerId, isActive: true }).then((result) => {
       if (!active) return;
-      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR');
+      const options = (result.data ?? []).filter((r) => r.unit_basis === 'FLAT' || r.unit_basis === 'PER_HOUR'
+        || (r.unit_basis === 'PER_KG' && !r.customer_product_id && isSlowFreezeRate(r)));
       setAuxServiceOptions(options);
     });
     return () => { active = false; };
@@ -717,7 +721,7 @@ export function CustomerDepositRequestCreatePage() {
                       }))}
                     />
                     <span style={{ flex: 1, fontSize: 13 }}>
-                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}
+                      {opt.note || opt.service_type} — {Number(opt.rate).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท{opt.unit_basis === 'PER_HOUR' ? '/ชม.' : ''}{opt.unit_basis === 'PER_KG' ? '/กก. (คิดตามน้ำหนักรับเข้าจริงของใบนี้ — ไม่คิดค่า Blast Freeze ซ้ำ)' : ''}
                       {opt.max_quantity ? ` (สูงสุด ${opt.max_quantity}${opt.unit_basis === 'PER_HOUR' ? ' ชม.' : ''})` : ''}
                     </span>
                     {opt.unit_basis === 'PER_HOUR' && sel.checked && (

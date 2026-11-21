@@ -15,7 +15,7 @@
 // starts), only rounded per row instead of per cycle. So the two totals can
 // differ by satang; `reconciliation` reports both so the UI can say so
 // instead of one silently winning.
-import { resolveStorageRateForLine } from './billingRateCalc.js';
+import { isSlowFreezeRate, resolveStorageRateForLine } from './billingRateCalc.js';
 
 export const STATEMENT_THEME = { NAVY: 'NAVY', LIGHT: 'LIGHT' };
 
@@ -221,10 +221,6 @@ function compareRows(a, b) {
     || String(a.trackingCode).localeCompare(String(b.trackingCode), 'en', { numeric: true })
     || (a.endDate < b.endDate ? -1 : a.endDate > b.endDate ? 1 : 0)
     || Number(a.isBalance) - Number(b.isBalance);
-}
-
-function isSlowFreezeRate(rate) {
-  return /slow\s*freeze|ปรับอุณหภูมิ/i.test(`${rate?.service_type ?? ''} ${rate?.note ?? ''}`);
 }
 
 function serviceLabel(rate) {

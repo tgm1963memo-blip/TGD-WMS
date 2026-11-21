@@ -323,6 +323,16 @@ export function generateLotBillingCycles({ receiptDate, periodDays, billedThroug
   return cycles;
 }
 
+// Slow Freeze (ปรับอุณหภูมิ) is a per-request service the customer ticks on
+// the deposit request, billed per kg of that request's received weight. Its
+// rate is set up with a free-text service type / note, so it's recognised by
+// name. A request ticked for it is NOT also charged the Blast Freeze
+// (FREEZING) fee -- its lots are Freeze & Frozen too, but go through the
+// slow-freeze process instead.
+export function isSlowFreezeRate(rate) {
+  return /slow\s*freeze|ปรับอุณหภูมิ/i.test(`${rate?.service_type ?? ''} ${rate?.note ?? ''}`);
+}
+
 // Turns a customer's selected per-request auxiliary services (container
 // reefer plug-in, overnight labor, etc. — see
 // tgd_customer_deposit_request_services / tgd_customer_withdrawal_request_services)
@@ -488,7 +498,25 @@ export function bangkokDateOf(iso) {
   return new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
-export const OVERTIME_SERVICE_TYPE_BY_KIND = { WORKDAY: 'OVERTIME', HOLIDAY: 'OVERTIME_HOLIDAY' };
+// From November 2026 the storage cycle of a deposit is anchored to the day
+// the goods PHYSICALLY arrived (receiving_started_at, else
+// receiving_finished_at, in Bangkok time) instead of the day the admin
+// confirmed the receipt -- e.g. CDR-20261114-0002 arrived Sat 14/11 but was
+// confirmed Mon 16/11. Deposits physically received before the cutoff keep
+// the confirmed-date anchor so already-issued invoices (Oct and earlier)
+// and the cycle grids they started stay exactly as billed.
+export const PHYSICAL_RECEIPT_ANCHOR_FROM = '2026-11-01';
+
+export function resolveStorageReceiptDate(confirmedDate, { receivingStartedAt = null, receivingFinishedAt = null } = {}) {
+  const physical = bangkokDateOf(receivingStartedAt ?? receivingFinishedAt);
+  if (!physical || physical < PHYSICAL_RECEIPT_ANCHOR_FROM) return confirmedDate ?? null;
+  // Receipt can't be physically after its own confirmation -- treat that as
+  // bad data and keep the confirmed date.
+  if (confirmedDate && physical > confirmedDate) return confirmedDate;
+  return physical;
+}
+
+export const OVERTIME_SERVICE_TYPE_BY_KIND ={ WORKDAY: 'OVERTIME', HOLIDAY: 'OVERTIME_HOLIDAY' };
 
 // OT (ค่าล่วงเวลา) for documents marked "คิด OT" (is_overtime +
 // overtime_type on tgd_customer_deposit_requests /

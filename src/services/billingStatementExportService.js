@@ -5,6 +5,7 @@
 // the two raw attachments the hand-made files carry (Movement Ledger of the
 // period, Stock Report at the cut-off).
 import { supabase } from './supabaseClient.js';
+import { bangkokDateOf } from '../utils/billingRateCalc.js';
 import { getBillingPeriodPreview } from './billingRateEngineService.js';
 import { fetchMergedMovementLedgerRows } from './movementLedgerMergedRows.js';
 import { getCustomerStockBalance } from './customerDepositRequestService.js';
@@ -69,7 +70,7 @@ async function buildStockAttachment({ customerId, customerName, periodEnd, keepR
     r.product_name ?? '',
     r.temperature_type ?? '',
     r.request_no ?? '',
-    r.received_at ? String(r.received_at).split('T')[0] : '',
+    bangkokDateOf(r.received_at) ?? '',
     r.lot_no ?? '',
     r.tracking_code ?? '',
     Number(r.balance_boxes ?? 0),

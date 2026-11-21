@@ -1,4 +1,5 @@
-import { AlertTriangle, RefreshCw, Settings, Warehouse } from 'lucide-react';
+import { AlertTriangle, FileSpreadsheet, RefreshCw, Settings, Warehouse } from 'lucide-react';
+import { exportLocationPalletExcel } from '../../utils/locationPalletExcelUtils.js';
 import { IconLabel } from '../../components/ui/IconLabel.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { useEffect, useState, useMemo } from 'react';
@@ -721,6 +722,17 @@ export function WarehouseLayoutWidget() {
                   <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
                     ใช้ไป {new Set(pallets.map((p) => p.palletNo)).size}/{palletCapacity} pallet
                   </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                  {pallets.length > 0 ? (
+                    <button
+                      type="button"
+                      data-testid="layout-export-location-button"
+                      onClick={() => exportLocationPalletExcel(stockModal.locCode, modalSlotNumbers, pallets, palletCapacity)}
+                      style={{ padding: '5px 12px', border: '1px solid var(--color-success-strong)', borderRadius: 8, background: '#dcfce7', color: 'var(--color-success-strong)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                    >
+                      <IconLabel icon={FileSpreadsheet} size={13} gap={4}>Export Excel</IconLabel>
+                    </button>
+                  ) : null}
                   {canResetLocations && pallets.length > 0 ? (
                     <button
                       type="button"
@@ -732,6 +744,7 @@ export function WarehouseLayoutWidget() {
                       {resetting ? 'กำลัง reset...' : 'Reset location'}
                     </button>
                   ) : null}
+                  </div>
                 </div>
                 {resetMsg ? (
                   <div role="status" style={{ fontSize: 12.5, marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: resetMsg.type === 'ok' ? '#dcfce7' : 'var(--color-danger-tint)', color: resetMsg.type === 'ok' ? 'var(--color-success-strong)' : '#b91c1c' }}>

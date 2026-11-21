@@ -19,6 +19,7 @@ import {
   reviewCustomerWithdrawalRequest,
   setWithdrawalConfirmedDispatchDate,
   cancelCustomerWithdrawalRequest,
+  adminRecallWithdrawalToSubmitted,
   enqueueCustomerWithdrawalNotification,
   recordWithdrawalLinePick,
   updateWithdrawalLineAdminNote,
@@ -78,6 +79,7 @@ const TIMELINE_ACTION_LABELS = {
   REVIEW_CONFIRM_DISPATCH: 'ยืนยันจ่ายออก',
   ADMIN_ADD_LINE: 'เพิ่มรายการสินค้า (Admin)',
   ADMIN_RECALL_COMPLETED: 'เรียกคืนเอกสารที่เสร็จสิ้นแล้ว',
+  ADMIN_RECALL_TO_SUBMITTED: 'ถอยกลับเป็นลูกค้าส่ง',
   SET_OVERTIME: 'แก้ไข OT',
   SET_VEHICLE_REGISTRATION: 'แก้ไขทะเบียนรถ',
 };
@@ -164,6 +166,8 @@ export function CustomerAdminWithdrawalReviewPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelComment, setCancelComment] = useState('');
+  const [recallOpen, setRecallOpen] = useState(false);
+  const [recallComment, setRecallComment] = useState('');
   const [confirmDateOpen, setConfirmDateOpen] = useState(false);
   const [confirmDate, setConfirmDate] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -234,6 +238,7 @@ export function CustomerAdminWithdrawalReviewPage() {
         (row.withdrawal_no || '').toLowerCase().includes(lower) ||
         (row.status || '').toLowerCase().includes(lower) ||
         (row.delivery_type || '').toLowerCase().includes(lower) ||
+        (row.note || '').toLowerCase().includes(lower) ||
         (row.pickup_contact || '').toLowerCase().includes(lower) ||
         (row.destination || '').toLowerCase().includes(lower) ||
         (custName || '').toLowerCase().includes(lower)
@@ -679,6 +684,15 @@ export function CustomerAdminWithdrawalReviewPage() {
   // side). canCancel already covers every one of those later statuses, so
   // narrowing this doesn't remove any capability.
   const canReject = canWrite && selected && ['SUBMITTED_BY_CUSTOMER', 'ADMIN_REVIEWING'].includes(selected.status);
+  // Mirrors tgd_admin_recall_withdrawal_to_submitted's guards: allowed
+  // until real warehouse work exists (a pick or a started dispatch time).
+  // Picking documents / allocations are checked server-side only.
+  const recallBlockedReason = lines.some((l) => l.picked_boxes != null || l.picked_weight != null || l.picked_at != null)
+    ? 'มีการหยิบสินค้าแล้ว ถอยสถานะไม่ได้'
+    : selected?.dispatch_started_at
+      ? 'เริ่มบันทึกเวลาจ่ายสินค้าแล้ว ถอยสถานะไม่ได้'
+      : '';
+  const canRecallToSubmitted = canWrite && selected && ['ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'].includes(selected.status);
   const canCancel = canWrite && selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
 
   async function handleRecordDispatchTime(phase, atOverride) {
@@ -938,6 +952,26 @@ export function CustomerAdminWithdrawalReviewPage() {
     setCancelComment('');
   }
 
+  async function handleRecallToSubmitted() {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    const result = await adminRecallWithdrawalToSubmitted(selectedId, recallComment || null);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message ?? 'ถอยสถานะไม่สำเร็จ');
+      return;
+    }
+    const newStatus = result.data?.status ?? 'SUBMITTED_BY_CUSTOMER';
+    setActionMsg('ถอยกลับเป็นสถานะลูกค้าส่งแล้ว');
+    setRows((prev) => prev.map((r) => (r.id === selectedId
+      ? { ...r, status: newStatus, reviewed_by_email: null, reviewed_at: null, confirmed_dispatch_date: null, confirmed_dispatch_by_email: null, confirmed_dispatch_at: null }
+      : r)));
+    await refreshLines(selectedId);
+    setRecallOpen(false);
+    setRecallComment('');
+  }
+
   async function handleSaveRecount() {
     if (!recountLine) return;
     setRecounting(true);
@@ -1169,7 +1203,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                 <th onClick={() => requestSort('customer_id')} style={{ cursor: 'pointer' }}>ลูกค้า {getSortIndicator('customer_id')}</th>
                 <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>{t('customer_col_status')} {getSortIndicator('status')}</th>
                 <th>{t('customer_field_requested_dispatch_date')}</th>
-                <th>{t('customer_field_delivery_type')}</th>
+                <th>{t('customer_field_note')}</th>
                 <th>{t('catalog_col_actions')}</th>
               </tr>
             </thead>
@@ -1197,7 +1231,7 @@ export function CustomerAdminWithdrawalReviewPage() {
                     </span>
                   </td>
                   <td className="cell-nowrap">{formatDocumentDate(row.requested_dispatch_date, { dateOnly: true })}</td>
-                  <td>{row.delivery_type ?? '-'}</td>
+                  <td style={{ maxWidth: 280, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{row.note?.trim() || '-'}</td>
                   <td>
                     <button
                       className="btn btn-primary btn-sm"
@@ -1270,6 +1304,18 @@ export function CustomerAdminWithdrawalReviewPage() {
                 {t('admin_reject_request')}
               </button>
             ) : null}
+            {canRecallToSubmitted ? (
+              <button
+                className="btn btn-secondary"
+                data-testid="btn-recall-withdrawal-to-submitted"
+                disabled={submitting || Boolean(recallBlockedReason)}
+                onClick={() => { setRecallComment(''); setRecallOpen(true); }}
+                title={recallBlockedReason}
+                type="button"
+              >
+                ถอยกลับเป็นลูกค้าส่ง
+              </button>
+            ) : null}
             {canCancel ? (
               <button
                 className="btn btn-secondary"
@@ -1331,8 +1377,8 @@ export function CustomerAdminWithdrawalReviewPage() {
                 ) : null}
               </div>
               <div>
-                <div className="form-label">{t('customer_field_delivery_type')}</div>
-                <div>{selected.delivery_type ?? '-'}</div>
+                <div className="form-label">{t('customer_field_note')}</div>
+                <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{selected.note?.trim() || '-'}</div>
               </div>
               <div>
                 <div className="form-label">{t('customer_field_pickup_contact')}</div>
@@ -1953,6 +1999,39 @@ export function CustomerAdminWithdrawalReviewPage() {
             value={cancelComment}
             onChange={(e) => setCancelComment(e.target.value)}
             placeholder="ระบุสาเหตุการยกเลิก..."
+          />
+        </label>
+      </Modal>
+
+      {/* Recall-to-submitted modal */}
+      <Modal
+        isOpen={recallOpen}
+        onClose={() => setRecallOpen(false)}
+        title="ถอยกลับเป็นลูกค้าส่ง"
+        size="sm"
+        footer={(
+          <div className="action-row">
+            <button className="btn btn-primary" data-testid="btn-confirm-recall-to-submitted" disabled={submitting} onClick={handleRecallToSubmitted} type="button">
+              {submitting ? '...' : 'ยืนยันถอยสถานะ'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setRecallOpen(false)} type="button">
+              {t('cancel')}
+            </button>
+          </div>
+        )}
+      >
+        <p style={{ marginTop: 0 }}>
+          ใบเบิก {selected?.withdrawal_no} จะกลับไปเป็นสถานะ "ลูกค้าส่งแล้ว" การอนุมัติและวันส่งที่ยืนยันไว้จะถูกล้าง
+          ต้องรีวิวและอนุมัติใหม่อีกครั้ง (ระบบจะส่งอีเมลแจ้งอนุมัติถึงลูกค้าอีกรอบเมื่ออนุมัติใหม่)
+        </p>
+        <label className="form-field">
+          <span>หมายเหตุ (ไม่บังคับ)</span>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={recallComment}
+            onChange={(e) => setRecallComment(e.target.value)}
+            placeholder="ระบุสาเหตุที่ถอยสถานะ..."
           />
         </label>
       </Modal>

@@ -10,6 +10,7 @@ import { listCustomerProducts } from '../../services/customerProductCatalogServi
 import { CustomerDepositDetailModal } from '../../components/customer/CustomerDepositDetailModal.jsx';
 import { downloadExcelWorkbookMultiSheet } from '../../utils/excelFileUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
+import { bangkokDateOf } from '../../utils/billingRateCalc.js';
 import { getTemperatureTypeShortLabel, toStockBalanceTemperatureType } from '../../utils/temperatureTypeLabels.js';
 import { splitBalanceByLocation, UNASSIGNED_LOCATION_LABEL } from '../../utils/stockBalanceExportUtils.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
@@ -36,7 +37,7 @@ function balanceLineFields(line, customerLabel) {
     'ชื่อสินค้า': line.product_name ?? '-',
     'อุณหภูมิ': toStockBalanceTemperatureType(line.temperature_type) ?? '-',
     'เลขที่ใบฝาก': line.request?.request_no ?? '-',
-    'วันที่รับเข้า': (line.request?.last_action_at ?? line.request?.expected_arrival_date ?? '').slice(0, 10) || '-',
+    'วันที่รับเข้า': bangkokDateOf(line.request?.last_action_at ?? line.request?.expected_arrival_date) || '-',
     'LOT': line.lot_no ?? '-',
     'รหัสติดตาม': line.tracking_code ?? '-',
   };
