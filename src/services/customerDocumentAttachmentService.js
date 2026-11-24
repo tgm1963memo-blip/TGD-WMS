@@ -24,6 +24,7 @@ export async function uploadCustomerDocumentAttachments({
   files,
   uploadedByUserId = null,
   uploadedByEmail = null,
+  photoCategory = null,
 } = {}) {
   if (!supabase) return missingSupabaseClientResult();
   if (!documentType || !documentId || !customerId) {
@@ -68,6 +69,9 @@ export async function uploadCustomerDocumentAttachments({
         uploaded_by_email: uploadedByEmail,
         uploaded_at: new Date().toISOString(),
         status: 'ACTIVE',
+        // Only sent when given, so callers that never use it keep working
+        // even on a database without the photo_category column.
+        ...(photoCategory ? { photo_category: photoCategory } : {}),
       })
       .select()
       .single();
@@ -145,6 +149,41 @@ export function describeAttachmentUploader(attachment) {
 // Receiving photos are keyed by deposit request LINE id (see migration
 // 20261007100000_deposit_receiving_photos.sql).
 export const DEPOSIT_RECEIVING_PHOTO_DOCUMENT_TYPE = 'CUSTOMER_DEPOSIT_RECEIVING_PHOTO';
+
+// Dispatch confirmation photos are keyed by WITHDRAWAL REQUEST id (see
+// migration 20261124100000_withdrawal_dispatch_photos.sql). Goods on the
+// truck is required before the handheld can close loading.
+export const WITHDRAWAL_DISPATCH_PHOTO_DOCUMENT_TYPE = 'CUSTOMER_WITHDRAWAL_DISPATCH_PHOTO';
+export const DISPATCH_PHOTO_CATEGORIES = [
+  { key: 'GOODS_ON_TRUCK', label: 'สินค้าบนรถ', required: true },
+  { key: 'VEHICLE_PLATE', label: 'ทะเบียนรถ / หมายเลขตู้', required: false },
+  { key: 'SEAL_DOCUMENT', label: 'ซีล / ใบส่งของที่เซ็นแล้ว', required: false },
+];
+
+export function dispatchPhotoCategoryLabel(key) {
+  return DISPATCH_PHOTO_CATEGORIES.find((c) => c.key === key)?.label ?? 'รูปยืนยันการส่ง';
+}
+
+export function hasRequiredDispatchPhotos(photos = []) {
+  return DISPATCH_PHOTO_CATEGORIES
+    .filter((c) => c.required)
+    .every((c) => photos.some((p) => p.photo_category === c.key));
+}
+
+export async function listWithdrawalDispatchPhotos(withdrawalRequestId) {
+  if (!supabase) return missingSupabaseClientResult();
+  if (!withdrawalRequestId) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('tgd_customer_document_attachments')
+    .select('id, document_type, document_id, customer_id, file_name, file_mime_type, storage_bucket, storage_path, uploaded_by_email, uploaded_at, status, created_at, photo_category')
+    .eq('document_type', WITHDRAWAL_DISPATCH_PHOTO_DOCUMENT_TYPE)
+    .eq('document_id', withdrawalRequestId)
+    .eq('status', 'ACTIVE')
+    .order('created_at', { ascending: true });
+
+  return { data: data ?? [], error };
+}
 
 export async function listCustomerDocumentAttachmentsForDocuments(documentType, documentIds) {
   if (!supabase) return missingSupabaseClientResult();

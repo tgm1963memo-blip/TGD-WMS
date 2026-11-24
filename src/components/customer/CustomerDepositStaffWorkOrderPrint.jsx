@@ -2,6 +2,7 @@ import QRCode from 'react-qr-code';
 import { getDefaultDocumentBranding, normalizeDocumentBrandingConfig } from '../../config/documentBrandingConfig.js';
 import { getTranslation } from '../../i18n/translationCatalog.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
+import { useTransportInfo } from '../../hooks/useTransportInfo.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 
@@ -63,6 +64,7 @@ function CustomerDepositStaffWorkOrderPrintPage({
   branding,
   copyType,
 }) {
+  const transport = useTransportInfo('CUSTOMER_DEPOSIT_REQUEST', header);
   if (!header) return null;
 
   const t = (key) => getTranslation(key, language);
@@ -185,7 +187,11 @@ function CustomerDepositStaffWorkOrderPrintPage({
             <td style={META_KEY}>TRUCK & CONTAINER NO</td>
             <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
             <td style={META_KEY}>SEAL NO</td>
-            <td style={META_VAL}>{fmt(header.seal_no)}</td>
+            <td style={META_VAL}>{fmt(transport?.seal_no)}</td>
+          </tr>
+          <tr>
+            <td style={META_KEY}>DRIVER</td>
+            <td style={META_VAL} colSpan={3}>{fmt(transport?.driver_name)}</td>
           </tr>
           <tr>
             <td style={META_KEY}>RECEIVE FROM</td>

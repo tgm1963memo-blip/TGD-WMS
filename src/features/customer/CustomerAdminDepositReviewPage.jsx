@@ -27,7 +27,7 @@ import {
   setDepositOvertime,
   setDepositVehicleRegistration,
 } from '../../services/customerDepositRequestService.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, TransportInfoControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -834,6 +834,12 @@ export function CustomerAdminDepositReviewPage() {
                 setByEmail={selected.vehicle_registration_set_by_email}
                 canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
                 onSave={handleSaveVehicleRegistration}
+              />
+              <TransportInfoControl
+                key={`transport-${selected.id}`}
+                documentType="CUSTOMER_DEPOSIT_REQUEST"
+                requestId={selected.id}
+                canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
               />
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>

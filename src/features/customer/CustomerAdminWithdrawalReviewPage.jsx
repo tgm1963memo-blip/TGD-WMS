@@ -38,7 +38,8 @@ import {
 import { listCustomerProducts, listR3CarcassTypes } from '../../services/customerProductCatalogService.js';
 import { WithdrawalR3PermitPanel } from '../../components/customer/WithdrawalR3PermitPanel.jsx';
 import { buildCatalogR3Map } from '../../utils/r3PermitComparisonUtils.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, TransportInfoControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { DispatchPhotoGallery } from '../../components/customer/DispatchPhotoGallery.jsx';
 import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -1393,6 +1394,12 @@ export function CustomerAdminWithdrawalReviewPage() {
                 canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
                 onSave={handleSaveVehicleRegistration}
               />
+              <TransportInfoControl
+                key={`transport-${selected.id}`}
+                documentType="CUSTOMER_WITHDRAWAL_REQUEST"
+                requestId={selected.id}
+                canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
+              />
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 {canWrite && !['CANCELLED', 'ADMIN_REJECTED'].includes(selected.status) ? (
@@ -1429,6 +1436,11 @@ export function CustomerAdminWithdrawalReviewPage() {
                 onRecordFinish={() => handleRecordDispatchTime('FINISH')}
                 onEditStart={(iso) => handleRecordDispatchTime('START', iso)}
                 onEditFinish={(iso) => handleRecordDispatchTime('FINISH', iso)}
+              />
+              <DispatchPhotoGallery
+                key={`dispatch-photos-${selected.id}`}
+                withdrawalRequestId={selected.id}
+                dispatchFinishedAt={selected.dispatch_finished_at}
               />
               <WorkPhaseTemperatureControl
                 canWrite={canWrite}

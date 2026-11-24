@@ -46,6 +46,7 @@ import {
   setWithdrawalOvertime,
 } from '../../services/customerWithdrawalRequestService.js';
 import { DocumentTimerCard } from './DocumentTimerCard.jsx';
+import { DispatchConfirmSheet } from './DispatchConfirmSheet.jsx';
 import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
 import { StockCountWorkflow } from './StockCountWorkflow.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
@@ -1221,6 +1222,8 @@ function ReceivingWorkflow({ onBack, t }) {
 
 // ── Picking workflow ──────────────────────────────────────────
 function PickingWorkflow({ onBack, t }) {
+  // "ขึ้นของเสร็จ" photo + driver step shown before loading can be closed.
+  const [dispatchConfirmOpen, setDispatchConfirmOpen] = useState(false);
   const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -1672,10 +1675,7 @@ function PickingWorkflow({ onBack, t }) {
           const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
         }}
-        onFinish={async () => {
-          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
-          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
-        }}
+        onFinish={async () => { setDispatchConfirmOpen(true); }}
         onEditStart={async (iso) => {
           const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { at: iso, actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
@@ -1701,6 +1701,19 @@ function PickingWorkflow({ onBack, t }) {
           return { error };
         }}
       />
+      {dispatchConfirmOpen && (
+        <DispatchConfirmSheet
+          doc={selectedDoc}
+          activeProfile={activeProfile}
+          onClose={() => setDispatchConfirmOpen(false)}
+          onFinish={async () => {
+            const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
+            if (error) return false;
+            setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
+            return true;
+          }}
+        />
+      )}
 
       {lines.length > 0 && (
         <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>

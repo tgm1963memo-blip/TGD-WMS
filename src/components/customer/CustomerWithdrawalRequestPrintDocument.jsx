@@ -4,6 +4,7 @@ import { getTranslation } from '../../i18n/translationCatalog.js';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
 import { R3_STATUS, compareR3Permit } from '../../utils/r3PermitComparisonUtils.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
+import { useTransportInfo } from '../../hooks/useTransportInfo.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 // overflow-wrap/word-break alone don't guarantee a break point in long,
@@ -85,6 +86,7 @@ function CustomerWithdrawalRequestPrintDocumentPage({
   r3CarcassTypes = null,
   r3CatalogMap = null,
 }) {
+  const transport = useTransportInfo('CUSTOMER_WITHDRAWAL_REQUEST', header);
   if (!header) return null;
 
   const t = (key) => getTranslation(key, language);
@@ -262,6 +264,12 @@ function CustomerWithdrawalRequestPrintDocumentPage({
               <td style={META_VAL}>{fmt(header.vehicle_registration)}</td>
               <td style={META_KEY}>PICKUP CONTACT</td>
               <td style={META_VAL}>{fmt(header.pickup_contact)}</td>
+            </tr>
+            <tr>
+              <td style={META_KEY}>SEAL NO</td>
+              <td style={META_VAL}>{fmt(transport?.seal_no)}</td>
+              <td style={META_KEY}>DRIVER</td>
+              <td style={META_VAL}>{fmt(transport?.driver_name)}</td>
             </tr>
             <tr>
               <td style={META_KEY}>TRUCK TEMP</td>

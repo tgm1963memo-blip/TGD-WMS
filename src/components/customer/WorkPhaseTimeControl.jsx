@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { listAllProductServiceRates } from '../../services/productServiceRatesService.js';
 import { computeOvertimePoolLines } from '../../utils/billingRateCalc.js';
 import { listOvertimeFlaggedDocuments } from '../../services/billingRateEngineService.js';
+import { getDocumentTransportInfo, setDocumentTransportInfo } from '../../services/transportInfoService.js';
 import {
   combineDateAndEditedTime,
   formatDateYYYYMMDD,
@@ -282,6 +283,94 @@ export function VehicleRegistrationControl({ label, value, r3Plate, hasR3, setBy
         style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
       />
       {draftMismatch ? <R3PlateWarning r3Plate={r3Plate} /> : null}
+      <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
+        บันทึก
+      </button>
+    </CompactFieldCell>
+  );
+}
+
+// "เลขซีล / ผู้ขับรถ" cell — seal number and the receiving driver's name,
+// recorded by staff. Loads its own values (see transportInfoService.js) so
+// the parent page needs no extra columns. documentType is
+// CUSTOMER_DEPOSIT_REQUEST or CUSTOMER_WITHDRAWAL_REQUEST.
+export function TransportInfoControl({ documentType, requestId, canWrite, onSaved }) {
+  const [info, setInfo] = useState(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftSeal, setDraftSeal] = useState('');
+  const [draftDriver, setDraftDriver] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let current = true;
+    setInfo(null);
+    getDocumentTransportInfo(documentType, requestId).then((result) => {
+      if (!current) return;
+      setUnavailable(Boolean(result.unavailable));
+      setInfo(result.data ?? null);
+    });
+    return () => { current = false; };
+  }, [documentType, requestId]);
+
+  function openEdit() {
+    setDraftSeal(info?.seal_no ?? '');
+    setDraftDriver(info?.driver_name ?? '');
+    setError('');
+    setEditing(true);
+  }
+
+  async function save() {
+    setBusy(true);
+    setError('');
+    const { data, error: err } = await setDocumentTransportInfo(documentType, requestId, { sealNo: draftSeal, driverName: draftDriver });
+    setBusy(false);
+    if (err) { setError(err.message ?? 'บันทึกไม่สำเร็จ'); return; }
+    const next = { seal_no: data?.seal_no ?? null, driver_name: data?.driver_name ?? null, transport_info_set_by_email: data?.by_email ?? null, transport_info_set_at: data?.at ?? null };
+    setInfo(next);
+    setEditing(false);
+    onSaved?.(next);
+  }
+
+  const valueNode = info
+    ? (
+      <span data-testid="transport-info-value">
+        ซีล {info.seal_no || '-'} · ผู้ขับ {info.driver_name || '-'}
+      </span>
+    )
+    : '...';
+
+  return (
+    <CompactFieldCell
+      label="เลขซีล / ผู้ขับรถ"
+      valueNode={valueNode}
+      byline={unavailable
+        ? <div>ยังไม่ได้เปิดใช้ในฐานข้อมูล</div>
+        : (info?.transport_info_set_by_email ? <div>บันทึกโดย {info.transport_info_set_by_email}</div> : null)}
+      canWrite={canWrite && !unavailable}
+      editing={editing}
+      onToggleEdit={() => (editing ? setEditing(false) : openEdit())}
+    >
+      <input
+        type="text"
+        value={draftSeal}
+        onChange={(e) => setDraftSeal(e.target.value)}
+        placeholder="เลขซีล (ถ้ามี)"
+        aria-label="เลขซีล"
+        data-testid="transport-seal-input"
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+      />
+      <input
+        type="text"
+        value={draftDriver}
+        onChange={(e) => setDraftDriver(e.target.value)}
+        placeholder="ชื่อผู้ขับรถ"
+        aria-label="ชื่อผู้ขับรถ"
+        data-testid="transport-driver-input"
+        style={{ font: 'inherit', fontSize: 12, padding: '5px 6px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+      />
+      {error ? <div style={{ color: 'var(--color-danger)', fontSize: 12 }}>{error}</div> : null}
       <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={save}>
         บันทึก
       </button>
