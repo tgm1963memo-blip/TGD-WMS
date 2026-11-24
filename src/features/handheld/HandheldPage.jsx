@@ -4,7 +4,16 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { C, Pill, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
-import { printSticker } from '../../utils/stickerPrint.jsx';
+import { printSticker, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
+import { useA5StickerPrint } from '../../components/sticker/A5StickerPrint.jsx';
+
+// Shown on the handheld's sticker preview card -- always states the allergen
+// state, unlike the thermal label which prints a warning only when present.
+function describeAllergen(allergen) {
+  if (allergen?.status === 'YES') return `มี: ${allergen.text}`;
+  if (allergen?.status === 'NO') return 'ไม่มี';
+  return 'ไม่ระบุ';
+}
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
 import {
@@ -535,7 +544,8 @@ function ReceivingWorkflow({ onBack, t }) {
       productCode: matchedLine.customer_product_code ?? matchedLine.internal_product_code ?? '',
       storageLabel: getTemperatureTypeShortLabel(matchedLine.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergen: resolveAllergen(catalogMatch),
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       trackingCode: matchedLine.tracking_code ?? '-',
       depositDate: new Date().toISOString(),
       palletWarning,
@@ -849,7 +859,7 @@ function ReceivingWorkflow({ onBack, t }) {
               <div><strong>LOT (ของลูกค้า):</strong> {stickerItem.lotNo || '-'}</div>
               <div><strong>การจัดเก็บ:</strong> {stickerItem.storageLabel || '-'}</div>
               <div><strong>จำนวน:</strong> {stickerItem.quantityLabel || '-'}</div>
-              <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {stickerItem.allergenLabel}</div>
+              <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {describeAllergen(stickerItem.allergen)}</div>
               <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'}</div>
               <div><strong>Location:</strong> {stickerItem.location?.code ? (stickerItem.palletNo ? buildPalletCode(stickerItem.location.code, stickerItem.palletNo) : stickerItem.location.code) : 'ยังไม่ได้เลือก'}</div>
               <div><strong>Tracking Code:</strong> {stickerItem.trackingCode}</div>
@@ -2001,6 +2011,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const a5Print = useA5StickerPrint();
   const [selectedLine, setSelectedLine] = useState(null);
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -2284,6 +2295,30 @@ function LocationUpdateWorkflow({ onBack, t }) {
     handleTrackingScan(trackingInputValue);
   }
 
+  function handlePrintA5(line, event) {
+    event.stopPropagation();
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
+    const allergen = resolveAllergen(catalogMatch);
+    a5Print.requestPrint([{
+      lineId: line.id,
+      boxesPerPallet: catalogMatch?.default_boxes_per_pallet ?? null,
+      baseItem: {
+        depositDate: selectedDoc?.expected_arrival_date,
+        customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
+        productCode: line.customer_product_code ?? line.internal_product_code ?? '',
+        productName: line.product_name,
+        lotNo: line.lot_no,
+        mfgDate: line.mfg_date,
+        expDate: line.exp_date,
+        trackingCode: line.tracking_code ?? '-',
+        lotBoxes: line.actual_boxes ?? line.expected_boxes ?? 0,
+        lotWeight: line.actual_weight ?? line.expected_weight ?? null,
+        allergenStatus: allergen.status,
+        allergenText: allergen.text,
+      },
+    }]);
+  }
+
   function handlePrintSticker(line, event) {
     event.stopPropagation();
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
@@ -2299,7 +2334,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       lotNo: line.lot_no,
       storageLabel: getTemperatureTypeShortLabel(line.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       mfgDate: line.mfg_date,
       locationCode,
       trackingCode: line.tracking_code ?? '-',
@@ -2373,7 +2408,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       lotNo: selectedLine.lot_no,
       storageLabel: getTemperatureTypeShortLabel(selectedLine.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       mfgDate: selectedLine.mfg_date,
       locationCode: buildPalletCode(selectedLocation.code, palletNo),
       trackingCode: selectedLine.tracking_code ?? '-',
@@ -2608,6 +2643,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       >
                         <IconLabel icon={Printer} size={14} gap={4}>พิมพ์สติกเกอร์</IconLabel>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handlePrintA5(l, e)}
+                        disabled={a5Print.busy}
+                        aria-label="พิมพ์สติกเกอร์ A5"
+                        style={{
+                          background: '#fff', color: C.primary, border: `2px solid ${C.primary}`, borderRadius: 10,
+                          padding: '4px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        A5
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2788,6 +2836,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
         </div>
       )}
     </div>
+      {a5Print.dialog}
     </div>
   );
 }

@@ -11,7 +11,8 @@ import { CustomerDepositStaffWorkOrderPrint } from './CustomerDepositStaffWorkOr
 import { getCustomerRequestStatusClass } from './customerRequestStatus.js';
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
-import { printSticker, printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
+import { printSticker, printStickers, StickerPageSizeControl, StickerRotationControl, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
+import { useA5StickerPrint } from '../sticker/A5StickerPrint.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -147,6 +148,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const [allocWarning, setAllocWarning] = useState('');
   const [customerData, setCustomerData] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const a5Print = useA5StickerPrint();
   const [actionMsg, setActionMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -690,10 +692,29 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
       // The sticker only shows a warning line when this is non-empty — the
       // actual allergen substance (e.g. "นม, ถั่ว"), not a bare yes/no, is
       // what a handler actually needs to read on the printed label.
-      allergenLabel: catalogMatch?.allergen || '',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       mfgDate: line.mfg_date,
       locationCode,
       trackingCode: line.tracking_code ?? '-',
+    };
+  }
+
+  // A5 pallet sticker: same fields plus the whole line's quantity, expiry and
+  // the allergen state (always printed on A5, even when there is none).
+  function buildA5Entry(line) {
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
+    const allergen = resolveAllergen(catalogMatch);
+    return {
+      lineId: line.id,
+      boxesPerPallet: catalogMatch?.default_boxes_per_pallet ?? null,
+      baseItem: {
+        ...buildStickerItem(line),
+        lotBoxes: line.actual_boxes ?? line.expected_boxes ?? 0,
+        lotWeight: line.actual_weight ?? line.expected_weight ?? null,
+        expDate: line.exp_date,
+        allergenStatus: allergen.status,
+        allergenText: allergen.text,
+      },
     };
   }
 
@@ -721,6 +742,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
     const items = lines.filter((l) => selectedLineIds.has(l.id)).map(buildStickerItem);
     if (!items.length) return;
     printStickers(items);
+  }
+
+  function handlePrintSelectedA5() {
+    a5Print.requestPrint(lines.filter((l) => selectedLineIds.has(l.id)).map(buildA5Entry));
   }
 
   // Saves ONE pallet allocation for the line being located -- repeatable
@@ -934,6 +959,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   >
                     <IconLabel icon={Printer} size={14} gap={6}>พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
                   </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    disabled={selectedLineIds.size === 0 || a5Print.busy}
+                    onClick={handlePrintSelectedA5}
+                    data-testid="deposit-print-selected-a5"
+                  >
+                    <IconLabel icon={Printer} size={14} gap={6}>พิมพ์ A5 ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
+                  </button>
                 </div>
               </div>
               <div className="responsive-table">
@@ -1136,6 +1170,17 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                               onClick={() => handlePrintSticker(line)}
                             >
                               <Printer size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              title="พิมพ์สติกเกอร์ A5 (1 แผ่นต่อพาเลท)"
+                              aria-label="พิมพ์สติกเกอร์ A5"
+                              style={{ marginLeft: 4, fontWeight: 700 }}
+                              disabled={a5Print.busy}
+                              onClick={() => a5Print.requestPrint([buildA5Entry(line)])}
+                            >
+                              A5
                             </button>
                             {isSystemAdmin ? (
                               <button
@@ -1760,6 +1805,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
           </>
         ) : null}
       </Modal>
+      {a5Print.dialog}
     </>
   );
 }

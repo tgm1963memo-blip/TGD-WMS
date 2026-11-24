@@ -2,6 +2,8 @@ import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { insertSoftBreaks as withSoftBreaks } from './textWrapUtils.js';
+import { buildPalletCode } from './locationCodeUtils.js';
+import { OSWALD_BOLD_SUBSET_WOFF2_DATA_URI } from '../assets/fonts/OswaldBoldSubset.js';
 
 // Simplified label: customer name + date top-right + QR, then just product
 // name/Location/quantity, with the tracking code as the single big, bold
@@ -459,4 +461,227 @@ export function printStickers(items = []) {
   );
   const html = stickerDocumentHtml(sorted.map((item) => renderStickerPageHtml(item)).join('\n'), sorted.length);
   openAndPrintHtml(html, sorted.length);
+}
+
+// ---------------------------------------------------------------------------
+// Allergen state shared by both sticker formats.
+//
+// YES: the product has allergen text on file. NO: the product is in the
+// catalog with no allergen. UNKNOWN: no catalog match, so we cannot say.
+// The thermal label only prints a warning for YES (pass allergenLabel =
+// allergenThermalLabel(...)); the A5 label always states one of the three.
+const NO_ALLERGEN_PATTERN = /^(ไม่มี.*|no|none|n\/a|-|–)$/i;
+
+export function resolveAllergen(catalogMatch) {
+  if (!catalogMatch) return { status: 'UNKNOWN', text: '' };
+  const text = String(catalogMatch.allergen ?? '').trim();
+  if (!text || NO_ALLERGEN_PATTERN.test(text)) return { status: 'NO', text: '' };
+  return { status: 'YES', text };
+}
+
+export function allergenThermalLabel(allergen) {
+  return allergen?.status === 'YES' ? allergen.text : '';
+}
+
+// ---------------------------------------------------------------------------
+// A5 pallet sticker (210 x 148 mm landscape, office printer).
+//
+// One sheet per pallet: the tracking code as the largest element, then the
+// pallet number n/N, that pallet's location and quantity, lot / MFG / EXP,
+// product code + name, the allergen state and a QR of the tracking code.
+
+function toQty(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatQty(value, digits = 0) {
+  const n = toQty(value);
+  if (n == null) return '-';
+  return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+// baseItem: the line-level sticker fields (tracking code, product, lot...,
+//   lotBoxes / lotWeight = the whole line's quantity).
+// allocations: [{ palletNo, locationCode, boxes, weight }] -- real pallets.
+// manual: { count, boxesPerPallet } -- used only when there are no
+//   allocations yet; boxes are split boxesPerPallet at a time and the last
+//   sheet takes the remainder, weight follows the line's average per box.
+export function buildPalletStickerItems(baseItem, allocations = [], manual = null) {
+  const real = [...(allocations ?? [])].sort((a, b) => Number(a.palletNo) - Number(b.palletNo));
+  if (real.length > 0) {
+    return real.map((a, i) => ({
+      ...baseItem,
+      palletIndex: i + 1,
+      palletTotal: real.length,
+      locationCode: a.locationCode ? buildPalletCode(a.locationCode, a.palletNo) : '-',
+      boxes: toQty(a.boxes),
+      weight: toQty(a.weight),
+    }));
+  }
+
+  const count = Math.max(1, Math.floor(Number(manual?.count) || 1));
+  const lotBoxes = toQty(baseItem.lotBoxes) ?? 0;
+  const lotWeight = toQty(baseItem.lotWeight);
+  const perPallet = Math.max(1, Math.floor(Number(manual?.boxesPerPallet) || Math.ceil(lotBoxes / count) || 1));
+  const weightPerBox = lotWeight != null && lotBoxes > 0 ? lotWeight / lotBoxes : null;
+  let left = lotBoxes;
+  return Array.from({ length: count }, (_, i) => {
+    const boxes = i < count - 1 ? Math.min(perPallet, Math.max(0, left)) : Math.max(0, left);
+    left -= boxes;
+    return {
+      ...baseItem,
+      palletIndex: i + 1,
+      palletTotal: count,
+      locationCode: '-',
+      boxes,
+      weight: weightPerBox != null ? Math.round(boxes * weightPerBox * 100) / 100 : null,
+    };
+  });
+}
+
+// Default pallet count for an unplaced lot: boxes / the product's usual
+// boxes per pallet, rounded up.
+export function suggestPalletCount(lotBoxes, boxesPerPallet) {
+  const boxes = Number(lotBoxes) || 0;
+  const per = Number(boxesPerPallet) || 0;
+  if (boxes <= 0 || per <= 0) return 1;
+  return Math.max(1, Math.ceil(boxes / per));
+}
+
+const WARN_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5M12 18v.5"/></svg>';
+
+function renderAllergenBadge(status, text) {
+  if (status === 'YES') return `<span class="a5-alg yes">${WARN_ICON_SVG}<span>มีสารก่อภูมิแพ้: ${withSoftBreaks(text)}</span></span>`;
+  if (status === 'NO') return '<span class="a5-alg">ไม่มีสารก่อภูมิแพ้</span>';
+  return '<span class="a5-alg">ไม่ระบุสารก่อภูมิแพ้</span>';
+}
+
+function renderA5StickerPageHtml(item) {
+  const qrSvg = renderToStaticMarkup(<QRCode value={item.trackingCode || ''} size={128} style={{ width: '100%', height: 'auto' }} />);
+  const unit = item.unitLabel || 'กล่อง';
+  const weight = toQty(item.weight);
+  const lotWeight = toQty(item.lotWeight);
+  return `<div class="a5-page">
+  <div class="a5">
+    <div class="a5-top">
+      <div class="a5-cust">${item.customerName || '-'}</div>
+      <div class="a5-date">วันที่รับเข้า<b>${formatStickerDate(item.depositDate)}</b></div>
+    </div>
+    <div class="a5-mid"><div class="a5-fr fit">${item.trackingCode || '-'}</div></div>
+    <div class="a5-facts">
+      <div class="a5-pal"><span class="a5-lbl">พาเลท</span><div class="a5-v">${item.palletIndex ?? 1} / ${item.palletTotal ?? 1}</div></div>
+      <div class="a5-loc"><span class="a5-lbl">Location</span><div class="a5-v fit">${item.locationCode || '-'}</div></div>
+      <div class="a5-qty"><span class="a5-lbl">จำนวน (พาเลทนี้)</span><div class="a5-qtyv">
+        <div class="a5-v">${formatQty(item.boxes)} ${unit}${weight != null ? `<span>/ ${formatQty(weight, 2)} กก.</span>` : ''}</div>
+        <small>ทั้ง lot ${formatQty(item.lotBoxes)} ${unit}${lotWeight != null ? ` / ${formatQty(lotWeight, 2)} กก.` : ''}</small>
+      </div></div>
+    </div>
+    <div class="a5-lower">
+      <div>
+        <div class="a5-bot">
+          <div>Lot ลูกค้า<br><b>${withSoftBreaks(item.lotNo) || '-'}</b></div>
+          <div>วันผลิต (MFG)<br><b>${formatStickerDate(item.mfgDate)}</b></div>
+          <div>วันหมดอายุ (EXP)<br><b class="a5-exp">${formatStickerDate(item.expDate)}</b></div>
+        </div>
+        <div class="a5-prod">
+          ${item.productCode ? `<span class="a5-code">${withSoftBreaks(item.productCode)}</span>` : ''}
+          <span class="a5-name">${item.productName || '-'}</span>
+          ${renderAllergenBadge(item.allergenStatus, item.allergenText)}
+        </div>
+      </div>
+      <div class="a5-qr">${qrSvg}</div>
+    </div>
+  </div>
+</div>`;
+}
+
+// Shrinks every .fit element until it fits its box, after fonts load. Runs
+// inside the print popup before print() fires (openAndPrintHtml waits at
+// least 500 ms), so an unusually long code never runs off the sheet.
+const FIT_TEXT_SCRIPT = `<script>
+(function () {
+  function fit() {
+    document.querySelectorAll('.fit').forEach(function (el) {
+      var size = parseFloat(getComputedStyle(el).fontSize);
+      var box = el.parentElement;
+      var guard = 0;
+      while ((el.scrollWidth > box.clientWidth - 2 || el.offsetHeight > box.clientHeight - 2) && size > 8 && guard < 120) {
+        size -= 1; el.style.fontSize = size + 'px'; guard += 1;
+      }
+    });
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit); else window.addEventListener('load', fit);
+})();
+</script>`;
+
+function a5DocumentHtml(pagesHtml) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sticker A5</title>
+<style>
+  @font-face { font-family: 'TGD Code'; font-weight: 700; src: url(${OSWALD_BOLD_SUBSET_WOFF2_DATA_URI}) format('woff2'); }
+  @page { size: A5 landscape; margin: 6mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Thai-capable fonts first -- same reasoning as the thermal sticker above. */
+  body { font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
+  .a5-page { width: 198mm; height: 136mm; margin: 0 auto 6mm; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
+  .a5-page:last-child { page-break-after: auto; break-after: auto; }
+  .a5 { width: 100%; height: 100%; border: 0.7mm solid #000; border-radius: 3mm; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; overflow: hidden; }
+  .a5-top { display: flex; justify-content: space-between; align-items: center; gap: 4mm; padding: 2.5mm 5mm 2mm; border-bottom: 0.7mm solid #000; }
+  .a5-cust { font-size: 5mm; font-weight: 700; line-height: 1.25; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
+  .a5-date { font-size: 3.4mm; text-align: right; line-height: 1.3; white-space: nowrap; }
+  .a5-date b { display: block; font-size: 4.8mm; }
+  .a5-mid { display: grid; place-items: center; padding: 1mm 4mm; border-bottom: 0.7mm solid #000; min-width: 0; overflow: hidden; }
+  .a5-fr { font-family: 'TGD Code', 'Arial Narrow', 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 32mm; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; }
+  .a5-facts { display: grid; grid-template-columns: auto auto minmax(0, 1fr); border-bottom: 0.7mm solid #000; }
+  .a5-facts > div { display: grid; grid-template-rows: auto 1fr; padding: 2mm 4mm; border-right: 0.6mm solid #000; min-width: 0; }
+  .a5-facts > div:last-child { border-right: 0; }
+  .a5-lbl { font-size: 3.4mm; font-weight: 700; line-height: 1.3; }
+  .a5-v { font-weight: 700; line-height: 1.1; align-self: center; white-space: nowrap; }
+  .a5-pal { background: #000; color: #fff; text-align: center; min-width: 43mm; }
+  .a5-pal .a5-v { font-family: 'TGD Code', 'Arial Narrow', sans-serif; font-size: 16mm; }
+  .a5-loc { max-width: 92mm; }
+  .a5-loc .a5-v { font-family: 'TGD Code', 'Arial Narrow', sans-serif; font-size: 14mm; letter-spacing: 0.01em; }
+  .a5-qtyv { align-self: center; }
+  .a5-qty .a5-v { font-size: 11mm; }
+  .a5-qty .a5-v span { display: block; font-size: 6.5mm; }
+  .a5-qty small { display: block; font-size: 3.6mm; font-weight: 700; margin-top: 0.8mm; }
+  .a5-lower { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .a5-bot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4mm; padding: 2mm 5mm; font-size: 3.8mm; line-height: 1.35; border-bottom: 0.7mm solid #000; }
+  .a5-bot b { font-size: 5mm; }
+  .a5-exp { background: #000; color: #fff; padding: 0 1.5mm; border-radius: 0.8mm; }
+  .a5-prod { display: flex; align-items: center; flex-wrap: wrap; gap: 2mm 4mm; padding: 2mm 5mm; }
+  .a5-code { font-size: 5.2mm; font-weight: 700; white-space: nowrap; border: 0.6mm solid #000; border-radius: 1mm; padding: 0 2mm; }
+  .a5-name { font-size: 5.2mm; font-weight: 700; line-height: 1.3; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
+  .a5-alg { display: inline-flex; align-items: center; gap: 1.5mm; font-size: 4.6mm; font-weight: 700; white-space: nowrap; border: 0.6mm solid #000; border-radius: 1mm; padding: 0.4mm 2.4mm; }
+  .a5-alg.yes { background: #000; color: #fff; }
+  .a5-alg svg { width: 5.4mm; height: 5.4mm; flex: none; }
+  .a5-qr { border-left: 0.7mm solid #000; padding: 2.5mm 3mm; display: grid; place-items: center; }
+  .a5-qr svg { width: 28mm; height: 28mm; display: block; }
+  @media screen { body { background: #eee; padding: 6mm 0; } .a5-page { background: #fff; } }
+</style>
+</head>
+<body>
+${pagesHtml}
+${FIT_TEXT_SCRIPT}
+</body>
+</html>`;
+}
+
+export function buildA5StickerDocumentHtml(items = []) {
+  return a5DocumentHtml(items.map((item) => renderA5StickerPageHtml(item)).join('\n'));
+}
+
+// items: output of buildPalletStickerItems (one entry per pallet sheet).
+// Kept in tracking-code then pallet order so a multi-line job comes out
+// grouped by lot, 1/N..N/N.
+export function printA5Stickers(items = []) {
+  if (!items.length) return;
+  const sorted = [...items].sort((a, b) =>
+    String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')) || (a.palletIndex ?? 0) - (b.palletIndex ?? 0),
+  );
+  openAndPrintHtml(buildA5StickerDocumentHtml(sorted), sorted.length);
 }
