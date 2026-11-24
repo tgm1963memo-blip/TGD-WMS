@@ -411,6 +411,8 @@ export async function getDepositInventoryLines(filters = {}) {
       request: headerMap[l.deposit_request_id] ?? null,
       actual_boxes: availableBoxes,
       actual_weight: availableWeight,
+      raw_actual_boxes: rawBoxes,
+      raw_actual_weight: rawWeight,
       claimed_by: claimed.by,
     };
   });

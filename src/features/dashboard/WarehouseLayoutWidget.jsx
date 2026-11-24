@@ -14,6 +14,7 @@ import {
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel, isAisleSide } from '../../utils/locationCodeUtils.js';
+import { UnlocatedStockCard } from './UnlocatedStockCard.jsx';
 
 // Aisle slots (side A) are temporary overflow spots in the forklift aisle,
 // so they get their own amber, dashed look on both views.
@@ -714,6 +715,8 @@ export function WarehouseLayoutWidget() {
             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>+{sections.length - 6} section อื่น</div>
           )}
         </div>
+
+        <UnlocatedStockCard />
 
         <div style={{ flex: 1 }} />
 
