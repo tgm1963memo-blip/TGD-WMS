@@ -43,7 +43,7 @@ import {
 } from '../../services/customerDocumentAttachmentService.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
-import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -299,7 +299,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
   const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })).filter((l) => l.parsed);
   const locZoneOptions = [...new Set(parsedAllLocs.map((l) => l.parsed.room))].sort();
-  const locSideOptions = locZone ? [...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))].sort() : [];
+  const locSideOptions = locZone ? sortSides(new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))) : [];
   const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
   const selectedLocObj = (locZone && locSide && locRow)
     ? (parsedAllLocs.find((l) => l.parsed.room === locZone && l.parsed.side === locSide && l.parsed.row === +locRow) ?? null)
@@ -1713,7 +1713,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   <span>ฝั่ง</span>
                   <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); }} disabled={!locZone}>
                     <option value="">-- เลือกฝั่ง --</option>
-                    {locSideOptions.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                    {locSideOptions.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                   </select>
                 </label>
                 <label className="form-field">

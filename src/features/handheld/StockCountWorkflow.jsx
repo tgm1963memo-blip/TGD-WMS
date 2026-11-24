@@ -15,7 +15,7 @@ import {
   setLocationCountStatus,
   startLocationCount,
 } from '../../services/locationCountService.js';
-import { buildPalletCode, formatRowLabel, parseLocationCode } from '../../utils/locationCodeUtils.js';
+import { buildPalletCode, formatRowLabel, formatSideLabel, parseLocationCode, sortSides } from '../../utils/locationCodeUtils.js';
 import { formatFixed2 } from '../../utils/numberFormat.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 
@@ -198,7 +198,7 @@ export function StockCountWorkflow({ onBack }) {
     .map((l) => ({ ...l, parsed: parseLocationCode(l.code) }))
     .filter((l) => l.parsed), [locations]);
   const zones = useMemo(() => [...new Set(parsedLocations.map((l) => l.parsed.room))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true })), [parsedLocations]);
-  const sides = useMemo(() => [...new Set(parsedLocations.filter((l) => l.parsed.room === zone).map((l) => l.parsed.side))].sort(), [parsedLocations, zone]);
+  const sides = useMemo(() => sortSides(new Set(parsedLocations.filter((l) => l.parsed.room === zone).map((l) => l.parsed.side))), [parsedLocations, zone]);
   const rowsInSide = useMemo(() => parsedLocations
     .filter((l) => l.parsed.room === zone && l.parsed.side === side)
     .sort((a, b) => a.parsed.row - b.parsed.row), [parsedLocations, zone, side]);
@@ -503,7 +503,7 @@ export function StockCountWorkflow({ onBack }) {
                 <div style={{ fontSize: 12, color: C.textSec, fontWeight: 700, marginBottom: 4 }}>ฝั่ง</div>
                 <select value={side} onChange={(e) => setSide(e.target.value)} disabled={!zone} style={selectStyle}>
                   <option value="">— เลือก —</option>
-                  {sides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                  {sides.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                 </select>
               </label>
             </div>

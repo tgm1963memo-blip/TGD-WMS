@@ -41,7 +41,7 @@ import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
 import { StockCountWorkflow } from './StockCountWorkflow.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
-import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -344,7 +344,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
   const availableSides = useMemo(() => {
     if (!locZone) return [];
-    return [...new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))].sort();
+    return sortSides(new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side)));
   }, [parsedLocs, locZone]);
 
   const availableRows = useMemo(() => {
@@ -999,7 +999,7 @@ function ReceivingWorkflow({ onBack, t }) {
                         disabled={!locZone}
                         style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
-                        {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                        {availableSides.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -2051,7 +2051,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
 
   const availableZones = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed).map((l) => l.parsed.room))].sort(), [parsedLocs]);
-  const availableSides = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))].sort(), [parsedLocs, locZone]);
+  const availableSides = useMemo(() => sortSides(new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))), [parsedLocs, locZone]);
   const availableRows = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), [parsedLocs, locZone, locSide]);
 
   useEffect(() => {
@@ -2709,7 +2709,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       disabled={!locZone}
                       style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
-                      {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                      {availableSides.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                     </select>
                   </div>
                   <div>

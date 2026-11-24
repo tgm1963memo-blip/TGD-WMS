@@ -13,7 +13,12 @@ import {
 } from '../../services/warehouseLayoutService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
-import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, isAisleSide } from '../../utils/locationCodeUtils.js';
+
+// Aisle slots (side A) are temporary overflow spots in the forklift aisle,
+// so they get their own amber, dashed look on both views.
+const AISLE_BORDER = '#d08a2c';
+const AISLE_TEXT = '#9a5a00';
 
 // Fill tones (redesign 2026-11): frost = has room, gold → amber → red as a
 // row/section fills up. Status words/icons still carry the meaning.
@@ -62,6 +67,8 @@ function RowBar({ location, onClick }) {
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
   const color = overCapacity ? 'var(--color-danger)' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
+  const isAisle = isAisleSide(parsed?.side);
+  const restBackground = overCapacity ? 'var(--color-danger-soft)' : (isAisle ? 'var(--color-warning-soft)' : 'var(--color-surface)');
 
   return (
     <div
@@ -69,14 +76,15 @@ function RowBar({ location, onClick }) {
       title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
-        borderRadius: 8, border: overCapacity ? '1px solid #fca5a5' : '1px solid var(--color-border-subtle)', cursor: 'pointer',
-        background: overCapacity ? 'var(--color-danger-soft)' : 'var(--color-surface)', transition: 'background 0.15s',
+        borderRadius: 8, cursor: 'pointer',
+        border: overCapacity ? '1px solid #fca5a5' : (isAisle ? `1px dashed ${AISLE_BORDER}` : '1px solid var(--color-border-subtle)'),
+        background: restBackground, transition: 'background 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.background = overCapacity ? 'var(--color-danger-tint)' : 'var(--color-surface-muted)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = overCapacity ? 'var(--color-danger-soft)' : '#fff'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = restBackground; }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color: parsed?.row === 0 ? '#b9660a' : 'var(--color-text-muted)', width: 64, flexShrink: 0 }}>
-        {parsed ? formatRowLabel(parsed.row) : '-'}
+      <span style={{ fontSize: 12, fontWeight: 700, color: isAisle ? AISLE_TEXT : (parsed?.row === 0 ? '#b9660a' : 'var(--color-text-muted)'), width: 72, flexShrink: 0 }}>
+        {parsed ? formatRowLabel(parsed.row, parsed.side) : '-'}
       </span>
       <div style={{ flex: 1, height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
@@ -92,13 +100,14 @@ function SectionGrid({ section, onLocClick }) {
   const { locations } = section;
 
   const bySide = useMemo(() => {
-    const map = { L: [], R: [] };
+    const map = { L: [], R: [], A: [] };
     for (const loc of locations || []) {
       const parsed = parseLocationCode(loc?.location_code);
       if (parsed && map[parsed.side]) map[parsed.side].push({ loc, row: parsed.row });
     }
     map.L.sort((a, b) => a.row - b.row);
     map.R.sort((a, b) => a.row - b.row);
+    map.A.sort((a, b) => a.row - b.row);
     return map;
   }, [locations]);
 
@@ -106,24 +115,22 @@ function SectionGrid({ section, onLocClick }) {
     return <div style={{ textAlign: 'center', padding: 24, color: 'var(--color-text-subtle)', fontSize: 13 }}>Section นี้ยังไม่มี Location</div>;
   }
 
+  const groups = [
+    { side: 'L', title: 'ฝั่งซ้าย (L)', color: 'var(--color-text-subtle)' },
+    { side: 'A', title: 'ทางเดิน (A) · วางชั่วคราว', color: AISLE_TEXT },
+    { side: 'R', title: 'ฝั่งขวา (R)', color: 'var(--color-text-subtle)' },
+  ].filter((g) => bySide[g.side].length > 0);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: bySide.L.length && bySide.R.length ? '1fr 1fr' : '1fr', gap: 20, padding: 16 }}>
-      {bySide.L.length > 0 && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-subtle)', marginBottom: 8 }}>ฝั่งซ้าย (L)</div>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${groups.length || 1}, minmax(0, 1fr))`, gap: 20, padding: 16 }}>
+      {groups.map((g) => (
+        <div key={g.side} data-testid={`list-side-${g.side}`}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: g.color, marginBottom: 8 }}>{g.title}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bySide.L.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
+            {bySide[g.side].map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
           </div>
         </div>
-      )}
-      {bySide.R.length > 0 && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-subtle)', marginBottom: 8 }}>ฝั่งขวา (R)</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bySide.R.map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -167,8 +174,13 @@ function VirtualRow({ location, onClick }) {
   const pct = capacity > 0 ? Math.min(100, (used / capacity) * 100) : 0;
   const color = overCapacity ? 'var(--color-danger)' : pctColor(pct);
   const parsed = parseLocationCode(location.location_code);
-  const isStaging = parsed?.row === 0;
-  const label = parsed ? formatRowLabel(parsed.row) : '-';
+  const isAisle = isAisleSide(parsed?.side);
+  const isStaging = !isAisle && parsed?.row === 0;
+  const label = !parsed ? '-' : (isAisle ? `A-${parsed.row}` : formatRowLabel(parsed.row));
+  const restBorder = overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : (isAisle ? AISLE_BORDER : 'var(--color-border-subtle)'));
+  const restBackground = overCapacity
+    ? 'var(--color-danger-soft)'
+    : ((isStaging || isAisle) ? 'var(--color-warning-soft)' : (used > 0 ? 'var(--color-surface-muted)' : 'var(--color-surface)'));
 
   return (
     <button
@@ -176,17 +188,17 @@ function VirtualRow({ location, onClick }) {
       onClick={() => onClick?.(location.id, location.location_code)}
       title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
       aria-label={`${location.location_code} ${label} ใช้ ${used} จาก ${capacity} pallet`}
-      data-testid="virtual-row"
+      data-testid={isAisle ? 'virtual-aisle-row' : 'virtual-row'}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10, height: 26, padding: '0 8px', width: '100%',
-        border: `1px solid ${overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : 'var(--color-border-subtle)')}`, borderRadius: 6,
-        background: overCapacity ? 'var(--color-danger-soft)' : (isStaging ? 'var(--color-warning-soft)' : (used > 0 ? 'var(--color-surface-muted)' : 'var(--color-surface)')),
+        display: 'flex', alignItems: 'center', gap: isAisle ? 6 : 10, height: 26, padding: '0 8px', width: '100%',
+        border: `1px ${isAisle && !overCapacity ? 'dashed' : 'solid'} ${restBorder}`, borderRadius: 6,
+        background: restBackground,
         cursor: 'pointer', font: 'inherit', textAlign: 'left', boxSizing: 'border-box',
       }}
     >
-      <span style={{ width: 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isStaging ? '#b9660a' : 'var(--color-text-secondary)' }}>{label}</span>
+      <span style={{ width: isAisle ? 38 : 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isAisle ? AISLE_TEXT : (isStaging ? '#b9660a' : 'var(--color-text-secondary)') }}>{label}</span>
       <PalletCells capacity={capacity} used={used} color={color} />
-      <span style={{ width: 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : 'var(--color-text-subtle)' }}>
+      <span style={{ width: isAisle ? 34 : 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : 'var(--color-text-subtle)' }}>
         {used}/{capacity}{overCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
       </span>
     </button>
@@ -197,18 +209,24 @@ function VirtualSectionGrid({ section, onLocClick }) {
   const { locations } = section;
 
   const rows = useMemo(() => {
-    const bySideRow = { L: new Map(), R: new Map() };
+    const bySideRow = { L: new Map(), R: new Map(), A: new Map() };
     for (const loc of locations || []) {
       const parsed = parseLocationCode(loc?.location_code);
       if (parsed && bySideRow[parsed.side]) bySideRow[parsed.side].set(parsed.row, loc);
     }
     // Descending: highest row at the back wall (top) ... row 1, then row 0
-    // (รอจ่าย) last, by the door.
-    const rowNumbers = Array.from(new Set([...bySideRow.L.keys(), ...bySideRow.R.keys()])).sort((a, b) => b - a);
+    // (รอจ่าย) last, by the door. Aisle slot N sits level with row N.
+    const rowNumbers = Array.from(new Set([...bySideRow.L.keys(), ...bySideRow.R.keys(), ...bySideRow.A.keys()])).sort((a, b) => b - a);
     return {
       hasL: bySideRow.L.size > 0,
       hasR: bySideRow.R.size > 0,
-      list: rowNumbers.map((row) => ({ row, left: bySideRow.L.get(row) ?? null, right: bySideRow.R.get(row) ?? null })),
+      hasA: bySideRow.A.size > 0,
+      list: rowNumbers.map((row) => ({
+        row,
+        left: bySideRow.L.get(row) ?? null,
+        right: bySideRow.R.get(row) ?? null,
+        aisle: bySideRow.A.get(row) ?? null,
+      })),
     };
   }, [locations]);
 
@@ -225,7 +243,30 @@ function VirtualSectionGrid({ section, onLocClick }) {
     </div>
   );
 
-  const columns = [rows.hasL ? 'minmax(0, 1fr)' : null, '90px', rows.hasR ? 'minmax(0, 1fr)' : null].filter(Boolean).join(' ');
+  const columns = [rows.hasL ? 'minmax(0, 1fr)' : null, rows.hasA ? '170px' : '90px', rows.hasR ? 'minmax(0, 1fr)' : null].filter(Boolean).join(' ');
+
+  // With aisle slots configured, the aisle column holds one real, clickable
+  // slot per row; otherwise it stays the plain decorative strip.
+  const aisleColumn = rows.hasA ? (
+    <div data-testid="virtual-aisle-column" style={{
+      display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, padding: '0 10px',
+      borderLeft: '2px dashed var(--color-border-strong)', borderRight: '2px dashed var(--color-border-strong)', background: 'var(--color-surface-sunken)',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: AISLE_TEXT, padding: '0 0 2px', textAlign: 'center' }}>ทางเดิน (A)</div>
+      {rows.list.map(({ row, aisle }) => (
+        <VirtualRow key={`A-${row}`} location={aisle} onClick={onLocClick} />
+      ))}
+    </div>
+  ) : (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+      margin: '22px 12px 0', borderLeft: '2px dashed var(--color-border-strong)', borderRight: '2px dashed var(--color-border-strong)', background: 'var(--color-surface-sunken)',
+    }}>
+      <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: '0.1em' }}>
+        ทางเดินรถโฟล์คลิฟท์
+      </span>
+    </div>
+  );
 
   return (
     <div data-testid="virtual-section-grid" style={{ padding: 12 }}>
@@ -234,14 +275,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: columns, gap: 0 }}>
         {rows.hasL ? sideColumn('L') : null}
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
-          margin: '22px 12px 0', borderLeft: '2px dashed var(--color-border-strong)', borderRight: '2px dashed var(--color-border-strong)', background: 'var(--color-surface-sunken)',
-        }}>
-          <span style={{ writingMode: 'vertical-rl', fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', letterSpacing: '0.1em' }}>
-            ทางเดินรถโฟล์คลิฟท์
-          </span>
-        </div>
+        {aisleColumn}
         {rows.hasR ? sideColumn('R') : null}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px minmax(0, 1fr)', alignItems: 'end', marginTop: 8 }}>
@@ -253,7 +287,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
         <div style={{ borderTop: '3px solid var(--color-text-subtle)' }} />
       </div>
       <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>
-        แต่ละช่องเล็ก = 1 pallet · ช่องสีแดงขอบประ = pallet ที่เกินความจุ · คลิกแถวเพื่อดูรายละเอียด pallet
+        แต่ละช่องเล็ก = 1 pallet · ช่องสีแดงขอบประ = pallet ที่เกินความจุ{rows.hasA ? ' · ช่องสีส้มในทางเดิน = วางชั่วคราว' : ''} · คลิกแถวเพื่อดูรายละเอียด pallet
       </div>
     </div>
   );
