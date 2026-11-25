@@ -47,6 +47,7 @@ import {
 } from '../../services/customerWithdrawalRequestService.js';
 import { DocumentTimerCard } from './DocumentTimerCard.jsx';
 import { DispatchConfirmSheet } from './DispatchConfirmSheet.jsx';
+import { TransportInfoCard } from './TransportInfoCard.jsx';
 import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
 import { StockCountWorkflow } from './StockCountWorkflow.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
@@ -786,6 +787,7 @@ function ReceivingWorkflow({ onBack, t }) {
           return { error };
         }}
       />
+      <TransportInfoCard key={`transport-${selectedDoc.id}`} documentType="CUSTOMER_DEPOSIT_REQUEST" requestId={selectedDoc.id} />
 
       {lines.length > 0 && (
         <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>

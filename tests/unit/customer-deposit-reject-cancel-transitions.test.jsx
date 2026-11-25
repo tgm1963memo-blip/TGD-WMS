@@ -1,5 +1,11 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, configure } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
+// The modal loads several services before the lines table appears. Under a
+// full parallel run that can take over the default 1 s, which made these
+// tests fail now and then; give the async queries more time.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 15000 });
 
 // Regression coverage for a real reported bug: staff filled in a reject
 // reason on a deposit request already accepted into a work order
