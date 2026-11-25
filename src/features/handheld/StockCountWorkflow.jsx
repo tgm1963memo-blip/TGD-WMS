@@ -527,7 +527,7 @@ export function StockCountWorkflow({ onBack }) {
                     return (
                       <button key={l.id} type="button" onClick={() => openLocation(l)} data-testid="stock-count-row"
                         style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${color}`, background: counted ? (status === 'VARIANCE' ? 'var(--color-warning-soft)' : C.greenLight) : C.surface, cursor: 'pointer', fontWeight: 900, color: C.text }}>
-                        <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{counted ? (status === 'VARIANCE' ? <AlertTriangle size={15} aria-hidden="true" color="#f59e0b" /> : <CheckCircle2 size={15} aria-hidden="true" color={C.green} />) : null}{formatRowLabel(l.parsed.row)}</div>
+                        <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{counted ? (status === 'VARIANCE' ? <AlertTriangle size={15} aria-hidden="true" color="#f59e0b" /> : <CheckCircle2 size={15} aria-hidden="true" color={C.green} />) : null}{l.displayName || formatRowLabel(l.parsed.row, l.parsed.side)}</div>
                         <div style={{ fontSize: 11, color: C.muted, fontFamily: 'var(--font-mono)' }}>{l.code}</div>
                       </button>
                     );

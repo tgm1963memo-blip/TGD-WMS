@@ -15,6 +15,48 @@ import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { supabase } from '../../services/supabaseClient.js';
 import { parseLocationCode, formatRowLabel, isAisleSide } from '../../utils/locationCodeUtils.js';
 import { UnlocatedStockCard } from './UnlocatedStockCard.jsx';
+import { findLocationGroup, rowDisplayLabel, zoneColor } from '../../utils/locationGroupUtils.js';
+
+// Rows inside a zone get the zone's colour as a left edge and tint, and the
+// zone name in their tooltip.
+function zoneEdgeStyle(group) {
+  if (!group) return {};
+  const c = zoneColor(group.color);
+  return { boxShadow: `inset 4px 0 0 ${c.fg}` };
+}
+
+// Per-zone usage under the map: pallets used / capacity of the rows in it.
+function ZoneSummary({ section }) {
+  const groups = section.groups ?? [];
+  if (!groups.length) return null;
+  const totals = groups.map((g) => {
+    let used = 0;
+    let capacity = 0;
+    for (const loc of section.locations ?? []) {
+      if (findLocationGroup([g], parseLocationCode(loc.location_code))) {
+        used += loc.usedCount || 0;
+        capacity += loc.capacity || 0;
+      }
+    }
+    return { g, used, capacity, pct: capacity > 0 ? Math.round((used / capacity) * 100) : 0 };
+  });
+  return (
+    <div data-testid="zone-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, padding: '0 12px 12px' }}>
+      {totals.map(({ g, used, capacity, pct }) => {
+        const c = zoneColor(g.color);
+        return (
+          <div key={g.id ?? g.name} style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '10px 12px', background: 'var(--color-surface)', boxShadow: `inset 4px 0 0 ${c.fg}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.fg, overflowWrap: 'anywhere' }}>{g.name}</div>
+            <div style={{ height: 6, borderRadius: 4, background: 'var(--color-border-subtle)', overflow: 'hidden', margin: '6px 0 4px' }}>
+              <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: c.fg }} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{used} / {capacity} pallet · {pct}%</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // Aisle slots (side A) are temporary overflow spots in the forklift aisle,
 // so they get their own amber, dashed look on both views.
@@ -53,7 +95,7 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#d4af37'
 // loosely). Rendered as a 1-dimensional list per side instead of the old
 // 2D grid of level×bay dots, with a fill bar + "used/capacity" count
 // instead of a plain on/off occupied dot.
-function RowBar({ location, onClick }) {
+function RowBar({ location, onClick, group = null }) {
   const capacity = location.capacity || 0;
   const used = location.usedCount || 0;
   // Capacity is advisory (see tgd_add_deposit_line_location_allocation's
@@ -74,8 +116,9 @@ function RowBar({ location, onClick }) {
   return (
     <div
       onClick={() => onClick?.(location.id, location.location_code)}
-      title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
+      title={`${location.location_code}${group ? ` · ${group.name}` : ''}${overCapacity ? ` — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : ''}`}
       style={{
+        ...zoneEdgeStyle(group),
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
         borderRadius: 8, cursor: 'pointer',
         border: overCapacity ? '1px solid #fca5a5' : (isAisle ? `1px dashed ${AISLE_BORDER}` : '1px solid var(--color-border-subtle)'),
@@ -85,7 +128,7 @@ function RowBar({ location, onClick }) {
       onMouseLeave={(e) => { e.currentTarget.style.background = restBackground; }}
     >
       <span style={{ fontSize: 12, fontWeight: 700, color: isAisle ? AISLE_TEXT : (parsed?.row === 0 ? '#b9660a' : 'var(--color-text-muted)'), width: 72, flexShrink: 0 }}>
-        {parsed ? formatRowLabel(parsed.row, parsed.side) : '-'}
+        {parsed ? rowDisplayLabel(location) : '-'}
       </span>
       <div style={{ flex: 1, height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
@@ -128,7 +171,9 @@ function SectionGrid({ section, onLocClick }) {
         <div key={g.side} data-testid={`list-side-${g.side}`}>
           <div style={{ fontSize: 12, fontWeight: 700, color: g.color, marginBottom: 8 }}>{g.title}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bySide[g.side].map(({ loc }) => <RowBar key={loc.id} location={loc} onClick={onLocClick} />)}
+            {bySide[g.side].map(({ loc }) => (
+              <RowBar key={loc.id} location={loc} onClick={onLocClick} group={findLocationGroup(section.groups, parseLocationCode(loc.location_code))} />
+            ))}
           </div>
         </div>
       ))}
@@ -165,7 +210,7 @@ function PalletCells({ capacity, used, color }) {
   );
 }
 
-function VirtualRow({ location, onClick }) {
+function VirtualRow({ location, onClick, group = null }) {
   if (!location) {
     return <div style={{ height: 26 }} aria-hidden="true" />;
   }
@@ -177,7 +222,8 @@ function VirtualRow({ location, onClick }) {
   const parsed = parseLocationCode(location.location_code);
   const isAisle = isAisleSide(parsed?.side);
   const isStaging = !isAisle && parsed?.row === 0;
-  const label = !parsed ? '-' : (isAisle ? `A-${parsed.row}` : formatRowLabel(parsed.row));
+  const customName = String(location.display_name ?? '').trim();
+  const label = !parsed ? '-' : (customName || (isAisle ? `A-${parsed.row}` : formatRowLabel(parsed.row)));
   const restBorder = overCapacity ? '#fca5a5' : (isStaging ? '#fcd34d' : (isAisle ? AISLE_BORDER : 'var(--color-border-subtle)'));
   const restBackground = overCapacity
     ? 'var(--color-danger-soft)'
@@ -190,14 +236,16 @@ function VirtualRow({ location, onClick }) {
       title={overCapacity ? `${location.location_code} — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : location.location_code}
       aria-label={`${location.location_code} ${label} ใช้ ${used} จาก ${capacity} pallet`}
       data-testid={isAisle ? 'virtual-aisle-row' : 'virtual-row'}
+      data-zone={group?.name ?? undefined}
       style={{
+        ...zoneEdgeStyle(group),
         display: 'flex', alignItems: 'center', gap: isAisle ? 6 : 10, height: 26, padding: '0 8px', width: '100%',
         border: `1px ${isAisle && !overCapacity ? 'dashed' : 'solid'} ${restBorder}`, borderRadius: 6,
         background: restBackground,
         cursor: 'pointer', font: 'inherit', textAlign: 'left', boxSizing: 'border-box',
       }}
     >
-      <span style={{ width: isAisle ? 38 : 52, flexShrink: 0, fontSize: 12, fontWeight: 700, color: isAisle ? AISLE_TEXT : (isStaging ? '#b9660a' : 'var(--color-text-secondary)') }}>{label}</span>
+      <span style={{ width: isAisle ? 38 : 56, flexShrink: 0, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: isAisle ? AISLE_TEXT : (isStaging ? '#b9660a' : (group ? zoneColor(group.color).fg : 'var(--color-text-secondary)')) }}>{label}</span>
       <PalletCells capacity={capacity} used={used} color={color} />
       <span style={{ width: isAisle ? 34 : 52, flexShrink: 0, textAlign: 'right', fontSize: 12, fontWeight: 700, color: used > 0 ? color : 'var(--color-text-subtle)' }}>
         {used}/{capacity}{overCapacity ? <AlertTriangle size={12} role="img" aria-label="เกินความจุ" style={{ verticalAlign: '-1px', marginLeft: 3 }} /> : null}
@@ -239,7 +287,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: '0 4px 2px' }}>{side === 'L' ? 'ฝั่งซ้าย (L)' : 'ฝั่งขวา (R)'}</div>
       {rows.list.map(({ row, left, right }) => (
-        <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} />
+        <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} group={findLocationGroup(section.groups, { side, row })} />
       ))}
     </div>
   );
@@ -255,7 +303,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: AISLE_TEXT, padding: '0 0 2px', textAlign: 'center' }}>ทางเดิน (A)</div>
       {rows.list.map(({ row, aisle }) => (
-        <VirtualRow key={`A-${row}`} location={aisle} onClick={onLocClick} />
+        <VirtualRow key={`A-${row}`} location={aisle} onClick={onLocClick} group={findLocationGroup(section.groups, { side: 'A', row })} />
       ))}
     </div>
   ) : (
@@ -608,9 +656,12 @@ export function WarehouseLayoutWidget() {
         {/* Grid */}
         <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 14, border: '1px solid var(--color-border-subtle)', marginBottom: 20 }}>
           {selected.total > 0 ? (
-            viewMode === 'virtual'
-              ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
-              : <SectionGrid section={selected} onLocClick={handleLocClick} />
+            <>
+              {viewMode === 'virtual'
+                ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
+                : <SectionGrid section={selected} onLocClick={handleLocClick} />}
+              <ZoneSummary section={selected} />
+            </>
           ) : (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>
               Section นี้ยังไม่มี Location

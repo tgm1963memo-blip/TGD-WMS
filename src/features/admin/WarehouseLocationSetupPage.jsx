@@ -15,6 +15,8 @@ import {
 } from '../../services/warehouseLayoutService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { parseLocationCode, formatRowLabel, isAisleSide, DEFAULT_AISLE_CAPACITY } from '../../utils/locationCodeUtils.js';
+import { findLocationGroup, rowDisplayLabel, zoneColor } from '../../utils/locationGroupUtils.js';
+import { LocationZonesPanel } from './LocationZonesPanel.jsx';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { listDepositLinesForLocationAssignment, importDepositLineLocationAssignments } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
@@ -142,7 +144,7 @@ function initEditForm(section) {
 // list -- edit (capacity and/or room/side/row, i.e. move to a different
 // spot entirely) or delete just this one row, without touching any other
 // row in the zone. Mirrors SectionCard's own confirm-then-delete pattern.
-function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
+function LocationRow({ location, zoneCode, onDelete, onEdit, onReset, group = null }) {
   const parsed = parseLocationCode(location.location_code);
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -155,10 +157,11 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
     side: parsed?.side ?? 'L',
     row: parsed?.row ?? 1,
     capacity: location.capacity,
+    displayName: location.display_name ?? '',
   });
 
   function openEdit() {
-    setForm({ zoneCode: parsed?.room ?? zoneCode, side: parsed?.side ?? 'L', row: parsed?.row ?? 1, capacity: location.capacity });
+    setForm({ zoneCode: parsed?.room ?? zoneCode, side: parsed?.side ?? 'L', row: parsed?.row ?? 1, capacity: location.capacity, displayName: location.display_name ?? '' });
     setEditError('');
     setEditing(true);
   }
@@ -183,6 +186,7 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
       zoneCode: form.zoneCode.trim().toUpperCase(),
       side: form.side,
       row: Math.max(0, Math.min(99, +form.row || 0)),
+      displayName: form.displayName,
     });
     setEditSaving(false);
     if (result?.error) {
@@ -196,7 +200,9 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
     <div style={{ border: '1px solid #eef2f7', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: location.isOccupied ? 'var(--color-warning-soft)' : 'var(--color-surface)', flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: 'var(--color-text-strong)', minWidth: 100 }}>{location.location_code}</span>
-        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row, parsed.side) : '-'}</span>
+        <span style={{ fontSize: 12, color: group ? zoneColor(group.color).fg : 'var(--color-text-muted)', fontWeight: location.display_name ? 700 : 400, minWidth: 70 }}>
+          {parsed ? rowDisplayLabel(location) : '-'}{group ? ` · ${group.name}` : ''}
+        </span>
         <span style={{ fontSize: 12, color: location.isOccupied ? 'var(--color-warning)' : 'var(--color-text-subtle)', flex: 1 }}>
           ใช้ไป {location.usedCount}/{location.capacity} pallet
         </span>
@@ -244,6 +250,13 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
             <div style={{ width: '100%', background: 'var(--color-danger-tint)', color: 'var(--color-danger)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>{editError}</div>
           )}
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
+            ชื่อแถว (แสดงบนหน้าจอ)
+            <input className="form-control" style={{ width: 160, marginTop: 2, boxSizing: 'border-box' }}
+              placeholder={parsed ? formatRowLabel(parsed.row, parsed.side) : ''}
+              value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+              data-testid="location-row-display-name" />
+          </label>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
             ห้อง
             <input className="form-control" style={{ width: 70, marginTop: 2, boxSizing: 'border-box' }}
               value={form.zoneCode} onChange={(e) => setForm((f) => ({ ...f, zoneCode: e.target.value }))} />
@@ -277,7 +290,8 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
   );
 }
 
-function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocation, onResetLocations }) {
+function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocation, onResetLocations, onZonesChanged }) {
+  const [zonesOpen, setZonesOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -400,6 +414,16 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               style={{ padding: '6px 10px', border: '1px solid #f59e0b', borderRadius: 8, background: 'var(--color-warning-soft)', color: 'var(--color-warning)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
             >
               Reset location
+            </button>
+          )}
+          {!confirm && (
+            <button
+              type="button"
+              onClick={() => setZonesOpen((v) => !v)}
+              data-testid="section-zones-toggle"
+              style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 8, background: zonesOpen ? 'var(--color-surface-sunken)' : 'var(--color-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              Zone / ชื่อแถว{section.groups?.length ? ` (${section.groups.length})` : ''}
             </button>
           )}
           {!confirm && (
@@ -571,6 +595,8 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
         </div>
       )}
 
+      {zonesOpen && <LocationZonesPanel key={`zones-${section.id}-${(section.groups ?? []).length}`} section={section} onChanged={onZonesChanged} />}
+
       {/* Per-row list -- edit/delete exactly one row without touching the rest */}
       {rowsOpen && (
         <div style={{ background: 'var(--color-surface-muted)', borderTop: '1px solid #e5e7eb', padding: '14px 18px' }}>
@@ -585,6 +611,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
               onDelete={onDeleteLocation}
               onEdit={onEditLocation}
               onReset={onResetLocations}
+              group={findLocationGroup(section.groups, parseLocationCode(loc.location_code))}
             />
           ))}
         </div>
@@ -1084,7 +1111,7 @@ export function WarehouseLocationSetupPage() {
 
   async function handleEditLocation(locationId, params) {
     const result = await updateLocation(locationId, params);
-    if (!result.error) await load();
+    if (!result.error) load({ background: true });
     return result;
   }
 
@@ -1174,6 +1201,7 @@ export function WarehouseLocationSetupPage() {
               onDeleteLocation={handleDeleteLocation}
               onEditLocation={handleEditLocation}
               onResetLocations={canResetLocations ? handleResetLocations : null}
+              onZonesChanged={() => load({ background: true })}
             />
           ))}
         </div>

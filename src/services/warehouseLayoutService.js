@@ -244,11 +244,28 @@ export async function getSectionsWithOccupancy() {
 
   const { data: zones, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, temperature_type, is_active, tgd_rooms(id, tgd_locations(id, location_code, capacity))')
+    .select('id, zone_code, zone_name, temperature_type, is_active, tgd_rooms(id, tgd_locations(id, location_code, capacity, display_name))')
     .eq('is_active', true)
     .order('zone_code');
 
   if (error) return { data: [], error };
+
+  // Zones are labels only, so any failed read just shows the map without them.
+  let groupRows = [];
+  try {
+    const { data } = await supabase
+      .from('tgd_location_groups')
+      .select('id, zone_id, name, color, side, row_from, row_to, sort_order')
+      .order('sort_order');
+    groupRows = data ?? [];
+  } catch {
+    groupRows = [];
+  }
+  const groupsByZone = new Map();
+  for (const g of groupRows ?? []) {
+    if (!groupsByZone.has(g.zone_id)) groupsByZone.set(g.zone_id, []);
+    groupsByZone.get(g.zone_id).push(g);
+  }
 
   // A row now holds several pallets, not one binary occupied/empty slot, so
   // occupancy is a COUNT of pallet SLOTS in use per location, compared
@@ -308,6 +325,7 @@ export async function getSectionsWithOccupancy() {
       name: zone.zone_name,
       temperatureType: zone.temperature_type ?? null,
       gridInfo,
+      groups: groupsByZone.get(zone.id) ?? [],
       rows: gridInfo.rows,
       total,
       totalCapacity,
@@ -403,7 +421,7 @@ export async function getActiveLocations() {
 
   const { data, error } = await supabase
     .from('tgd_zones')
-    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name, capacity))')
+    .select('id, zone_code, zone_name, tgd_rooms(id, tgd_locations(id, location_code, location_name, capacity, display_name))')
     .neq('is_active', false)
     .order('zone_code');
 
@@ -415,6 +433,7 @@ export async function getActiveLocations() {
         id: l.id,
         code: l.location_code,
         name: l.location_name ?? l.location_code,
+        displayName: l.display_name ?? null,
         capacity: Number(l.capacity) || 0,
         sectionCode: zone.zone_code,
         sectionName: zone.zone_name,
@@ -701,7 +720,7 @@ export async function deleteLocation(locationId) {
 // by the location_code text, so changing the code can never orphan existing
 // stock. Shrinking capacity below what's actually in use IS blocked, same
 // reasoning as updateSectionSize's occupied-row guard above.
-export async function updateLocation(locationId, { capacity, zoneCode, side, row } = {}) {
+export async function updateLocation(locationId, { capacity, zoneCode, side, row, displayName } = {}) {
   if (!supabase || !locationId) return missing();
 
   const { data: current, error: fetchErr } = await supabase
@@ -723,6 +742,7 @@ export async function updateLocation(locationId, { capacity, zoneCode, side, row
   }
 
   const updates = { capacity: nextCapacity };
+  if (displayName !== undefined) updates.display_name = String(displayName ?? '').trim() || null;
 
   if (zoneCode != null && side != null && row != null) {
     const newCode = buildLocationCode(zoneCode, side, row);
@@ -817,4 +837,36 @@ export async function confirmAndResetLocations(locationIds, label) {
     + '\n\nเอกสารรับเข้าและยอดคงเหลือจะไม่ถูกลบ';
   if (!window.confirm(message)) return { data: null, error: null, cancelled: true };
   return resetLocationAllocations(locationIds);
+}
+
+// Replaces one room's zones with the given list (zones are labels only, so a
+// full replace is safe). groups: [{ name, color, side, row_from, row_to }].
+export async function saveLocationGroups(zoneId, groups = []) {
+  if (!supabase || !zoneId) return missing();
+  const rows = groups.map((g, i) => ({
+    zone_id: zoneId,
+    name: String(g.name ?? '').trim(),
+    color: g.color || 'blue',
+    side: g.side,
+    row_from: Number(g.row_from),
+    row_to: Number(g.row_to),
+    sort_order: i,
+  }));
+  const { error: delErr } = await supabase.from('tgd_location_groups').delete().eq('zone_id', zoneId);
+  if (delErr) return { error: delErr };
+  if (rows.length === 0) return { data: [], error: null };
+  const { data, error } = await supabase.from('tgd_location_groups').insert(rows).select();
+  return { data, error };
+}
+
+// Sets display names for many rows at once. updates: [{ id, displayName }];
+// a blank name clears it (the row shows "แถว N" again).
+export async function setLocationDisplayNames(updates = []) {
+  if (!supabase) return missing();
+  const results = await Promise.all(updates.map(({ id, displayName }) => supabase
+    .from('tgd_locations')
+    .update({ display_name: String(displayName ?? '').trim() || null })
+    .eq('id', id)));
+  const failed = results.find((r) => r.error);
+  return { data: { updated: updates.length - (failed ? 1 : 0) }, error: failed?.error ?? null };
 }

@@ -52,6 +52,7 @@ import { StockCountWorkflow } from './StockCountWorkflow.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
+import { rowOptionLabel } from '../../utils/locationGroupUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -1019,7 +1020,7 @@ function ReceivingWorkflow({ onBack, t }) {
                         disabled={!locSide}
                         style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
-                        {availableRows.map((r) => <option key={r} value={r}>{formatRowLabel(r)}</option>)}
+                        {availableRows.map((r) => <option key={r} value={r}>{rowOptionLabel(r, locSide, parsedLocs.find((l) => l.parsed?.room === locZone && l.parsed?.side === locSide && l.parsed?.row === r)?.displayName)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -2779,7 +2780,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       disabled={!locSide}
                       style={{ width: '100%', boxSizing: 'border-box', background: locSide ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locSide ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
-                      {availableRows.map((r) => <option key={r} value={r}>{formatRowLabel(r)}</option>)}
+                      {availableRows.map((r) => <option key={r} value={r}>{rowOptionLabel(r, locSide, parsedLocs.find((l) => l.parsed?.room === locZone && l.parsed?.side === locSide && l.parsed?.row === r)?.displayName)}</option>)}
                     </select>
                   </div>
                   <div>

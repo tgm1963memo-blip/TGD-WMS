@@ -45,6 +45,7 @@ import {
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
+import { rowOptionLabel } from '../../utils/locationGroupUtils.js';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -1765,7 +1766,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                   <span>แถว</span>
                   <select className="form-control" value={locRow} onChange={(e) => setLocRow(e.target.value)} disabled={!locSide}>
                     <option value="">-- เลือกแถว --</option>
-                    {locRowOptions.map((r) => <option key={r} value={String(r)}>{formatRowLabel(r)}</option>)}
+                    {locRowOptions.map((r) => <option key={r} value={String(r)}>{rowOptionLabel(r, locSide, parsedAllLocs.find((l) => l.parsed.room === locZone && l.parsed.side === locSide && l.parsed.row === r)?.displayName)}</option>)}
                   </select>
                 </label>
                 <label className="form-field">
