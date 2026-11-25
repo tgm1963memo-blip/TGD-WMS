@@ -1,8 +1,43 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { Printer, RefreshCw } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { getUnlocatedStockSummary } from '../../services/unlocatedStockService.js';
+import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
+import { useA5StickerPrint } from '../../components/sticker/A5StickerPrint.jsx';
+import { resolveAllergen } from '../../utils/stickerPrint.jsx';
+
+// A5 sheets for unplaced boxes only: placed pallets already got their sticker
+// when they were put away. Each lot asks for its pallet count first.
+export async function buildUnlocatedA5Entries(items) {
+  const customerIds = [...new Set(items.map((i) => i.customerId).filter(Boolean))];
+  const catalogs = await Promise.all(customerIds.map((id) => listCustomerProducts({ customerId: id })));
+  const catalogByCustomer = new Map(customerIds.map((id, i) => [id, catalogs[i]?.data ?? []]));
+  return items.map((item) => {
+    const catalogMatch = (catalogByCustomer.get(item.customerId) ?? []).find((p) => p.customer_product_code === item.productCode) ?? null;
+    const allergen = resolveAllergen(catalogMatch);
+    return {
+      lineId: item.lineId,
+      manualOnly: true,
+      splitBoxes: item.unlocatedBoxes,
+      boxesPerPallet: catalogMatch?.default_boxes_per_pallet ?? null,
+      baseItem: {
+        depositDate: item.receivedAt,
+        customerName: item.customerName,
+        productCode: item.productCode ?? '',
+        productName: item.productName,
+        lotNo: item.lotNo,
+        mfgDate: item.mfgDate,
+        expDate: item.expDate,
+        trackingCode: item.trackingCode ?? '-',
+        lotBoxes: item.lotBoxes ?? item.inStockBoxes,
+        lotWeight: item.lotWeight ?? null,
+        allergenStatus: allergen.status,
+        allergenText: allergen.text,
+      },
+    };
+  });
+}
 
 // "ยังไม่ระบุ Location": stock in the warehouse that was received but never
 // put on a pallet location. Lives in the dark side panel of the room map.
@@ -88,6 +123,27 @@ export function UnlocatedStockCard() {
   const [error, setError] = useState('');
   const [listOpen, setListOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [preparing, setPreparing] = useState(false);
+  const a5Print = useA5StickerPrint();
+
+  function toggleSelected(lineId) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId); else next.add(lineId);
+      return next;
+    });
+  }
+
+  async function printSelectedA5() {
+    const items = (summary?.items ?? []).filter((i) => selectedIds.has(i.lineId));
+    if (!items.length) return;
+    setPreparing(true);
+    const entries = await buildUnlocatedA5Entries(items);
+    setPreparing(false);
+    setListOpen(false);
+    a5Print.requestPrint(entries);
+  }
 
   useEffect(() => {
     let current = true;
@@ -141,13 +197,34 @@ export function UnlocatedStockCard() {
 
       {listOpen && summary && (
         <Modal isOpen onClose={() => setListOpen(false)} title="สินค้าที่ยังไม่ระบุ Location" size="lg">
-          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
-            {summary.lots} lot · {formatNumber(summary.boxes)} กล่อง ({summary.pct}% ของสต็อกในคลัง) · คลิกรายการเพื่อเปิดใบฝากและระบุ Location
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+              {summary.lots} lot · {formatNumber(summary.boxes)} กล่อง ({summary.pct}% ของสต็อกในคลัง) · คลิกรายการเพื่อเปิดใบฝากและระบุ Location หรือติ๊กเลือกเพื่อพิมพ์สติ๊กเกอร์ A5 ของกล่องที่ยังไม่วาง
+            </div>
+            <button
+              type="button" className="btn btn-primary btn-sm"
+              disabled={selectedIds.size === 0 || preparing || a5Print.busy}
+              onClick={printSelectedA5}
+              data-testid="unlocated-print-a5"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Printer size={14} aria-hidden="true" />
+              {preparing ? 'กำลังเตรียม...' : `พิมพ์ A5 ที่เลือก${selectedIds.size ? ` (${selectedIds.size})` : ''}`}
+            </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table" style={{ width: '100%', fontSize: 13 }}>
               <thead>
                 <tr>
+                  <th style={{ width: 32 }}>
+                    <input
+                      type="checkbox"
+                      aria-label="เลือกทั้งหมด"
+                      checked={summary.items.length > 0 && summary.items.every((i) => selectedIds.has(i.lineId))}
+                      onChange={(e) => setSelectedIds(e.target.checked ? new Set(summary.items.map((i) => i.lineId)) : new Set())}
+                      data-testid="unlocated-select-all"
+                    />
+                  </th>
                   <th>รหัสติดตาม</th>
                   <th>ลูกค้า</th>
                   <th>สินค้า</th>
@@ -159,6 +236,15 @@ export function UnlocatedStockCard() {
               <tbody>
                 {summary.items.map((item) => (
                   <tr key={item.lineId} onClick={() => openDeposit(item)} style={{ cursor: 'pointer' }}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`เลือก ${item.trackingCode ?? ''}`}
+                        checked={selectedIds.has(item.lineId)}
+                        onChange={() => toggleSelected(item.lineId)}
+                        data-testid={`unlocated-select-${item.lineId}`}
+                      />
+                    </td>
                     <td style={{ fontWeight: 700 }}>{item.trackingCode ?? '-'}</td>
                     <td>{item.customerName}</td>
                     <td>{item.productCode ? `${item.productCode} ` : ''}{item.productName ?? '-'}</td>
@@ -172,6 +258,7 @@ export function UnlocatedStockCard() {
           </div>
         </Modal>
       )}
+      {a5Print.dialog}
     </div>
   );
 }

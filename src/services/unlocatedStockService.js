@@ -70,6 +70,12 @@ export function computeUnlocatedStock({ lines = [], allocations = [], customersB
       inStockBoxes,
       linePct: inStockBoxes > 0 ? Math.round((unlocatedBoxes / inStockBoxes) * 100) : 100,
       receivedAt: request.reviewed_at ?? request.expected_arrival_date ?? null,
+      // For printing A5 stickers from the dashboard.
+      lotNo: line.lot_no ?? null,
+      mfgDate: line.mfg_date ?? null,
+      expDate: line.exp_date ?? null,
+      lotBoxes: rawBoxes,
+      lotWeight: round2(rawWeight),
     });
   }
 
