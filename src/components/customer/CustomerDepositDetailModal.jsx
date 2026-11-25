@@ -46,6 +46,7 @@ import { getDocumentBrandingConfig } from '../../services/documentBrandingServic
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { rowOptionLabel } from '../../utils/locationGroupUtils.js';
+import { useZonePicker, narrowSides, narrowRows, ZoneChips } from '../../components/location/ZonePicker.jsx';
 import { getCustomers } from '../../services/masterDataService.js';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { useTranslation } from '../../i18n/languageProvider.jsx';
@@ -302,8 +303,9 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
 
   const parsedAllLocs = allLocations.map((l) => ({ ...l, parsed: parseLocationCode(l.code) })).filter((l) => l.parsed);
   const locZoneOptions = [...new Set(parsedAllLocs.map((l) => l.parsed.room))].sort();
-  const locSideOptions = locZone ? sortSides(new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))) : [];
-  const locRowOptions = (locZone && locSide) ? [...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b) : [];
+  const depZone = useZonePicker(locZone);
+  const locSideOptions = locZone ? narrowSides(sortSides(new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))), depZone.activeGroup) : [];
+  const locRowOptions = (locZone && locSide) ? narrowRows([...new Set(parsedAllLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), locSide, depZone.activeGroup) : [];
   const selectedLocObj = (locZone && locSide && locRow)
     ? (parsedAllLocs.find((l) => l.parsed.room === locZone && l.parsed.side === locSide && l.parsed.row === +locRow) ?? null)
     : null;
@@ -1755,6 +1757,15 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                     {locZoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
                   </select>
                 </label>
+                {depZone.roomGroups.length > 0 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <ZoneChips
+                      roomGroups={depZone.roomGroups}
+                      groupId={depZone.groupId}
+                      onPick={(g) => { depZone.setGroupId(g?.id ?? ''); if (g) setLocSide(g.side); setLocRow(''); }}
+                    />
+                  </div>
+                )}
                 <label className="form-field">
                   <span>ฝั่ง</span>
                   <select className="form-control" value={locSide} onChange={(e) => { setLocSide(e.target.value); setLocRow(''); }} disabled={!locZone}>

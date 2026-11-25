@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { C, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
 import { useHandheldAuth } from './HandheldContext.jsx';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { useZonePicker, narrowSides, narrowRows, ZoneChips } from '../../components/location/ZonePicker.jsx';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { resolveCountPhotoUrls } from '../../services/customerDocumentAttachmentService.js';
 import {
@@ -198,10 +199,15 @@ export function StockCountWorkflow({ onBack }) {
     .map((l) => ({ ...l, parsed: parseLocationCode(l.code) }))
     .filter((l) => l.parsed), [locations]);
   const zones = useMemo(() => [...new Set(parsedLocations.map((l) => l.parsed.room))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true })), [parsedLocations]);
-  const sides = useMemo(() => sortSides(new Set(parsedLocations.filter((l) => l.parsed.room === zone).map((l) => l.parsed.side))), [parsedLocations, zone]);
-  const rowsInSide = useMemo(() => parsedLocations
-    .filter((l) => l.parsed.room === zone && l.parsed.side === side)
-    .sort((a, b) => a.parsed.row - b.parsed.row), [parsedLocations, zone, side]);
+  const countZone = useZonePicker(zone);
+  const sides = useMemo(() => narrowSides(sortSides(new Set(parsedLocations.filter((l) => l.parsed.room === zone).map((l) => l.parsed.side))), countZone.activeGroup), [parsedLocations, zone, countZone.activeGroup]);
+  const rowsInSide = useMemo(() => {
+    const rows = parsedLocations
+      .filter((l) => l.parsed.room === zone && l.parsed.side === side)
+      .sort((a, b) => a.parsed.row - b.parsed.row);
+    const allowed = new Set(narrowRows(rows.map((l) => l.parsed.row), side, countZone.activeGroup));
+    return rows.filter((l) => allowed.has(l.parsed.row));
+  }, [parsedLocations, zone, side, countZone.activeGroup]);
   const linesByLocation = useMemo(() => {
     const map = new Map();
     countedLines.forEach((l) => {
@@ -507,6 +513,12 @@ export function StockCountWorkflow({ onBack }) {
                 </select>
               </label>
             </div>
+            <ZoneChips
+              size="lg"
+              roomGroups={countZone.roomGroups}
+              groupId={countZone.groupId}
+              onPick={(g) => { countZone.setGroupId(g?.id ?? ''); if (g) setSide(g.side); }}
+            />
 
             {zone && side && (
               <>
