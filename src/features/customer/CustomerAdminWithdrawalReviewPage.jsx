@@ -55,6 +55,8 @@ import {
   getCustomerDocumentAttachmentUrl,
   listCustomerDocumentAttachments,
   uploadCustomerDocumentAttachments,
+  listWithdrawalDispatchPhotos,
+  hasRequiredDispatchPhotos,
 } from '../../services/customerDocumentAttachmentService.js';
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 import { TEMPERATURE_TYPE_LABELS } from '../../utils/temperatureTypeLabels.js';
@@ -696,8 +698,23 @@ export function CustomerAdminWithdrawalReviewPage() {
   const canRecallToSubmitted = canWrite && selected && ['ADMIN_REVIEWING', 'ADMIN_ACCEPTED', 'WAREHOUSE_PICKING'].includes(selected.status);
   const canCancel = canWrite && selected && !['COMPLETED', 'DISPATCHED', 'CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status);
 
+  // The handheld requires a goods-on-truck photo before loading can be
+  // closed; on the web it is a warning only (staff may have photographed it
+  // some other way), asked before finishing or confirming dispatch.
+  async function confirmCloseWithoutGoodsPhoto() {
+    if (!selectedId) return true;
+    const { data, error } = await listWithdrawalDispatchPhotos(selectedId);
+    if (!error && hasRequiredDispatchPhotos(data ?? [])) return true;
+    return window.confirm(
+      'ใบเบิกนี้ยังไม่มีรูปสินค้าบนรถ (ปกติถ่ายจากเครื่อง handheld ตอนขึ้นของเสร็จ)\n'
+      + 'ต้องการปิดงานโดยไม่มีรูปใช่หรือไม่?',
+    );
+  }
+
   async function handleRecordDispatchTime(phase, atOverride) {
     if (!selectedId) return;
+    // Editing an already-recorded time is a correction, not closing the job.
+    if (phase === 'FINISH' && !atOverride && !(await confirmCloseWithoutGoodsPhoto())) return;
     const { data, error } = await setWithdrawalDispatchTime(selectedId, phase, { at: atOverride ?? null });
     if (error) {
       setError(error.message ?? 'บันทึกเวลาไม่สำเร็จ');
@@ -894,6 +911,7 @@ export function CustomerAdminWithdrawalReviewPage() {
 
   async function handleConfirmWithdrawal(effectiveDate) {
     if (!selectedId) return;
+    if (!(await confirmCloseWithoutGoodsPhoto())) return;
     setSubmitting(true);
     setError('');
     setActionMsg('');
