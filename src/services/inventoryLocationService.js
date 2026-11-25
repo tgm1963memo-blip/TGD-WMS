@@ -20,7 +20,7 @@ async function readAllocations(field, ids) {
   const uniqueIds = [...new Set(ids)];
   for (let start = 0; start < uniqueIds.length; start += 150) {
     rows.push(...await collect(() => supabase.from('tgd_customer_deposit_line_locations')
-      .select('id, line_id, location_id, pallet_no, boxes, weight, tgd_locations(location_code)')
+      .select('id, line_id, location_id, pallet_no, boxes, weight, tgd_locations(location_code, display_name)')
       .in(field, uniqueIds.slice(start, start + 150))));
   }
   const picked = new Map();
@@ -43,6 +43,7 @@ async function readAllocations(field, ids) {
     return {
       id: row.id, lineId: row.line_id, locationId: row.location_id,
       locationCode: row.tgd_locations?.location_code ?? '', palletNo: row.pallet_no,
+      locationDisplayName: row.tgd_locations?.display_name ?? null,
       palletCode: buildPalletCode(row.tgd_locations?.location_code ?? '?', row.pallet_no),
       boxes, weight, remainingBoxes,
       remainingWeight: remainingBoxes === 0 ? 0 : weight == null ? null : Math.max(0, weight - total.weight),

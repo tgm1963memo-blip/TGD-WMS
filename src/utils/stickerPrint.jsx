@@ -515,6 +515,7 @@ export function buildPalletStickerItems(baseItem, allocations = [], manual = nul
       palletIndex: i + 1,
       palletTotal: real.length,
       locationCode: a.locationCode ? buildPalletCode(a.locationCode, a.palletNo) : '-',
+      locationName: a.locationDisplayName ?? null,
       boxes: toQty(a.boxes),
       weight: toQty(a.weight),
     }));
@@ -571,7 +572,7 @@ function renderA5StickerPageHtml(item) {
     <div class="a5-mid"><div class="a5-fr fit">${item.trackingCode || '-'}</div></div>
     <div class="a5-facts">
       <div class="a5-pal"><span class="a5-lbl">พาเลท</span><div class="a5-v">${item.palletIndex ?? 1} / ${item.palletTotal ?? 1}</div></div>
-      <div class="a5-loc"><span class="a5-lbl">Location</span><div class="a5-v fit">${item.locationCode || '-'}</div></div>
+      <div class="a5-loc"><span class="a5-lbl">Location${item.locationName ? ` · ${item.locationName}` : ''}</span><div class="a5-v fit">${item.locationCode || '-'}</div></div>
       <div class="a5-qty"><span class="a5-lbl">จำนวน (พาเลทนี้)</span><div class="a5-qtyv">
         <div class="a5-v">${formatQty(item.boxes)} ${unit}${weight != null ? `<span>/ ${formatQty(weight, 2)} กก.</span>` : ''}</div>
         <small>ทั้ง lot ${formatQty(item.lotBoxes)} ${unit}${lotWeight != null ? ` / ${formatQty(lotWeight, 2)} กก.` : ''}</small>
