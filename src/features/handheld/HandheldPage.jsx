@@ -4,7 +4,16 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { C, Pill, TopBar, triggerSuccessFeedback, useCameraScanner } from './handheldUi.jsx';
 import { LoadingState } from '../../components/ui/LoadingState.jsx';
 import { DateInputDMY } from '../../components/common/DateInputDMY.jsx';
-import { printSticker } from '../../utils/stickerPrint.jsx';
+import { printSticker, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
+import { useA5StickerPrint } from '../../components/sticker/A5StickerPrint.jsx';
+
+// Shown on the handheld's sticker preview card -- always states the allergen
+// state, unlike the thermal label which prints a warning only when present.
+function describeAllergen(allergen) {
+  if (allergen?.status === 'YES') return `มี: ${allergen.text}`;
+  if (allergen?.status === 'NO') return 'ไม่มี';
+  return 'ไม่ระบุ';
+}
 import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.js';
 import { getWithdrawalStatusLabel } from '../../utils/customerWithdrawalStatusLabels.js';
 import {
@@ -37,11 +46,12 @@ import {
   setWithdrawalOvertime,
 } from '../../services/customerWithdrawalRequestService.js';
 import { DocumentTimerCard } from './DocumentTimerCard.jsx';
+import { DispatchConfirmSheet } from './DispatchConfirmSheet.jsx';
 import { ReceivingPhotoCapture } from './ReceivingPhotoCapture.jsx';
 import { StockCountWorkflow } from './StockCountWorkflow.jsx';
 import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState } from '../../services/warehouseLayoutService.js';
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
-import { parseLocationCode, formatRowLabel, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -344,7 +354,7 @@ function ReceivingWorkflow({ onBack, t }) {
 
   const availableSides = useMemo(() => {
     if (!locZone) return [];
-    return [...new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))].sort();
+    return sortSides(new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side)));
   }, [parsedLocs, locZone]);
 
   const availableRows = useMemo(() => {
@@ -535,7 +545,8 @@ function ReceivingWorkflow({ onBack, t }) {
       productCode: matchedLine.customer_product_code ?? matchedLine.internal_product_code ?? '',
       storageLabel: getTemperatureTypeShortLabel(matchedLine.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergen: resolveAllergen(catalogMatch),
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       trackingCode: matchedLine.tracking_code ?? '-',
       depositDate: new Date().toISOString(),
       palletWarning,
@@ -849,7 +860,7 @@ function ReceivingWorkflow({ onBack, t }) {
               <div><strong>LOT (ของลูกค้า):</strong> {stickerItem.lotNo || '-'}</div>
               <div><strong>การจัดเก็บ:</strong> {stickerItem.storageLabel || '-'}</div>
               <div><strong>จำนวน:</strong> {stickerItem.quantityLabel || '-'}</div>
-              <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {stickerItem.allergenLabel}</div>
+              <div><strong>สารก่อภูมิแพ้ (Allergen):</strong> {describeAllergen(stickerItem.allergen)}</div>
               <div><strong>วันผลิต:</strong> {stickerItem.mfgDate || '-'}</div>
               <div><strong>Location:</strong> {stickerItem.location?.code ? (stickerItem.palletNo ? buildPalletCode(stickerItem.location.code, stickerItem.palletNo) : stickerItem.location.code) : 'ยังไม่ได้เลือก'}</div>
               <div><strong>Tracking Code:</strong> {stickerItem.trackingCode}</div>
@@ -999,7 +1010,7 @@ function ReceivingWorkflow({ onBack, t }) {
                         disabled={!locZone}
                         style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                         <option value="">— เลือก —</option>
-                        {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                        {availableSides.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -1211,6 +1222,8 @@ function ReceivingWorkflow({ onBack, t }) {
 
 // ── Picking workflow ──────────────────────────────────────────
 function PickingWorkflow({ onBack, t }) {
+  // "ขึ้นของเสร็จ" photo + driver step shown before loading can be closed.
+  const [dispatchConfirmOpen, setDispatchConfirmOpen] = useState(false);
   const { activeProfile } = useHandheldAuth();
   const [docs, setDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -1662,10 +1675,7 @@ function PickingWorkflow({ onBack, t }) {
           const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
         }}
-        onFinish={async () => {
-          const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
-          if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
-        }}
+        onFinish={async () => { setDispatchConfirmOpen(true); }}
         onEditStart={async (iso) => {
           const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'START', { at: iso, actorProfileId: activeProfile?.id });
           if (!error) setSelectedDoc((d) => (d ? { ...d, dispatch_started_at: data.at } : d));
@@ -1691,6 +1701,19 @@ function PickingWorkflow({ onBack, t }) {
           return { error };
         }}
       />
+      {dispatchConfirmOpen && (
+        <DispatchConfirmSheet
+          doc={selectedDoc}
+          activeProfile={activeProfile}
+          onClose={() => setDispatchConfirmOpen(false)}
+          onFinish={async () => {
+            const { data, error } = await setWithdrawalDispatchTime(selectedDoc.id, 'FINISH', { actorProfileId: activeProfile?.id });
+            if (error) return false;
+            setSelectedDoc((d) => (d ? { ...d, dispatch_finished_at: data.at } : d));
+            return true;
+          }}
+        />
+      )}
 
       {lines.length > 0 && (
         <div style={{ background: C.primaryDark, height: 6, flexShrink: 0 }}>
@@ -2001,6 +2024,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const a5Print = useA5StickerPrint();
   const [selectedLine, setSelectedLine] = useState(null);
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -2051,7 +2075,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
 
   const availableZones = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed).map((l) => l.parsed.room))].sort(), [parsedLocs]);
-  const availableSides = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))].sort(), [parsedLocs, locZone]);
+  const availableSides = useMemo(() => sortSides(new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))), [parsedLocs, locZone]);
   const availableRows = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), [parsedLocs, locZone, locSide]);
 
   useEffect(() => {
@@ -2284,6 +2308,30 @@ function LocationUpdateWorkflow({ onBack, t }) {
     handleTrackingScan(trackingInputValue);
   }
 
+  function handlePrintA5(line, event) {
+    event.stopPropagation();
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
+    const allergen = resolveAllergen(catalogMatch);
+    a5Print.requestPrint([{
+      lineId: line.id,
+      boxesPerPallet: catalogMatch?.default_boxes_per_pallet ?? null,
+      baseItem: {
+        depositDate: selectedDoc?.expected_arrival_date,
+        customerName: selectedDoc?.customer?.customer_name ?? selectedDoc?.customer?.name ?? selectedDoc?.contact_name ?? '',
+        productCode: line.customer_product_code ?? line.internal_product_code ?? '',
+        productName: line.product_name,
+        lotNo: line.lot_no,
+        mfgDate: line.mfg_date,
+        expDate: line.exp_date,
+        trackingCode: line.tracking_code ?? '-',
+        lotBoxes: line.actual_boxes ?? line.expected_boxes ?? 0,
+        lotWeight: line.actual_weight ?? line.expected_weight ?? null,
+        allergenStatus: allergen.status,
+        allergenText: allergen.text,
+      },
+    }]);
+  }
+
   function handlePrintSticker(line, event) {
     event.stopPropagation();
     const catalogMatch = catalogProducts.find((p) => p.customer_product_code === line.customer_product_code);
@@ -2299,7 +2347,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       lotNo: line.lot_no,
       storageLabel: getTemperatureTypeShortLabel(line.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       mfgDate: line.mfg_date,
       locationCode,
       trackingCode: line.tracking_code ?? '-',
@@ -2373,7 +2421,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
       lotNo: selectedLine.lot_no,
       storageLabel: getTemperatureTypeShortLabel(selectedLine.temperature_type),
       quantityLabel: quantityParts.join(' / ') || '-',
-      allergenLabel: catalogMatch?.allergen ? 'มี (Yes)' : 'ไม่มี (No)',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
       mfgDate: selectedLine.mfg_date,
       locationCode: buildPalletCode(selectedLocation.code, palletNo),
       trackingCode: selectedLine.tracking_code ?? '-',
@@ -2608,6 +2656,19 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       >
                         <IconLabel icon={Printer} size={14} gap={4}>พิมพ์สติกเกอร์</IconLabel>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handlePrintA5(l, e)}
+                        disabled={a5Print.busy}
+                        aria-label="พิมพ์สติกเกอร์ A5"
+                        style={{
+                          background: '#fff', color: C.primary, border: `2px solid ${C.primary}`, borderRadius: 10,
+                          padding: '4px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        A5
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2709,7 +2770,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
                       disabled={!locZone}
                       style={{ width: '100%', boxSizing: 'border-box', background: locZone ? C.inputBg : C.borderLight, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '10px 8px', fontSize: 14, fontWeight: 700, color: locZone ? C.text : C.muted, outline: 'none', minHeight: 48 }}>
                       <option value="">— เลือก —</option>
-                      {availableSides.map((s) => <option key={s} value={s}>{s === 'L' ? 'ซ้าย (L)' : 'ขวา (R)'}</option>)}
+                      {availableSides.map((s) => <option key={s} value={s}>{formatSideLabel(s)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -2788,6 +2849,7 @@ function LocationUpdateWorkflow({ onBack, t }) {
         </div>
       )}
     </div>
+      {a5Print.dialog}
     </div>
   );
 }

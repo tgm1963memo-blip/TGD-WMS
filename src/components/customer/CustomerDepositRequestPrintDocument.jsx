@@ -4,6 +4,7 @@ import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.j
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { CancelledDocumentWatermark } from './CancelledDocumentWatermark.jsx';
 import { insertSoftBreaks } from '../../utils/textWrapUtils.js';
+import { useTransportInfo } from '../../hooks/useTransportInfo.js';
 
 function fmt(v) { return v != null && v !== '' ? v : '-'; }
 function fmtNum2(v) {
@@ -51,6 +52,7 @@ export function CustomerDepositRequestPrintDocument({
   language = 'th',
   branding,
 }) {
+  const transport = useTransportInfo('CUSTOMER_DEPOSIT_REQUEST', header);
   if (!header) return null;
 
   const t = (key) => getTranslation(key, language);
@@ -175,7 +177,11 @@ export function CustomerDepositRequestPrintDocument({
               <td style={MK}>ARR / START / FINISH</td>
               <td style={MV}>{fmt(header.arrival_time)}{header.start_time ? ` / ${header.start_time}` : ''}{header.finish_time ? ` / ${header.finish_time}` : ''}</td>
               <td style={MK}>SEAL NO</td>
-              <td style={MV}>{fmt(header.seal_no)}</td>
+              <td style={MV}>{fmt(transport?.seal_no)}</td>
+            </tr>
+            <tr>
+              <td style={MK}>DRIVER</td>
+              <td style={MV} colSpan={3}>{fmt(transport?.driver_name)}</td>
             </tr>
             <tr>
               <td style={MK}>GOODS TEMP</td>

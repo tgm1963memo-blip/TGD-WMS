@@ -1,5 +1,13 @@
 import { supabase } from './supabaseClient.js';
-import { parseLocationCode, buildLocationCode, formatRowLabel } from '../utils/locationCodeUtils.js';
+import {
+  parseLocationCode,
+  buildLocationCode,
+  formatRowLabel,
+  isAisleSide,
+  AISLE_SIDE,
+  AISLE_LOCATION_TYPE,
+  DEFAULT_AISLE_CAPACITY,
+} from '../utils/locationCodeUtils.js';
 
 // Standard max pallets/row per the warehouse's own operating rule -- rows
 // created without an explicit capacity fall back to this. A row can still
@@ -39,17 +47,51 @@ export async function ensureDefaultWarehouse() {
 // defensive against a bad manual insert) is just excluded from the count
 // rather than falling back to a legacy grid-shape guess -- there's no
 // legacy shape left to guess at.
+// Aisle slots (side A) are reported separately in sidesConfig.A and are not
+// counted in `rows` or `sides`, which stay about the L/R shelf rows.
 function analyzeLocations(locations) {
-  if (!locations.length) return { rows: 0, sidesConfig: { L: { rows: 0 }, R: { rows: 0 } } };
+  const emptyAisle = { rows: 0, count: 0, capacity: 0 };
+  if (!locations.length) return { rows: 0, sidesConfig: { L: { rows: 0 }, R: { rows: 0 }, A: emptyAisle } };
 
-  const parsed = locations.map((l) => parseLocationCode(l.location_code)).filter(Boolean);
-  const sidesConfig = { L: { rows: 0 }, R: { rows: 0 } };
-  for (const p of parsed) {
-    if (sidesConfig[p.side]) sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
+  const sidesConfig = { L: { rows: 0 }, R: { rows: 0 }, A: { ...emptyAisle } };
+  const shelfSides = new Set();
+  for (const l of locations) {
+    const p = parseLocationCode(l.location_code);
+    if (!p) continue;
+    if (isAisleSide(p.side)) {
+      sidesConfig.A.rows = Math.max(sidesConfig.A.rows, p.row);
+      sidesConfig.A.count += 1;
+      sidesConfig.A.capacity = Math.max(sidesConfig.A.capacity, Number(l.capacity) || 0);
+      continue;
+    }
+    shelfSides.add(p.side);
+    sidesConfig[p.side].rows = Math.max(sidesConfig[p.side].rows, p.row);
   }
-  const sides = [...new Set(parsed.map((p) => p.side))].sort();
+  const sides = [...shelfSides].sort();
 
   return { rows: sidesConfig.L.rows + sidesConfig.R.rows, numSides: sides.length, sides, sidesConfig };
+}
+
+const SIDE_NAMES = { L: 'ฝั่งซ้าย', R: 'ฝั่งขวา', [AISLE_SIDE]: 'ทางเดิน' };
+
+export function buildLocationName(zoneName, side, row) {
+  if (isAisleSide(side)) return `${zoneName} ทางเดิน ข้างแถว ${row}`;
+  return `${zoneName} ${SIDE_NAMES[side] ?? `ฝั่ง${side}`} ${formatRowLabel(row)}`;
+}
+
+// One aisle slot per shelf row (1..the longer of L/R; the staging row 0 has
+// no aisle slot). Returns [] when the aisle is switched off.
+export function aisleRowsFor(aisleConfig, leftConfig, rightConfig) {
+  if (!aisleConfig?.active) return [];
+  const maxRows = Math.max(
+    leftConfig?.active ? Number(leftConfig.rows) || 0 : 0,
+    rightConfig?.active ? Number(rightConfig.rows) || 0 : 0,
+  );
+  return Array.from({ length: maxRows }, (_, i) => i + 1);
+}
+
+function aisleCapacityFor(aisleConfig) {
+  return Number(aisleConfig?.capacity) || DEFAULT_AISLE_CAPACITY;
 }
 
 function isUnknownColumnError(error) {
@@ -388,7 +430,7 @@ export async function getActiveLocations() {
 // Location code format: {roomCode}-{side}-{row:02d}  e.g. H1-L-01 -- one
 // location per row now (see locationCodeUtils.js); capacity is a single
 // pallets-per-row figure applied to every row created for this zone.
-export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig, capacity }) {
+export async function createSection({ warehouseId, zoneCode, zoneName, temperatureType, leftConfig, rightConfig, aisleConfig, capacity }) {
   if (!supabase) return missing();
 
   let { data: zone, error: ze } = await supabase
@@ -425,7 +467,6 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
     .single();
   if (re) return { error: re };
 
-  const sideNames = { L: 'ซ้าย', R: 'ขวา' };
   const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
   const inserts = [];
 
@@ -442,7 +483,7 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
         zone_id: zone.id,
         name: code,
         location_code: code,
-        location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(r)}`,
+        location_name: buildLocationName(zoneName, side, r),
         location_type: 'SHELF',
         capacity: rowCapacity,
       });
@@ -452,6 +493,19 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   addSideLocations('L', leftConfig);
   addSideLocations('R', rightConfig);
 
+  for (const r of aisleRowsFor(aisleConfig, leftConfig, rightConfig)) {
+    const code = buildLocationCode(zoneCode, AISLE_SIDE, r);
+    inserts.push({
+      room_id: room.id,
+      zone_id: zone.id,
+      name: code,
+      location_code: code,
+      location_name: buildLocationName(zoneName, AISLE_SIDE, r),
+      location_type: AISLE_LOCATION_TYPE,
+      capacity: aisleCapacityFor(aisleConfig),
+    });
+  }
+
   if (inserts.length > 0) {
     const { error: le } = await insertLocationsWithSchemaFallback(inserts);
     if (le) return { error: le };
@@ -460,7 +514,10 @@ export async function createSection({ warehouseId, zoneCode, zoneName, temperatu
   return { data: zone, error: null };
 }
 
-export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig, rightConfig, capacity }) {
+// aisleConfig: { active, capacity } -- omit it (undefined) to leave the
+// zone's existing aisle slots exactly as they are, so a caller that predates
+// the aisle feature can never delete aisle slots by accident.
+export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig, rightConfig, aisleConfig, capacity }) {
   if (!supabase) return missing();
 
   const { data: rooms, error: roomErr } = await supabase
@@ -488,10 +545,11 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
     ? await getOccupiedPalletCountByLocationId(locIds)
     : new Map();
 
-  const sideNames = { L: 'ซ้าย', R: 'ขวา' };
   const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
   const desiredCodes = new Set();
   const toInsertRows = [];
+  const manageAisle = aisleConfig !== undefined;
+  const isAisleCode = (code) => isAisleSide(parseLocationCode(code)?.side);
 
   const addSide = (side, config) => {
     if (!config?.active) return;
@@ -505,7 +563,7 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
           zone_id: zoneId,
           name: code,
           location_code: code,
-          location_name: `${zoneName} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(r)}`,
+          location_name: buildLocationName(zoneName, side, r),
           location_type: 'SHELF',
           capacity: rowCapacity,
         });
@@ -516,7 +574,28 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
   addSide('L', leftConfig);
   addSide('R', rightConfig);
 
-  const toDeleteCodes = [...existingCodes].filter((code) => !desiredCodes.has(code));
+  if (manageAisle) {
+    for (const r of aisleRowsFor(aisleConfig, leftConfig, rightConfig)) {
+      const code = buildLocationCode(zoneCode, AISLE_SIDE, r);
+      desiredCodes.add(code);
+      if (!existingCodes.has(code)) {
+        toInsertRows.push({
+          room_id: roomId,
+          zone_id: zoneId,
+          name: code,
+          location_code: code,
+          location_name: buildLocationName(zoneName, AISLE_SIDE, r),
+          location_type: AISLE_LOCATION_TYPE,
+          capacity: aisleCapacityFor(aisleConfig),
+        });
+      }
+    }
+  }
+
+  const toDeleteCodes = [...existingCodes].filter((code) => {
+    if (desiredCodes.has(code)) return false;
+    return manageAisle || !isAisleCode(code);
+  });
   const occupiedToDelete = toDeleteCodes.filter((code) => {
     const loc = existingMap.get(code);
     return loc && (occupiedPalletCountById.get(loc.id) ?? 0) > 0;
@@ -537,9 +616,18 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
   // Apply a changed capacity to every row this zone already has too, not
   // just newly-inserted ones -- otherwise adjusting it later would only
   // ever affect rows added after that point.
-  if (locIds.length > 0) {
-    const { error: capErr } = await supabase.from('tgd_locations').update({ capacity: rowCapacity }).in('id', locIds);
+  // Aisle slots keep their own (smaller) capacity.
+  const shelfIds = (existingLocs ?? []).filter((l) => !isAisleCode(l.location_code)).map((l) => l.id);
+  if (shelfIds.length > 0) {
+    const { error: capErr } = await supabase.from('tgd_locations').update({ capacity: rowCapacity }).in('id', shelfIds);
     if (capErr) return { error: capErr };
+  }
+  const keptAisleIds = (existingLocs ?? [])
+    .filter((l) => isAisleCode(l.location_code) && desiredCodes.has(l.location_code))
+    .map((l) => l.id);
+  if (manageAisle && keptAisleIds.length > 0) {
+    const { error: aisleCapErr } = await supabase.from('tgd_locations').update({ capacity: aisleCapacityFor(aisleConfig) }).in('id', keptAisleIds);
+    if (aisleCapErr) return { error: aisleCapErr };
   }
 
   if (toInsertRows.length > 0) {
@@ -681,10 +769,10 @@ export async function updateLocation(locationId, { capacity, zoneCode, side, row
         targetRoomId = targetRoom.id;
       }
 
-      const sideNames = { L: 'ซ้าย', R: 'ขวา' };
       updates.location_code = newCode;
       updates.name = newCode;
-      updates.location_name = `${targetZone.zone_name} ฝั่ง${sideNames[side] ?? side} ${formatRowLabel(Number(row))}`;
+      updates.location_name = buildLocationName(targetZone.zone_name, side, Number(row));
+      updates.location_type = isAisleSide(side) ? AISLE_LOCATION_TYPE : 'SHELF';
       updates.zone_id = targetZone.id;
       updates.room_id = targetRoomId;
     }

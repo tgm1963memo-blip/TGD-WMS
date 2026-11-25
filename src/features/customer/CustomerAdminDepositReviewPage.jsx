@@ -27,7 +27,7 @@ import {
   setDepositOvertime,
   setDepositVehicleRegistration,
 } from '../../services/customerDepositRequestService.js';
-import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
+import { WorkPhaseTimeControl, WorkPhaseTemperatureControl, OvertimeControl, VehicleRegistrationControl, TransportInfoControl, useOvertimeEstimate } from '../../components/customer/WorkPhaseTimeControl.jsx';
 import { getR3VehicleRegistration } from '../../utils/vehicleRegistrationUtils.js';
 import { mergeDepositRequestsForPrint } from '../../utils/mergeRequestLinesForPrint.js';
 import { getDocumentBrandingConfig } from '../../services/documentBrandingService.js';
@@ -43,7 +43,8 @@ import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/te
 // later during physical receiving), same "not yet confirmed" boundary the
 // per-line recount button already uses on this page.
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
-import { printStickers, StickerPageSizeControl, StickerRotationControl } from '../../utils/stickerPrint.jsx';
+import { printStickers, StickerPageSizeControl, StickerRotationControl, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
+import { useA5StickerPrint } from '../../components/sticker/A5StickerPrint.jsx';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { exportCustomerDepositDocumentExcel, exportCustomerDepositDocumentFormExcel } from '../../utils/customerDepositLineExcelUtils.js';
 
@@ -74,6 +75,7 @@ export function CustomerAdminDepositReviewPage() {
   const [lines, setLines] = useState([]);
   const [linesLoading, setLinesLoading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const a5Print = useA5StickerPrint();
   const [selectedId, setSelectedId] = useState(routeRequestId ?? '');
   const [detailOpen, setDetailOpen] = useState(!!routeRequestId);
   const [comment, setComment] = useState('');
@@ -533,29 +535,49 @@ export function CustomerAdminDepositReviewPage() {
     setCombining(false);
   }
 
+  function buildReviewStickerItem(l) {
+    const quantityParts = [];
+    if (l.actual_boxes != null) quantityParts.push(`${l.actual_boxes} กล่อง`);
+    if (l.actual_weight != null) quantityParts.push(`${Number(l.actual_weight).toLocaleString('th-TH')} กก.`);
+    const catalogMatch = catalogProducts.find((p) => p.customer_product_code === l.customer_product_code);
+    return {
+      depositDate: selected?.last_action_at ?? selected?.expected_arrival_date ?? null,
+      customerName: selected?.customer?.customer_name || selected?.customer?.name || '',
+      productName: l.product_name ?? l.customer_product_code ?? '-',
+      productCode: l.customer_product_code ?? l.internal_product_code ?? '',
+      quantityLabel: quantityParts.join(' / ') || '-',
+      locationCode: l.location?.location_code ?? '-',
+      trackingCode: l.tracking_code ?? '',
+      allergenLabel: allergenThermalLabel(resolveAllergen(catalogMatch)),
+    };
+  }
+
   function handlePrintSelectedStickers() {
-    const depositDate = selected?.last_action_at ?? selected?.expected_arrival_date ?? null;
-    const customerName = selected?.customer?.customer_name || selected?.customer?.name || '';
-    const items = lines
-      .filter((l) => selectedLineIds.has(l.id))
-      .map((l) => {
-        const quantityParts = [];
-        if (l.actual_boxes != null) quantityParts.push(`${l.actual_boxes} กล่อง`);
-        if (l.actual_weight != null) quantityParts.push(`${Number(l.actual_weight).toLocaleString('th-TH')} กก.`);
-        const catalogMatch = catalogProducts.find((p) => p.customer_product_code === l.customer_product_code);
-        return {
-          depositDate,
-          customerName,
-          productName: l.product_name ?? l.customer_product_code ?? '-',
-          productCode: l.customer_product_code ?? l.internal_product_code ?? '',
-          quantityLabel: quantityParts.join(' / ') || '-',
-          locationCode: l.location?.location_code ?? '-',
-          trackingCode: l.tracking_code ?? '',
-          allergenLabel: catalogMatch?.allergen || '',
-        };
-      });
+    const items = lines.filter((l) => selectedLineIds.has(l.id)).map(buildReviewStickerItem);
     if (!items.length) return;
     printStickers(items);
+  }
+
+  function handlePrintSelectedA5() {
+    const entries = lines.filter((l) => selectedLineIds.has(l.id)).map((l) => {
+      const catalogMatch = catalogProducts.find((p) => p.customer_product_code === l.customer_product_code);
+      const allergen = resolveAllergen(catalogMatch);
+      return {
+        lineId: l.id,
+        boxesPerPallet: catalogMatch?.default_boxes_per_pallet ?? null,
+        baseItem: {
+          ...buildReviewStickerItem(l),
+          lotNo: l.lot_no,
+          mfgDate: l.mfg_date,
+          expDate: l.exp_date,
+          lotBoxes: l.actual_boxes ?? l.expected_boxes ?? 0,
+          lotWeight: l.actual_weight ?? l.expected_weight ?? null,
+          allergenStatus: allergen.status,
+          allergenText: allergen.text,
+        },
+      };
+    });
+    a5Print.requestPrint(entries);
   }
 
   if (loading) {
@@ -813,6 +835,12 @@ export function CustomerAdminDepositReviewPage() {
                 canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
                 onSave={handleSaveVehicleRegistration}
               />
+              <TransportInfoControl
+                key={`transport-${selected.id}`}
+                documentType="CUSTOMER_DEPOSIT_REQUEST"
+                requestId={selected.id}
+                canWrite={canWrite && !['CANCELLED', 'REJECTED', 'ADMIN_REJECTED'].includes(selected.status)}
+              />
               <div>
                 <div className="form-label">{t('customer_field_r3_document')}</div>
                 <div>{selected.requires_r3_document ? <Check size={16} role="img" aria-label="มี" /> : '-'}</div>
@@ -910,6 +938,15 @@ export function CustomerAdminDepositReviewPage() {
                     onClick={handlePrintSelectedStickers}
                   >
                     <IconLabel icon={Printer} size={14} gap={6}>พิมพ์สติกเกอร์ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    disabled={selectedLineIds.size === 0 || a5Print.busy}
+                    onClick={handlePrintSelectedA5}
+                    data-testid="admin-deposit-print-selected-a5"
+                  >
+                    <IconLabel icon={Printer} size={14} gap={6}>พิมพ์ A5 ที่เลือก{selectedLineIds.size > 0 ? ` (${selectedLineIds.size})` : ''}</IconLabel>
                   </button>
                 </div>
               </div>
@@ -1384,6 +1421,7 @@ export function CustomerAdminDepositReviewPage() {
           />
         </label>
       </Modal>
+      {a5Print.dialog}
     </section>
   );
 }

@@ -11,8 +11,40 @@
 // src/components/customer/CustomerDepositDetailModal.jsx) -- now all four
 // import from here instead.
 
+// Side "A" is the forklift aisle between the L and R rows. Overflow pallets
+// are parked there temporarily, one aisle slot per row ("41-A-30" sits
+// beside row 30). Each slot is an ordinary tgd_locations row with
+// location_type = 'AISLE'.
+export const AISLE_SIDE = 'A';
+export const LOCATION_SIDES = ['L', 'R', AISLE_SIDE];
+export const DEFAULT_AISLE_CAPACITY = 2;
+export const AISLE_LOCATION_TYPE = 'AISLE';
+
+export function isAisleSide(side) {
+  return String(side ?? '').toUpperCase() === AISLE_SIDE;
+}
+
+// L, R, then the aisle last -- so a picker that defaults to the first side
+// never lands on the temporary aisle slots.
+export function sortSides(sides) {
+  const rank = (s) => { const i = LOCATION_SIDES.indexOf(String(s).toUpperCase()); return i === -1 ? 99 : i; };
+  return [...sides].sort((a, b) => rank(a) - rank(b) || String(a).localeCompare(String(b)));
+}
+
+export function formatSideLabel(side) {
+  const s = String(side ?? '').toUpperCase();
+  if (s === 'L') return 'ซ้าย (L)';
+  if (s === 'R') return 'ขวา (R)';
+  if (s === AISLE_SIDE) return 'ทางเดิน (A)';
+  return s || '-';
+}
+
+export function isAisleLocationCode(code) {
+  return isAisleSide(parseLocationCode(code)?.side);
+}
+
 export function parseLocationCode(code) {
-  const m = /^(.+)-([LR])-(\d+)$/i.exec(code ?? '');
+  const m = /^(.+)-([LRA])-(\d+)$/i.exec(code ?? '');
   return m ? { room: m[1], side: m[2].toUpperCase(), row: Number(m[3]) } : null;
 }
 
@@ -33,7 +65,8 @@ export function buildPalletCode(locationCode, palletNo) {
 // regular row in every other respect (capacity, pallets, allocations) that
 // just sorts first (0 < 1, 2, 3...) and displays with this label instead
 // of a number.
-export function formatRowLabel(row) {
+export function formatRowLabel(row, side = null) {
+  if (isAisleSide(side)) return `ทางเดิน ${row}`;
   return row === 0 ? 'รอจ่าย' : `แถว ${row}`;
 }
 

@@ -14,7 +14,7 @@ import {
   LOCATION_RESET_ROLES,
 } from '../../services/warehouseLayoutService.js';
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
-import { parseLocationCode, formatRowLabel } from '../../utils/locationCodeUtils.js';
+import { parseLocationCode, formatRowLabel, isAisleSide, DEFAULT_AISLE_CAPACITY } from '../../utils/locationCodeUtils.js';
 import { ExcelImportExportToolbar } from '../../components/customer/ExcelImportExportToolbar.jsx';
 import { listDepositLinesForLocationAssignment, importDepositLineLocationAssignments } from '../../services/customerDepositRequestService.js';
 import { getCustomers } from '../../services/masterDataService.js';
@@ -37,6 +37,8 @@ const EMPTY_FORM = {
   rightRows: 5,
   rightStaging: false,
   capacity: DEFAULT_CAPACITY,
+  aisleActive: false,
+  aisleCapacity: DEFAULT_AISLE_CAPACITY,
 };
 
 const TEMP_OPTIONS = [
@@ -63,11 +65,51 @@ function describeGrid(gridInfo) {
   const parts = [];
   if (gridInfo.sidesConfig?.L?.rows > 0) parts.push(`L: ${gridInfo.sidesConfig.L.rows} แถว`);
   if (gridInfo.sidesConfig?.R?.rows > 0) parts.push(`R: ${gridInfo.sidesConfig.R.rows} แถว`);
+  if (gridInfo.sidesConfig?.A?.count > 0) parts.push(`ทางเดิน: ${gridInfo.sidesConfig.A.count} ช่อง`);
   return parts.join(' · ');
 }
 
+// Shelf-row capacity only -- aisle slots carry their own smaller capacity.
 function sectionCapacity(section) {
-  return section.locations?.find((l) => l.capacity)?.capacity ?? DEFAULT_CAPACITY;
+  return section.locations?.find((l) => l.capacity && !isAisleSide(parseLocationCode(l.location_code)?.side))?.capacity ?? DEFAULT_CAPACITY;
+}
+
+function AisleConfigFields({ active, capacity, onChange, testIdPrefix }) {
+  return (
+    <div style={{ background: 'var(--color-warning-soft)', border: '1px dashed #d08a2c', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600, color: '#9a5a00' }}>
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={(e) => onChange('aisleActive', e.target.checked)}
+          data-testid={`${testIdPrefix}-aisle-active`}
+          style={{ width: 16, height: 16, accentColor: '#b9660a' }}
+        />
+        มีช่องวางที่ทางเดิน (A)
+      </label>
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+        สำหรับสินค้าที่วางเกินพื้นที่ชั่วคราว สร้าง 1 ช่องต่อแถว รหัสเช่น 41-A-30 (ข้างแถว 30)
+      </div>
+      {active && (
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-body)', marginTop: 10, maxWidth: 220 }}>
+          ความจุต่อช่องทางเดิน (pallet)
+          <input
+            className="form-control"
+            type="number"
+            min={1} max={20}
+            value={capacity}
+            onChange={(e) => onChange('aisleCapacity', e.target.value)}
+            data-testid={`${testIdPrefix}-aisle-capacity`}
+            style={{ display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function aisleConfigFromForm(active, capacity) {
+  return { active: !!active, capacity: Math.max(1, +capacity || DEFAULT_AISLE_CAPACITY) };
 }
 
 // A "รอจ่าย" staging row is just row 0 for that side (see
@@ -91,6 +133,8 @@ function initEditForm(section) {
     rightRows: sc.R?.rows || 5,
     rightStaging: sideHasStagingRow(section, 'R'),
     capacity: sectionCapacity(section),
+    aisleActive: (sc.A?.count ?? 0) > 0,
+    aisleCapacity: sc.A?.capacity || DEFAULT_AISLE_CAPACITY,
   };
 }
 
@@ -152,7 +196,7 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
     <div style={{ border: '1px solid #eef2f7', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: location.isOccupied ? 'var(--color-warning-soft)' : 'var(--color-surface)', flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: 'var(--color-text-strong)', minWidth: 100 }}>{location.location_code}</span>
-        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row) : '-'}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', minWidth: 70 }}>{parsed ? formatRowLabel(parsed.row, parsed.side) : '-'}</span>
         <span style={{ fontSize: 12, color: location.isOccupied ? 'var(--color-warning)' : 'var(--color-text-subtle)', flex: 1 }}>
           ใช้ไป {location.usedCount}/{location.capacity} pallet
         </span>
@@ -210,6 +254,7 @@ function LocationRow({ location, zoneCode, onDelete, onEdit, onReset }) {
               value={form.side} onChange={(e) => setForm((f) => ({ ...f, side: e.target.value }))}>
               <option value="L">L</option>
               <option value="R">R</option>
+              <option value="A">A (ทางเดิน)</option>
             </select>
           </label>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-body)' }}>
@@ -291,6 +336,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
       zoneName: section.name,
       leftConfig: { active: editForm.leftActive, rows: lRows, staging: editForm.leftStaging },
       rightConfig: { active: editForm.rightActive, rows: rRows, staging: editForm.rightStaging },
+      aisleConfig: aisleConfigFromForm(editForm.aisleActive, editForm.aisleCapacity),
       capacity,
     });
     setEditSaving(false);
@@ -498,6 +544,7 @@ function SectionCard({ section, onDelete, onEdit, onDeleteLocation, onEditLocati
             />
             <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
           </label>
+          <AisleConfigFields active={editForm.aisleActive} capacity={editForm.aisleCapacity} onChange={setEf} testIdPrefix="edit-section" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
               รวม <strong style={{ color: 'var(--color-text-strong)' }}>{editTotal}</strong> แถว
@@ -766,6 +813,7 @@ function AddSectionForm({ onAdd }) {
       temperatureType: form.temperatureType,
       leftConfig,
       rightConfig,
+      aisleConfig: aisleConfigFromForm(form.aisleActive, form.aisleCapacity),
       capacity,
     });
     setSaving(false);
@@ -936,6 +984,8 @@ function AddSectionForm({ onAdd }) {
         />
         <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 400 }}>ใช้กับทุกแถวในห้องนี้ (ปกติ 12-16)</span>
       </label>
+
+      <AisleConfigFields active={form.aisleActive} capacity={form.aisleCapacity} onChange={set} testIdPrefix="add-section" />
 
       {/* Preview */}
       <div style={{
