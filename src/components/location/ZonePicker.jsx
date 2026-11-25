@@ -15,9 +15,10 @@ const CACHE_MS = 2 * 60 * 1000;
 let cache = null;
 let cacheAt = 0;
 
-export function useZonePicker(room) {
+// Every room's zones (with zone_code), shared with the pickers' cache. Also
+// used by reports to fill their "Zone" column.
+export function useAllLocationGroups() {
   const [groups, setGroups] = useState(cache ?? []);
-  const [groupId, setGroupId] = useState('');
 
   useEffect(() => {
     if (cache && Date.now() - cacheAt < CACHE_MS) return undefined;
@@ -29,6 +30,13 @@ export function useZonePicker(room) {
     });
     return () => { current = false; };
   }, []);
+
+  return groups;
+}
+
+export function useZonePicker(room) {
+  const groups = useAllLocationGroups();
+  const [groupId, setGroupId] = useState('');
 
   // A zone belongs to one room; switching rooms clears the choice.
   useEffect(() => { setGroupId(''); }, [room]);
