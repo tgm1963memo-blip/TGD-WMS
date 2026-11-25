@@ -155,6 +155,7 @@ function openingBalanceExcelRow(meta, opening) {
     'วันผลิต': meta.mfg_date ? formatDocumentDate(meta.mfg_date, { dateOnly: true }) : '-',
     'อุณหภูมิ': meta.temperature_type || '-',
     'Location': meta.location_name || '-',
+    ...('zone_name' in meta ? { 'Zone': meta.zone_name || '-' } : {}),
     'รับเข้า(กล่อง)': '',
     'รับเข้า(น้ำหนัก)': '',
     'จ่ายออก(กล่อง)': '',
@@ -182,6 +183,7 @@ function movementExcelRow(row, balance) {
     'วันผลิต': row.mfg_date ? formatDocumentDate(row.mfg_date, { dateOnly: true }) : '-',
     'อุณหภูมิ': row.temperature_type || '-',
     'Location': row.location_name || '-',
+    ...('zone_name' in row ? { 'Zone': row.zone_name || '-' } : {}),
     'รับเข้า(กล่อง)': inbound ? qty : '',
     'รับเข้า(น้ำหนัก)': inbound ? fmtWt(row.weight) : '',
     'จ่ายออก(กล่อง)': inbound ? '' : qty,
@@ -350,5 +352,21 @@ export function buildMovementLedgerExcelRows(rows = [], openingBalances = new Ma
 export function downloadMovementLedgerExcel(rows = [], openingBalances = new Map(), sortMode = 'productLot', filenamePrefix = 'movement-ledger', authoritativeTotals = null) {
   const excelRows = buildMovementLedgerExcelRows(rows, openingBalances, sortMode, authoritativeTotals);
   const stamp = new Date().toISOString().slice(0, 10);
-  downloadExcelRows(excelRows, MOVEMENT_LEDGER_EXCEL_HEADERS, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger', MOVEMENT_LEDGER_EXCEL_COLUMN_WIDTHS);
+  const { headers, widths } = movementLedgerExcelLayout(rows);
+  downloadExcelRows(excelRows, headers, `${filenamePrefix}-${stamp}.xlsx`, 'Movement Ledger', widths);
+}
+
+// The admin report attaches zone_name to every row; then the export gets a
+// "Zone" column right after "Location". The customer report never does, so
+// its file keeps the original columns.
+export function movementLedgerExcelLayout(rows = []) {
+  if (!rows.some((row) => row && 'zone_name' in row)) {
+    return { headers: MOVEMENT_LEDGER_EXCEL_HEADERS, widths: MOVEMENT_LEDGER_EXCEL_COLUMN_WIDTHS };
+  }
+  const at = MOVEMENT_LEDGER_EXCEL_HEADERS.indexOf('Location') + 1;
+  const headers = [...MOVEMENT_LEDGER_EXCEL_HEADERS];
+  headers.splice(at, 0, 'Zone');
+  const widths = [...MOVEMENT_LEDGER_EXCEL_COLUMN_WIDTHS];
+  widths.splice(at, 0, 18);
+  return { headers, widths };
 }

@@ -19,6 +19,8 @@ import { downloadMovementLedgerExcel, aggregateFinalBalances, sortRowsByProductT
 import { getCustomers, getProducts } from '../../services/masterDataService.js';
 import { listCustomerProductCategories } from '../../services/customerProductCatalogService.js';
 import { getActiveLocations } from '../../services/warehouseLayoutService.js';
+import { useAllLocationGroups } from '../../components/location/ZonePicker.jsx';
+import { zoneNamesForLocationText } from '../../utils/locationGroupUtils.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 
 const initialState = {
@@ -88,6 +90,7 @@ export function MovementLedgerReportPage() {
   const [customerOptions, setCustomerOptions] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [locationOptions, setLocationOptions] = useState([]);
+  const zoneGroups = useAllLocationGroups();
   const [categoryOptions, setCategoryOptions] = useState([]);
 
   useEffect(() => {
@@ -262,8 +265,13 @@ export function MovementLedgerReportPage() {
 
   const t = (key) => getTranslation(key, language);
   const isGrouped = sortMode !== 'date';
+  // Zone of each row's location (internal label; admin report only).
+  const rowsWithZone = useMemo(
+    () => state.rows.map((row) => ({ ...row, zone_name: zoneNamesForLocationText(zoneGroups, row.location_name ?? '') })),
+    [state.rows, zoneGroups],
+  );
   const displayRows = useMemo(() => {
-    const ordered = isGrouped ? sortRowsByProductThenLot(state.rows, groupBy) : state.rows;
+    const ordered = isGrouped ? sortRowsByProductThenLot(rowsWithZone, groupBy) : rowsWithZone;
     const running = new Map();
     let currentKey = null;
     let balance = { qty: 0, weight: 0 };
@@ -365,7 +373,7 @@ export function MovementLedgerReportPage() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => downloadMovementLedgerExcel(state.rows, openingBalances, sortMode, 'movement-ledger', authoritativeTotals)}
+                onClick={() => downloadMovementLedgerExcel(rowsWithZone, openingBalances, sortMode, 'movement-ledger', authoritativeTotals)}
                 disabled={state.rows.length === 0}
               >
                 Export Excel

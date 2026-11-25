@@ -20,6 +20,8 @@ import {
 import { downloadExcelRows } from '../../utils/excelFileUtils.js';
 import { formatFixed2, round2 } from '../../utils/numberFormat.js';
 import { buildPalletCode } from '../../utils/locationCodeUtils.js';
+import { useAllLocationGroups } from '../../components/location/ZonePicker.jsx';
+import { zoneNamesForLocationText } from '../../utils/locationGroupUtils.js';
 
 const RESULT_COLORS = {
   MATCH: '#059669', SHORT: '#d97706', OVER: '#2563eb', MISSING: '#dc2626', UNEXPECTED: '#7c3aed',
@@ -27,7 +29,7 @@ const RESULT_COLORS = {
 const STATUS_COLORS = { OPEN: '#2563eb', SUBMITTED: '#d97706', REVIEWED: '#059669', CANCELLED: '#94a3b8' };
 
 const EXPORT_HEADERS = [
-  'Location', 'พาเลท', 'รหัสสินค้า', 'ชื่อสินค้า', 'LOT', 'รหัสติดตาม',
+  'Location', 'พาเลท', 'Zone', 'รหัสสินค้า', 'ชื่อสินค้า', 'LOT', 'รหัสติดตาม',
   'ในระบบ (กล่อง)', 'นับได้ (กล่อง)', 'ต่าง (กล่อง)', 'ในระบบ (กก.)', 'นับได้ (กก.)', 'ต่าง (กก.)',
   'ผล', 'หมายเหตุ', 'ผู้นับ', 'เวลานับ',
 ];
@@ -58,6 +60,7 @@ function diff(counted, expected) {
 export function StockCountReviewPage() {
   const { role } = useUserRole();
   const canReview = canReviewLocationCount(role);
+  const zoneGroups = useAllLocationGroups();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -128,6 +131,7 @@ export function StockCountReviewPage() {
     const rows = lines.map((l) => ({
       'Location': l.location_code ?? '-',
       'พาเลท': l.pallet_no != null ? palletLabel(l) : '',
+      'Zone': zoneNamesForLocationText(zoneGroups, l.location_code) || '-',
       'รหัสสินค้า': l.customer_product_code ?? '-',
       'ชื่อสินค้า': l.product_name ?? '-',
       'LOT': l.lot_no ?? '-',
@@ -220,7 +224,7 @@ export function StockCountReviewPage() {
               <table className="data-table" style={{ fontSize: 13 }} data-testid="stock-count-line-table">
                 <thead>
                   <tr>
-                    <th>รูป</th><th>Location / พาเลท</th><th>สินค้า</th><th>LOT / รหัสติดตาม</th>
+                    <th>รูป</th><th>Location / พาเลท</th><th>Zone</th><th>สินค้า</th><th>LOT / รหัสติดตาม</th>
                     <th style={{ textAlign: 'right' }}>ในระบบ</th><th style={{ textAlign: 'right' }}>นับได้</th><th style={{ textAlign: 'right' }}>ต่าง</th>
                     <th>ผล</th><th>หมายเหตุ / ผู้นับ</th>
                   </tr>
@@ -239,6 +243,7 @@ export function StockCountReviewPage() {
                           ) : <span style={{ color: 'var(--tgd-muted-text)', fontSize: 11 }}>ไม่มีรูป</span>}
                         </td>
                         <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{palletLabel(l)}</td>
+                        <td style={{ overflowWrap: 'anywhere' }}>{zoneNamesForLocationText(zoneGroups, l.location_code) || '-'}</td>
                         <td>
                           <div style={{ fontWeight: 600 }}>{l.product_name ?? '-'}</div>
                           <div style={{ fontSize: 12, color: 'var(--tgd-muted-text)' }}>{l.customer_product_code ?? ''}</div>
@@ -260,7 +265,7 @@ export function StockCountReviewPage() {
                       </tr>
                     );
                   }) : (
-                    <tr><td colSpan={9}>{varianceOnly ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>ไม่มีรายการที่ไม่ตรง<PartyPopper size={16} aria-hidden="true" /></span> : 'ยังไม่มีผลการนับ'}</td></tr>
+                    <tr><td colSpan={10}>{varianceOnly ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>ไม่มีรายการที่ไม่ตรง<PartyPopper size={16} aria-hidden="true" /></span> : 'ยังไม่มีผลการนับ'}</td></tr>
                   )}
                 </tbody>
               </table>

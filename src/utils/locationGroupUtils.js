@@ -70,3 +70,21 @@ export function applyRowNamePattern(pattern, row, side) {
   const name = p.replace(/\{(แถว|row)\}/gi, String(row)).replace(/\{(ฝั่ง|side)\}/gi, String(side ?? ''));
   return hasRow ? name : `${name}${row}`;
 }
+
+// Zone names for any text holding location codes: a row code (41-L-30), a
+// pallet code (41-L-30-05), a picker label ("41 · 41-L-30") or several
+// pallets joined with commas. groups need zone_code (see getLocationGroups).
+// Returns unique zone names joined with ", ", or '' when none match.
+const LOCATION_CODE_IN_TEXT = /([A-Za-z0-9]+)-([LRA])-(\d+)/gi;
+
+export function zoneNamesForLocationText(groups = [], text = '') {
+  if (!groups.length || !text) return '';
+  const names = [];
+  for (const m of String(text).matchAll(LOCATION_CODE_IN_TEXT)) {
+    const room = m[1];
+    const parsed = { side: m[2].toUpperCase(), row: Number(m[3]) };
+    const group = findLocationGroup(groups.filter((g) => String(g.zone_code) === String(room)), parsed);
+    if (group && !names.includes(group.name)) names.push(group.name);
+  }
+  return names.join(', ');
+}

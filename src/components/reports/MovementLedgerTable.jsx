@@ -195,6 +195,8 @@ function renderMovementDetail(row) {
       <DetailField label="อุณหภูมิ" value={row.temperature_type} />
       <DetailField label="ตำแหน่งต้นทาง" value={row.from_location_id} />
       <DetailField label="ตำแหน่งปลายทาง" value={row.to_location_id} />
+      <DetailField label="Location" value={row.location_name} />
+      {'zone_name' in row ? <DetailField label="Zone" value={row.zone_name || '-'} /> : null}
       {inbound ? (
         <>
           <DetailField label="รับเข้า (กล่อง)" value={row.qty ?? row.quantity} />

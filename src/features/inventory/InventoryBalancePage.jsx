@@ -16,6 +16,8 @@ import { splitBalanceByLocation, UNASSIGNED_LOCATION_LABEL } from '../../utils/s
 import { useUserRole } from '../auth/UserRoleProvider.jsx';
 import { InventoryLocationModal } from './InventoryLocationModal.jsx';
 import { canManageInventoryLocation, inventoryLocationLabel, listInventoryLocations } from '../../services/inventoryLocationService.js';
+import { useAllLocationGroups } from '../../components/location/ZonePicker.jsx';
+import { zoneNamesForLocationText } from '../../utils/locationGroupUtils.js';
 
 const BALANCE_SUMMARY_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
@@ -24,7 +26,7 @@ const BALANCE_SUMMARY_HEADERS = [
 
 const BALANCE_EXPORT_HEADERS = [
   'ลูกค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'อุณหภูมิ', 'เลขที่ใบฝาก', 'วันที่รับเข้า',
-  'LOT', 'รหัสติดตาม', 'Location / พาเลท', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
+  'LOT', 'รหัสติดตาม', 'Location / พาเลท', 'Zone', 'คงเหลือ (กล่อง)', 'คงเหลือ (กก.)', 'หมายเหตุลูกค้า', 'หมายเหตุ ADMIN',
 ];
 
 function lineBalanceBoxes(line) { return line.actual_boxes ?? line.expected_boxes ?? 0; }
@@ -57,11 +59,12 @@ function balanceSummaryRow(line, customerLabel) {
 // "แยก Location" sheet: one row per lot x pallet location (see
 // splitBalanceByLocation). Balance not on any pallet keeps its own row but
 // with the Location cell left blank.
-function balanceExportRows(line, customerLabel, allocations) {
+function balanceExportRows(line, customerLabel, allocations, zoneGroups = []) {
   const split = splitBalanceByLocation(lineBalanceBoxes(line), lineBalanceWeight(line), allocations ?? []);
   return split.map((part) => ({
     ...balanceLineFields(line, customerLabel),
     'Location / พาเลท': part.location === UNASSIGNED_LOCATION_LABEL ? '' : part.location,
+    'Zone': part.location === UNASSIGNED_LOCATION_LABEL ? '' : zoneNamesForLocationText(zoneGroups, part.location),
     'คงเหลือ (กล่อง)': part.boxes,
     'คงเหลือ (กก.)': part.weight,
     'หมายเหตุลูกค้า': line.note ?? '-',
@@ -97,6 +100,7 @@ export function InventoryBalancePage() {
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [locationsError, setLocationsError] = useState(null);
   const [locationRevision, setLocationRevision] = useState(0);
+  const zoneGroups = useAllLocationGroups();
   const [customers, setCustomers] = useState([]);
   const [lines, setLines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -275,7 +279,7 @@ export function InventoryBalancePage() {
       || naturalText(a.line.lot_no, b.line.lot_no)
       || naturalText(a.line.tracking_code, b.line.tracking_code));
     const summaryRows = labelled.map(({ line, customerLabel }) => balanceSummaryRow(line, customerLabel));
-    const locationRows = labelled.flatMap(({ line, customerLabel }) => balanceExportRows(line, customerLabel, locationMap.get(line.id)));
+    const locationRows = labelled.flatMap(({ line, customerLabel }) => balanceExportRows(line, customerLabel, locationMap.get(line.id), zoneGroups));
     const stamp = asOfDate || new Date().toISOString().slice(0, 10);
     downloadExcelWorkbookMultiSheet([
       { name: 'รวม', rows: summaryRows, headers: BALANCE_SUMMARY_HEADERS },
@@ -477,6 +481,7 @@ export function InventoryBalancePage() {
                               <th>LOT</th>
                               <th>รหัสติดตาม</th>
                               <th>{asOfDate ? 'Location ปัจจุบัน' : 'Location / พาเลท'}</th>
+                              <th>Zone</th>
                               <th className="cell-num">คงเหลือ (กล่อง)</th>
                               <th className="cell-num">คงเหลือ (กก.)</th>
                               <th>หมายเหตุลูกค้า</th>
@@ -504,6 +509,9 @@ export function InventoryBalancePage() {
                                 <td style={{ minWidth: 170, maxWidth: 280, overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
                                   <div>{locationsLoading ? 'กำลังโหลด...' : locationsError ? 'โหลด Location ไม่สำเร็จ' : inventoryLocationLabel(locationMap.get(l.id)) || 'ยังไม่กำหนด Location'}</div>
                                   {!asOfDate && canManageInventoryLocation(role) && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} disabled={locationsLoading || !!locationsError} onClick={() => setLocationLine(l)}>จัดการ Location</button>}
+                                </td>
+                                <td style={{ minWidth: 90, overflowWrap: 'anywhere', whiteSpace: 'normal' }} data-testid="stock-line-zone">
+                                  {zoneNamesForLocationText(zoneGroups, inventoryLocationLabel(locationMap.get(l.id))) || '-'}
                                 </td>
                                 <td className="cell-num">
                                   {l.actual_boxes?.toLocaleString() ?? (
