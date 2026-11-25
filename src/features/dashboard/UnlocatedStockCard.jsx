@@ -24,6 +24,63 @@ function formatDate(value) {
   return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' });
 }
 
+// Summary + preview rows, split out so it renders from plain data (the card
+// above loads the data). Every row shrinks to the card width: long customer
+// names are cut with "…" (full name in the tooltip) instead of overflowing.
+export function UnlocatedStockSummaryBody({ summary, onOpenItem, onViewAll }) {
+  const pct = summary?.pct ?? 0;
+  return (
+    <>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+      <span data-testid="unlocated-stock-pct" style={{ fontSize: 28, fontWeight: 900, color: AMBER, lineHeight: 1.1 }}>{pct}%</span>
+      <span style={{ fontSize: 12, opacity: 0.85 }}>
+        {formatNumber(summary.boxes)} กล่อง · {summary.lots} lot
+      </span>
+    </div>
+    <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden', margin: '8px 0 6px' }}>
+      <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: AMBER, borderRadius: 6 }} />
+    </div>
+    <div style={{ fontSize: 11, opacity: 0.75, lineHeight: 1.5 }}>
+      จากสต็อกในคลังทั้งหมด {formatNumber(summary.totalBoxes)} กล่อง
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 6, marginTop: 10 }}>
+      {summary.items.slice(0, PREVIEW_COUNT).map((item) => (
+        <button
+          key={item.lineId}
+          type="button"
+          onClick={() => onOpenItem(item)}
+          title={`${item.trackingCode ?? '-'} · ${item.customerName}`}
+          data-testid="unlocated-stock-item"
+          style={{
+            display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '2px 8px',
+            width: '100%', minWidth: 0, boxSizing: 'border-box', textAlign: 'left',
+            padding: '8px 10px', borderRadius: 8, border: 'none',
+            background: 'rgba(255,191,94,0.12)', color: '#fff', cursor: 'pointer', font: 'inherit',
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere', minWidth: 0 }}>{item.trackingCode ?? '-'}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: AMBER, fontVariantNumeric: 'tabular-nums' }}>{item.linePct}%</span>
+          <span style={{ gridColumn: '1 / -1', minWidth: 0, fontSize: 12, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {item.customerName}
+          </span>
+          <span style={{ gridColumn: '1 / -1', minWidth: 0, fontSize: 12, opacity: 0.85, overflowWrap: 'anywhere' }}>
+            ยังไม่วาง {formatNumber(item.unlocatedBoxes)}/{formatNumber(item.inStockBoxes)} กล่อง · รับ {formatDate(item.receivedAt)}
+          </span>
+        </button>
+      ))}
+    </div>
+    <button
+      type="button"
+      onClick={onViewAll}
+      data-testid="unlocated-stock-view-all"
+      style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,191,94,0.5)', background: 'transparent', color: AMBER, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+    >
+      ดูทั้งหมด {summary.lots} รายการ
+    </button>
+    </>
+  );
+}
+
 export function UnlocatedStockCard() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
@@ -55,12 +112,10 @@ export function UnlocatedStockCard() {
     if (item.depositRequestId) navigate(`/customer/admin/deposit-review/${item.depositRequestId}`);
   }
 
-  const pct = summary?.pct ?? 0;
-
   return (
     <div
       data-testid="unlocated-stock-card"
-      style={{ alignSelf: 'stretch', marginTop: 18, border: '1px solid rgba(255,191,94,0.45)', background: 'rgba(255,191,94,0.08)', borderRadius: 12, padding: 14 }}
+      style={{ alignSelf: 'stretch', minWidth: 0, boxSizing: 'border-box', marginTop: 18, border: '1px solid rgba(255,191,94,0.45)', background: 'rgba(255,191,94,0.08)', borderRadius: 12, padding: 14 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: AMBER, letterSpacing: '0.06em', flex: 1 }}>ยังไม่ระบุ LOCATION</div>
@@ -81,44 +136,7 @@ export function UnlocatedStockCard() {
       ) : summary?.lots === 0 ? (
         <div style={{ fontSize: 13, color: '#c9f2d8', fontWeight: 600 }}>สินค้าทุก lot มี Location แล้ว</div>
       ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span data-testid="unlocated-stock-pct" style={{ fontSize: 28, fontWeight: 900, color: AMBER, lineHeight: 1.1 }}>{pct}%</span>
-            <span style={{ fontSize: 12, opacity: 0.85 }}>
-              {formatNumber(summary.boxes)} กล่อง · {summary.lots} lot
-            </span>
-          </div>
-          <div style={{ height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden', margin: '8px 0 6px' }}>
-            <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: AMBER, borderRadius: 6 }} />
-          </div>
-          <div style={{ fontSize: 11, opacity: 0.75, lineHeight: 1.5 }}>
-            จากสต็อกในคลังทั้งหมด {formatNumber(summary.totalBoxes)} กล่อง
-          </div>
-          <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
-            {summary.items.slice(0, PREVIEW_COUNT).map((item) => (
-              <button
-                key={item.lineId}
-                type="button"
-                onClick={() => openDeposit(item)}
-                style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 8px', textAlign: 'left', padding: '7px 9px', borderRadius: 8, border: 'none', background: 'rgba(255,191,94,0.12)', color: '#fff', cursor: 'pointer', font: 'inherit' }}
-              >
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{item.trackingCode ?? '-'}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: AMBER }}>{item.linePct}%</span>
-                <span style={{ gridColumn: '1 / -1', fontSize: 11, opacity: 0.8 }}>
-                  {item.customerName} · ยังไม่วาง {formatNumber(item.unlocatedBoxes)}/{formatNumber(item.inStockBoxes)} กล่อง · รับ {formatDate(item.receivedAt)}
-                </span>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setListOpen(true)}
-            data-testid="unlocated-stock-view-all"
-            style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,191,94,0.5)', background: 'transparent', color: AMBER, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-          >
-            ดูทั้งหมด {summary.lots} รายการ
-          </button>
-        </>
+        <UnlocatedStockSummaryBody summary={summary} onOpenItem={openDeposit} onViewAll={() => setListOpen(true)} />
       )}
 
       {listOpen && summary && (

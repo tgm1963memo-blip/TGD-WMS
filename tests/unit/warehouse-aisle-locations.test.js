@@ -133,6 +133,22 @@ describe('updateSectionSize with aisle slots', () => {
     expect(aisleRows.every((r) => r.location_type === 'AISLE' && r.capacity === 2)).toBe(true);
   });
 
+  it('skips the slow occupancy read when the save deletes no rows', async () => {
+    const mock = baseMock();
+    const { updateSectionSize } = await loadServiceWith(mock);
+
+    await updateSectionSize('zone-41', {
+      zoneCode: '41', zoneName: 'ห้อง 41',
+      leftConfig: { active: true, rows: 2 }, rightConfig: { active: false, rows: 0 },
+      aisleConfig: { active: true, capacity: 2 },
+      capacity: 12,
+    });
+
+    const tables = mock.supabase.from.mock.calls.map(([table]) => table);
+    expect(tables).not.toContain('tgd_deposit_line_location_picked');
+    expect(tables).not.toContain('tgd_customer_deposit_line_locations');
+  });
+
   it('removes empty aisle slots only when the aisle is explicitly switched off', async () => {
     const mock = baseMock();
     const { updateSectionSize } = await loadServiceWith(mock);

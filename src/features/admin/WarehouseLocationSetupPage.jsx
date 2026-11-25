@@ -1039,8 +1039,8 @@ export function WarehouseLocationSetupPage() {
 
   useEffect(() => { load(); }, []);
 
-  async function load() {
-    setLoading(true);
+  async function load({ background = false } = {}) {
+    if (!background) setLoading(true);
     const { data: wh, error: we } = await ensureDefaultWarehouse();
     if (we) { setError(we); setLoading(false); return; }
     setWarehouseId(wh.id);
@@ -1067,9 +1067,12 @@ export function WarehouseLocationSetupPage() {
     await load();
   }
 
+  // The save itself is quick; reloading every room's pallet counts is what
+  // took long. Close the form as soon as the save succeeds and refresh the
+  // counts in the background (`refresh` keeps the rooms on screen meanwhile).
   async function handleEdit(zoneId, params) {
     const result = await updateSectionSize(zoneId, params);
-    if (!result.error) await load();
+    if (!result.error) load({ background: true });
     return result;
   }
 
