@@ -53,6 +53,7 @@ import { getActiveLocations, getPalletDetailsAtLocation, resolvePalletSlotState 
 import { checkLocationHasInventory } from '../../services/inventoryMovementService.js';
 import { parseLocationCode, formatRowLabel, formatSideLabel, sortSides, buildPalletCode, buildPalletAllocationWarning } from '../../utils/locationCodeUtils.js';
 import { rowOptionLabel } from '../../utils/locationGroupUtils.js';
+import { useZonePicker, narrowSides, narrowRows, ZoneChips } from '../../components/location/ZonePicker.jsx';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { enqueue as enqueueOfflineAction, summarizeQueue } from '../../utils/offlineActionQueue.js';
 import { saveSnapshot, loadSnapshot } from '../../utils/offlineSnapshotStore.js';
@@ -353,15 +354,17 @@ function ReceivingWorkflow({ onBack, t }) {
     return [...new Set(parsedLocs.map((l) => l.parsed.room))].sort();
   }, [parsedLocs, useHierarchy]);
 
+  const recvZone = useZonePicker(locZone);
+
   const availableSides = useMemo(() => {
     if (!locZone) return [];
-    return sortSides(new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side)));
-  }, [parsedLocs, locZone]);
+    return narrowSides(sortSides(new Set(parsedLocs.filter((l) => l.parsed.room === locZone).map((l) => l.parsed.side))), recvZone.activeGroup);
+  }, [parsedLocs, locZone, recvZone.activeGroup]);
 
   const availableRows = useMemo(() => {
     if (!locZone || !locSide) return [];
-    return [...new Set(parsedLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b);
-  }, [parsedLocs, locZone, locSide]);
+    return narrowRows([...new Set(parsedLocs.filter((l) => l.parsed.room === locZone && l.parsed.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), locSide, recvZone.activeGroup);
+  }, [parsedLocs, locZone, locSide, recvZone.activeGroup]);
 
   // Auto-resolve selectedLocation from the 3-part hierarchy selection
   useEffect(() => {
@@ -995,6 +998,14 @@ function ReceivingWorkflow({ onBack, t }) {
                   )}
                 </div>
 
+                {useHierarchy && (
+                  <ZoneChips
+                    size="lg"
+                    roomGroups={recvZone.roomGroups}
+                    groupId={recvZone.groupId}
+                    onPick={(g) => { recvZone.setGroupId(g?.id ?? ''); if (g) setLocSide(g.side); setLocRow(''); }}
+                  />
+                )}
                 {useHierarchy ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
                     <div>
@@ -2076,8 +2087,9 @@ function LocationUpdateWorkflow({ onBack, t }) {
   const useHierarchy = parsedLocs.length > 0 && parsedLocs.every((l) => l.parsed !== null);
 
   const availableZones = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed).map((l) => l.parsed.room))].sort(), [parsedLocs]);
-  const availableSides = useMemo(() => sortSides(new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))), [parsedLocs, locZone]);
-  const availableRows = useMemo(() => [...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), [parsedLocs, locZone, locSide]);
+  const updZone = useZonePicker(locZone);
+  const availableSides = useMemo(() => narrowSides(sortSides(new Set(parsedLocs.filter((l) => l.parsed?.room === locZone).map((l) => l.parsed.side))), updZone.activeGroup), [parsedLocs, locZone, updZone.activeGroup]);
+  const availableRows = useMemo(() => narrowRows([...new Set(parsedLocs.filter((l) => l.parsed?.room === locZone && l.parsed?.side === locSide).map((l) => l.parsed.row))].sort((a, b) => a - b), locSide, updZone.activeGroup), [parsedLocs, locZone, locSide, updZone.activeGroup]);
 
   useEffect(() => {
     if (locZone && locSide && locRow && useHierarchy) {
@@ -2755,6 +2767,14 @@ function LocationUpdateWorkflow({ onBack, t }) {
                 <IconLabel icon={MapPin} size={14} gap={4}>เพิ่มการจัดเก็บ (เลือกที่ว่างทีละ pallet)</IconLabel>
                 {selectedLocation && <span style={{ marginLeft: 8, color: C.green, fontWeight: 900 }}><IconLabel icon={Check} size={14} gap={3}>{selectedLocation.code}</IconLabel></span>}
               </div>
+              {useHierarchy && (
+                <ZoneChips
+                  size="lg"
+                  roomGroups={updZone.roomGroups}
+                  groupId={updZone.groupId}
+                  onPick={(g) => { updZone.setGroupId(g?.id ?? ''); if (g) setLocSide(g.side); setLocRow(''); }}
+                />
+              )}
               {useHierarchy ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
                   <div>
