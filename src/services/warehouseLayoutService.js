@@ -533,18 +533,6 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
   const existingMap = new Map((existingLocs ?? []).map((l) => [l.location_code, l]));
   const existingCodes = new Set(existingMap.keys());
 
-  const locIds = (existingLocs ?? []).map((l) => l.id);
-  // Real, pallet-split-aware occupancy (see getOccupiedPalletCountByLocationId)
-  // -- this used to check tgd_stock_balances/tgd_customer_deposit_request_lines.
-  // location_id directly, both stale since the pallet-split migration: a
-  // deposit line's location_id is now only a "most recently added" pointer,
-  // not the source of truth once it has multiple pallet allocations, so a
-  // row holding real stock under an allocation that ISN'T that pointer could
-  // silently look empty and get shrunk/deleted out from under it.
-  const occupiedPalletCountById = locIds.length > 0
-    ? await getOccupiedPalletCountByLocationId(locIds)
-    : new Map();
-
   const rowCapacity = Number(capacity) || DEFAULT_ROW_CAPACITY;
   const desiredCodes = new Set();
   const toInsertRows = [];
@@ -596,6 +584,15 @@ export async function updateSectionSize(zoneId, { zoneCode, zoneName, leftConfig
     if (desiredCodes.has(code)) return false;
     return manageAisle || !isAisleCode(code);
   });
+
+  // Real, pallet-split-aware occupancy (see getOccupiedPalletCountByLocationId),
+  // checked only for the rows this save would delete. Checking every row in
+  // the zone made each save read the slow picked-quantity view several times
+  // even when nothing was being removed.
+  const deleteIds = toDeleteCodes.map((code) => existingMap.get(code)?.id).filter(Boolean);
+  const occupiedPalletCountById = deleteIds.length > 0
+    ? await getOccupiedPalletCountByLocationId(deleteIds)
+    : new Map();
   const occupiedToDelete = toDeleteCodes.filter((code) => {
     const loc = existingMap.get(code);
     return loc && (occupiedPalletCountById.get(loc.id) ?? 0) > 0;
