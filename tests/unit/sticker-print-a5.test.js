@@ -59,10 +59,12 @@ describe('buildPalletStickerItems', () => {
 });
 
 describe('A5 sticker document', () => {
-  it('is an A5 landscape page with the pallet number, allergen badge and QR', () => {
+  it('prints each pallet as two copies on one A4 sheet with the pallet number, allergen badge and QR', () => {
     const html = buildA5StickerDocumentHtml(buildPalletStickerItems(base, [], { count: 5, boxesPerPallet: 15 }));
-    expect(html).toContain('size: A5 landscape');
-    expect(html.match(/class="a5-page"/g)).toHaveLength(5);
+    expect(html).toContain('size: A4 portrait');
+    expect(html.match(/class="a5-page"/g)).toHaveLength(10);
+    // 5 pallets -> 5 A4 sheets, each with the same sticker twice.
+    expect(html.match(/class="a4-sheet two"/g)).toHaveLength(5);
     expect(html).toContain('3 / 5');
     expect(html).toContain('มีสารก่อภูมิแพ้: ');
     expect(html).toContain('<svg');
@@ -80,7 +82,7 @@ describe('A5 sticker document', () => {
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(win);
     printA5Stickers(buildPalletStickerItems(base, [], { count: 3, boxesPerPallet: 25 }));
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(written.match(/class="a5-page"/g)).toHaveLength(3);
+    expect(written.match(/class="a5-page"/g)).toHaveLength(6);
     openSpy.mockRestore();
   });
 });
