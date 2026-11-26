@@ -16,6 +16,7 @@ const APP_ROUTES = [
   '/operations/receiving',
   '/operations/receiving/:id',
   '/inventory',
+  '/inventory/sticker-prints',
   '/handheld',
   '/reports',
   '/reports/movement-ledger',

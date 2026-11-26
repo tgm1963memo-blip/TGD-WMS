@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Modal.jsx';
 import { listInventoryLocations } from '../../services/inventoryLocationService.js';
+import { loadStickerPrintRows } from '../../services/stickerPrintLogService.js';
 import { buildPalletStickerItems, printA5Stickers, suggestPalletCount } from '../../utils/stickerPrint.jsx';
 
 // Shared "พิมพ์ A5" flow for every screen that prints pallet stickers.
@@ -37,9 +38,11 @@ export function useA5StickerPrint() {
     if (!valid.length || busy) return;
     setBusy(true);
     const lineIds = valid.filter((e) => !e.manualOnly).map((e) => e.lineId).filter(Boolean);
-    const { data: allocationsByLine, error } = lineIds.length
-      ? await listInventoryLocations(lineIds)
-      : { data: new Map(), error: null };
+    // Print history is loaded alongside so a reprint can be flagged.
+    const [{ data: allocationsByLine, error }] = await Promise.all([
+      lineIds.length ? listInventoryLocations(lineIds) : Promise.resolve({ data: new Map(), error: null }),
+      loadStickerPrintRows(valid.map((e) => e.baseItem.trackingCode)),
+    ]);
     setBusy(false);
 
     const ready = [];
