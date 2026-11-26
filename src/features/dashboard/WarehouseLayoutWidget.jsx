@@ -25,8 +25,13 @@ function zoneEdgeStyle(group) {
   return { boxShadow: `inset 4px 0 0 ${c.fg}` };
 }
 
+// With a zone focused, rows outside it fade so the zone stands out.
+function isDimmed(group, focusGroup) {
+  return Boolean(focusGroup) && group?.id !== focusGroup.id;
+}
+
 // Per-zone usage under the map: pallets used / capacity of the rows in it.
-function ZoneSummary({ section }) {
+function ZoneSummary({ section, focusId = null, onFocus = null }) {
   const groups = section.groups ?? [];
   if (!groups.length) return null;
   const totals = groups.map((g) => {
@@ -45,13 +50,25 @@ function ZoneSummary({ section }) {
       {totals.map(({ g, used, capacity, pct }) => {
         const c = zoneColor(g.color);
         return (
-          <div key={g.id ?? g.name} style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '10px 12px', background: 'var(--color-surface)', boxShadow: `inset 4px 0 0 ${c.fg}` }}>
+          <button
+            key={g.id ?? g.name}
+            type="button"
+            aria-pressed={focusId === g.id}
+            title={focusId === g.id ? 'กดอีกครั้งเพื่อแสดงทุกแถว' : 'กดเพื่อเน้นเฉพาะแถวใน Zone นี้'}
+            onClick={() => onFocus?.(focusId === g.id ? null : g.id)}
+            data-testid={`zone-summary-${g.id}`}
+            style={{
+              textAlign: 'left', font: 'inherit', cursor: 'pointer', borderRadius: 10, padding: '10px 12px',
+              border: focusId === g.id ? `2px solid ${c.fg}` : '1px solid var(--color-border-subtle)',
+              background: focusId === g.id ? c.bg : 'var(--color-surface)', boxShadow: `inset 4px 0 0 ${c.fg}`,
+            }}
+          >
             <div style={{ fontSize: 13, fontWeight: 700, color: c.fg, overflowWrap: 'anywhere' }}>{g.name}</div>
             <div style={{ height: 6, borderRadius: 4, background: 'var(--color-border-subtle)', overflow: 'hidden', margin: '6px 0 4px' }}>
               <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: c.fg }} />
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{used} / {capacity} pallet · {pct}%</div>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -95,7 +112,7 @@ function CircularProgress({ pct, size = 120, strokeWidth = 10, color = '#d4af37'
 // loosely). Rendered as a 1-dimensional list per side instead of the old
 // 2D grid of level×bay dots, with a fill bar + "used/capacity" count
 // instead of a plain on/off occupied dot.
-function RowBar({ location, onClick, group = null }) {
+function RowBar({ location, onClick, group = null, dimmed = false }) {
   const capacity = location.capacity || 0;
   const used = location.usedCount || 0;
   // Capacity is advisory (see tgd_add_deposit_line_location_allocation's
@@ -119,6 +136,7 @@ function RowBar({ location, onClick, group = null }) {
       title={`${location.location_code}${group ? ` · ${group.name}` : ''}${overCapacity ? ` — เกินความจุที่ตั้งไว้ (${used}/${capacity})` : ''}`}
       style={{
         ...zoneEdgeStyle(group),
+        opacity: dimmed ? 0.3 : 1,
         display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
         borderRadius: 8, cursor: 'pointer',
         border: overCapacity ? '1px solid #fca5a5' : (isAisle ? `1px dashed ${AISLE_BORDER}` : '1px solid var(--color-border-subtle)'),
@@ -140,7 +158,7 @@ function RowBar({ location, onClick, group = null }) {
   );
 }
 
-function SectionGrid({ section, onLocClick }) {
+function SectionGrid({ section, onLocClick, focusGroup = null }) {
   const { locations } = section;
 
   const bySide = useMemo(() => {
@@ -172,7 +190,11 @@ function SectionGrid({ section, onLocClick }) {
           <div style={{ fontSize: 12, fontWeight: 700, color: g.color, marginBottom: 8 }}>{g.title}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {bySide[g.side].map(({ loc }) => (
-              <RowBar key={loc.id} location={loc} onClick={onLocClick} group={findLocationGroup(section.groups, parseLocationCode(loc.location_code))} />
+              <RowBar
+                key={loc.id} location={loc} onClick={onLocClick}
+                group={findLocationGroup(section.groups, parseLocationCode(loc.location_code))}
+                dimmed={isDimmed(findLocationGroup(section.groups, parseLocationCode(loc.location_code)), focusGroup)}
+              />
             ))}
           </div>
         </div>
@@ -210,7 +232,7 @@ function PalletCells({ capacity, used, color }) {
   );
 }
 
-function VirtualRow({ location, onClick, group = null }) {
+function VirtualRow({ location, onClick, group = null, dimmed = false }) {
   if (!location) {
     return <div style={{ height: 26 }} aria-hidden="true" />;
   }
@@ -237,8 +259,10 @@ function VirtualRow({ location, onClick, group = null }) {
       aria-label={`${location.location_code} ${label} ใช้ ${used} จาก ${capacity} pallet`}
       data-testid={isAisle ? 'virtual-aisle-row' : 'virtual-row'}
       data-zone={group?.name ?? undefined}
+      data-dimmed={dimmed ? 'true' : undefined}
       style={{
         ...zoneEdgeStyle(group),
+        opacity: dimmed ? 0.3 : 1,
         display: 'flex', alignItems: 'center', gap: isAisle ? 6 : 10, height: 26, padding: '0 8px', width: '100%',
         border: `1px ${isAisle && !overCapacity ? 'dashed' : 'solid'} ${restBorder}`, borderRadius: 6,
         background: restBackground,
@@ -254,7 +278,7 @@ function VirtualRow({ location, onClick, group = null }) {
   );
 }
 
-function VirtualSectionGrid({ section, onLocClick }) {
+function VirtualSectionGrid({ section, onLocClick, focusGroup = null }) {
   const { locations } = section;
 
   const rows = useMemo(() => {
@@ -287,7 +311,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: '0 4px 2px' }}>{side === 'L' ? 'ฝั่งซ้าย (L)' : 'ฝั่งขวา (R)'}</div>
       {rows.list.map(({ row, left, right }) => (
-        <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} group={findLocationGroup(section.groups, { side, row })} />
+        <VirtualRow key={`${side}-${row}`} location={side === 'L' ? left : right} onClick={onLocClick} group={findLocationGroup(section.groups, { side, row })} dimmed={isDimmed(findLocationGroup(section.groups, { side, row }), focusGroup)} />
       ))}
     </div>
   );
@@ -303,7 +327,7 @@ function VirtualSectionGrid({ section, onLocClick }) {
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: AISLE_TEXT, padding: '0 0 2px', textAlign: 'center' }}>ทางเดิน (A)</div>
       {rows.list.map(({ row, aisle }) => (
-        <VirtualRow key={`A-${row}`} location={aisle} onClick={onLocClick} group={findLocationGroup(section.groups, { side: 'A', row })} />
+        <VirtualRow key={`A-${row}`} location={aisle} onClick={onLocClick} group={findLocationGroup(section.groups, { side: 'A', row })} dimmed={isDimmed(findLocationGroup(section.groups, { side: 'A', row }), focusGroup)} />
       ))}
     </div>
   ) : (
@@ -363,6 +387,9 @@ export function WarehouseLayoutWidget() {
   const [isEstimate, setIsEstimate] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [focusZoneId, setFocusZoneId] = useState(null);
+  // A zone belongs to one room; switching rooms clears the focus.
+  useEffect(() => { setFocusZoneId(null); }, [selectedId]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewMode, setViewMode] = useState(readStoredViewMode);
 
@@ -658,9 +685,9 @@ export function WarehouseLayoutWidget() {
           {selected.total > 0 ? (
             <>
               {viewMode === 'virtual'
-                ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} />
-                : <SectionGrid section={selected} onLocClick={handleLocClick} />}
-              <ZoneSummary section={selected} />
+                ? <VirtualSectionGrid section={selected} onLocClick={handleLocClick} focusGroup={(selected.groups ?? []).find((g) => g.id === focusZoneId) ?? null} />
+                : <SectionGrid section={selected} onLocClick={handleLocClick} focusGroup={(selected.groups ?? []).find((g) => g.id === focusZoneId) ?? null} />}
+              <ZoneSummary section={selected} focusId={focusZoneId} onFocus={setFocusZoneId} />
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-text-subtle)' }}>

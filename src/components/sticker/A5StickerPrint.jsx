@@ -5,7 +5,9 @@ import { buildPalletStickerItems, printA5Stickers, suggestPalletCount } from '..
 
 // Shared "พิมพ์ A5" flow for every screen that prints pallet stickers.
 //
-// entries: [{ lineId, baseItem, boxesPerPallet }]
+// entries: [{ lineId, baseItem, boxesPerPallet, manualOnly?, splitBoxes? }]
+//   manualOnly: ask for a pallet count even if some pallets are placed
+//   splitBoxes: boxes to split across those pallets (default: the whole lot)
 //   baseItem: line-level sticker fields incl. trackingCode, lotBoxes, lotWeight
 //   boxesPerPallet: the product's usual boxes per pallet (may be null)
 //
@@ -34,7 +36,7 @@ export function useA5StickerPrint() {
     const valid = entries.filter((e) => e?.baseItem);
     if (!valid.length || busy) return;
     setBusy(true);
-    const lineIds = valid.map((e) => e.lineId).filter(Boolean);
+    const lineIds = valid.filter((e) => !e.manualOnly).map((e) => e.lineId).filter(Boolean);
     const { data: allocationsByLine, error } = lineIds.length
       ? await listInventoryLocations(lineIds)
       : { data: new Map(), error: null };
@@ -44,10 +46,10 @@ export function useA5StickerPrint() {
     const manual = [];
     for (const entry of valid) {
       const active = (allocationsByLine?.get(entry.lineId) ?? []).filter((a) => a.active);
-      if (active.length > 0) {
+      if (active.length > 0 && !entry.manualOnly) {
         ready.push(...buildPalletStickerItems(entry.baseItem, active));
       } else {
-        const lotBoxes = Number(entry.baseItem.lotBoxes) || 0;
+        const lotBoxes = Number(entry.splitBoxes ?? entry.baseItem.lotBoxes) || 0;
         const count = suggestPalletCount(lotBoxes, entry.boxesPerPallet);
         const boxesPerPallet = Number(entry.boxesPerPallet) || Math.max(1, Math.ceil(lotBoxes / count));
         manual.push({ entry, count, boxesPerPallet });
@@ -76,7 +78,7 @@ export function useA5StickerPrint() {
     if (!pending) return;
     const items = [
       ...pending.ready,
-      ...pending.manual.flatMap((m) => buildPalletStickerItems(m.entry.baseItem, [], { count: m.count, boxesPerPallet: m.boxesPerPallet })),
+      ...pending.manual.flatMap((m) => buildPalletStickerItems(m.entry.baseItem, [], { count: m.count, boxesPerPallet: m.boxesPerPallet, totalBoxes: m.entry.splitBoxes })),
     ];
     setPending(null);
     printA5Stickers(items);
@@ -102,7 +104,7 @@ export function useA5StickerPrint() {
             <div style={{ fontWeight: 700 }}>
               {m.entry.baseItem.trackingCode ?? '-'}
               <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 8 }}>
-                {m.entry.baseItem.productName ?? ''} · รวม {Number(m.entry.baseItem.lotBoxes) || 0} กล่อง
+                {m.entry.baseItem.productName ?? ''} · {m.entry.splitBoxes != null ? `ยังไม่วาง ${Number(m.entry.splitBoxes) || 0} จาก ${Number(m.entry.baseItem.lotBoxes) || 0} กล่อง` : `รวม ${Number(m.entry.baseItem.lotBoxes) || 0} กล่อง`}
               </span>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -128,7 +130,7 @@ export function useA5StickerPrint() {
               </label>
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }} aria-live="polite">
-              แบ่งเป็น: {splitPreview(m.entry.baseItem.lotBoxes, m.count, m.boxesPerPallet)} กล่อง
+              แบ่งเป็น: {splitPreview(m.entry.splitBoxes ?? m.entry.baseItem.lotBoxes, m.count, m.boxesPerPallet)} กล่อง
             </div>
           </div>
         ))}

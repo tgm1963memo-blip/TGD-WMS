@@ -522,10 +522,13 @@ export function buildPalletStickerItems(baseItem, allocations = [], manual = nul
   }
 
   const count = Math.max(1, Math.floor(Number(manual?.count) || 1));
-  const lotBoxes = toQty(baseItem.lotBoxes) ?? 0;
+  // manual.totalBoxes: split only this many (e.g. a lot's unplaced boxes);
+  // the sheet still shows the whole lot under "ทั้ง lot".
+  const lotBoxes = toQty(manual?.totalBoxes ?? baseItem.lotBoxes) ?? 0;
   const lotWeight = toQty(baseItem.lotWeight);
+  const lotBoxesForAverage = toQty(baseItem.lotBoxes) ?? lotBoxes;
   const perPallet = Math.max(1, Math.floor(Number(manual?.boxesPerPallet) || Math.ceil(lotBoxes / count) || 1));
-  const weightPerBox = lotWeight != null && lotBoxes > 0 ? lotWeight / lotBoxes : null;
+  const weightPerBox = lotWeight != null && lotBoxesForAverage > 0 ? lotWeight / lotBoxesForAverage : null;
   let left = lotBoxes;
   return Array.from({ length: count }, (_, i) => {
     const boxes = i < count - 1 ? Math.min(perPallet, Math.max(0, left)) : Math.max(0, left);
