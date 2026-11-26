@@ -484,7 +484,7 @@ export function allergenThermalLabel(allergen) {
 }
 
 // ---------------------------------------------------------------------------
-// A5 pallet sticker (210 x 148 mm landscape, office printer).
+// A5 pallet sticker (210 x 148 mm landscape, office printer), printed as two copies on one A4 sheet.
 //
 // One sheet per pallet: the tracking code as the largest element, then the
 // pallet number n/N, that pallet's location and quantity, lot / MFG / EXP,
@@ -627,12 +627,17 @@ function a5DocumentHtml(pagesHtml) {
 <title>Sticker A5</title>
 <style>
   @font-face { font-family: 'TGD Code'; font-weight: 700; src: url(${OSWALD_BOLD_SUBSET_WOFF2_DATA_URI}) format('woff2'); }
-  @page { size: A5 landscape; margin: 6mm; }
+  /* Each pallet prints on one A4 portrait sheet: two copies of its A5 sticker, top and bottom, with a
+     cut line between. The 6mm padding keeps each sticker clear of the
+     printer's unprintable edge. */
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* Thai-capable fonts first -- same reasoning as the thermal sticker above. */
   body { font-family: 'Leelawadee UI', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
-  .a5-page { width: 198mm; height: 136mm; margin: 0 auto 6mm; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
-  .a5-page:last-child { page-break-after: auto; break-after: auto; }
+  .a4-sheet { position: relative; width: 210mm; height: 296mm; margin: 0 auto; overflow: hidden; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
+  .a4-sheet:last-child { page-break-after: auto; break-after: auto; }
+  .a4-sheet.two::after { content: ''; position: absolute; left: 0; right: 0; top: 148mm; border-top: 0.3mm dashed #888; }
+  .a5-page { width: 210mm; height: 148mm; padding: 6mm; }
   .a5 { width: 100%; height: 100%; border: 0.7mm solid #000; border-radius: 3mm; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; overflow: hidden; }
   .a5-top { display: flex; justify-content: space-between; align-items: center; gap: 4mm; padding: 2.5mm 5mm 2mm; border-bottom: 0.7mm solid #000; }
   .a5-cust { font-size: 5mm; font-weight: 700; line-height: 1.25; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
@@ -665,7 +670,7 @@ function a5DocumentHtml(pagesHtml) {
   .a5-alg svg { width: 5.4mm; height: 5.4mm; flex: none; }
   .a5-qr { border-left: 0.7mm solid #000; padding: 2.5mm 3mm; display: grid; place-items: center; }
   .a5-qr svg { width: 28mm; height: 28mm; display: block; }
-  @media screen { body { background: #eee; padding: 6mm 0; } .a5-page { background: #fff; } }
+  @media screen { body { background: #eee; padding: 6mm 0; } .a4-sheet { background: #fff; margin-bottom: 6mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); } }
 </style>
 </head>
 <body>
@@ -676,7 +681,11 @@ ${FIT_TEXT_SCRIPT}
 }
 
 export function buildA5StickerDocumentHtml(items = []) {
-  return a5DocumentHtml(items.map((item) => renderA5StickerPageHtml(item)).join('\n'));
+  // One A4 sheet per pallet, holding two identical copies of its sticker.
+  return a5DocumentHtml(items.map((item) => {
+    const sticker = renderA5StickerPageHtml(item);
+    return `<div class="a4-sheet two">\n${sticker}\n${sticker}\n</div>`;
+  }).join('\n'));
 }
 
 // items: output of buildPalletStickerItems (one entry per pallet sheet).
