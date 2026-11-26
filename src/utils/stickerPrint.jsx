@@ -1,3 +1,4 @@
+import { logStickerPrints } from '../services/stickerPrintLogService.js';
 import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -420,7 +421,7 @@ function openAndPrintHtml(html, pageCount = 1) {
   // sticker size once loaded, rather than guessing a fixed size up front
   // (which previously left a large blank margin around a single sticker).
   const win = window.open('', '_blank', 'width=500,height=400');
-  if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return; }
+  if (!win) { alert('กรุณาอนุญาตป๊อปอัพ'); return false; }
   win.document.write(html);
   win.document.close();
   // A fixed 500ms delay was tuned against a single label — printing many
@@ -435,6 +436,7 @@ function openAndPrintHtml(html, pageCount = 1) {
     fitPopupToContent(win);
     setTimeout(() => win.print(), delay);
   };
+  return true;
 }
 
 export function printSticker({
@@ -443,7 +445,7 @@ export function printSticker({
   const html = stickerDocumentHtml(renderStickerPageHtml({
     depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
   }));
-  openAndPrintHtml(html, 1);
+  if (openAndPrintHtml(html, 1)) logStickerPrints('THERMAL', [{ trackingCode, locationCode }]);
 }
 
 // items: [{ depositDate, productName, quantityLabel, locationCode, trackingCode }]
@@ -460,7 +462,7 @@ export function printStickers(items = []) {
     String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')),
   );
   const html = stickerDocumentHtml(sorted.map((item) => renderStickerPageHtml(item)).join('\n'), sorted.length);
-  openAndPrintHtml(html, sorted.length);
+  if (openAndPrintHtml(html, sorted.length)) logStickerPrints('THERMAL', sorted);
 }
 
 // ---------------------------------------------------------------------------
@@ -696,5 +698,5 @@ export function printA5Stickers(items = []) {
   const sorted = [...items].sort((a, b) =>
     String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')) || (a.palletIndex ?? 0) - (b.palletIndex ?? 0),
   );
-  openAndPrintHtml(buildA5StickerDocumentHtml(sorted), sorted.length);
+  if (openAndPrintHtml(buildA5StickerDocumentHtml(sorted), sorted.length)) logStickerPrints('A5', sorted);
 }

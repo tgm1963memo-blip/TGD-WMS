@@ -13,6 +13,7 @@ import { getDepositStatusLabel } from '../../utils/customerDepositStatusLabels.j
 import { getTemperatureTypeShortLabel } from '../../utils/temperatureTypeLabels.js';
 import { printSticker, printStickers, StickerPageSizeControl, StickerRotationControl, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
 import { useA5StickerPrint } from '../sticker/A5StickerPrint.jsx';
+import { StickerPrintBadge, useStickerPrintSummary } from '../sticker/StickerPrintHistory.jsx';
 import {
   getCustomerDepositRequest,
   listCustomerDepositRequestLines,
@@ -109,6 +110,7 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
   const isSystemAdmin = userRole === 'admin';
   const [header, setHeader] = useState(null);
   const [lines, setLines] = useState([]);
+  const stickerPrintSummary = useStickerPrintSummary(lines.map((l) => l.tracking_code));
   const [loading, setLoading] = useState(false);
   const [comment, setComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -1027,7 +1029,10 @@ export function CustomerDepositDetailModal({ requestId, isOpen, onClose, onStatu
                             />
                           </td>
                           <td>{line.line_no}</td>
-                          <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">{line.tracking_code ?? '-'}</td>
+                          <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">
+                            {line.tracking_code ?? '-'}
+                            <StickerPrintBadge entry={stickerPrintSummary.get(line.tracking_code)} />
+                          </td>
                           <td>{line.customer_product_code ?? '-'}</td>
                           <td>{line.product_name ?? '-'}</td>
                           <td style={{ textAlign: 'center' }}>{line.lot_no ?? '-'}</td>

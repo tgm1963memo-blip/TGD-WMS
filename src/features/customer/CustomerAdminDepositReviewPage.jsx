@@ -45,6 +45,7 @@ import { getTemperatureTypeLabel, TEMPERATURE_TYPE_LABELS } from '../../utils/te
 const ADD_LINE_EXCLUDED_STATUSES = ['RECEIVED_CONFIRMED', 'CUSTOMER_NOTIFIED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 import { printStickers, StickerPageSizeControl, StickerRotationControl, resolveAllergen, allergenThermalLabel } from '../../utils/stickerPrint.jsx';
 import { useA5StickerPrint } from '../../components/sticker/A5StickerPrint.jsx';
+import { StickerPrintBadge, useStickerPrintSummary } from '../../components/sticker/StickerPrintHistory.jsx';
 import { listCustomerProducts } from '../../services/customerProductCatalogService.js';
 import { exportCustomerDepositDocumentExcel, exportCustomerDepositDocumentFormExcel } from '../../utils/customerDepositLineExcelUtils.js';
 
@@ -73,6 +74,7 @@ export function CustomerAdminDepositReviewPage() {
   const { requestId: routeRequestId } = useParams();
   const [rows, setRows] = useState([]);
   const [lines, setLines] = useState([]);
+  const stickerPrintSummary = useStickerPrintSummary(lines.map((l) => l.tracking_code));
   const [linesLoading, setLinesLoading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const a5Print = useA5StickerPrint();
@@ -990,7 +992,10 @@ export function CustomerAdminDepositReviewPage() {
                           />
                         </td>
                         <td>{line.line_no}</td>
-                        <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">{line.tracking_code ?? '-'}</td>
+                        <td className="num" style={{ whiteSpace: 'nowrap' }} data-testid="deposit-line-tracking-code">
+                          {line.tracking_code ?? '-'}
+                          <StickerPrintBadge entry={stickerPrintSummary.get(line.tracking_code)} />
+                        </td>
                         <td>{line.customer_product_code ?? '-'}</td>
                         <td>{line.product_name ?? '-'}</td>
                         <td>{line.weight_per_box != null ? Number(line.weight_per_box).toFixed(2) : '-'}</td>
