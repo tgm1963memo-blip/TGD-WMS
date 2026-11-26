@@ -19,6 +19,7 @@ const WAREHOUSE_ADMIN_NAV_KEYS = Object.freeze([
   'withdrawal_request',
   'stock_balance',
   'stock_count_review',
+  'sticker_print_history',
 ]);
 
 const WAREHOUSE_ADMIN_ROUTE_PREFIXES = Object.freeze([

@@ -25,6 +25,7 @@ export const navigationGroups = [
     items: [
       { label: 'ยอดคงเหลือ', key: 'stock_balance', path: '/inventory' },
       { label: 'นับสต็อก', key: 'stock_count_review', path: '/inventory/count' },
+      { label: 'ประวัติการพิมพ์สติ๊กเกอร์', key: 'sticker_print_history', path: '/inventory/sticker-prints' },
     ],
   },
   {

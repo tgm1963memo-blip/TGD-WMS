@@ -1,4 +1,4 @@
-import { logStickerPrints } from '../services/stickerPrintLogService.js';
+import { findStickerReprints, logStickerPrints } from '../services/stickerPrintLogService.js';
 import { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -439,9 +439,32 @@ function openAndPrintHtml(html, pageCount = 1) {
   return true;
 }
 
+// Asks before printing a sticker that was printed before (same FR and the
+// same pallet n/N or location). Uses the print history already loaded for
+// these FR codes, so it never delays the print popup.
+function formatReprintTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function buildReprintMessage(reprints) {
+  const shown = reprints.slice(0, 6).map((r) => `• ${r.label} — พิมพ์แล้ว ${r.count} ครั้ง ล่าสุด ${formatReprintTime(r.lastAt)}${r.lastBy ? ` โดย ${r.lastBy}` : ''}`);
+  const more = reprints.length > 6 ? [`• และอีก ${reprints.length - 6} รายการ`] : [];
+  return ['สติ๊กเกอร์ต่อไปนี้เคยพิมพ์ไปแล้ว:', ...shown, ...more, '', 'ต้องการพิมพ์ซ้ำหรือไม่?'].join('\n');
+}
+
+function confirmReprint(format, items) {
+  const reprints = findStickerReprints(format, items);
+  if (!reprints.length || typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
+  return window.confirm(buildReprintMessage(reprints));
+}
+
 export function printSticker({
   depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
 }) {
+  if (!confirmReprint('THERMAL', [{ trackingCode, locationCode }])) return;
   const html = stickerDocumentHtml(renderStickerPageHtml({
     depositDate, customerName, productName, productCode, quantityLabel, locationCode, trackingCode, allergenLabel,
   }));
@@ -462,6 +485,7 @@ export function printStickers(items = []) {
     String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')),
   );
   const html = stickerDocumentHtml(sorted.map((item) => renderStickerPageHtml(item)).join('\n'), sorted.length);
+  if (!confirmReprint('THERMAL', sorted)) return;
   if (openAndPrintHtml(html, sorted.length)) logStickerPrints('THERMAL', sorted);
 }
 
@@ -698,5 +722,6 @@ export function printA5Stickers(items = []) {
   const sorted = [...items].sort((a, b) =>
     String(a.trackingCode ?? '').localeCompare(String(b.trackingCode ?? '')) || (a.palletIndex ?? 0) - (b.palletIndex ?? 0),
   );
+  if (!confirmReprint('A5', sorted)) return;
   if (openAndPrintHtml(buildA5StickerDocumentHtml(sorted), sorted.length)) logStickerPrints('A5', sorted);
 }

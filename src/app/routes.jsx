@@ -7,6 +7,7 @@ import { ReceivingDetailPage } from '../features/operations/receiving/ReceivingD
 import { HandheldPage } from '../features/handheld/HandheldPage.jsx';
 import { InventoryBalancePage } from '../features/inventory/InventoryBalancePage.jsx';
 import { StockCountReviewPage } from '../features/inventory/StockCountReviewPage.jsx';
+import { StickerPrintHistoryPage } from '../features/inventory/StickerPrintHistoryPage.jsx';
 import { ReportsPage } from '../features/reports/ReportsPage.jsx';
 import { MovementLedgerReportPage } from '../features/reports/MovementLedgerReportPage.jsx';
 import { StorageAgingReportPage } from '../features/reports/StorageAgingReportPage.jsx';
@@ -65,6 +66,7 @@ export function AppRoutes() {
             <Route path="/operations/receiving/:id" element={<ReceivingDetailPage />} />
             <Route path="/inventory" element={<InventoryBalancePage />} />
             <Route path="/inventory/count" element={<StockCountReviewPage />} />
+            <Route path="/inventory/sticker-prints" element={<StickerPrintHistoryPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/movement-ledger" element={<MovementLedgerReportPage />} />
             <Route path="/reports/storage-aging" element={<StorageAgingReportPage />} />
