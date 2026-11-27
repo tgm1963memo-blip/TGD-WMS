@@ -3786,3 +3786,31 @@ a.dash-q:hover { background: var(--color-surface-muted); text-decoration: none; 
 @media screen {
   .app-shell[data-theme="dark"] label[for="demo-role-select"] { color: #92400e; }
 }
+
+/* Icon-only row buttons. .btn-secondary / .btn-danger set horizontal padding
+   later in this file, which left ~2px for the glyph inside a 28px button and
+   reduced every icon to a dot. Fixed square box, no padding, readable glyph. */
+@media screen {
+  .btn.icon-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    gap: 0;
+    flex: 0 0 auto;
+  }
+  .btn.icon-btn svg { width: 16px; height: 16px; flex: none; }
+  .btn.btn-secondary.icon-btn { color: var(--color-text, var(--tgd-navy)); }
+  .btn.btn-secondary.icon-btn:hover:not(:disabled) {
+    background-color: var(--color-surface-muted, var(--tgd-surface));
+    border-color: var(--color-text-muted, var(--tgd-border));
+  }
+  .btn.icon-btn:focus-visible { outline: 2px solid var(--tgd-primary-gold); outline-offset: 2px; }
+  .action-row--compact { gap: 6px; }
+}
+/* Touch screens: keep the 44px tap target. */
+@media screen and (max-width: 1024px) {
+  .btn.icon-btn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .btn.icon-btn svg { width: 18px; height: 18px; }
+}
