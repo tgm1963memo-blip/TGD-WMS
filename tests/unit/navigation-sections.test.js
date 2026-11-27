@@ -30,6 +30,24 @@ describe('sidebar sections', () => {
     expect(sections[0].label).toBe('พอร์ทัลลูกค้า');
   });
 
+  it('gathers user/role menus into one "ผู้ใช้และสิทธิ์" section for admins', () => {
+    const sections = buildSidebarSections(navigationGroups, 'th');
+    const access = sections.find((s) => s.key === 'access');
+    expect(access.label).toBe('ผู้ใช้และสิทธิ์');
+    expect(access.items.map((i) => i.key)).toEqual([
+      'user_management', 'role_permissions_admin', 'customer_team_roles', 'users_and_roles',
+    ]);
+    const elsewhere = sections.filter((s) => s.key !== 'access').flatMap((s) => s.items.map((i) => i.key));
+    expect(elsewhere).not.toContain('user_management');
+    expect(elsewhere).not.toContain('customer_team_roles');
+  });
+
+  it('keeps customer_team_roles in the portal when it is the only access menu visible', () => {
+    const onlyPortal = navigationGroups.filter((g) => g.key === 'customer_portal');
+    const [portal] = buildSidebarSections(onlyPortal, 'th');
+    expect(portal.items.map((i) => i.key)).toContain('customer_team_roles');
+  });
+
   it('keeps an unmapped group as its own section instead of dropping it', () => {
     const extra = { key: 'brand_new_group', label: 'Brand New', items: [{ key: 'x', label: 'X', path: '/x' }] };
     const sections = buildSidebarSections([...navigationGroups, extra], 'en');

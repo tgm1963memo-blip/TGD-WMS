@@ -58,12 +58,25 @@ export const SIDEBAR_SECTIONS = [
     groups: ['billing', 'reports'],
   },
   {
+    // Every user/role/permission screen in one place. Claims items by key
+    // (not by group) because they live in different permission groups; the
+    // groups themselves are unchanged, so role permissions are unaffected.
+    key: 'access',
+    label: { th: 'ผู้ใช้และสิทธิ์', en: 'Users & Access' },
+    groups: [],
+    itemKeys: ['user_management', 'role_permissions_admin', 'customer_team_roles', 'users_and_roles'],
+  },
+  {
     key: 'settings',
     label: { th: 'ตั้งค่าระบบ', en: 'System Settings' },
     groups: ['system_administration'],
     collapsible: true,
   },
 ];
+
+const CLAIMED_ITEM_KEYS = new Map(
+  SIDEBAR_SECTIONS.flatMap((section) => (section.itemKeys ?? []).map((key) => [key, section])),
+);
 
 const ITEM_ICONS = {
   dashboard: LayoutDashboard,
@@ -113,6 +126,14 @@ function pickLabel(label, language) {
  */
 export function buildSidebarSections(visibleGroups, language = 'th') {
   const byKey = new Map(visibleGroups.map((group) => [group.key, group]));
+  const visibleItems = new Map(visibleGroups.flatMap((group) => group.items.map((item) => [item.key, item])));
+  // An item-key section only forms when it would gather 2+ items; a lone item
+  // (e.g. a customer admin's team-roles page) stays where it normally lives.
+  const claimed = new Set();
+  for (const section of SIDEBAR_SECTIONS) {
+    const present = (section.itemKeys ?? []).filter((key) => visibleItems.has(key));
+    if (present.length >= 2) present.forEach((key) => claimed.add(key));
+  }
   const used = new Set();
   const sections = [];
 
@@ -122,7 +143,10 @@ export function buildSidebarSections(visibleGroups, language = 'th') {
       const group = byKey.get(groupKey);
       if (!group) continue;
       used.add(groupKey);
-      items.push(...group.items);
+      items.push(...group.items.filter((item) => !claimed.has(item.key)));
+    }
+    for (const itemKey of section.itemKeys ?? []) {
+      if (claimed.has(itemKey)) items.push(visibleItems.get(itemKey));
     }
     if (items.length) {
       sections.push({
@@ -135,8 +159,10 @@ export function buildSidebarSections(visibleGroups, language = 'th') {
   }
 
   for (const group of visibleGroups) {
-    if (used.has(group.key) || !group.items.length) continue;
-    sections.push({ key: group.key, label: group.label, collapsible: false, items: group.items });
+    if (used.has(group.key)) continue;
+    const items = group.items.filter((item) => !claimed.has(item.key));
+    if (!items.length) continue;
+    sections.push({ key: group.key, label: group.label, collapsible: false, items });
   }
 
   return sections;
@@ -160,7 +186,8 @@ export function findNavigationContext(groups, pathname, language = 'th') {
     }
   }
   if (!best) return null;
-  const section = SIDEBAR_SECTIONS.find((s) => s.groups.includes(best.group.key));
+  const section = CLAIMED_ITEM_KEYS.get(best.item.key)
+    ?? SIDEBAR_SECTIONS.find((s) => s.groups.includes(best.group.key));
   return {
     item: best.item,
     groupKey: best.group.key,

@@ -397,6 +397,7 @@ Object.assign(TRANSLATION_CATALOG, {
   'nav.customerRequestPolicyAdmin': { th: 'นโยบายการยกเลิกคำขอ', en: 'Customer Request Policy' },
   'nav.productServiceRatesAdmin': { th: 'อัตราค่าบริการตามสินค้า', en: 'Product Service Rates' },
   'nav.rolePermissionsAdmin': { th: 'สิทธิ์และบทบาท', en: 'Roles & Permissions' },
+  'nav.customerTeamRoles': { th: 'สิทธิ์ทีมลูกค้า', en: 'Customer Team Roles' },
   'nav.emailSettings': { th: 'ตั้งค่าอีเมล', en: 'Email Settings' },
   'nav.billingInvoiceDrafts': { th: 'ใบแจ้งหนี้ร่าง', en: 'Invoice Drafts' },
   'nav.customerFacilityUsage': { th: 'Facility Usage', en: 'Facility Usage' },

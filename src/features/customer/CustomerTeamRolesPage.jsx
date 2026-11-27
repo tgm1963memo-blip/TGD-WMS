@@ -166,7 +166,7 @@ export function CustomerTeamRolesPage() {
   return (
     <section className="page-shell customer-portal-page" data-testid="customer-team-roles-page">
       <PageHeader
-        title="จัดการสิทธิ์ผู้ใช้งาน"
+        title="สิทธิ์ทีมลูกค้า"
         description="กำหนด role และเมนูที่พนักงานในบริษัทของคุณสามารถเข้าถึงได้"
       />
       <CustomerPortalLiveBanner />
